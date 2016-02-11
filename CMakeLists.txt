@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   nav_msgs
   mrs_msgs
+  mrs_lib
   tf
   cmake_modules
   nodelet
@@ -23,7 +24,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs 
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib
   LIBRARIES ControlManager MavManager
   )
 
