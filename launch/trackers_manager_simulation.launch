@@ -1,0 +1,32 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <group ns="$(arg uav_name)">
+
+    <!-- Nodelet manager -->
+    <node pkg="nodelet" type="nodelet" name="standalone_nodelet" args="manager" output="screen"/>
+
+    <!-- Trackers manager -->
+    <node pkg="nodelet" type="nodelet" name="trackers_manager" args="load mrs_mav_manager/TrackersManager standalone_nodelet" output="screen">
+
+      <rosparam file="$(find mrs_mav_manager)/config/trackers_manager.yaml" />
+
+      <!-- Controller's configs -->
+      <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/pid_simulation.yaml" />
+
+      <!-- Trackers' configs -->
+      <rosparam ns="linear_tracker" file="$(find mrs_trackers)/config/simulation/linear_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
+
+      <!-- Subscribers -->
+      <remap from="~odometry_in" to="mrs_odometry/new_odom" />
+
+      <!-- Publishers -->
+      <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
+
+    </node>
+
+  </group>
+
+</launch>

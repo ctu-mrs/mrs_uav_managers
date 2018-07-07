@@ -1,0 +1,6 @@
+<library path="lib/libTrackersManager">
+  <class name="mrs_mav_manager/TrackersManager" type="mrs_mav_manager::TrackersManager" base_class_type="nodelet::Nodelet">
+    <description>TrackersManger nodelet</description>
+  </class>
+</library>
+

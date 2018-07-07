@@ -1,0 +1,9 @@
+trackers : [
+  "mrs_trackers/LinearTracker",
+]
+
+controllers : [
+  "mrs_controllers/PidController",
+]
+
+null_tracker: "mrs_mav_manager/NullTracker"

@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<package>
+
+  <name>mrs_mav_manager</name>
+  <version>1.0.0</version>
+  <description>The mrs_mav_manager package</description>
+
+  <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
+
+  <!-- One license tag required, multiple allowed, one license per tag -->
+  <!-- Commonly used license strings: -->
+  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>roscpp</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>cmake_modules</build_depend>
+  <build_depend>mrs_msgs</build_depend>
+  <build_depend>nodelet</build_depend>
+  <build_depend>mav_manager</build_depend>
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>nav_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>cmake_modules</run_depend>
+  <run_depend>mrs_msgs</run_depend>
+  <run_depend>nodelet</run_depend>
+  <run_depend>mav_manager</run_depend>
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <nodelet plugin="${prefix}/trackers_manager.xml" />
+    <mrs_mav_manager plugin="${prefix}/null_tracker.xml" />
+  </export>
+
+</package>
