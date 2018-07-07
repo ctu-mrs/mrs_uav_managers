@@ -225,12 +225,11 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       ROS_WARN_THROTTLE(1, "The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
 
       // TODO: switch to failsave tracker, or stop outputting commands
-      return;  // TODO
+      return;  // TODO figure out what to do
 
     } else if (active_tracker_idx == 0) {
 
       last_position_cmd_ = position_cmd_;
-      return;
     }
   }
   catch (std::runtime_error &exrun) {
@@ -239,49 +238,63 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   }
 
   // publish the cmd_pose topic
-  nav_msgs::Odometry cmd_pose;
-  cmd_pose.pose.pose.position = position_cmd_->position;
-  publisher_cmd_pose.publish(cmd_pose);
+  if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+
+    nav_msgs::Odometry cmd_pose;
+    cmd_pose.pose.pose.position = position_cmd_->position;
+    publisher_cmd_pose.publish(cmd_pose);
+  }
 
   // --------------------------------------------------------------
   // |                   Update the controllers                   |
   // --------------------------------------------------------------
 
   mrs_msgs::AttitudeCommand::ConstPtr attitude_cmd_;
+  
+  if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
 
-  try {
-    ROS_INFO("Calling the '%s' controller", controller_names[active_controller_idx].c_str());
-    attitude_cmd_ = (*controller_list[active_controller_idx]).update(odometry_const_ptr, last_position_cmd_);
-  }
-  catch (std::runtime_error &exrun) {
-    ROS_INFO("Exception while updating the active controller.");
-    ROS_ERROR("Exeption: %s", exrun.what());
+    try {
+      /* ROS_INFO("Calling the '%s' controller", controller_names[active_controller_idx].c_str()); */
+      attitude_cmd_ = (*controller_list[active_controller_idx]).update(odometry_const_ptr, last_position_cmd_);
+    }
+    catch (std::runtime_error &exrun) {
+      ROS_INFO("Exception while updating the active controller.");
+      ROS_ERROR("Exeption: %s", exrun.what());
+    }
   }
 
   // --------------------------------------------------------------
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
+  tf::Quaternion              desired_orientation;
+  mavros_msgs::AttitudeTarget attitude_target;
+
   if (attitude_cmd_ == mrs_msgs::AttitudeCommand::Ptr()) {
 
-    ROS_ERROR("TrackerManager: the controll (%s) returned nil command!", controller_names[active_controller_idx].c_str());
+    ROS_WARN_THROTTLE(1.0, "TrackerManager: the controller (%s) returned nil command! publishing zeros...", controller_names[active_controller_idx].c_str());
+
+    // convert the RPY to quaternion
+    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+    attitude_target.thrust = 0.0;
 
   } else {
 
-    mavros_msgs::AttitudeTarget attitude_target;
-
     // convert the RPY to quaternion
-    tf::Quaternion desired_orientation;
     desired_orientation = tf::createQuaternionFromRPY(attitude_cmd_->roll, attitude_cmd_->pitch, attitude_cmd_->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust          = attitude_cmd_->thrust;
-    attitude_target.header.stamp    = ros::Time::now();
-    attitude_target.header.frame_id = "local_origin";
-
-    publisher_attitude_cmd.publish(attitude_target);
+    attitude_target.thrust = attitude_cmd_->thrust;
   }
+
+  attitude_target.header.stamp    = ros::Time::now();
+  attitude_target.header.frame_id = "local_origin";
+
+  publisher_attitude_cmd.publish(attitude_target);
 }
 
 //}
