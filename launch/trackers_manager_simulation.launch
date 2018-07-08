@@ -1,6 +1,7 @@
 <launch>
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+  <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml"/>
 
   <group ns="$(arg uav_name)">
 
@@ -15,9 +16,14 @@
       <!-- Controller's configs -->
       <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/pid_simulation.yaml" />
 
-      <!-- Trackers' configs -->
+      <!-- LinearTracker -->
       <rosparam ns="linear_tracker" file="$(find mrs_trackers)/config/simulation/linear_tracker.yaml" />
+
+      <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(arg world_file)" />
+      <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
+      <param name="mpc_tracker/predicted_trajectory_topic" value="trackers_manager/mpc_tracker/predicted_trajectory" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="mrs_odometry/new_odom" />

@@ -1,5 +1,6 @@
 trackers : [
   "mrs_trackers/LinearTracker",
+  "mrs_trackers/MpcTracker",
 ]
 
 controllers : [
