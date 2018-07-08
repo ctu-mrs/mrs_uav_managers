@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   cmake_modules
   nodelet
-  mav_manager
   )
 
 set(CMAKE_CXX_FLAGS "-std=c++11 -fno-diagnostics-color")
@@ -24,7 +23,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp sensor_msgs std_msgs geometry_msgs mrs_msgs mav_manager
+  CATKIN_DEPENDS roscpp sensor_msgs std_msgs geometry_msgs mrs_msgs 
   LIBRARIES TrackersManager
   )
 

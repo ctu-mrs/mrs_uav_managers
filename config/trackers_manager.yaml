@@ -1,10 +1,16 @@
+# - list of names of dynamically loaded trackers
+# - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LinearTracker",
   "mrs_trackers/MpcTracker",
 ]
 
+# - list of names of dynamically loaded controllers
+# - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/PidController",
 ]
 
+# - this is the "do nothing tracker", which is active when no other is
+# - NullTracker is defined in the mrs_uav_manager package
 null_tracker: "mrs_mav_manager/NullTracker"

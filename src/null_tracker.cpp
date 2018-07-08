@@ -52,13 +52,11 @@ void NullTracker::Deactivate(void) {
 
 const mrs_msgs::PositionCommand::ConstPtr NullTracker::update(const nav_msgs::Odometry::ConstPtr &msg) {
 
-  ROS_INFO_THROTTLE(1.0, "NullTracker's update() is called");
   return mrs_msgs::PositionCommand::Ptr();
 }
 
 const mrs_msgs::TrackerStatus::Ptr NullTracker::status() {
 
-  ROS_INFO_THROTTLE(1.0, "NullTracker's debug() is called");
   return mrs_msgs::TrackerStatus::Ptr();
 }
 
