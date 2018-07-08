@@ -1,5 +1,5 @@
-#ifndef TRACKERS_MANAGER_TRACKER_H_
-#define TRACKERS_MANAGER_TRACKER_H_
+#ifndef control_manager_TRACKER_H_
+#define control_manager_TRACKER_H_
 
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>

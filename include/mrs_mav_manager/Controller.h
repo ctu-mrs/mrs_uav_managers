@@ -1,5 +1,5 @@
-#ifndef TRACKERS_MANAGER_CONTROLLER_H_
-#define TRACKERS_MANAGER_CONTROLLER_H_
+#ifndef control_manager_CONTROLLER_H_
+#define control_manager_CONTROLLER_H_
 
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/ControllerStatus.h>

@@ -19,7 +19,7 @@
 namespace mrs_mav_manager
 {
 
-class TrackersManager : public nodelet::Nodelet {
+class ControlManager : public nodelet::Nodelet {
 
 public:
   virtual void onInit();
@@ -57,7 +57,7 @@ private:
 
 //{ onInit
 
-void TrackersManager::onInit() {
+void ControlManager::onInit() {
 
   ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
 
@@ -67,7 +67,7 @@ void TrackersManager::onInit() {
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry = nh_.subscribe("odometry_in", 1, &TrackersManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
 
   // --------------------------------------------------------------
   // |                         publishers                         |
@@ -80,7 +80,7 @@ void TrackersManager::onInit() {
   // |                          services                          |
   // --------------------------------------------------------------
 
-  service_switch_tracker = nh_.advertiseService("switch_tracker", &TrackersManager::callbackSwitchTracker, this);
+  service_switch_tracker = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -187,7 +187,7 @@ void TrackersManager::onInit() {
 
 //{ callbackOdometry
 
-void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   got_odometry = true;
 
@@ -307,7 +307,7 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //{ callbackSwitchTracker
 
-bool TrackersManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
+bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
 
   char message[50];
 
@@ -369,4 +369,4 @@ bool TrackersManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &re
 }
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::TrackersManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::ControlManager, nodelet::Nodelet)

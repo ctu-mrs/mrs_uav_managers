@@ -9,9 +9,9 @@
     <node pkg="nodelet" type="nodelet" name="standalone_nodelet" args="manager" output="screen"/>
 
     <!-- Trackers manager -->
-    <node pkg="nodelet" type="nodelet" name="trackers_manager" args="load mrs_mav_manager/TrackersManager standalone_nodelet" output="screen">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager standalone_nodelet" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/trackers_manager.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
 
       <!-- Controller's configs -->
       <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/pid_simulation.yaml" />
@@ -23,7 +23,7 @@
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(arg world_file)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
-      <param name="mpc_tracker/predicted_trajectory_topic" value="trackers_manager/mpc_tracker/predicted_trajectory" />
+      <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="mrs_odometry/new_odom" />
