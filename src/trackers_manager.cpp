@@ -342,7 +342,9 @@ bool TrackersManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &re
 
     ROS_INFO("Activating tracker %s", tracker_names[new_tracker_idx].c_str());
     (*tracker_list[new_tracker_idx]).Activate(last_position_cmd_);
-    ROS_INFO("Tracker %s has been activated", req.tracker.c_str());
+    sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
+    ROS_INFO("%s", message);
+    res.success = true;
 
     // super important, switch which the active tracker idx
     try {
@@ -359,6 +361,7 @@ bool TrackersManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &re
     ROS_INFO("Exeption: %s", exrun.what());
   }
 
+  res.message = message;
   return true;
 }
 
