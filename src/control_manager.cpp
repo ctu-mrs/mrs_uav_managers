@@ -4,6 +4,7 @@
 #include <mrs_msgs/SwitchTracker.h>
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
+#include <mrs_msgs/TrackerStatus.h>
 
 #include <pluginlib/class_loader.h>
 
@@ -15,6 +16,8 @@
 #include <mutex>
 
 #include <tf/transform_datatypes.h>
+
+#include <thread>
 
 namespace mrs_mav_manager
 {
@@ -34,6 +37,7 @@ private:
   std::vector<boost::shared_ptr<mrs_mav_manager::Tracker>>    tracker_list;
   std::vector<boost::shared_ptr<mrs_mav_manager::Controller>> controller_list;
   std::string                                                 null_tracker_name;
+  std::mutex                                                  mutex_tracker_list;
 
   ros::Subscriber    subscriber_odometry;
   nav_msgs::Odometry odometry;
@@ -43,8 +47,10 @@ private:
   int active_tracker_idx    = 0;
   int active_controller_idx = 0;
 
-  ros::Publisher     publisher_attitude_cmd;
-  ros::Publisher     publisher_cmd_pose;
+  ros::Publisher publisher_attitude_cmd;
+  ros::Publisher publisher_cmd_pose;
+  ros::Publisher publisher_tracker_status;
+
   ros::ServiceServer service_switch_tracker;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
@@ -53,6 +59,10 @@ private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
+
+private:
+  void        mainThread(void);
+  std::thread main_thread;
 };
 
 //{ onInit
@@ -73,8 +83,9 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_attitude_cmd = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
-  publisher_cmd_pose     = nh_.advertise<nav_msgs::Odometry>("cmd_pose", 1);
+  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
+  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose", 1);
+  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status", 1);
 
   // --------------------------------------------------------------
   // |                          services                          |
@@ -98,7 +109,9 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("Trying to load: %s", tracker_name.c_str());
-      tracker_list.push_back(tracker_loader->createInstance(tracker_name.c_str()));
+      mutex_tracker_list.lock();
+      { tracker_list.push_back(tracker_loader->createInstance(tracker_name.c_str())); }
+      mutex_tracker_list.unlock();
       ROS_INFO("%d: %s", (int)i, tracker_name.c_str());
     }
     catch (pluginlib::CreateClassException &ex1) {
@@ -120,7 +133,9 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("Initializing tracker %d: %s", i, tracker_names[i].c_str());
-      (*tracker_list[i]).Initialize(nh_);
+      mutex_tracker_list.lock();
+      { tracker_list[i]->Initialize(nh_); }
+      mutex_tracker_list.unlock();
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("Exception caught during tracker initialization: %s", ex.what());
@@ -181,6 +196,12 @@ void ControlManager::onInit() {
   ROS_INFO("Activating the first controller on the list (%s)", controller_names[0].c_str());
 
   (*controller_list[active_controller_idx]).Activate();
+
+  // --------------------------------------------------------------
+  // |                    start the main thread                   |
+  // --------------------------------------------------------------
+
+  main_thread = std::thread(&ControlManager::mainThread, this);
 }
 
 //}
@@ -209,10 +230,14 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
       if (i == active_tracker_idx) {
         // if it is the active one, update and retrieve the command
-        position_cmd_ = (*tracker_list[i]).update(odometry_const_ptr);
+        mutex_tracker_list.lock();
+        { position_cmd_ = tracker_list[i]->update(odometry_const_ptr); }
+        mutex_tracker_list.unlock();
       } else {
         // if it is not the active one, just update without retrieving the commadn
-        (*tracker_list[i]).update(odometry_const_ptr);
+        mutex_tracker_list.lock();
+        { tracker_list[i]->update(odometry_const_ptr); }
+        mutex_tracker_list.unlock();
       }
     }
 
@@ -246,7 +271,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     cmd_pose.header.stamp       = ros::Time::now();
     cmd_pose.header.frame_id    = "local_origin";
     cmd_pose.pose.pose.position = position_cmd_->position;
-    desired_orientation = tf::createQuaternionFromRPY(0, 0, position_cmd_->yaw);
+    desired_orientation         = tf::createQuaternionFromRPY(0, 0, position_cmd_->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, cmd_pose.pose.pose.orientation);
     publisher_cmd_pose.publish(cmd_pose);
@@ -341,14 +366,18 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   try {
 
     ROS_INFO("Activating tracker %s", tracker_names[new_tracker_idx].c_str());
-    (*tracker_list[new_tracker_idx]).Activate(last_position_cmd_);
+    mutex_tracker_list.lock();
+    { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
+    mutex_tracker_list.unlock();
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
     ROS_INFO("%s", message);
     res.success = true;
 
     // super important, switch which the active tracker idx
     try {
-      (*tracker_list[active_tracker_idx]).Deactivate();
+      mutex_tracker_list.lock();
+      { tracker_list[active_tracker_idx]->Deactivate(); }
+      mutex_tracker_list.unlock();
     }
     catch (std::runtime_error &exrun) {
       ROS_ERROR("Could not deactivate %s", tracker_names[active_tracker_idx].c_str());
@@ -363,6 +392,41 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
   res.message = message;
   return true;
+}
+
+//}
+
+//{ mainThread
+
+void ControlManager::mainThread(void) {
+
+  ROS_INFO("mainThread has started");
+  ros::Rate r(100);
+
+  mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
+  mrs_msgs::TrackerStatus tracker_status;
+
+  while (ros::ok()) {
+
+    mutex_tracker_list.lock();
+    {
+      tracker_status_ptr = tracker_list[active_tracker_idx]->status();
+    }
+    mutex_tracker_list.unlock();
+
+    tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
+
+    tracker_status.tracker = tracker_names[active_tracker_idx];
+    tracker_status.stamp = ros::Time::now();
+
+    try {
+      publisher_tracker_status.publish(tracker_status);
+    } catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
+    }
+
+    r.sleep();
+  }
 }
 
 //}

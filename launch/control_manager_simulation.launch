@@ -30,6 +30,7 @@
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~tracker_status" to="~tracker_status" />
 
     </node>
 

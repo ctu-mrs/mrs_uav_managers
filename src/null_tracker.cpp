@@ -15,17 +15,18 @@ public:
 
   void Initialize(const ros::NodeHandle &parent_nh);
   bool Activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
-  void Deactivate(void);
+  void                                      Deactivate(void);
   const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg);
   const mrs_msgs::TrackerStatus::Ptr status();
 
 private:
-
   ros::NodeHandle nh_;
-  bool is_active = false;
+  bool            is_active      = false;
+  bool            is_initialized = false;
 };
 
-NullTracker::NullTracker(void) {}
+NullTracker::NullTracker(void) {
+}
 
 // called once at the very beginning
 void NullTracker::Initialize(const ros::NodeHandle &parent_nh) {
@@ -33,6 +34,8 @@ void NullTracker::Initialize(const ros::NodeHandle &parent_nh) {
   ros::NodeHandle priv_nh(parent_nh, "null_tracker");
 
   ros::Time::waitForValid();
+
+  is_initialized = true;
 
   ROS_INFO("NullTracker initialized");
 }
@@ -57,9 +60,22 @@ const mrs_msgs::PositionCommand::ConstPtr NullTracker::update(const nav_msgs::Od
 
 const mrs_msgs::TrackerStatus::Ptr NullTracker::status() {
 
-  return mrs_msgs::TrackerStatus::Ptr();
-}
+  if (is_initialized) {
 
+    mrs_msgs::TrackerStatus::Ptr tracker_status(new mrs_msgs::TrackerStatus);
+
+    if (is_active) {
+      tracker_status->active = mrs_msgs::TrackerStatus::ACTIVE;
+    } else {
+      tracker_status->active = mrs_msgs::TrackerStatus::NONACTIVE;
+    }
+
+    return tracker_status;
+  } else {
+
+    return mrs_msgs::TrackerStatus::Ptr();
+  }
+}
 }
 
 #include <pluginlib/class_list_macros.h>

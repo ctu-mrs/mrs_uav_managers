@@ -23,7 +23,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp sensor_msgs std_msgs geometry_msgs mrs_msgs 
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs 
   LIBRARIES ControlManager
   )
 
@@ -39,7 +39,8 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
-# Declare a C++ executable
+# ControlManager
+
 add_library(ControlManager src/control_manager.cpp)
 
 add_dependencies(ControlManager
@@ -47,12 +48,11 @@ add_dependencies(ControlManager
   ${catkin_EXPORTED_TARGETS}
   )
 
-## Specify libraries to link a library or executable target against
 target_link_libraries(ControlManager
   ${catkin_LIBRARIES}
   )
 
-# Null Tracker
+# NullTracker
 
 add_library(NullTracker src/null_tracker.cpp)
 add_dependencies(NullTracker
@@ -60,3 +60,16 @@ add_dependencies(NullTracker
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
 target_link_libraries(NullTracker ${catkin_LIBRARIES})
+
+# MavManager
+
+add_executable(MavManager src/mav_manager.cpp)
+
+add_dependencies(MavManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(MavManager
+  ${catkin_LIBRARIES}
+  )
