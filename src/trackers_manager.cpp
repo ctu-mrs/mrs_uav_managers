@@ -237,11 +237,18 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     ROS_ERROR("Exeption: %s", exrun.what());
   }
 
+  tf::Quaternion desired_orientation;
+
   // publish the cmd_pose topic
   if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
 
     nav_msgs::Odometry cmd_pose;
+    cmd_pose.header.stamp       = ros::Time::now();
+    cmd_pose.header.frame_id    = "local_origin";
     cmd_pose.pose.pose.position = position_cmd_->position;
+    desired_orientation = tf::createQuaternionFromRPY(0, 0, position_cmd_->yaw);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, cmd_pose.pose.pose.orientation);
     publisher_cmd_pose.publish(cmd_pose);
   }
 
@@ -250,7 +257,7 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // --------------------------------------------------------------
 
   mrs_msgs::AttitudeCommand::ConstPtr attitude_cmd_;
-  
+
   if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
 
     try {
@@ -267,7 +274,6 @@ void TrackersManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
-  tf::Quaternion              desired_orientation;
   mavros_msgs::AttitudeTarget attitude_target;
 
   if (attitude_cmd_ == mrs_msgs::AttitudeCommand::Ptr()) {
