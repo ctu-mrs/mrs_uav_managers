@@ -363,6 +363,16 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     return true;
   }
 
+  // check if the tracker exists
+  if (new_tracker_idx == active_tracker_idx) {
+
+    sprintf((char *)&message, "The tracker %s is already active!", req.tracker.c_str());
+    ROS_ERROR("%s", message);
+    res.success = true;
+    res.message = message;
+    return true;
+  }
+
   try {
 
     ROS_INFO("Activating tracker %s", tracker_names[new_tracker_idx].c_str());
@@ -404,24 +414,23 @@ void ControlManager::mainThread(void) {
   ros::Rate r(100);
 
   mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
-  mrs_msgs::TrackerStatus tracker_status;
+  mrs_msgs::TrackerStatus      tracker_status;
 
   while (ros::ok()) {
 
     mutex_tracker_list.lock();
-    {
-      tracker_status_ptr = tracker_list[active_tracker_idx]->status();
-    }
+    { tracker_status_ptr = tracker_list[active_tracker_idx]->status(); }
     mutex_tracker_list.unlock();
 
     tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
 
     tracker_status.tracker = tracker_names[active_tracker_idx];
-    tracker_status.stamp = ros::Time::now();
+    tracker_status.stamp   = ros::Time::now();
 
     try {
       publisher_tracker_status.publish(tracker_status);
-    } catch (...) {
+    }
+    catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
     }
 
