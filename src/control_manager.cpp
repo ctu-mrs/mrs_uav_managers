@@ -109,9 +109,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("Trying to load: %s", tracker_name.c_str());
-      mutex_tracker_list.lock();
       { tracker_list.push_back(tracker_loader->createInstance(tracker_name.c_str())); }
-      mutex_tracker_list.unlock();
       ROS_INFO("%d: %s", (int)i, tracker_name.c_str());
     }
     catch (pluginlib::CreateClassException &ex1) {
@@ -133,9 +131,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("Initializing tracker %d: %s", i, tracker_names[i].c_str());
-      mutex_tracker_list.lock();
       { tracker_list[i]->Initialize(nh_); }
-      mutex_tracker_list.unlock();
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("Exception caught during tracker initialization: %s", ex.what());
@@ -202,6 +198,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   main_thread = std::thread(&ControlManager::mainThread, this);
+
+  ros::spin();
 }
 
 //}
@@ -212,9 +210,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   got_odometry = true;
 
-  mutex_odometry.lock();
-  { odometry = *msg; }
-  mutex_odometry.unlock();
+  ROS_INFO_THROTTLE(1.0, "ControlManager: receiving odometry");
+
+  odometry = *msg;
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -229,15 +227,14 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     for (int i = 0; i < tracker_list.size(); i++) {
 
       if (i == active_tracker_idx) {
+
         // if it is the active one, update and retrieve the command
-        mutex_tracker_list.lock();
-        { position_cmd_ = tracker_list[i]->update(odometry_const_ptr); }
-        mutex_tracker_list.unlock();
+        position_cmd_ = tracker_list[i]->update(odometry_const_ptr);
+
       } else {
+
         // if it is not the active one, just update without retrieving the commadn
-        mutex_tracker_list.lock();
-        { tracker_list[i]->update(odometry_const_ptr); }
-        mutex_tracker_list.unlock();
+        tracker_list[i]->update(odometry_const_ptr);
       }
     }
 
@@ -248,9 +245,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     } else if (active_tracker_idx > 0) {
 
       ROS_WARN_THROTTLE(1, "The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
-
       // TODO: switch to failsave tracker, or stop outputting commands
-      return;  // TODO figure out what to do
+      ROS_ERROR_THROTTLE(1.0, "TODO");
 
     } else if (active_tracker_idx == 0) {
 
@@ -334,7 +330,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
 
-  char message[50];
+  char message[100];
 
   if (!got_odometry) {
 
@@ -376,18 +372,14 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   try {
 
     ROS_INFO("Activating tracker %s", tracker_names[new_tracker_idx].c_str());
-    mutex_tracker_list.lock();
     { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
-    mutex_tracker_list.unlock();
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
     ROS_INFO("%s", message);
     res.success = true;
 
     // super important, switch which the active tracker idx
     try {
-      mutex_tracker_list.lock();
       { tracker_list[active_tracker_idx]->Deactivate(); }
-      mutex_tracker_list.unlock();
     }
     catch (std::runtime_error &exrun) {
       ROS_ERROR("Could not deactivate %s", tracker_names[active_tracker_idx].c_str());
@@ -410,7 +402,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
 void ControlManager::mainThread(void) {
 
-  ROS_INFO("mainThread has started");
+  ROS_INFO("ControlManager: mainThread has started");
   ros::Rate r(100);
 
   mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
@@ -418,9 +410,7 @@ void ControlManager::mainThread(void) {
 
   while (ros::ok()) {
 
-    mutex_tracker_list.lock();
-    { tracker_status_ptr = tracker_list[active_tracker_idx]->status(); }
-    mutex_tracker_list.unlock();
+    tracker_status_ptr = tracker_list[active_tracker_idx]->status();
 
     tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
 

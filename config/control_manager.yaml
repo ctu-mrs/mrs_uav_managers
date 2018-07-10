@@ -2,7 +2,6 @@
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LinearTracker",
-  "mrs_trackers/MpcTracker",
 ]
 
 # - list of names of dynamically loaded controllers
