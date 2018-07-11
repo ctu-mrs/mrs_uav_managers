@@ -37,19 +37,19 @@ void NullTracker::Initialize(const ros::NodeHandle &parent_nh) {
 
   is_initialized = true;
 
-  ROS_INFO("NullTracker initialized");
+  ROS_INFO("NullTracker: initialized");
 }
 
 bool NullTracker::Activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) {
 
-  ROS_INFO("NullTracker activated");
+  ROS_INFO("NullTracker: activated");
   is_active = true;
   return true;
 }
 
 void NullTracker::Deactivate(void) {
 
-  ROS_INFO("NullTracker deactivated");
+  ROS_INFO("NullTracker: deactivated");
   is_active = false;
 }
 

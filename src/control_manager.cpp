@@ -125,7 +125,7 @@ void ControlManager::onInit() {
     }
   }
 
-  ROS_INFO("Trackers are loaded");
+  ROS_INFO("[%s]: trackers were loaded", ros::this_node::getName().c_str());
 
   for (int i = 0; i < tracker_list.size(); i++) {
 
@@ -138,7 +138,7 @@ void ControlManager::onInit() {
     }
   }
 
-  ROS_INFO("Trackers are activated");
+  ROS_INFO("[%s]: trackers were activated", ros::this_node::getName().c_str());
 
   // --------------------------------------------------------------
   // |                      load controllers                      |
@@ -170,7 +170,7 @@ void ControlManager::onInit() {
     }
   }
 
-  ROS_INFO("Controllers are loaded");
+  ROS_INFO("[%s]: controllers were loaded", ros::this_node::getName().c_str());
 
   for (int i = 0; i < controller_list.size(); i++) {
 
@@ -183,7 +183,7 @@ void ControlManager::onInit() {
     }
   }
 
-  ROS_INFO("Controllers are initialized");
+  ROS_INFO("[%s]: controllers were initialized", ros::this_node::getName().c_str());
 
   // --------------------------------------------------------------
   // |           active the first controller on the list          |
@@ -198,6 +198,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   main_thread = std::thread(&ControlManager::mainThread, this);
+
+  ROS_INFO("[%s]: initialized", ros::this_node::getName().c_str());
 
   ros::spin();
 }
@@ -335,7 +337,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (!got_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
-    ROS_ERROR("%s", message);
+    ROS_ERROR("[%s]", message);
     res.success = false;
     res.message = message;
     return true;
@@ -353,7 +355,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (new_tracker_idx < 0) {
 
     sprintf((char *)&message, "The tracker %s does not exist!", req.tracker.c_str());
-    ROS_ERROR("%s", message);
+    ROS_ERROR("[%s]", message);
     res.success = false;
     res.message = message;
     return true;
@@ -363,7 +365,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (new_tracker_idx == active_tracker_idx) {
 
     sprintf((char *)&message, "The tracker %s is already active!", req.tracker.c_str());
-    ROS_ERROR("%s", message);
+    ROS_ERROR("[%s]", message);
     res.success = true;
     res.message = message;
     return true;
@@ -374,7 +376,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     ROS_INFO("Activating tracker %s", tracker_names[new_tracker_idx].c_str());
     { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
-    ROS_INFO("%s", message);
+    ROS_INFO("[%s]", message);
     res.success = true;
 
     // super important, switch which the active tracker idx
