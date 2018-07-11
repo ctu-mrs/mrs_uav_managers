@@ -370,7 +370,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     ROS_INFO("[%s]: Activating tracker %s", ros::this_node::getName().c_str(), tracker_names[new_tracker_idx].c_str());
     { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
-    ROS_INFO("[%s]", message);
+    ROS_INFO("[%s]: %s",  ros::this_node::getName().c_str(), message);
     res.success = true;
 
     // super important, switch which the active tracker idx
