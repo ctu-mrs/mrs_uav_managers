@@ -1,33 +1,18 @@
 #include <ros/ros.h>
+#include <nodelet/nodelet.h>
 
-class MavManager {
+//<reformat_checkpoint>
+class MavManager : public nodelet::Nodelet {
 
 public:
-
-  MavManager();
+  virtual void onInit();
 
 private:
-
   ros::NodeHandle nh_;
-
 };
 
 // constructor
-MavManager::MavManager() {
+void MavManager::onInit() {
 
-  nh_ = ros::NodeHandle("~");
-
-
-
+  ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
 }
-
-int main(int argc, char **argv) {
-
-  ros::init(argc, argv, "mav_manager");
-
-  MavManager mav_manager;
-
-  ros::spin();
-
-  return 0;
-};

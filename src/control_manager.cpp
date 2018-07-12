@@ -125,10 +125,10 @@ void ControlManager::onInit() {
 
   ROS_INFO("[%s]: trackers were loaded", ros::this_node::getName().c_str());
 
-  for (int i = 0; i < tracker_list.size(); i++) {
+  for (unsigned long i = 0; i < tracker_list.size(); i++) {
 
     try {
-      ROS_INFO("[%s]: Initializing tracker %d: %s", ros::this_node::getName().c_str(), i, tracker_names[i].c_str());
+      ROS_INFO("[%s]: Initializing tracker %d: %s", ros::this_node::getName().c_str(), (int)i, tracker_names[i].c_str());
       { tracker_list[i]->Initialize(nh_); }
     }
     catch (std::runtime_error &ex) {
@@ -168,10 +168,10 @@ void ControlManager::onInit() {
 
   ROS_INFO("[%s]: controllers were loaded", ros::this_node::getName().c_str());
 
-  for (int i = 0; i < controller_list.size(); i++) {
+  for (unsigned long i = 0; i < controller_list.size(); i++) {
 
     try {
-      ROS_INFO("[%s]: Initializing controller %d: %s", ros::this_node::getName().c_str(), i, controller_names[i].c_str());
+      ROS_INFO("[%s]: Initializing controller %d: %s", ros::this_node::getName().c_str(), (int)i, controller_names[i].c_str());
       (*controller_list[i]).Initialize(nh_);
     }
     catch (std::runtime_error &ex) {
@@ -196,8 +196,7 @@ void ControlManager::onInit() {
   main_thread = std::thread(&ControlManager::mainThread, this);
 
   ROS_INFO("[%s]: initialized", ros::this_node::getName().c_str());
-
-  ros::spin();
+  NODELET_INFO("initialized");
 }
 
 //}
@@ -370,7 +369,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     ROS_INFO("[%s]: Activating tracker %s", ros::this_node::getName().c_str(), tracker_names[new_tracker_idx].c_str());
     { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
-    ROS_INFO("[%s]: %s",  ros::this_node::getName().c_str(), message);
+    ROS_INFO("[%s]: %s", ros::this_node::getName().c_str(), message);
     res.success = true;
 
     // super important, switch which the active tracker idx
@@ -425,7 +424,6 @@ void ControlManager::mainThread(void) {
 }
 
 //}
-
 }
 
 #include <pluginlib/class_list_macros.h>
