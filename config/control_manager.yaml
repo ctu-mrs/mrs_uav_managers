@@ -1,13 +1,14 @@
 # - list of names of dynamically loaded trackers
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
-  "mrs_trackers/LinearTracker",
+  "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
+  "mrs_controllers/LsfController",
   "mrs_controllers/PidController",
 ]
 

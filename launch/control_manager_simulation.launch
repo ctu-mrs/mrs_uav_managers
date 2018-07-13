@@ -14,10 +14,14 @@
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
 
       <!-- Controller's configs -->
+      <!-- PID -->
       <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/pid_simulation.yaml" />
+      <!-- LSF -->
+      <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/lsf_simulation.yaml" />
 
-      <!-- LinearTracker -->
-      <rosparam ns="linear_tracker" file="$(find mrs_trackers)/config/simulation/linear_tracker.yaml" />
+      <!-- Trackers' configs -->
+      <!-- LineTracker -->
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/simulation/line_tracker.yaml" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />

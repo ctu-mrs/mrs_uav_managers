@@ -2,9 +2,11 @@
 #include <ros/ros.h>
 
 #include <mrs_msgs/SwitchTracker.h>
+#include <mrs_msgs/SwitchController.h>
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
 #include <mrs_msgs/TrackerStatus.h>
+#include <mrs_msgs/Vec4.h>
 
 #include <pluginlib/class_loader.h>
 
@@ -52,13 +54,21 @@ private:
   ros::Publisher publisher_tracker_status;
 
   ros::ServiceServer service_switch_tracker;
+  ros::ServiceServer service_switch_controller;
+  ros::ServiceServer service_goto;
+  ros::ServiceServer service_goto_relative;
 
-  mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
+  mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
+  mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
+  bool callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res);
+
+  bool callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
 private:
   void        mainThread(void);
@@ -91,7 +101,10 @@ void ControlManager::onInit() {
   // |                          services                          |
   // --------------------------------------------------------------
 
-  service_switch_tracker = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
+  service_switch_tracker    = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
+  service_switch_controller = nh_.advertiseService("switch_controller", &ControlManager::callbackSwitchController, this);
+  service_goto              = nh_.advertiseService("goto", &ControlManager::callbackGoto, this);
+  service_goto_relative     = nh_.advertiseService("goto_relative", &ControlManager::callbackGotoRelative, this);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -187,7 +200,7 @@ void ControlManager::onInit() {
 
   ROS_INFO("[%s]: Activating the first controller on the list (%s)", ros::this_node::getName().c_str(), controller_names[0].c_str());
 
-  (*controller_list[active_controller_idx]).Activate();
+  (*controller_list[active_controller_idx]).Activate(last_attitude_cmd);
 
   // --------------------------------------------------------------
   // |                    start the main thread                   |
@@ -214,17 +227,17 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // --------------------------------------------------------------
 
   nav_msgs::Odometry::ConstPtr        odometry_const_ptr(new nav_msgs::Odometry(odometry));
-  mrs_msgs::PositionCommand::ConstPtr position_cmd_;
+  mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
   try {
 
     // for each tracker
-    for (int i = 0; i < tracker_list.size(); i++) {
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
 
-      if (i == active_tracker_idx) {
+      if ((int)i == active_tracker_idx) {
 
         // if it is the active one, update and retrieve the command
-        position_cmd_ = tracker_list[i]->update(odometry_const_ptr);
+        tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
 
       } else {
 
@@ -233,9 +246,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       }
     }
 
-    if (mrs_msgs::PositionCommand::Ptr() != position_cmd_) {
+    if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
 
-      last_position_cmd_ = position_cmd_;
+      last_position_cmd = tracker_output_cmd;
 
     } else if (active_tracker_idx > 0) {
 
@@ -245,7 +258,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     } else if (active_tracker_idx == 0) {
 
-      last_position_cmd_ = position_cmd_;
+      last_position_cmd = tracker_output_cmd;
     }
   }
   catch (std::runtime_error &exrun) {
@@ -256,13 +269,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   tf::Quaternion desired_orientation;
 
   // publish the cmd_pose topic
-  if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     nav_msgs::Odometry cmd_pose;
-    cmd_pose.header.stamp       = ros::Time::now();
-    cmd_pose.header.frame_id    = "local_origin";
-    cmd_pose.pose.pose.position = position_cmd_->position;
-    desired_orientation         = tf::createQuaternionFromRPY(0, 0, position_cmd_->yaw);
+    cmd_pose.header.stamp         = ros::Time::now();
+    cmd_pose.header.frame_id      = "local_origin";
+    cmd_pose.pose.pose.position   = tracker_output_cmd->position;
+    cmd_pose.twist.twist.linear.x = tracker_output_cmd->velocity.x;
+    cmd_pose.twist.twist.linear.y = tracker_output_cmd->velocity.y;
+    cmd_pose.twist.twist.linear.z = tracker_output_cmd->velocity.z;
+    desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, cmd_pose.pose.pose.orientation);
     publisher_cmd_pose.publish(cmd_pose);
@@ -272,12 +288,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // |                   Update the controllers                   |
   // --------------------------------------------------------------
 
-  mrs_msgs::AttitudeCommand::ConstPtr attitude_cmd_;
+  mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
-  if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     try {
-      attitude_cmd_ = (*controller_list[active_controller_idx]).update(odometry_const_ptr, last_position_cmd_);
+      controller_output_cmd = (*controller_list[active_controller_idx]).update(odometry_const_ptr, last_position_cmd);
     }
     catch (std::runtime_error &exrun) {
       ROS_INFO("[%s]: Exception while updating the active controller.", ros::this_node::getName().c_str());
@@ -291,7 +307,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mavros_msgs::AttitudeTarget attitude_target;
 
-  if (attitude_cmd_ == mrs_msgs::AttitudeCommand::Ptr()) {
+  if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[%s]: TrackerManager: the controller (%s) returned nil command! publishing zeros...", ros::this_node::getName().c_str(),
                       controller_names[active_controller_idx].c_str());
@@ -303,14 +319,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     attitude_target.thrust = 0.0;
 
-  } else {
+  } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+    last_attitude_cmd = controller_output_cmd;
 
     // convert the RPY to quaternion
-    desired_orientation = tf::createQuaternionFromRPY(attitude_cmd_->roll, attitude_cmd_->pitch, attitude_cmd_->yaw);
+    desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->roll, controller_output_cmd->pitch, controller_output_cmd->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust = attitude_cmd_->thrust;
+    attitude_target.thrust = controller_output_cmd->thrust;
   }
 
   attitude_target.header.stamp    = ros::Time::now();
@@ -338,7 +356,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
   int new_tracker_idx = -1;
 
-  for (int i = 0; i < tracker_names.size(); i++) {
+  for (unsigned int i = 0; i < tracker_names.size(); i++) {
     if (req.tracker.compare(tracker_names[i]) == 0) {
       new_tracker_idx = i;
     }
@@ -354,7 +372,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     return true;
   }
 
-  // check if the tracker exists
+  // check if the tracker is already active
   if (new_tracker_idx == active_tracker_idx) {
 
     sprintf((char *)&message, "The tracker %s is already active!", req.tracker.c_str());
@@ -367,7 +385,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   try {
 
     ROS_INFO("[%s]: Activating tracker %s", ros::this_node::getName().c_str(), tracker_names[new_tracker_idx].c_str());
-    { tracker_list[new_tracker_idx]->Activate(last_position_cmd_); }
+    { tracker_list[new_tracker_idx]->Activate(last_position_cmd); }
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
     ROS_INFO("[%s]: %s", ros::this_node::getName().c_str(), message);
     res.success = true;
@@ -384,6 +402,65 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   }
   catch (std::runtime_error &exrun) {
     ROS_ERROR("[%s]: Error during activation of tracker %s", ros::this_node::getName().c_str(), req.tracker.c_str());
+    ROS_ERROR("[%s]: Exception: %s", ros::this_node::getName().c_str(), exrun.what());
+  }
+
+  res.message = message;
+  return true;
+}
+
+bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res) {
+
+  char message[100];
+
+  int new_controller_idx = -1;
+
+  for (unsigned int i = 0; i < controller_names.size(); i++) {
+    if (req.controller.compare(controller_names[i]) == 0) {
+      new_controller_idx = i;
+    }
+  }
+
+  // check if the controller exists
+  if (new_controller_idx < 0) {
+
+    sprintf((char *)&message, "The controller %s does not exist!", req.controller.c_str());
+    ROS_ERROR("[%s]", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  // check if the controller is not active
+  if (new_controller_idx == active_controller_idx) {
+
+    sprintf((char *)&message, "The controller %s is already active!", req.controller.c_str());
+    ROS_ERROR("[%s]", message);
+    res.success = true;
+    res.message = message;
+    return true;
+  }
+
+  try {
+
+    ROS_INFO("[%s]: Activating controller %s", ros::this_node::getName().c_str(), controller_names[new_controller_idx].c_str());
+    { controller_list[new_controller_idx]->Activate(last_attitude_cmd); }
+    sprintf((char *)&message, "Controller %s has been activated", req.controller.c_str());
+    ROS_INFO("[%s]: %s", ros::this_node::getName().c_str(), message);
+    res.success = true;
+
+    // super important, switch which the active controller idx
+    try {
+      { controller_list[active_controller_idx]->Deactivate(); }
+    }
+    catch (std::runtime_error &exrun) {
+      ROS_ERROR("[%s]: Could not deactivate controller %s", ros::this_node::getName().c_str(), controller_names[active_controller_idx].c_str());
+    }
+
+    active_controller_idx = new_controller_idx;
+  }
+  catch (std::runtime_error &exrun) {
+    ROS_ERROR("[%s]: Error during activation of controller %s", ros::this_node::getName().c_str(), req.controller.c_str());
     ROS_ERROR("[%s]: Exception: %s", ros::this_node::getName().c_str(), exrun.what());
   }
 
@@ -421,6 +498,56 @@ void ControlManager::mainThread(void) {
 
     r.sleep();
   }
+}
+
+bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec4Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto'!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec4Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative'!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
 }
 
 //}

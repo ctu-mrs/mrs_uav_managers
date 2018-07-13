@@ -4,6 +4,8 @@
 #include <nav_msgs/Odometry.h>
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
+#include <mrs_msgs/Vec4Request.h>
+#include <mrs_msgs/Vec4Response.h>
 
 namespace mrs_mav_manager
 {
@@ -18,6 +20,9 @@ public:
   void                                      Deactivate(void);
   const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg);
   const mrs_msgs::TrackerStatus::Ptr status();
+
+  virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd);
+  virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd);
 
 private:
   ros::NodeHandle nh_;
@@ -75,6 +80,13 @@ const mrs_msgs::TrackerStatus::Ptr NullTracker::status() {
 
     return mrs_msgs::TrackerStatus::Ptr();
   }
+}
+
+const mrs_msgs::Vec4Response::ConstPtr NullTracker::goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd) {
+  return mrs_msgs::Vec4Response::Ptr();
+}
+const mrs_msgs::Vec4Response::ConstPtr NullTracker::goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd) {
+  return mrs_msgs::Vec4Response::Ptr();
 }
 }
 

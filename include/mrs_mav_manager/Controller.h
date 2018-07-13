@@ -4,6 +4,7 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/AttitudeCommand.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 
@@ -15,7 +16,7 @@ public:
   }
 
   virtual void Initialize(const ros::NodeHandle &parent_nh) = 0;
-  virtual bool Activate(void)   = 0;
+  virtual bool Activate(const mrs_msgs::AttitudeCommand::ConstPtr &cmd)   = 0;
   virtual void Deactivate(void) = 0;
 
   virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &odometry, const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
