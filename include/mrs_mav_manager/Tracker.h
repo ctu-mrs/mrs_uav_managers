@@ -15,9 +15,9 @@ public:
   virtual ~Tracker(void) {
   }
 
-  virtual void Initialize(const ros::NodeHandle &parent_nh)             = 0;
-  virtual bool Activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) = 0;
-  virtual void Deactivate(void)                                         = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh)             = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) = 0;
+  virtual void deactivate(void)                                         = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus::Ptr status()                                               = 0;

@@ -15,9 +15,10 @@ class NullTracker : public mrs_mav_manager::Tracker {
 public:
   NullTracker(void);
 
-  void Initialize(const ros::NodeHandle &parent_nh);
-  bool Activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
-  void                                      Deactivate(void);
+  void initialize(const ros::NodeHandle &parent_nh);
+  bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
+  void deactivate(void);
+
   const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg);
   const mrs_msgs::TrackerStatus::Ptr status();
 
@@ -34,7 +35,7 @@ NullTracker::NullTracker(void) {
 }
 
 // called once at the very beginning
-void NullTracker::Initialize(const ros::NodeHandle &parent_nh) {
+void NullTracker::initialize(const ros::NodeHandle &parent_nh) {
 
   ros::NodeHandle priv_nh(parent_nh, "null_tracker");
 
@@ -45,14 +46,14 @@ void NullTracker::Initialize(const ros::NodeHandle &parent_nh) {
   ROS_INFO("[NullTracker]: initialized");
 }
 
-bool NullTracker::Activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) {
+bool NullTracker::activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) {
 
   ROS_INFO("[NullTracker]: activated");
   is_active = true;
   return true;
 }
 
-void NullTracker::Deactivate(void) {
+void NullTracker::deactivate(void) {
 
   ROS_INFO("[NullTracker]: deactivated");
   is_active = false;
