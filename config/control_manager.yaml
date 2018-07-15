@@ -2,14 +2,14 @@
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LineTracker",
-  # "mrs_trackers/MpcTracker",
+  "mrs_trackers/MpcTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/LsfController",
-  # "mrs_controllers/PidController",
+  "mrs_controllers/PidController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
