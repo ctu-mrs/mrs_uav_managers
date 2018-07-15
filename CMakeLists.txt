@@ -24,7 +24,7 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fno-diagnostics-color")
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs 
-  LIBRARIES ControlManager
+  LIBRARIES ControlManager MavManager
   )
 
 ###########
@@ -55,15 +55,17 @@ target_link_libraries(ControlManager
 # NullTracker
 
 add_library(NullTracker src/null_tracker.cpp)
+
 add_dependencies(NullTracker
   ${catkin_EXPORTED_TARGETS}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
+
 target_link_libraries(NullTracker ${catkin_LIBRARIES})
 
 # MavManager
 
-add_executable(MavManager src/mav_manager.cpp)
+add_library(MavManager src/mav_manager.cpp)
 
 add_dependencies(MavManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}

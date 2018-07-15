@@ -8,8 +8,10 @@
     <!-- Nodelet manager -->
     <node pkg="nodelet" type="nodelet" name="standalone_nodelet" args="manager" output="screen"/>
 
+    <!-- <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager standalone_nodelet" required="true" output="screen" /> -->
+
     <!-- Trackers manager -->
-    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager standalone_nodelet" output="screen">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager standalone_nodelet" required="true" output="screen">
 
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
 

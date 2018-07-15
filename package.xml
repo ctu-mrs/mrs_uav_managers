@@ -33,6 +33,7 @@
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <nodelet plugin="${prefix}/control_manager.xml" />
+    <nodelet plugin="${prefix}/mav_manager.xml" />
     <mrs_mav_manager plugin="${prefix}/null_tracker.xml" />
   </export>
 

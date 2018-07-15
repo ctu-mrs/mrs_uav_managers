@@ -1,79 +1,7 @@
-#include <ros/package.h>
-#include <ros/ros.h>
-
-#include <mrs_msgs/SwitchTracker.h>
-#include <mrs_msgs/SwitchController.h>
-#include <mrs_mav_manager/Controller.h>
-#include <mrs_mav_manager/Tracker.h>
-#include <mrs_msgs/TrackerStatus.h>
-#include <mrs_msgs/Vec4.h>
-
-#include <pluginlib/class_loader.h>
-
-#include <nodelet/loader.h>
-#include <nodelet/nodelet.h>
-
-#include <mavros_msgs/AttitudeTarget.h>
-
-#include <mutex>
-
-#include <tf/transform_datatypes.h>
-
-#include <thread>
+#include <mrs_mav_manager/ControlManager.h>
 
 namespace mrs_mav_manager
 {
-
-class ControlManager : public nodelet::Nodelet {
-
-public:
-  virtual void onInit();
-
-private:
-  pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
-  pluginlib::ClassLoader<mrs_mav_manager::Controller> *controller_loader;
-
-  std::vector<std::string> tracker_names;
-  std::vector<std::string> controller_names;
-
-  std::vector<boost::shared_ptr<mrs_mav_manager::Tracker>>    tracker_list;
-  std::vector<boost::shared_ptr<mrs_mav_manager::Controller>> controller_list;
-  std::string                                                 null_tracker_name;
-  std::mutex                                                  mutex_tracker_list;
-
-  ros::Subscriber    subscriber_odometry;
-  nav_msgs::Odometry odometry;
-  std::mutex         mutex_odometry;
-  bool               got_odometry = false;
-
-  int active_tracker_idx    = 0;
-  int active_controller_idx = 0;
-
-  ros::Publisher publisher_attitude_cmd;
-  ros::Publisher publisher_cmd_pose;
-  ros::Publisher publisher_tracker_status;
-
-  ros::ServiceServer service_switch_tracker;
-  ros::ServiceServer service_switch_controller;
-  ros::ServiceServer service_goto;
-  ros::ServiceServer service_goto_relative;
-
-  mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
-  mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
-
-private:
-  void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-
-  bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
-  bool callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res);
-
-  bool callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-
-private:
-  void        mainThread(void);
-  std::thread main_thread;
-};
 
 //{ onInit
 
@@ -308,15 +236,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: TrackerManager: the controller (%s) returned nil command! publishing zeros...",
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
                       controller_names[active_controller_idx].c_str());
-
-    // convert the RPY to quaternion
-    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
-    desired_orientation.normalize();
-    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
-
-    attitude_target.thrust = 0.0;
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
@@ -328,12 +249,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
     attitude_target.thrust = controller_output_cmd->thrust;
+
+    attitude_target.header.stamp    = ros::Time::now();
+    attitude_target.header.frame_id = "local_origin";
+
+    publisher_attitude_cmd.publish(attitude_target);
   }
-
-  attitude_target.header.stamp    = ros::Time::now();
-  attitude_target.header.frame_id = "local_origin";
-
-  publisher_attitude_cmd.publish(attitude_target);
 }
 
 //}
