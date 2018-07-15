@@ -18,8 +18,6 @@
 
 #include <tf/transform_datatypes.h>
 
-#include <thread>
-
 #include <ros/package.h>
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
@@ -77,10 +75,9 @@ private:
   bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
 private:
-  void        mainThread(void);
-  std::thread main_thread;
+  ros::Timer main_timer;
+  void mainTimer(const ros::TimerEvent &event);
 };
-
 }
 
 #endif

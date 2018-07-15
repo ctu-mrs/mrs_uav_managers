@@ -49,35 +49,41 @@ void ControlManager::onInit() {
     std::string tracker_name = tracker_names[i];
 
     try {
-      ROS_INFO("[ControlManager]: Trying to load tracker %s", tracker_name.c_str());
+      NODELET_INFO("[ControlManager]: Trying to load tracker %s", tracker_name.c_str());
       { tracker_list.push_back(tracker_loader->createInstance(tracker_name.c_str())); }
     }
     catch (pluginlib::CreateClassException &ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for tracker %s", tracker_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
+      NODELET_ERROR("[ControlManager]: CreateClassException for tracker %s", tracker_name.c_str());
+      NODELET_ERROR("[ControlManager]: Error: %s", ex1.what());
       return;
     }
     catch (pluginlib::PluginlibException &ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for tracker %s", tracker_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
+      NODELET_ERROR("[ControlManager]: PluginlibException for tracker %s", tracker_name.c_str());
+      NODELET_ERROR("[ControlManager]: Error: %s", ex.what());
       return;
     }
   }
 
-  ROS_INFO("[ControlManager]: trackers were loaded");
+  NODELET_INFO("[ControlManager]: trackers were loaded");
 
   for (unsigned long i = 0; i < tracker_list.size(); i++) {
 
     try {
-      ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, tracker_names[i].c_str());
+      NODELET_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, tracker_names[i].c_str());
       { tracker_list[i]->initialize(nh_); }
     }
     catch (std::runtime_error &ex) {
-      ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
+      NODELET_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
     }
   }
 
-  ROS_INFO("[ControlManager]: trackers were activated");
+  // --------------------------------------------------------------
+  // |                           timers                           |
+  // --------------------------------------------------------------
+
+  main_timer = nh_.createTimer(ros::Rate(10), &ControlManager::mainTimer, this);
+
+  NODELET_INFO("[ControlManager]: trackers were activated");
 
   // --------------------------------------------------------------
   // |                      load controllers                      |
@@ -92,51 +98,45 @@ void ControlManager::onInit() {
     std::string controller_name = controller_names[i];
 
     try {
-      ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
+      NODELET_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
       controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
     }
     catch (pluginlib::CreateClassException &ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
+      NODELET_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
+      NODELET_ERROR("[ControlManager]: Error: %s", ex1.what());
       return;
     }
     catch (pluginlib::PluginlibException &ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
+      NODELET_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
+      NODELET_ERROR("[ControlManager]: Error: %s", ex.what());
       return;
     }
   }
 
-  ROS_INFO("[ControlManager]: controllers were loaded");
+  NODELET_INFO("[ControlManager]: controllers were loaded");
 
   for (unsigned long i = 0; i < controller_list.size(); i++) {
 
     try {
-      ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
+      NODELET_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
       controller_list[i]->initialize(nh_);
     }
     catch (std::runtime_error &ex) {
-      ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
+      NODELET_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
     }
   }
 
-  ROS_INFO("[ControlManager]: controllers were initialized");
+  NODELET_INFO("[ControlManager]: controllers were initialized");
 
   // --------------------------------------------------------------
   // |           active the first controller on the list          |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
+  NODELET_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
 
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
-  // --------------------------------------------------------------
-  // |                    start the main thread                   |
-  // --------------------------------------------------------------
-
-  main_thread = std::thread(&ControlManager::mainThread, this);
-
-  ROS_INFO("[ControlManager]: initialized");
+  NODELET_INFO("[ControlManager]: initialized");
 }
 
 //}
@@ -179,9 +179,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     } else if (active_tracker_idx > 0) {
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
+      NODELET_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
       // TODO: switch to failsave tracker, or stop outputting commands
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
+      NODELET_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
 
     } else if (active_tracker_idx == 0) {
 
@@ -189,8 +189,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     }
   }
   catch (std::runtime_error &exrun) {
-    ROS_INFO("[ControlManager]: Exception while updateing trackers.");
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    NODELET_INFO("[ControlManager]: Exception while updateing trackers.");
+    NODELET_ERROR("[ControlManager]: Exception: %s", exrun.what());
   }
 
   tf::Quaternion desired_orientation;
@@ -223,8 +223,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
     }
     catch (std::runtime_error &exrun) {
-      ROS_INFO("[ControlManager]: Exception while updating the active controller.");
-      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+      NODELET_INFO("[ControlManager]: Exception while updating the active controller.");
+      NODELET_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
 
@@ -234,10 +234,37 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mavros_msgs::AttitudeTarget attitude_target;
 
-  if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+  if (active_tracker_idx == 0) {  // NullTracker
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
-                      controller_names[active_controller_idx].c_str());
+    NODELET_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
+
+    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+    attitude_target.thrust = 0.0;
+
+    attitude_target.header.stamp    = ros::Time::now();
+    attitude_target.header.frame_id = "local_origin";
+
+    publisher_attitude_cmd.publish(attitude_target);
+
+  } else if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+
+    NODELET_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
+                          controller_names[active_controller_idx].c_str());
+
+    // convert the RPY to quaternion
+    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+    attitude_target.thrust = 0.0;
+
+    attitude_target.header.stamp    = ros::Time::now();
+    attitude_target.header.frame_id = "local_origin";
+
+    publisher_attitude_cmd.publish(attitude_target);
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
@@ -268,7 +295,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (!got_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
-    ROS_ERROR("[ControlManager]: %s", message);
+    NODELET_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
     return true;
@@ -286,7 +313,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (new_tracker_idx < 0) {
 
     sprintf((char *)&message, "The tracker %s does not exist!", req.tracker.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
+    NODELET_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
     return true;
@@ -296,7 +323,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   if (new_tracker_idx == active_tracker_idx) {
 
     sprintf((char *)&message, "The tracker %s is already active!", req.tracker.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
+    NODELET_ERROR("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
     return true;
@@ -304,10 +331,10 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
+    NODELET_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
     { tracker_list[new_tracker_idx]->activate(last_position_cmd); }
     sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    NODELET_INFO("[ControlManager]: %s", message);
     res.success = true;
 
     // super important, switch which the active tracker idx
@@ -315,14 +342,14 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
       { tracker_list[active_tracker_idx]->deactivate(); }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+      NODELET_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
     }
 
     active_tracker_idx = new_tracker_idx;
   }
   catch (std::runtime_error &exrun) {
-    ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    NODELET_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
+    NODELET_ERROR("[ControlManager]: Exception: %s", exrun.what());
   }
 
   res.message = message;
@@ -345,7 +372,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
   if (new_controller_idx < 0) {
 
     sprintf((char *)&message, "The controller %s does not exist!", req.controller.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
+    NODELET_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
     return true;
@@ -355,7 +382,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
   if (new_controller_idx == active_controller_idx) {
 
     sprintf((char *)&message, "The controller %s is already active!", req.controller.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
+    NODELET_ERROR("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
     return true;
@@ -363,10 +390,10 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
+    NODELET_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
     { controller_list[new_controller_idx]->activate(last_attitude_cmd); }
     sprintf((char *)&message, "Controller %s has been activated", req.controller.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    NODELET_INFO("[ControlManager]: %s", message);
     res.success = true;
 
     // super important, switch which the active controller idx
@@ -374,14 +401,14 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
       { controller_list[active_controller_idx]->deactivate(); }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
+      NODELET_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
     }
 
     active_controller_idx = new_controller_idx;
   }
   catch (std::runtime_error &exrun) {
-    ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    NODELET_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
+    NODELET_ERROR("[ControlManager]: Exception: %s", exrun.what());
   }
 
   res.message = message;
@@ -390,33 +417,25 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
 //}
 
-//{ mainThread
+//{ mainTimer
 
-void ControlManager::mainThread(void) {
-
-  ROS_INFO("[ControlManager]: mainThread has started");
-  ros::Rate r(100);
+void ControlManager::mainTimer(const ros::TimerEvent &event) {
 
   mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
   mrs_msgs::TrackerStatus      tracker_status;
 
-  while (ros::ok()) {
+  tracker_status_ptr = tracker_list[active_tracker_idx]->status();
 
-    tracker_status_ptr = tracker_list[active_tracker_idx]->status();
+  tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
 
-    tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
+  tracker_status.tracker = tracker_names[active_tracker_idx];
+  tracker_status.stamp   = ros::Time::now();
 
-    tracker_status.tracker = tracker_names[active_tracker_idx];
-    tracker_status.stamp   = ros::Time::now();
-
-    try {
-      publisher_tracker_status.publish(tracker_status);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
-    }
-
-    r.sleep();
+  try {
+    publisher_tracker_status.publish(tracker_status);
+  }
+  catch (...) {
+    NODELET_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
   }
 }
 

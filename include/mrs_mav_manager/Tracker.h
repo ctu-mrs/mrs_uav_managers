@@ -1,12 +1,12 @@
 #ifndef control_manager_TRACKER_H_
 #define control_manager_TRACKER_H_
 
+#include <ros/ros.h>
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/Vec4Request.h>
 #include <mrs_msgs/Vec4Response.h>
 #include <nav_msgs/Odometry.h>
-#include <ros/ros.h>
 
 namespace mrs_mav_manager
 {

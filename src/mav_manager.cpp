@@ -13,7 +13,7 @@ public:
   void         test(void);
 
 private:
-  ros::NodeHandle                 nh_;
+  ros::NodeHandle nh_;
   /* mrs_mav_manager::ControlManager control_manager_; */
 };
 
@@ -22,12 +22,18 @@ void MavManager::onInit() {
 
   ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
 
-  ROS_INFO("[MavManager]: initilized");
+  NODELET_INFO("[MavManager]: initilized");
+
+  /* nodelet::Loader   nodelet; */
+  /* nodelet::M_string remap(ros::names::getRemappings()); */
+  /* nodelet::V_string nargv; */
+  /* nodelet.load("control_manager2", "mrs_mav_manager/MavManager", remap, nargv); */
+
 }
 
 void MavManager::test(void) {
 
-  ROS_INFO("[MavManager]: pes steka");
+  NODELET_INFO("[MavManager]: pes steka");
 }
 }
 
