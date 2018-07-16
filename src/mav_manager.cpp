@@ -22,7 +22,7 @@ void MavManager::onInit() {
 
   ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
 
-  NODELET_INFO("[MavManager]: initilized");
+  ROS_INFO("[MavManager]: initilized");
 
   /* nodelet::Loader   nodelet; */
   /* nodelet::M_string remap(ros::names::getRemappings()); */
@@ -33,7 +33,7 @@ void MavManager::onInit() {
 
 void MavManager::test(void) {
 
-  NODELET_INFO("[MavManager]: pes steka");
+  ROS_INFO("[MavManager]: pes steka");
 }
 }
 

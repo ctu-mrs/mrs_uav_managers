@@ -6,7 +6,6 @@
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
 #include <mrs_msgs/TrackerStatus.h>
-#include <mrs_msgs/Vec4.h>
 
 #include <pluginlib/class_loader.h>
 
@@ -21,6 +20,8 @@
 #include <ros/package.h>
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
+
+#include <std_srvs/SetBool.h>
 
 namespace mrs_mav_manager
 {
@@ -50,8 +51,9 @@ private:
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
 
-  int active_tracker_idx    = 0;
-  int active_controller_idx = 0;
+  int  active_tracker_idx    = 0;
+  int  active_controller_idx = 0;
+  bool motors                = 0;
 
   ros::Publisher publisher_attitude_cmd;
   ros::Publisher publisher_cmd_pose;
@@ -61,6 +63,8 @@ private:
   ros::ServiceServer service_switch_controller;
   ros::ServiceServer service_goto;
   ros::ServiceServer service_goto_relative;
+  ros::ServiceServer service_hover;
+  ros::ServiceServer service_motors;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
@@ -73,6 +77,10 @@ private:
 
   bool callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+
+  bool callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+  bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
 private:
   ros::Timer main_timer;

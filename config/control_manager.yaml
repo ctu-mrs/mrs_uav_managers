@@ -15,3 +15,6 @@ controllers : [
 # - this is the "do nothing tracker", which is active when no other is
 # - NullTracker is defined in the mrs_uav_manager package
 null_tracker: "mrs_mav_manager/NullTracker"
+
+# - this tracker will be used for calling the emergancy hover outine
+hover_tracker: "mrs_trackers/LineTracker"

@@ -6,8 +6,10 @@
   <group ns="$(arg uav_name)">
 
     <!-- Nodelet manager -->
+    <!-- <node pkg="nodelet" type="nodelet" name="mrs_nodelet_manager" args="manager" output="screen"/> -->
 
-    <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager standalone_nodelet" output="screen">
+    <!-- MAV Manager -->
+    <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager mrs_nodelet_manager" output="screen">
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="mrs_odometry/new_odom" />
@@ -18,7 +20,7 @@
     </node>
 
     <!-- Control manager -->
-    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager standalone_nodelet" output="screen">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager mrs_nodelet_manager" output="screen">
 
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
 

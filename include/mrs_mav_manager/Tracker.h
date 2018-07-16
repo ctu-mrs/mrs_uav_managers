@@ -2,11 +2,18 @@
 #define control_manager_TRACKER_H_
 
 #include <ros/ros.h>
+
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
+#include <nav_msgs/Odometry.h>
+
+#include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/Vec4Request.h>
 #include <mrs_msgs/Vec4Response.h>
-#include <nav_msgs/Odometry.h>
+
+#include <std_srvs/Trigger.h>
+#include <std_srvs/TriggerRequest.h>
+#include <std_srvs/TriggerResponse.h>
 
 namespace mrs_mav_manager
 {
@@ -24,6 +31,7 @@ public:
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)         = 0;
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd) = 0;
+  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)  = 0;
 };
 }
 
