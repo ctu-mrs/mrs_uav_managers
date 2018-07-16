@@ -3,6 +3,12 @@
   <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
   <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml"/>
 
+  <!-- Nodelet Manager -->
+  <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
+
+  <!-- Odometry -->
+  <include file="$(find mrs_odometry)/launch/simulation.launch" />
+
   <group ns="$(arg uav_name)">
 
     <!-- Nodelet manager -->
@@ -12,7 +18,7 @@
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager mrs_nodelet_manager" output="screen">
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="mrs_odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/new_odom" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
@@ -41,7 +47,7 @@
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="mrs_odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/new_odom" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
