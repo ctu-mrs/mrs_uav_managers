@@ -260,7 +260,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   } else if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
-                          controller_names[active_controller_idx].c_str());
+                      controller_names[active_controller_idx].c_str());
 
     // convert the RPY to quaternion
     desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
@@ -361,6 +361,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   }
 
   res.message = message;
+
   return true;
 }
 
@@ -546,9 +547,11 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   motors = req.data;
 
   char message[100];
-  sprintf((char *) &message, "Motors: %s", motors ? "ON" : "OFF");
+  sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
   res.message = message;
   res.success = true;
+
+  ROS_INFO("[ControlManager]: %s", message);
 
   return true;
 }
