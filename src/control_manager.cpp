@@ -289,6 +289,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: publishing controllers command");
+
     last_attitude_cmd = controller_output_cmd;
 
     // convert the RPY to quaternion
