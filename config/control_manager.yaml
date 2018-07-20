@@ -18,4 +18,8 @@ controllers : [
 null_tracker: "mrs_mav_manager/NullTracker"
 
 # - this tracker will be used for calling the emergancy hover routine
-hover_tracker: "mrs_trackers/LineTracker"
+hover_tracker: "mrs_trackers/LandoffTracker"
+
+safety:
+  max_tilt_angle: 45 # [deg]
+  max_control_error: 2.0 # [m]

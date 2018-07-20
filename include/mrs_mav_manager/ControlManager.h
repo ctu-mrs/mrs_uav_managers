@@ -43,22 +43,26 @@ private:
 
   std::vector<boost::shared_ptr<mrs_mav_manager::Tracker>>    tracker_list;
   std::vector<boost::shared_ptr<mrs_mav_manager::Controller>> controller_list;
-  std::string                                                 null_tracker_name;
-  std::mutex                                                  mutex_tracker_list;
+
+  std::string null_tracker_name_;
+  std::string hover_tracker_name_;
+
+  std::mutex mutex_tracker_list;
 
   ros::Subscriber    subscriber_odometry;
   nav_msgs::Odometry odometry;
-  double odometry_x;
-  double odometry_y;
-  double odometry_z;
-  double odometry_yaw;
-  double odometry_roll;
-  double odometry_pitch;
+  double             odometry_x;
+  double             odometry_y;
+  double             odometry_z;
+  double             odometry_yaw;
+  double             odometry_roll;
+  double             odometry_pitch;
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
 
   int  active_tracker_idx    = 0;
   int  active_controller_idx = 0;
+  int  hover_tracker_idx     = 0;
   bool motors                = 0;
 
   ros::Publisher publisher_attitude_cmd;
@@ -76,6 +80,10 @@ private:
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
 
 private:
+  double max_tilt_angle_;
+  double max_control_error_;
+
+private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
@@ -89,8 +97,12 @@ private:
   bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
 private:
-  ros::Timer main_timer;
-  void mainTimer(const ros::TimerEvent &event);
+  ros::Timer status_timer;
+  void statusTimer(const ros::TimerEvent &event);
+
+private:
+  ros::Timer safety_timer;
+  void safetyTimer(const ros::TimerEvent &event);
 };
 }
 

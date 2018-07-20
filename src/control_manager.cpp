@@ -41,14 +41,19 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   nh_.getParam("trackers", tracker_names);
-  nh_.getParam("null_tracker", null_tracker_name);
-  tracker_names.insert(tracker_names.begin(), null_tracker_name);
+  nh_.getParam("null_tracker", null_tracker_name_);
+  nh_.getParam("hover_tracker", hover_tracker_name_);
+  tracker_names.insert(tracker_names.begin(), null_tracker_name_);
 
   tracker_loader = new pluginlib::ClassLoader<mrs_mav_manager::Tracker>("mrs_mav_manager", "mrs_mav_manager::Tracker");
 
   for (unsigned long i = 0; i < tracker_names.size(); i++) {
 
     std::string tracker_name = tracker_names[i];
+
+    if (hover_tracker_name_.compare(tracker_name) == 0) {
+      hover_tracker_idx = i;
+    }
 
     try {
       ROS_INFO("[ControlManager]: Trying to load tracker %s", tracker_name.c_str());
@@ -72,7 +77,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, tracker_names[i].c_str());
-      { tracker_list[i]->initialize(nh_); }
+      tracker_list[i]->initialize(nh_);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
@@ -80,10 +85,23 @@ void ControlManager::onInit() {
   }
 
   // --------------------------------------------------------------
-  // |                           timers                           |
+  // |                           params                           |
   // --------------------------------------------------------------
 
-  main_timer = nh_.createTimer(ros::Rate(10), &ControlManager::mainTimer, this);
+  nh_.param("safety/max_tilt_angle", max_tilt_angle_, -1.0);
+  nh_.param("safety/max_control_error", max_control_error_, -1.0);
+
+  if (max_tilt_angle_ < 0) {
+    ROS_ERROR("[ControlManager]: max_tilt_angle was not specified!");
+    ros::shutdown();
+  }
+
+  if (max_control_error_ < 0) {
+    ROS_ERROR("[ControlManager]: max_control_error_ was not specified!");
+    ros::shutdown();
+  }
+
+  max_tilt_angle_ = (max_tilt_angle_ / 180.0) * 3.141592;
 
   ROS_INFO("[ControlManager]: trackers were activated");
 
@@ -139,6 +157,13 @@ void ControlManager::onInit() {
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
   motors = false;
+
+  // --------------------------------------------------------------
+  // |                           timers                           |
+  // --------------------------------------------------------------
+
+  status_timer = nh_.createTimer(ros::Rate(10), &ControlManager::statusTimer, this);
+  safety_timer = nh_.createTimer(ros::Rate(100), &ControlManager::safetyTimer, this);
 
   ROS_INFO("[ControlManager]: initialized");
 }
@@ -362,13 +387,12 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
     // super important, switch which the active tracker idx
     try {
-      { tracker_list[active_tracker_idx]->deactivate(); }
+      tracker_list[active_tracker_idx]->deactivate();
+      active_tracker_idx = new_tracker_idx;
     }
     catch (std::runtime_error &exrun) {
       ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
     }
-
-    active_tracker_idx = new_tracker_idx;
   }
   catch (std::runtime_error &exrun) {
     ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
@@ -422,13 +446,12 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
     // super important, switch which the active controller idx
     try {
-      { controller_list[active_controller_idx]->deactivate(); }
+      controller_list[active_controller_idx]->deactivate();
+      active_controller_idx = new_controller_idx;
     }
     catch (std::runtime_error &exrun) {
       ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
     }
-
-    active_controller_idx = new_controller_idx;
   }
   catch (std::runtime_error &exrun) {
     ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
@@ -441,9 +464,9 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
 //}
 
-//{ mainTimer()
+//{ statusTimer()
 
-void ControlManager::mainTimer(const ros::TimerEvent &event) {
+void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
   // --------------------------------------------------------------
   // |                publishing the tracker status               |
@@ -465,6 +488,65 @@ void ControlManager::mainTimer(const ros::TimerEvent &event) {
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
   }
+}
+
+//}
+
+//{ safetyTimer()
+
+void ControlManager::safetyTimer(const ros::TimerEvent &event) {
+
+  if (!got_odometry || active_tracker_idx <= 0) {
+    return;
+  }
+
+  if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
+    return;
+  }
+
+  char message[100];
+
+  mutex_odometry.lock();
+  mutex_tracker_list.lock();
+  {
+    double position_error_x = last_position_cmd->position.x - odometry_x;
+    double position_error_y = last_position_cmd->position.y - odometry_y;
+    double position_error_z = last_position_cmd->position.z - odometry_z;
+
+    double control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
+
+    if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > max_control_error_) {
+
+      // check if the controller is not active
+      if (hover_tracker_idx != active_tracker_idx) {
+
+        ROS_ERROR("[ControlManager]: Activating safety hover: max_tilt_angle_=%f, control_error=%f", max_tilt_angle_, control_error);
+
+        try {
+
+          ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
+          tracker_list[hover_tracker_idx]->activate(last_position_cmd);
+          sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
+          ROS_INFO("[ControlManager]: %s", message);
+
+          // super important, switch which the active tracker idx
+          try {
+            tracker_list[active_tracker_idx]->deactivate();
+            active_tracker_idx = hover_tracker_idx;
+          }
+          catch (std::runtime_error &exrun) {
+            ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+          }
+        }
+        catch (std::runtime_error &exrun) {
+          ROS_ERROR("[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
+          ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+        }
+      }
+    }
+  }
+  mutex_tracker_list.unlock();
+  mutex_odometry.unlock();
 }
 
 //}
