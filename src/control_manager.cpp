@@ -174,8 +174,6 @@ void ControlManager::onInit() {
 
 void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
-  got_odometry = true;
-
   mutex_odometry.lock();
   {
     odometry = *msg;
@@ -191,6 +189,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
   }
   mutex_odometry.unlock();
+
+  got_odometry = true;
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -279,7 +279,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (active_tracker_idx == 0 || !motors) {
 
     if (!motors) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors off...");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
     } else {
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
     }
@@ -301,7 +301,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
                       controller_names[active_controller_idx].c_str());
 
     // convert the RPY to quaternion
-    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
@@ -313,8 +313,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     publisher_attitude_cmd.publish(attitude_target);
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: publishing controllers command");
 
     last_attitude_cmd = controller_output_cmd;
 

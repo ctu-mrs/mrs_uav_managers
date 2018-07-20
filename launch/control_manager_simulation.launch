@@ -15,11 +15,22 @@
     <!-- MAV Manager -->
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager $(arg uav_name)_nodelet_manager" output="screen">
 
+      <rosparam file="$(find mrs_mav_manager)/config/mav_manager.yaml" />
+
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~tracker_status_in" to="control_manager/tracker_status" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
+
+      <!-- Services -->
+      <remap from="~takeoff_in" to="~takeoff" />
+      <remap from="~land_in" to="~land" />
+      <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
+      <remap from="~land_out" to="control_manager/landoff_tracker/land" />
+      <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
+      <remap from="~motors_out" to="control_manager/motors" />
 
     </node>
 
