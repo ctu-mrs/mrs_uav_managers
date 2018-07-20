@@ -1,6 +1,7 @@
 # - list of names of dynamically loaded trackers
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
+  "mrs_trackers/LandoffTracker",
   "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
 ]
@@ -16,5 +17,5 @@ controllers : [
 # - NullTracker is defined in the mrs_uav_manager package
 null_tracker: "mrs_mav_manager/NullTracker"
 
-# - this tracker will be used for calling the emergancy hover outine
+# - this tracker will be used for calling the emergancy hover routine
 hover_tracker: "mrs_trackers/LineTracker"

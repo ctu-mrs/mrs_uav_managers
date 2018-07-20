@@ -48,6 +48,12 @@ private:
 
   ros::Subscriber    subscriber_odometry;
   nav_msgs::Odometry odometry;
+  double odometry_x;
+  double odometry_y;
+  double odometry_z;
+  double odometry_yaw;
+  double odometry_roll;
+  double odometry_pitch;
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
 

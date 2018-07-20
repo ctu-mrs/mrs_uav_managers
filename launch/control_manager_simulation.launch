@@ -43,6 +43,9 @@
       <!-- LineTracker -->
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/simulation/line_tracker.yaml" />
 
+      <!-- LandoffTracker -->
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/simulation/landoff_tracker.yaml" />
+
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(arg world_file)" />

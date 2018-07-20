@@ -151,7 +151,21 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   got_odometry = true;
 
-  odometry = *msg;
+  mutex_odometry.lock();
+  {
+    odometry = *msg;
+
+    odometry_x = odometry.pose.pose.position.x;
+    odometry_y = odometry.pose.pose.position.y;
+    odometry_z = odometry.pose.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion quaternion_odometry;
+    quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
+    tf::Matrix3x3 m(quaternion_odometry);
+    m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+  }
+  mutex_odometry.unlock();
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -236,17 +250,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
-  if (!motors) {
-    return;
-  }
-
   mavros_msgs::AttitudeTarget attitude_target;
+  if (active_tracker_idx == 0 || !motors) {
 
-  if (active_tracker_idx == 0) {  // NullTracker
+    if (!motors) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors off...");
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
+    }
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
-
-    desired_orientation = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
