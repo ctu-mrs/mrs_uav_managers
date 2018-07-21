@@ -110,8 +110,6 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
     if (odometry_z < landing_cutoff_height_) {
 
-      ROS_INFO("[MavManager]: landing finished, switching motors off");
-
       std_srvs::SetBool motors_out;
       motors_out.request.data = false;
       service_client_motors.call(motors_out);
@@ -121,6 +119,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       service_client_switch_tracker.call(switch_tracker_out);
 
       landing = false;
+
+      ROS_INFO("[MavManager]: landing finished, switching motors off");
     }
   }
 }
@@ -234,14 +234,6 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
     res.message = message;
     res.success = false;
     ROS_ERROR("[MavManager]: %s", message);
-    return true;
-  }
-
-  if (odometry_z < 0.5) {
-    sprintf((char *)&message, "Can't land, already on the ground!");
-    res.message = message;
-    res.success = false;
-    ROS_WARN("[MavManager]: %s", message);
     return true;
   }
 

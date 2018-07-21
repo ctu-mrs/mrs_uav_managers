@@ -42,11 +42,11 @@
       <!-- Controller's configs -->
 
       <!-- PID -->
-      <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/pid_simulation.yaml" />
+      <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/simulation/pid.yaml" />
       <param name="pid_controller/uav_mass" value="$(arg uav_mass)" />
 
       <!-- LSF -->
-      <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/lsf_simulation.yaml" />
+      <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/simulation/lsf.yaml" />
       <param name="lsf_controller/uav_mass" value="$(arg uav_mass)" />
 
       <!-- Trackers' configs -->
