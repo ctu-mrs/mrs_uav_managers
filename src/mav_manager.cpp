@@ -210,7 +210,21 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger takeoff_out;
-  service_client_takeoff.call(takeoff_out);
+
+  if (switch_tracker_out.response.success == true) {
+
+    service_client_takeoff.call(takeoff_out);
+
+    res.success = takeoff_out.response.success;
+    res.message = takeoff_out.response.message;
+
+  } else {
+
+    res.success = switch_tracker_out.response.success;
+    res.message = switch_tracker_out.response.message;
+  }
+
+  return true;
 }
 
 //}
@@ -244,9 +258,21 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger land_out;
-  service_client_land.call(land_out);
+  if (switch_tracker_out.response.success == true) {
 
-  landing = true;
+    service_client_land.call(land_out);
+
+    res.success = land_out.response.success;
+    res.message = land_out.response.message;
+    landing = true;
+
+  } else {
+
+    res.success = switch_tracker_out.response.success;
+    res.message = switch_tracker_out.response.message;
+  }
+
+  return true;
 }
 
 //}
