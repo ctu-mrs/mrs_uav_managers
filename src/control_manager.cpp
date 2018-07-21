@@ -255,7 +255,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   }
 
   // --------------------------------------------------------------
-  // |                   Update the controllers                   |
+  // |                   Update the controller                    |
   // --------------------------------------------------------------
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
