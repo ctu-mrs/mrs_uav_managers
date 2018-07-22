@@ -23,6 +23,7 @@
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
       <remap from="~takeoff_in" to="~takeoff" />
@@ -44,24 +45,29 @@
       <!-- PID -->
       <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/simulation/pid.yaml" />
       <param name="pid_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~pid_controller/profiler" to="profiler" />
 
       <!-- LSF -->
       <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/simulation/lsf.yaml" />
       <param name="lsf_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~lsf_controller/profiler" to="profiler" />
 
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/simulation/line_tracker.yaml" />
+      <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/simulation/landoff_tracker.yaml" />
+      <remap from="~landoff_tracker/profiler" to="profiler" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(arg world_file)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
+      <remap from="~mpc_tracker/profiler" to="profiler" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
@@ -69,6 +75,7 @@
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~tracker_status" to="~tracker_status" />
+      <remap from="~profiler" to="profiler" />
 
     </node>
 
