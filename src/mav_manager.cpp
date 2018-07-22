@@ -63,7 +63,7 @@ private:
 
 void MavManager::onInit() {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
+  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   subscriber_odometry       = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_tracker_status = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());

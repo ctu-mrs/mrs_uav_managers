@@ -7,7 +7,7 @@ namespace mrs_mav_manager
 
 void ControlManager::onInit() {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getPrivateNodeHandle();
+  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
