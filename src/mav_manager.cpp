@@ -14,7 +14,6 @@ namespace mrs_mav_manager
 typedef enum {
 
   IDLE_STATE,
-  GOTO_STATE,
   LANDING_STATE,
 
 } States_t;
@@ -106,8 +105,6 @@ void MavManager::changeLandingState(States_t new_state) {
 
     case IDLE_STATE:
       break;
-    case GOTO_STATE:
-      break;
     case LANDING_STATE:
       break;
   }
@@ -178,26 +175,6 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
   if (current_state_landing == IDLE_STATE) {
     return;
-  } else if (current_state_landing == GOTO_STATE) {
-
-    if (fabs(odometry_z - landing_goto_height_) < 0.05) {
-      // switch to landing state
-
-      mrs_msgs::SwitchTracker switch_tracker_out;
-      switch_tracker_out.request.tracker = landing_tracker_name_;
-      service_client_switch_tracker.call(switch_tracker_out);
-
-      std_srvs::Trigger land_out;
-      if (switch_tracker_out.response.success == true) {
-
-        service_client_land.call(land_out);
-
-        landing = true;
-        changeLandingState(LANDING_STATE);
-      } else {
-        changeLandingState(IDLE_STATE);
-      }
-    }
   } else if (current_state_landing == LANDING_STATE) {
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
@@ -375,24 +352,23 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
   ROS_INFO("[MavManager]: landing");
 
   mrs_msgs::SwitchTracker switch_tracker_out;
-  switch_tracker_out.request.tracker = goto_tracker_name_;
+  switch_tracker_out.request.tracker = landing_tracker_name_;
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger land_out;
   if (switch_tracker_out.response.success == true) {
 
-    mrs_msgs::Vec1 goto_altitude_out;
-    goto_altitude_out.request.goal = landing_goto_height_;
-    service_client_gotoaltitude.call(goto_altitude_out);
+    service_client_land.call(land_out);
 
-    res.success = goto_altitude_out.response.success;
-    res.message = goto_altitude_out.response.message;
-    changeLandingState(GOTO_STATE);
+    res.success = land_out.response.success;
+    res.message = land_out.response.message;
 
+    changeLandingState(LANDING_STATE);
   } else {
 
     res.success = switch_tracker_out.response.success;
     res.message = switch_tracker_out.response.message;
+    changeLandingState(IDLE_STATE);
   }
 
   return true;
