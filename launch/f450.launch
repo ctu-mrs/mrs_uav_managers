@@ -8,7 +8,7 @@
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f450.launch" />
+  <include file="$(find mrs_odometry)/launch/uav.launch" />
 
   <group ns="$(arg uav_name)">
 
@@ -57,15 +57,15 @@
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/f450/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/line_tracker.yaml" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- LandoffTracker -->
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/f450/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/landoff_tracker.yaml" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
 
       <!-- MpcTracker -->
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/f450/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(arg world_file)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
