@@ -276,6 +276,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // --------------------------------------------------------------
 
   mavros_msgs::AttitudeTarget attitude_target;
+  bool                        should_publish = false;
+
   if (active_tracker_idx == 0 || !motors) {
 
     if (!motors) {
@@ -293,7 +295,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     attitude_target.header.stamp    = ros::Time::now();
     attitude_target.header.frame_id = "local_origin";
 
-    publisher_attitude_cmd.publish(attitude_target);
+    should_publish = true;
 
   } else if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
@@ -310,7 +312,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     attitude_target.header.stamp    = ros::Time::now();
     attitude_target.header.frame_id = "local_origin";
 
-    publisher_attitude_cmd.publish(attitude_target);
+    should_publish = true;
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
@@ -325,6 +327,33 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     attitude_target.header.stamp    = ros::Time::now();
     attitude_target.header.frame_id = "local_origin";
+
+    should_publish = true;
+  }
+
+  if (should_publish) {
+
+    // test the output
+    if (!std::isfinite(attitude_target.orientation.x)) {
+      ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+      return;
+    }
+    if (!std::isfinite(attitude_target.orientation.y)) {
+      ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+      return;
+    }
+    if (!std::isfinite(attitude_target.orientation.z)) {
+      ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+      return;
+    }
+    if (!std::isfinite(attitude_target.orientation.w)) {
+      ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+      return;
+    }
+    if (!std::isfinite(attitude_target.thrust)) {
+      ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+      return;
+    }
 
     publisher_attitude_cmd.publish(attitude_target);
   }
