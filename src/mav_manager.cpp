@@ -8,6 +8,21 @@
 namespace mrs_mav_manager
 {
 
+//{ class MavManager
+
+// state machine
+typedef enum {
+
+  IDLE_STATE,
+  GOTO_STATE,
+  LANDING_STATE,
+
+} States_t;
+
+const char *state_names[3] = {
+
+    "IDLING", "GOING_TO_LAND", "LANDING"};
+
 class MavManager : public nodelet::Nodelet {
 
 public:
@@ -15,7 +30,9 @@ public:
   bool callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
+  void changeLandingState(States_t new_state);
 
 private:
   ros::Subscriber    subscriber_odometry;
@@ -28,6 +45,18 @@ private:
   double             odometry_pitch;
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
+
+private:
+  ros::Subscriber    subscriber_mavros_odometry;
+  std::mutex         mutex_mavros_odometry;
+  nav_msgs::Odometry mavros_odometry;
+  double             mavros_odometry_x;
+  double             mavros_odometry_y;
+  double             mavros_odometry_z;
+  double             mavros_odometry_yaw;
+  double             mavros_odometry_roll;
+  double             mavros_odometry_pitch;
+  bool               got_mavros_odometry = false;
 
 private:
   ros::Subscriber         subscriber_tracker_status;
@@ -46,18 +75,48 @@ private:
   ros::ServiceClient service_client_switch_tracker;
   ros::ServiceClient service_client_land;
   ros::ServiceClient service_client_motors;
+  ros::ServiceClient service_client_gotoaltitude;
 
 private:
   std::string null_tracker_name_;
   std::string takeoff_tracker_name_;
   std::string landing_tracker_name_;
+  std::string goto_tracker_name_;
   double      landing_cutoff_height_;
+  double      landing_goto_height_;
 
 private:
   ros::Timer landing_timer;
   bool       landing = false;
+  States_t   current_state_landing;
+  States_t   previous_state_landing;
   void landingTimer(const ros::TimerEvent &event);
 };
+
+//}
+
+//{ changeLandingState()
+
+void MavManager::changeLandingState(States_t new_state) {
+
+  previous_state_landing = current_state_landing;
+  current_state_landing  = new_state;
+
+  switch (current_state_landing) {
+
+    case IDLE_STATE:
+      break;
+    case GOTO_STATE:
+      break;
+    case LANDING_STATE:
+      break;
+  }
+
+  // just for ROS_INFO
+  ROS_DEBUG("[MavManager]: Switching landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+}
+
+//}
 
 //{ onInit()
 
@@ -65,8 +124,9 @@ void MavManager::onInit() {
 
   ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-  subscriber_odometry       = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_tracker_status = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry        = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_odometry = nh_.subscribe("mavros_odometry_in", 1, &MavManager::callbackMavrosOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_tracker_status  = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
 
   service_server_takeoff = nh_.advertiseService("takeoff_in", &MavManager::callbackTakeoff, this);
   service_server_land    = nh_.advertiseService("land_in", &MavManager::callbackLand, this);
@@ -75,17 +135,31 @@ void MavManager::onInit() {
   service_client_land           = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_switch_tracker = nh_.serviceClient<mrs_msgs::SwitchTracker>("switch_tracker_out");
   service_client_motors         = nh_.serviceClient<std_srvs::SetBool>("motors_out");
+  service_client_gotoaltitude   = nh_.serviceClient<mrs_msgs::Vec1>("goto_altitude_out");
 
   nh_.getParam("null_tracker", null_tracker_name_);
   nh_.getParam("landoff/landing_tracker", landing_tracker_name_);
   nh_.getParam("landoff/takeoff_tracker", takeoff_tracker_name_);
+  nh_.getParam("landoff/goto_tracker", goto_tracker_name_);
 
   nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
+  nh_.param("landoff/landing_goto_height", landing_goto_height_, -1.0);
 
   if (landing_cutoff_height_ < 0) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
     ros::shutdown();
   }
+
+  if (landing_goto_height_ < 0) {
+    ROS_ERROR("[MavManager]: landoff/landing_goto_height was not specified!");
+    ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
+  // |                    landing state machine                   |
+  // --------------------------------------------------------------
+
+  changeLandingState(IDLE_STATE);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -102,25 +176,47 @@ void MavManager::onInit() {
 
 void MavManager::landingTimer(const ros::TimerEvent &event) {
 
-  if (!landing) {
+  if (current_state_landing == IDLE_STATE) {
     return;
-  }
+  } else if (current_state_landing == GOTO_STATE) {
 
-  if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
-
-    if (odometry_z < landing_cutoff_height_) {
-
-      std_srvs::SetBool motors_out;
-      motors_out.request.data = false;
-      service_client_motors.call(motors_out);
+    if (fabs(odometry_z - landing_goto_height_) < 0.05) {
+      // switch to landing state
 
       mrs_msgs::SwitchTracker switch_tracker_out;
-      switch_tracker_out.request.tracker = null_tracker_name_;
+      switch_tracker_out.request.tracker = landing_tracker_name_;
       service_client_switch_tracker.call(switch_tracker_out);
 
-      landing = false;
+      std_srvs::Trigger land_out;
+      if (switch_tracker_out.response.success == true) {
 
-      ROS_INFO("[MavManager]: landing finished, switching motors off");
+        service_client_land.call(land_out);
+
+        landing = true;
+        changeLandingState(LANDING_STATE);
+      } else {
+        changeLandingState(IDLE_STATE);
+      }
+    }
+  } else if (current_state_landing == LANDING_STATE) {
+    if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
+
+      if (odometry_z < landing_cutoff_height_ && fabs(mavros_odometry_z) < 0.02) {
+
+        std_srvs::SetBool motors_out;
+        motors_out.request.data = false;
+        service_client_motors.call(motors_out);
+
+        mrs_msgs::SwitchTracker switch_tracker_out;
+        switch_tracker_out.request.tracker = null_tracker_name_;
+        service_client_switch_tracker.call(switch_tracker_out);
+
+        changeLandingState(IDLE_STATE);
+
+        ROS_INFO("[MavManager]: landing finished, switching motors off");
+      }
+    } else {
+      changeLandingState(IDLE_STATE);
     }
   }
 }
@@ -165,13 +261,38 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
+//{ callbackMavrosOdometry()
+
+void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
+
+  mutex_mavros_odometry.lock();
+  {
+    mavros_odometry = *msg;
+
+    mavros_odometry_x = mavros_odometry.pose.pose.position.x;
+    mavros_odometry_y = mavros_odometry.pose.pose.position.y;
+    mavros_odometry_z = mavros_odometry.pose.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion quaternion_odometry;
+    quaternionMsgToTF(mavros_odometry.pose.pose.orientation, quaternion_odometry);
+    tf::Matrix3x3 m(quaternion_odometry);
+    m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+  }
+  mutex_mavros_odometry.unlock();
+
+  got_mavros_odometry = true;
+}
+
+//}
+
 //{ callbackTakeoff()
 
 bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   char message[100];
 
-  if (!got_odometry) {
+  if (!(got_odometry && got_mavros_odometry)) {
     sprintf((char *)&message, "Can't takeoff, missing odometry!");
     res.message = message;
     res.success = false;
@@ -235,7 +356,7 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
   char message[100];
 
-  if (!got_odometry) {
+  if (!(got_odometry && got_mavros_odometry)) {
     sprintf((char *)&message, "Can't land, missing odometry!");
     res.message = message;
     res.success = false;
@@ -254,17 +375,19 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
   ROS_INFO("[MavManager]: landing");
 
   mrs_msgs::SwitchTracker switch_tracker_out;
-  switch_tracker_out.request.tracker = landing_tracker_name_;
+  switch_tracker_out.request.tracker = goto_tracker_name_;
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger land_out;
   if (switch_tracker_out.response.success == true) {
 
-    service_client_land.call(land_out);
+    mrs_msgs::Vec1 goto_altitude_out;
+    goto_altitude_out.request.goal = landing_goto_height_;
+    service_client_gotoaltitude.call(goto_altitude_out);
 
-    res.success = land_out.response.success;
-    res.message = land_out.response.message;
-    landing = true;
+    res.success = goto_altitude_out.response.success;
+    res.message = goto_altitude_out.response.message;
+    changeLandingState(GOTO_STATE);
 
   } else {
 

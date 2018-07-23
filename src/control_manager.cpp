@@ -33,6 +33,7 @@ void ControlManager::onInit() {
   service_switch_controller = nh_.advertiseService("switch_controller", &ControlManager::callbackSwitchController, this);
   service_goto              = nh_.advertiseService("goto", &ControlManager::callbackGoto, this);
   service_goto_relative     = nh_.advertiseService("goto_relative", &ControlManager::callbackGotoRelative, this);
+  service_goto_altitude     = nh_.advertiseService("goto_altitude", &ControlManager::callbackGotoAltitude, this);
   service_hover             = nh_.advertiseService("hover", &ControlManager::callbackHover, this);
   service_motors            = nh_.advertiseService("motors", &ControlManager::callbackMotors, this);
 
@@ -625,6 +626,35 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs
       res = *tracker_response;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative'!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackGotoAltitude()
+
+bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec1Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_altitude'!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }

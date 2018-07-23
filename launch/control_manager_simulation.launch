@@ -19,6 +19,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
 
       <!-- Publishers -->
@@ -32,6 +33,7 @@
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~motors_out" to="control_manager/motors" />
+      <remap from="~goto_altitude_out" to="control_manager/goto_altitude" />
 
     </node>
 

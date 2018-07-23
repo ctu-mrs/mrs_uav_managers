@@ -73,6 +73,7 @@ private:
   ros::ServiceServer service_switch_controller;
   ros::ServiceServer service_goto;
   ros::ServiceServer service_goto_relative;
+  ros::ServiceServer service_goto_altitude;
   ros::ServiceServer service_hover;
   ros::ServiceServer service_motors;
 
@@ -91,6 +92,7 @@ private:
 
   bool callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackGotoAltitude(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
   bool callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 

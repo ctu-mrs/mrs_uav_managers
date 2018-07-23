@@ -7,6 +7,10 @@
 #include <mrs_msgs/TrackerStatus.h>
 #include <nav_msgs/Odometry.h>
 
+#include <mrs_msgs/Vec1.h>
+#include <mrs_msgs/Vec1Request.h>
+#include <mrs_msgs/Vec1Response.h>
+
 #include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/Vec4Request.h>
 #include <mrs_msgs/Vec4Response.h>
@@ -31,6 +35,7 @@ public:
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)         = 0;
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd) = 0;
+  virtual const mrs_msgs::Vec1Response::ConstPtr goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd) = 0;
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)  = 0;
 };
 }
