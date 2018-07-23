@@ -3,6 +3,4 @@ null_tracker: "mrs_mav_manager/NullTracker"
 landoff:
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   landing_tracker: "mrs_trackers/LandoffTracker"
-  goto_tracker: "mrs_trackers/LineTracker"
   landing_cutoff_height:  0.3
-  landing_goto_height: 1.5

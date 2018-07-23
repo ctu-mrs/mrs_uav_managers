@@ -74,15 +74,12 @@ private:
   ros::ServiceClient service_client_switch_tracker;
   ros::ServiceClient service_client_land;
   ros::ServiceClient service_client_motors;
-  ros::ServiceClient service_client_gotoaltitude;
 
 private:
   std::string null_tracker_name_;
   std::string takeoff_tracker_name_;
   std::string landing_tracker_name_;
-  std::string goto_tracker_name_;
   double      landing_cutoff_height_;
-  double      landing_goto_height_;
 
 private:
   ros::Timer landing_timer;
@@ -132,23 +129,15 @@ void MavManager::onInit() {
   service_client_land           = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_switch_tracker = nh_.serviceClient<mrs_msgs::SwitchTracker>("switch_tracker_out");
   service_client_motors         = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_gotoaltitude   = nh_.serviceClient<mrs_msgs::Vec1>("goto_altitude_out");
 
   nh_.getParam("null_tracker", null_tracker_name_);
   nh_.getParam("landoff/landing_tracker", landing_tracker_name_);
   nh_.getParam("landoff/takeoff_tracker", takeoff_tracker_name_);
-  nh_.getParam("landoff/goto_tracker", goto_tracker_name_);
 
   nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
-  nh_.param("landoff/landing_goto_height", landing_goto_height_, -1.0);
 
   if (landing_cutoff_height_ < 0) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
-    ros::shutdown();
-  }
-
-  if (landing_goto_height_ < 0) {
-    ROS_ERROR("[MavManager]: landoff/landing_goto_height was not specified!");
     ros::shutdown();
   }
 
