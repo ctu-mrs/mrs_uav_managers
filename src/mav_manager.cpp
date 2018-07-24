@@ -177,7 +177,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       mutex_odometry.lock();
       mutex_mavros_odometry.lock();
       {
-        if ((odometry_z < landing_cutoff_height_) && (fabs(mavros_odometry.twist.twist.linear.z) < landing_cutoff_speed_)) {
+        if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > -landing_cutoff_speed_)) {
 
           std_srvs::SetBool motors_out;
           motors_out.request.data = false;
