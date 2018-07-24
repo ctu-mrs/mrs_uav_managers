@@ -158,7 +158,7 @@ void MavManager::onInit() {
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  landing_timer = nh_.createTimer(ros::Rate(10), &MavManager::landingTimer, this);
+  landing_timer = nh_.createTimer(ros::Rate(100), &MavManager::landingTimer, this);
 
   ROS_INFO("[MavManager]: initilized");
 }
