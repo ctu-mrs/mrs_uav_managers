@@ -18,9 +18,9 @@ typedef enum {
 
 } States_t;
 
-const char *state_names[3] = {
+const char *state_names[2] = {
 
-    "IDLING", "GOING_TO_LAND", "LANDING"};
+    "IDLING", "LANDING"};
 
 class MavManager : public nodelet::Nodelet {
 
@@ -108,7 +108,7 @@ void MavManager::changeLandingState(States_t new_state) {
   }
 
   // just for ROS_INFO
-  ROS_DEBUG("[MavManager]: Switching landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+  ROS_INFO("[MavManager]: Switching landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
 }
 
 //}
@@ -136,14 +136,14 @@ void MavManager::onInit() {
   nh_.getParam("landoff/takeoff_tracker", takeoff_tracker_name_);
 
   nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
-  nh_.param("landoff/landing_cutoff_speed", landing_cutoff_speed_, -1.0);
+  nh_.param("landoff/landing_cutoff_speed", landing_cutoff_speed_, -1000.0);
 
   if (landing_cutoff_height_ < 0) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
     ros::shutdown();
   }
 
-  if (landing_cutoff_speed_ < 0) {
+  if (landing_cutoff_speed_ < -999) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_speed was not specified!");
     ros::shutdown();
   }
@@ -158,7 +158,7 @@ void MavManager::onInit() {
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  landing_timer = nh_.createTimer(ros::Rate(100), &MavManager::landingTimer, this);
+  landing_timer = nh_.createTimer(ros::Rate(2), &MavManager::landingTimer, this);
 
   ROS_INFO("[MavManager]: initilized");
 }
@@ -172,12 +172,16 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   if (current_state_landing == IDLE_STATE) {
     return;
   } else if (current_state_landing == LANDING_STATE) {
+
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
+
+      ROS_INFO_THROTTLE(0.1, "[MavManager]: odom_z: %1.3f, z_speed: %1.3f", odometry_z, mavros_odometry.twist.twist.linear.z);
+      ROS_INFO_THROTTLE(0.1, "[MavManager]: landing_cutoff_height_: %1.3f, landing_cutoff_speed_: %1.3f", landing_cutoff_height_, landing_cutoff_speed_);
 
       mutex_odometry.lock();
       mutex_mavros_odometry.lock();
       {
-        if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > -landing_cutoff_speed_)) {
+        if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > landing_cutoff_speed_)) {
 
           std_srvs::SetBool motors_out;
           motors_out.request.data = false;
@@ -196,7 +200,9 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       mutex_odometry.unlock();
 
     } else {
-      changeLandingState(IDLE_STATE);
+
+      ROS_ERROR("[MavManager]: incorrect tracker detected during landing!");
+      /* changeLandingState(IDLE_STATE); */
     }
   }
 }
@@ -366,7 +372,11 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
     res.success = land_out.response.success;
     res.message = land_out.response.message;
 
+    ros::Duration wait(1.0);
+    wait.sleep();
+
     changeLandingState(LANDING_STATE);
+
   } else {
 
     res.success = switch_tracker_out.response.success;
