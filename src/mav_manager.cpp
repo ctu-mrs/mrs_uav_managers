@@ -167,7 +167,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   } else if (current_state_landing == LANDING_STATE) {
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
-      if (odometry_z < landing_cutoff_height_ && fabs(mavros_odometry_z) < 0.02) {
+      if (odometry_z < landing_cutoff_height_ && fabs(mavros_odometry_z) < 0.1) {
 
         std_srvs::SetBool motors_out;
         motors_out.request.data = false;
