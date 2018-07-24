@@ -48,6 +48,7 @@ private:
   std::string hover_tracker_name_;
 
   std::mutex mutex_tracker_list;
+  std::mutex mutex_controller_list;
 
   ros::Subscriber    subscriber_odometry;
   nav_msgs::Odometry odometry;

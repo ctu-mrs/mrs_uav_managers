@@ -175,9 +175,6 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
-      ROS_INFO_THROTTLE(0.1, "[MavManager]: odom_z: %1.3f, z_speed: %1.3f", odometry_z, mavros_odometry.twist.twist.linear.z);
-      ROS_INFO_THROTTLE(0.1, "[MavManager]: landing_cutoff_height_: %1.3f, landing_cutoff_speed_: %1.3f", landing_cutoff_height_, landing_cutoff_speed_);
-
       mutex_odometry.lock();
       mutex_mavros_odometry.lock();
       {

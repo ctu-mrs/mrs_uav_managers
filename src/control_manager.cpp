@@ -118,34 +118,44 @@ void ControlManager::onInit() {
 
     std::string controller_name = controller_names[i];
 
-    try {
-      ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
-      controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
+    mutex_controller_list.lock();
+    {
+      try {
+        ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
+        controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
+      }
+      catch (pluginlib::CreateClassException &ex1) {
+        ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
+        ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
+        mutex_controller_list.unlock();
+        return;
+      }
+      catch (pluginlib::PluginlibException &ex) {
+        ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
+        ROS_ERROR("[ControlManager]: Error: %s", ex.what());
+        mutex_controller_list.unlock();
+        return;
+      }
     }
-    catch (pluginlib::CreateClassException &ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      return;
-    }
-    catch (pluginlib::PluginlibException &ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      return;
-    }
+    mutex_controller_list.unlock();
   }
 
   ROS_INFO("[ControlManager]: controllers were loaded");
 
-  for (unsigned long i = 0; i < controller_list.size(); i++) {
-
-    try {
-      ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
-      controller_list[i]->initialize(nh_);
-    }
-    catch (std::runtime_error &ex) {
-      ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
+  mutex_controller_list.lock();
+  {
+    for (unsigned long i = 0; i < controller_list.size(); i++) {
+    
+      try {
+        ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
+        controller_list[i]->initialize(nh_);
+      }
+      catch (std::runtime_error &ex) {
+        ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
+      }
     }
   }
+  mutex_controller_list.unlock();
 
   ROS_INFO("[ControlManager]: controllers were initialized");
 
@@ -155,7 +165,11 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
 
-  controller_list[active_controller_idx]->activate(last_attitude_cmd);
+  mutex_controller_list.lock();
+  {
+    controller_list[active_controller_idx]->activate(last_attitude_cmd);
+  }
+  mutex_controller_list.unlock();
 
   motors = false;
 
@@ -261,16 +275,20 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  mutex_controller_list.lock();
+  {
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
-    try {
-      controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
-    }
-    catch (std::runtime_error &exrun) {
-      ROS_INFO("[ControlManager]: Exception while updating the active controller.");
-      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+      try {
+        controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_INFO("[ControlManager]: Exception while updating the active controller.");
+        ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+      }
     }
   }
+  mutex_controller_list.unlock();
 
   // --------------------------------------------------------------
   // |                 Publish the control command                |
@@ -405,27 +423,42 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
     return true;
   }
 
-  try {
-
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
-    { tracker_list[new_tracker_idx]->activate(last_position_cmd); }
-    sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
-    res.success = true;
-
-    // super important, switch which the active tracker idx
+  mutex_controller_list.lock();
+  {
     try {
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = new_tracker_idx;
+
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
+      { tracker_list[new_tracker_idx]->activate(last_position_cmd); }
+      sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
+      res.success = true;
+
+      // super important, switch which the active tracker idx
+      try {
+        tracker_list[active_tracker_idx]->deactivate();
+
+        // if switching from null tracker, activate the active the controller
+        if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
+          controller_list[active_controller_idx]->activate(last_attitude_cmd);
+
+          // if switching to null tracker, deactivate the active controller
+        } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
+
+          controller_list[active_controller_idx]->deactivate();
+        }
+
+        active_tracker_idx = new_tracker_idx;
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+      }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+      ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  catch (std::runtime_error &exrun) {
-    ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-  }
+  mutex_controller_list.unlock();
 
   res.message = message;
 
@@ -464,27 +497,31 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
     return true;
   }
 
-  try {
-
-    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
-    { controller_list[new_controller_idx]->activate(last_attitude_cmd); }
-    sprintf((char *)&message, "Controller %s has been activated", req.controller.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
-    res.success = true;
-
-    // super important, switch which the active controller idx
+  mutex_controller_list.lock();
+  {
     try {
-      controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = new_controller_idx;
+
+      ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
+      { controller_list[new_controller_idx]->activate(last_attitude_cmd); }
+      sprintf((char *)&message, "Controller %s has been activated", req.controller.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
+      res.success = true;
+
+      // super important, switch which the active controller idx
+      try {
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = new_controller_idx;
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
+      }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
+      ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  catch (std::runtime_error &exrun) {
-    ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-  }
+  mutex_controller_list.unlock();
 
   res.message = message;
   return true;
