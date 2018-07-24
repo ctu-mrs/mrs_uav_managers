@@ -80,6 +80,7 @@ private:
   std::string takeoff_tracker_name_;
   std::string landing_tracker_name_;
   double      landing_cutoff_height_;
+  double      landing_cutoff_speed_;
 
 private:
   ros::Timer landing_timer;
@@ -135,9 +136,15 @@ void MavManager::onInit() {
   nh_.getParam("landoff/takeoff_tracker", takeoff_tracker_name_);
 
   nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
+  nh_.param("landoff/landing_cutoff_speed", landing_cutoff_speed_, -1.0);
 
   if (landing_cutoff_height_ < 0) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
+    ros::shutdown();
+  }
+
+  if (landing_cutoff_speed_ < 0) {
+    ROS_ERROR("[MavManager]: landoff/landing_cutoff_speed was not specified!");
     ros::shutdown();
   }
 
@@ -167,20 +174,27 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   } else if (current_state_landing == LANDING_STATE) {
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
-      if (odometry_z < landing_cutoff_height_ && fabs(mavros_odometry_z) < 0.1) {
+      mutex_odometry.lock();
+      mutex_mavros_odometry.lock();
+      {
+        if ((odometry_z < landing_cutoff_height_) && (fabs(mavros_odometry.twist.twist.linear.z) < landing_cutoff_speed_)) {
 
-        std_srvs::SetBool motors_out;
-        motors_out.request.data = false;
-        service_client_motors.call(motors_out);
+          std_srvs::SetBool motors_out;
+          motors_out.request.data = false;
+          service_client_motors.call(motors_out);
 
-        mrs_msgs::SwitchTracker switch_tracker_out;
-        switch_tracker_out.request.tracker = null_tracker_name_;
-        service_client_switch_tracker.call(switch_tracker_out);
+          mrs_msgs::SwitchTracker switch_tracker_out;
+          switch_tracker_out.request.tracker = null_tracker_name_;
+          service_client_switch_tracker.call(switch_tracker_out);
 
-        changeLandingState(IDLE_STATE);
+          changeLandingState(IDLE_STATE);
 
-        ROS_INFO("[MavManager]: landing finished, switching motors off");
+          ROS_INFO("[MavManager]: landing finished, switching motors off");
+        }
       }
+      mutex_mavros_odometry.unlock();
+      mutex_odometry.unlock();
+
     } else {
       changeLandingState(IDLE_STATE);
     }
