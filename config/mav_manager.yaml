@@ -1,3 +1,5 @@
+landing_timer_rate: 10 # [Hz]
+
 null_tracker: "mrs_mav_manager/NullTracker"
 
 landoff:

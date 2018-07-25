@@ -748,6 +748,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 }
 
 //}
+
 }
 
 #include <pluginlib/class_list_macros.h>

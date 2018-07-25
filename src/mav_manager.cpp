@@ -4,6 +4,7 @@
 #include <std_srvs/SetBool.h>
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_mav_manager/ControlManager.h>
+#include <mrs_lib/Profiler.h>
 
 namespace mrs_mav_manager
 {
@@ -84,10 +85,15 @@ private:
 
 private:
   ros::Timer landing_timer;
+  double     landing_timer_rate_;
   bool       landing = false;
   States_t   current_state_landing;
   States_t   previous_state_landing;
   void landingTimer(const ros::TimerEvent &event);
+
+private:
+  mrs_lib::Profiler *profiler;
+  mrs_lib::Routine * routine_landing_timer;
 };
 
 //}
@@ -138,6 +144,8 @@ void MavManager::onInit() {
   nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
   nh_.param("landoff/landing_cutoff_speed", landing_cutoff_speed_, -1000.0);
 
+  nh_.param("landing_timer_rate", landing_timer_rate_, -1.0);
+
   if (landing_cutoff_height_ < 0) {
     ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
     ros::shutdown();
@@ -148,6 +156,11 @@ void MavManager::onInit() {
     ros::shutdown();
   }
 
+  if (landing_timer_rate_ < 0) {
+    ROS_ERROR("[MavManager]: landing_timer_rate was not specified!");
+    ros::shutdown();
+  }
+
   // --------------------------------------------------------------
   // |                    landing state machine                   |
   // --------------------------------------------------------------
@@ -155,10 +168,17 @@ void MavManager::onInit() {
   changeLandingState(IDLE_STATE);
 
   // --------------------------------------------------------------
+  // |                          profiler                          |
+  // --------------------------------------------------------------
+
+  profiler              = new mrs_lib::Profiler(nh_, "MavManager");
+  routine_landing_timer = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
+
+  // --------------------------------------------------------------
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  landing_timer = nh_.createTimer(ros::Rate(2), &MavManager::landingTimer, this);
+  landing_timer = nh_.createTimer(ros::Rate(landing_timer_rate_), &MavManager::landingTimer, this);
 
   ROS_INFO("[MavManager]: initilized");
 }
@@ -172,6 +192,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   if (current_state_landing == IDLE_STATE) {
     return;
   } else if (current_state_landing == LANDING_STATE) {
+
+    routine_landing_timer->start(event);
 
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
@@ -201,6 +223,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       ROS_ERROR("[MavManager]: incorrect tracker detected during landing!");
       /* changeLandingState(IDLE_STATE); */
     }
+
+    routine_landing_timer->end();
   }
 }
 
