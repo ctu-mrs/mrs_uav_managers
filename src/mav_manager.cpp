@@ -2,9 +2,14 @@
 #include <nodelet/nodelet.h>
 
 #include <std_srvs/SetBool.h>
+#include <std_srvs/Trigger.h>
+#include <nav_msgs/Odometry.h>
+#include <mrs_msgs/SwitchTracker.h>
+
 #include <mrs_msgs/TrackerStatus.h>
-#include <mrs_mav_manager/ControlManager.h>
 #include <mrs_lib/Profiler.h>
+
+#include <tf/transform_datatypes.h>
 
 namespace mrs_mav_manager
 {
@@ -201,10 +206,6 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       mutex_mavros_odometry.lock();
       {
         if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > landing_cutoff_speed_)) {
-
-          std_srvs::SetBool motors_out;
-          motors_out.request.data = false;
-          service_client_motors.call(motors_out);
 
           mrs_msgs::SwitchTracker switch_tracker_out;
           switch_tracker_out.request.tracker = null_tracker_name_;

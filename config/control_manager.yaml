@@ -11,15 +11,21 @@ trackers : [
 controllers : [
   "mrs_controllers/LsfController",
   "mrs_controllers/PidController",
+  "mrs_controllers/FailsafeController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
 # - NullTracker is defined in the mrs_uav_manager package
 null_tracker: "mrs_mav_manager/NullTracker"
 
-# - this tracker will be used for calling the emergancy hover routine
-hover_tracker: "mrs_trackers/LandoffTracker"
-
 safety:
+
   max_tilt_angle: 60 # [deg]
-  max_control_error: 1.5 # [m]
+  failsafe_hover_control_error: 1.5 # [m]
+  failsafe_land_control_error: 3.0 # [m]
+
+  # - this tracker will be used for calling the emergancy hover routine
+  hover_tracker: "mrs_trackers/LandoffTracker"
+
+  # - this controller will be used for emergancy landing
+  failsafe_controller: "mrs_controllers/FailsafeController"

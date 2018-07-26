@@ -54,6 +54,11 @@
       <param name="lsf_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~lsf_controller/profiler" to="profiler" />
 
+      <!-- FailSafe -->
+      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/simulation/failsafe.yaml" />
+      <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~failsafe_controller/profiler" to="profiler" />
+
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
