@@ -262,7 +262,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
           changeLandingState(IDLE_STATE);
 
-          ROS_INFO("[MavManager]: landing finished, switching motors off");
+          ROS_INFO("[MavManager]: landing finished");
         }
       }
       mutex_mavros_odometry.unlock();
@@ -539,6 +539,7 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
 }
 
 //}
+
 }
 
 #include <pluginlib/class_list_macros.h>
