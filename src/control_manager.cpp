@@ -659,6 +659,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     attitude_target.header.frame_id = "local_origin";
 
     should_publish = true;
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
   }
 
   if (should_publish) {

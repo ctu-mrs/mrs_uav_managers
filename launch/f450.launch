@@ -29,11 +29,12 @@
       <!-- Services -->
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
+      <remap from="~land_home_in" to="~land_home" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~motors_out" to="control_manager/motors" />
-      <remap from="~goto_altitude_out" to="control_manager/goto_altitude" />
+      <remap from="~goto_out" to="control_manager/goto" />
 
     </node>
 
