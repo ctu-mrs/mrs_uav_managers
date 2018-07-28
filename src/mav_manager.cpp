@@ -98,11 +98,13 @@ private:
   double      landing_cutoff_speed_;
 
 private:
-  ros::Timer      landing_timer;
-  double          landing_timer_rate_;
-  bool            landing = false;
-  LandingStates_t current_state_landing;
-  LandingStates_t previous_state_landing;
+  ros::Timer landing_timer;
+  double     landing_timer_rate_;
+  bool       landing = false;
+
+  LandingStates_t current_state_landing  = IDLE_STATE;
+  LandingStates_t previous_state_landing = IDLE_STATE;
+
   void landingTimer(const ros::TimerEvent &event);
 
 private:
@@ -414,7 +416,7 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
     }
     mutex_odometry.unlock();
 
-    ROS_INFO("[MavManager]: took of, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
+    ROS_INFO("[MavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
 
   } else {
 
@@ -539,7 +541,6 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
 }
 
 //}
-
 }
 
 #include <pluginlib/class_list_macros.h>

@@ -123,32 +123,6 @@ void ControlManager::onInit() {
   ros::Time::waitForValid();
 
   // --------------------------------------------------------------
-  // |                         subscribers                        |
-  // --------------------------------------------------------------
-
-  subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-
-  // --------------------------------------------------------------
-  // |                         publishers                         |
-  // --------------------------------------------------------------
-
-  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
-  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose", 1);
-  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status", 1);
-
-  // --------------------------------------------------------------
-  // |                          services                          |
-  // --------------------------------------------------------------
-
-  service_switch_tracker    = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
-  service_switch_controller = nh_.advertiseService("switch_controller", &ControlManager::callbackSwitchController, this);
-  service_goto              = nh_.advertiseService("goto", &ControlManager::callbackGoto, this);
-  service_goto_relative     = nh_.advertiseService("goto_relative", &ControlManager::callbackGotoRelative, this);
-  service_goto_altitude     = nh_.advertiseService("goto_altitude", &ControlManager::callbackGotoAltitude, this);
-  service_hover             = nh_.advertiseService("hover", &ControlManager::callbackHover, this);
-  service_motors            = nh_.advertiseService("motors", &ControlManager::callbackMotors, this);
-
-  // --------------------------------------------------------------
   // |                           params                           |
   // --------------------------------------------------------------
 
@@ -322,6 +296,33 @@ void ControlManager::onInit() {
   mutex_controller_list.unlock();
 
   motors = false;
+
+  // --------------------------------------------------------------
+  // |                         subscribers                        |
+  // --------------------------------------------------------------
+
+  subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+
+  // --------------------------------------------------------------
+  // |                         publishers                         |
+  // --------------------------------------------------------------
+
+  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
+  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose", 1);
+  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status", 1);
+
+  // --------------------------------------------------------------
+  // |                          services                          |
+  // --------------------------------------------------------------
+
+  service_switch_tracker    = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
+  service_switch_controller = nh_.advertiseService("switch_controller", &ControlManager::callbackSwitchController, this);
+  service_goto              = nh_.advertiseService("goto", &ControlManager::callbackGoto, this);
+  service_goto_relative     = nh_.advertiseService("goto_relative", &ControlManager::callbackGotoRelative, this);
+  service_goto_altitude     = nh_.advertiseService("goto_altitude", &ControlManager::callbackGotoAltitude, this);
+  service_hover             = nh_.advertiseService("hover", &ControlManager::callbackHover, this);
+  service_motors            = nh_.advertiseService("motors", &ControlManager::callbackMotors, this);
+
 
   // --------------------------------------------------------------
   // |                           timers                           |
