@@ -79,6 +79,11 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~goto_in" to="~goto" />
+      <remap from="~goto_relative_in" to="~goto_relative" />
+      <remap from="~goto_altitude_in" to="~goto_altitude" />
+      <remap from="~set_yaw_in" to="~set_yaw" />
+      <remap from="~set_yaw_relative_in" to="~set_yaw_relative_in" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />

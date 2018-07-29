@@ -26,11 +26,11 @@ public:
   virtual const mrs_msgs::Vec1Response::ConstPtr setYaw(const mrs_msgs::Vec1Request::ConstPtr &cmd);
   virtual const mrs_msgs::Vec1Response::ConstPtr setYawRelative(const mrs_msgs::Vec1Request::ConstPtr &cmd);
 
-  virtual const bool goTo(const mrs_msgs::TrackerPointConstPtr &cmd);
-  virtual const bool goToRelative(const mrs_msgs::TrackerPointConstPtr &cmd);
-  virtual const bool goToAltitude(const std_msgs::Float64ConstPtr &cmd);
-  virtual const bool setYaw(const std_msgs::Float64ConstPtr &cmd);
-  virtual const bool setYawRelative(const std_msgs::Float64ConstPtr &cmd);
+  virtual bool goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  virtual bool goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg);
+  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg);
+  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg);
 
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
@@ -135,7 +135,7 @@ const mrs_msgs::Vec4Response::ConstPtr NullTracker::goTo(const mrs_msgs::Vec4Req
 
 //{ goTo() topic
 
-const bool NullTracker::goTo(const mrs_msgs::TrackerPointConstPtr &cmd) {
+bool NullTracker::goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
   return false;
 }
 
@@ -151,7 +151,7 @@ const mrs_msgs::Vec4Response::ConstPtr NullTracker::goToRelative(const mrs_msgs:
 
 //{ goToRelative() topic
 
-const bool NullTracker::goToRelative(const mrs_msgs::TrackerPointConstPtr &cmd) {
+bool NullTracker::goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
   return false;
 }
 
@@ -167,7 +167,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::goToAltitude(const mrs_msgs:
 
 //{ goToAltitude() topic
 
-const bool NullTracker::goToAltitude(const std_msgs::Float64ConstPtr &cmd) {
+bool NullTracker::goToAltitude(const std_msgs::Float64ConstPtr &msg) {
   return false;
 }
 
@@ -183,7 +183,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYaw(const mrs_msgs::Vec1R
 
 //{ setYaw() topic
 
-const bool NullTracker::setYaw(const std_msgs::Float64ConstPtr &cmd) {
+bool NullTracker::setYaw(const std_msgs::Float64ConstPtr &msg) {
   return false;
 }
 
@@ -199,7 +199,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYawRelative(const mrs_msg
 
 //{ setYawRelative() topic
 
-const bool NullTracker::setYawRelative(const std_msgs::Float64ConstPtr &cmd) {
+bool NullTracker::setYawRelative(const std_msgs::Float64ConstPtr &msg) {
   return false;
 }
 

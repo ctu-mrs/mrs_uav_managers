@@ -25,7 +25,7 @@
 
 #include <std_msgs/Float64.h>
 
-#include <mrs_msgs/TrackerPoint.h>
+#include <mrs_msgs/TrackerPointStamped.h>
 
 namespace mrs_mav_manager
 {
@@ -39,7 +39,7 @@ public:
   virtual void deactivate(void)                                         = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
-  virtual const mrs_msgs::TrackerStatus::Ptr getStatus()                                               = 0;
+  virtual const mrs_msgs::TrackerStatus::Ptr getStatus()                                            = 0;
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)           = 0;
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd)   = 0;
@@ -50,11 +50,11 @@ public:
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)           = 0;
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) = 0;
 
-  virtual const bool goTo(const mrs_msgs::TrackerPointConstPtr &cmd)         = 0;
-  virtual const bool goToRelative(const mrs_msgs::TrackerPointConstPtr &cmd) = 0;
-  virtual const bool goToAltitude(const std_msgs::Float64ConstPtr &cmd)      = 0;
-  virtual const bool setYaw(const std_msgs::Float64ConstPtr &cmd)            = 0;
-  virtual const bool setYawRelative(const std_msgs::Float64ConstPtr &cmd)    = 0;
+  virtual bool goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg)         = 0;
+  virtual bool goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg) = 0;
+  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg)      = 0;
+  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg)            = 0;
+  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg)    = 0;
 };
 }
 

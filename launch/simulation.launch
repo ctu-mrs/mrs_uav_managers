@@ -80,10 +80,24 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
 
+      <!-- Subscribers and Services -->
+      <remap from="~goto_in" to="~goto" />
+      <remap from="~goto_relative_in" to="~goto_relative" />
+      <remap from="~goto_altitude_in" to="~goto_altitude" />
+      <remap from="~set_yaw_in" to="~set_yaw" />
+      <remap from="~set_yaw_relative_in" to="~set_yaw_relative_in" />
+
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
-      <remap from="~tracker_status" to="~tracker_status" />
+      <remap from="~tracker_status_out" to="~tracker_status" />
+      <remap from="~cmd_pose_out" to="~cmd_pose" />
       <remap from="~profiler" to="profiler" />
+
+      <!-- Services -->
+      <remap from="~switch_tracker_in" to="~switch_tracker" />
+      <remap from="~switch_controller_in" to="~switch_controller" />
+      <remap from="~hover_in" to="~hover" />
+      <remap from="~motors_in" to="~motors" />
 
     </node>
 

@@ -74,11 +74,20 @@ private:
 
   ros::ServiceServer service_switch_tracker;
   ros::ServiceServer service_switch_controller;
-  ros::ServiceServer service_goto;
-  ros::ServiceServer service_goto_relative;
-  ros::ServiceServer service_goto_altitude;
   ros::ServiceServer service_hover;
   ros::ServiceServer service_motors;
+
+  ros::ServiceServer service_goTo;
+  ros::ServiceServer service_goTo_relative;
+  ros::ServiceServer service_goTo_altitude;
+  ros::ServiceServer service_set_yaw;
+  ros::ServiceServer service_set_yaw_relative;
+
+  ros::Subscriber subscriber_goTo;
+  ros::Subscriber subscriber_goTo_relative;
+  ros::Subscriber subscriber_goTo_altitude;
+  ros::Subscriber subscriber_set_yaw;
+  ros::Subscriber subscriber_set_yaw_relative;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
@@ -94,9 +103,17 @@ private:
   bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
   bool callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res);
 
-  bool callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGotoAltitude(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
+  bool callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
+  bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
+  bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
+
+  void callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  void callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  void callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
+  void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
+  void callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg);
 
   bool hover(std::string &message_out);
   bool callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
@@ -298,31 +315,41 @@ void ControlManager::onInit() {
   motors = false;
 
   // --------------------------------------------------------------
+  // |                         publishers                         |
+  // --------------------------------------------------------------
+
+  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
+  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose_out", 1);
+  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
+
+  // --------------------------------------------------------------
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
   subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
 
-  // --------------------------------------------------------------
-  // |                         publishers                         |
-  // --------------------------------------------------------------
+  // | -------------------- general services -------------------- |
 
-  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
-  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose", 1);
-  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status", 1);
+  service_switch_tracker    = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+  service_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
+  service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
 
-  // --------------------------------------------------------------
-  // |                          services                          |
-  // --------------------------------------------------------------
+  // | ---------------- setpoint command services --------------- |
 
-  service_switch_tracker    = nh_.advertiseService("switch_tracker", &ControlManager::callbackSwitchTracker, this);
-  service_switch_controller = nh_.advertiseService("switch_controller", &ControlManager::callbackSwitchController, this);
-  service_goto              = nh_.advertiseService("goto", &ControlManager::callbackGoto, this);
-  service_goto_relative     = nh_.advertiseService("goto_relative", &ControlManager::callbackGotoRelative, this);
-  service_goto_altitude     = nh_.advertiseService("goto_altitude", &ControlManager::callbackGotoAltitude, this);
-  service_hover             = nh_.advertiseService("hover", &ControlManager::callbackHover, this);
-  service_motors            = nh_.advertiseService("motors", &ControlManager::callbackMotors, this);
+  service_goTo             = nh_.advertiseService("goto_in", &ControlManager::callbackgoToService, this);
+  service_goTo_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackgoToRelativeService, this);
+  service_goTo_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackgoToAltitudeService, this);
+  service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
+  service_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
+  // | ----------------- setpoint command topics ---------------- |
+
+  subscriber_goTo             = nh_.subscribe("goto_in", 1, &ControlManager::callbackgoToTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goTo_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackgoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goTo_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackgoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_set_yaw          = nh_.subscribe("set_yaw_in", 1, &ControlManager::callbackSetYawTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_set_yaw_relative = nh_.subscribe("set_yaw_relative_in", 1, &ControlManager::callbackSetYawRelativeTopic, this, ros::TransportHints().tcpNoDelay());
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -843,93 +870,6 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
 //}
 
-//{ callbackGoto()
-
-bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
-
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
-
-  mrs_msgs::Vec4Request req_out;
-  req_out.goal = req.goal;
-
-  mutex_tracker_list.lock();
-  {
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
-
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
-    } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto'!", tracker_names[active_tracker_idx].c_str());
-      res.message = message;
-      res.success = false;
-    }
-  }
-  mutex_tracker_list.unlock();
-
-  return true;
-}
-
-//}
-
-//{ callbackGotoRelative()
-
-bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
-
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
-
-  mrs_msgs::Vec4Request req_out;
-  req_out.goal = req.goal;
-
-  mutex_tracker_list.lock();
-  {
-    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
-
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
-    } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative'!", tracker_names[active_tracker_idx].c_str());
-      res.message = message;
-      res.success = false;
-    }
-  }
-  mutex_tracker_list.unlock();
-
-  return true;
-}
-
-//}
-
-//{ callbackGotoAltitude()
-
-bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
-
-  mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[100];
-
-  mrs_msgs::Vec1Request req_out;
-  req_out.goal = req.goal;
-
-  mutex_tracker_list.lock();
-  {
-    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
-
-    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
-      res = *tracker_response;
-    } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_altitude'!", tracker_names[active_tracker_idx].c_str());
-      res.message = message;
-      res.success = false;
-    }
-  }
-  mutex_tracker_list.unlock();
-
-  return true;
-}
-
-//}
-
 //{ callbackHover()
 
 bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
@@ -955,6 +895,238 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   ROS_INFO("[ControlManager]: %s", message);
 
   return true;
+}
+
+//}
+
+// | -------------- setpoint topics and services -------------- |
+
+//{ callbackgoToService()
+
+bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec4Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackgoToTopic()
+
+void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+
+  bool                   tracker_response;
+
+  mutex_tracker_list.lock();
+  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  mutex_tracker_list.unlock();
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo' topic!", tracker_names[active_tracker_idx].c_str());
+  }
+}
+
+//}
+
+//{ callbackgoToRelativeService()
+
+bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec4Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo_relative' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackgoToRelativeTopic()
+
+void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+
+  bool                   tracker_response;
+
+  mutex_tracker_list.lock();
+  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  mutex_tracker_list.unlock();
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo_relative' topic!", tracker_names[active_tracker_idx].c_str());
+  }
+}
+
+//}
+
+//{ callbackgoToAltitudeService()
+
+bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec1Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo_altitude' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackgoToAltitudeTopic()
+
+void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
+
+  bool                   tracker_response;
+
+  mutex_tracker_list.lock();
+  { tracker_response = tracker_list[active_tracker_idx]->goToAltitude(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
+  mutex_tracker_list.unlock();
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo_altitude' topic!", tracker_names[active_tracker_idx].c_str());
+  }
+}
+
+//}
+
+//{ callbackSetYawService()
+
+bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec1Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackSetYawTopic()
+
+void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
+
+  bool                   tracker_response;
+
+  mutex_tracker_list.lock();
+  { tracker_response = tracker_list[active_tracker_idx]->setYaw(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
+  mutex_tracker_list.unlock();
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw' topic!", tracker_names[active_tracker_idx].c_str());
+  }
+}
+
+//}
+
+//{ callbackSetYawRelativeService()
+
+bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec1Request req_out;
+  req_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+
+    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw_relative' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
+}
+
+//}
+
+//{ callbackSetYawRelativeTopic()
+
+void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg) {
+
+  bool                   tracker_response;
+
+  mutex_tracker_list.lock();
+  { tracker_response = tracker_list[active_tracker_idx]->setYawRelative(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
+  mutex_tracker_list.unlock();
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw_relative' topic!", tracker_names[active_tracker_idx].c_str());
+  }
 }
 
 //}
