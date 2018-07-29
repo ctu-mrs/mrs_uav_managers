@@ -1,5 +1,5 @@
-#ifndef control_manager_TRACKER_H_
-#define control_manager_TRACKER_H_
+#ifndef TRACKER_H_
+#define TRACKER_H_
 
 #include <ros/ros.h>
 
@@ -19,6 +19,14 @@
 #include <std_srvs/TriggerRequest.h>
 #include <std_srvs/TriggerResponse.h>
 
+#include <std_srvs/SetBool.h>
+#include <std_srvs/SetBoolRequest.h>
+#include <std_srvs/SetBoolResponse.h>
+
+#include <std_msgs/Float64.h>
+
+#include <mrs_msgs/TrackerPoint.h>
+
 namespace mrs_mav_manager
 {
 class Tracker {
@@ -31,12 +39,22 @@ public:
   virtual void deactivate(void)                                         = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
-  virtual const mrs_msgs::TrackerStatus::Ptr status()                                               = 0;
+  virtual const mrs_msgs::TrackerStatus::Ptr getStatus()                                               = 0;
 
-  virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)         = 0;
-  virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd) = 0;
-  virtual const mrs_msgs::Vec1Response::ConstPtr goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd) = 0;
-  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)  = 0;
+  virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)           = 0;
+  virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd)   = 0;
+  virtual const mrs_msgs::Vec1Response::ConstPtr goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd)   = 0;
+  virtual const mrs_msgs::Vec1Response::ConstPtr setYaw(const mrs_msgs::Vec1Request::ConstPtr &cmd)         = 0;
+  virtual const mrs_msgs::Vec1Response::ConstPtr setYawRelative(const mrs_msgs::Vec1Request::ConstPtr &cmd) = 0;
+
+  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)           = 0;
+  virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) = 0;
+
+  virtual const bool goTo(const mrs_msgs::TrackerPointConstPtr &cmd)         = 0;
+  virtual const bool goToRelative(const mrs_msgs::TrackerPointConstPtr &cmd) = 0;
+  virtual const bool goToAltitude(const std_msgs::Float64ConstPtr &cmd)      = 0;
+  virtual const bool setYaw(const std_msgs::Float64ConstPtr &cmd)            = 0;
+  virtual const bool setYawRelative(const std_msgs::Float64ConstPtr &cmd)    = 0;
 };
 }
 

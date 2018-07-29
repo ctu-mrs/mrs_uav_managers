@@ -1,12 +1,13 @@
-#ifndef control_manager_CONTROLLER_H_
-#define control_manager_CONTROLLER_H_
+#ifndef CONTROLLER_H_
+#define CONTROLLER_H_
+
+#include <ros/ros.h>
 
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <nav_msgs/Odometry.h>
-#include <ros/ros.h>
 
 namespace mrs_mav_manager
 {

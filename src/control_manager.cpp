@@ -351,7 +351,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
   mrs_msgs::TrackerStatus      tracker_status;
 
-  tracker_status_ptr = tracker_list[active_tracker_idx]->status();
+  tracker_status_ptr = tracker_list[active_tracker_idx]->getStatus();
 
   tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
 

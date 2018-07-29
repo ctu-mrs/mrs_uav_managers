@@ -522,8 +522,8 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
 
     service_client_land.call(land_out);
 
-    res.success = land_out.response.success;
-    res.message = land_out.response.message;
+    res.success = goto_out.response.success;
+    res.message = "Flying home for landing";
 
     ros::Duration wait(1.0);
     wait.sleep();
