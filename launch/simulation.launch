@@ -76,6 +76,7 @@
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
+      <remap from="~mpc_tracker/rc_in" to="mavros/rc/in" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
@@ -85,7 +86,7 @@
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
       <remap from="~set_yaw_in" to="~set_yaw" />
-      <remap from="~set_yaw_relative_in" to="~set_yaw_relative_in" />
+      <remap from="~set_yaw_relative_in" to="~set_yaw_relative" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
