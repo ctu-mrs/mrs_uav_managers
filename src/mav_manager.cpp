@@ -32,6 +32,10 @@ const char *state_names[3] = {
 
 class MavManager : public nodelet::Nodelet {
 
+private:
+  ros::NodeHandle nh_;
+  bool is_initialized = false;
+
 public:
   virtual void onInit();
   bool callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
@@ -71,9 +75,6 @@ private:
   bool                    got_tracker_status = false;
   mrs_msgs::TrackerStatus tracker_status;
   std::mutex              mutex_tracker_status;
-
-private:
-  ros::NodeHandle nh_;
 
 private:
   ros::ServiceServer service_server_takeoff;
@@ -143,6 +144,10 @@ void MavManager::onInit() {
 
   ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
+  ros::Time::waitForValid();
+
+  ROS_INFO("[MavManager]: initializing");
+
   subscriber_odometry        = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_odometry = nh_.subscribe("mavros_odometry_in", 1, &MavManager::callbackMavrosOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_tracker_status  = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
@@ -201,6 +206,8 @@ void MavManager::onInit() {
   landing_timer = nh_.createTimer(ros::Rate(landing_timer_rate_), &MavManager::landingTimer, this);
 
   ROS_INFO("[MavManager]: initilized");
+
+  is_initialized = true;
 }
 
 //}
@@ -212,6 +219,8 @@ void MavManager::onInit() {
 //{ landingTimer()
 
 void MavManager::landingTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized) return;
 
   if (current_state_landing == IDLE_STATE) {
     return;
@@ -293,6 +302,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
 void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   mutex_tracker_status.lock();
   { tracker_status = *msg; }
   mutex_tracker_status.unlock();
@@ -305,6 +316,8 @@ void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &ms
 //{ callbackOdometry()
 
 void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+
+  if (!is_initialized) return;
 
   mutex_odometry.lock();
   {
@@ -331,6 +344,8 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   mutex_mavros_odometry.lock();
   {
     mavros_odometry = *msg;
@@ -355,6 +370,8 @@ void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
 //{ callbackTakeoff()
 
 bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized) return false;
 
   char message[100];
 
@@ -436,6 +453,8 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
 
 bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
+  if (!is_initialized) return false;
+
   char message[100];
 
   if (!(got_odometry && got_mavros_odometry)) {
@@ -488,6 +507,8 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 //{ callbackLandHome()
 
 bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized) return false;
 
   char message[100];
 

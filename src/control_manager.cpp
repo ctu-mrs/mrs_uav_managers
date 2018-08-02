@@ -32,6 +32,7 @@ public:
 
 private:
   ros::NodeHandle nh_;
+  bool is_initialized = false;
 
 private:
   pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
@@ -359,6 +360,8 @@ void ControlManager::onInit() {
   safety_timer = nh_.createTimer(ros::Rate(100), &ControlManager::safetyTimer, this);
 
   ROS_INFO("[ControlManager]: initialized");
+
+  is_initialized = true;
 }
 
 //}
@@ -370,6 +373,8 @@ void ControlManager::onInit() {
 //{ statusTimer()
 
 void ControlManager::statusTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized) return;
 
   // --------------------------------------------------------------
   // |                publishing the tracker status               |
@@ -398,6 +403,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 //{ safetyTimer()
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized) return;
 
   if (!got_odometry || active_tracker_idx <= 0) {
     return;
@@ -479,6 +486,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
 bool ControlManager::hover(std::string &message_out) {
 
+  if (!is_initialized) return false;
+
   char message[100];
 
   try {
@@ -527,6 +536,8 @@ bool ControlManager::hover(std::string &message_out) {
 //{ callbackOdometry()
 
 void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+
+  if (!is_initialized) return;
 
   mutex_odometry.lock();
   {
@@ -725,6 +736,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
 
+  if (!is_initialized) return false;
+
   char message[100];
 
   if (!got_odometry) {
@@ -874,6 +887,8 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
 bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
+  if (!is_initialized) return false;
+
   res.success = hover(res.message);
 
   return true;
@@ -884,6 +899,8 @@ bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Tr
 //{ callbackMotors()
 
 bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+
+  if (!is_initialized) return false;
 
   motors = req.data;
 
@@ -904,6 +921,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 //{ callbackgoToService()
 
 bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized) return false;
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
@@ -934,6 +953,8 @@ bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
 
 void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   bool                   tracker_response;
 
   mutex_tracker_list.lock();
@@ -950,6 +971,8 @@ void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstP
 //{ callbackgoToRelativeService()
 
 bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized) return false;
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
@@ -980,6 +1003,8 @@ bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, m
 
 void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   bool                   tracker_response;
 
   mutex_tracker_list.lock();
@@ -996,6 +1021,8 @@ void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStamp
 //{ callbackgoToAltitudeService()
 
 bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  if (!is_initialized) return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1026,6 +1053,8 @@ bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
 void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   bool                   tracker_response;
 
   mutex_tracker_list.lock();
@@ -1042,6 +1071,8 @@ void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &
 //{ callbackSetYawService()
 
 bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  if (!is_initialized) return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1072,6 +1103,8 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
 
 void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
+  if (!is_initialized) return;
+
   bool                   tracker_response;
 
   mutex_tracker_list.lock();
@@ -1088,6 +1121,8 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 //{ callbackSetYawRelativeService()
 
 bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+
+  if (!is_initialized) return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1117,6 +1152,8 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 //{ callbackSetYawRelativeTopic()
 
 void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg) {
+
+  if (!is_initialized) return;
 
   bool                   tracker_response;
 
