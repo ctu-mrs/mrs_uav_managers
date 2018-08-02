@@ -34,7 +34,7 @@
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~motors_out" to="control_manager/motors" />
-      <remap from="~goto_out" to="control_manager/goto" />
+      <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
 
     </node>
 
@@ -99,6 +99,8 @@
       <remap from="~switch_controller_in" to="~switch_controller" />
       <remap from="~hover_in" to="~hover" />
       <remap from="~motors_in" to="~motors" />
+      <remap from="~emergency_goto_in" to="~emergency_goto" />
+      <remap from="~enable_callbacks_in" to="~enable_callbacks" />
 
     </node>
 

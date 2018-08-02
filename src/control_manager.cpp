@@ -77,12 +77,15 @@ private:
   ros::ServiceServer service_switch_controller;
   ros::ServiceServer service_hover;
   ros::ServiceServer service_motors;
+  ros::ServiceServer service_enable_callbacks;
 
   ros::ServiceServer service_goTo;
   ros::ServiceServer service_goTo_relative;
   ros::ServiceServer service_goTo_altitude;
   ros::ServiceServer service_set_yaw;
   ros::ServiceServer service_set_yaw_relative;
+
+  ros::ServiceServer service_emergencyGoTo;
 
   ros::Subscriber subscriber_goTo;
   ros::Subscriber subscriber_goTo_relative;
@@ -104,22 +107,29 @@ private:
   bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
   bool callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res);
 
-  bool callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
+  bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
-  void callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  void callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  void callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
+  void callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  void callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  void callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
   void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
   void callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg);
+
+  bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
   bool hover(std::string &message_out);
   bool callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
   bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+
+  bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+
+private:
+  bool callbacks_enabled = true;
 
 private:
   ros::Timer status_timer;
@@ -335,22 +345,27 @@ void ControlManager::onInit() {
   service_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
   service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
   service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+  service_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
 
   // | ---------------- setpoint command services --------------- |
 
-  service_goTo             = nh_.advertiseService("goto_in", &ControlManager::callbackgoToService, this);
-  service_goTo_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackgoToRelativeService, this);
-  service_goTo_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackgoToAltitudeService, this);
+  service_goTo             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
+  service_goTo_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
+  service_goTo_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
   service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
   service_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
   // | ----------------- setpoint command topics ---------------- |
 
-  subscriber_goTo             = nh_.subscribe("goto_in", 1, &ControlManager::callbackgoToTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goTo_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackgoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goTo_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackgoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goTo             = nh_.subscribe("goto_in", 1, &ControlManager::callbackGoToTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goTo_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackGoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goTo_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackGoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
   subscriber_set_yaw          = nh_.subscribe("set_yaw_in", 1, &ControlManager::callbackSetYawTopic, this, ros::TransportHints().tcpNoDelay());
   subscriber_set_yaw_relative = nh_.subscribe("set_yaw_relative_in", 1, &ControlManager::callbackSetYawRelativeTopic, this, ros::TransportHints().tcpNoDelay());
+
+  // | --------------------- other services --------------------- |
+
+  service_emergencyGoTo = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -927,24 +942,70 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
 //}
 
-// | -------------- setpoint topics and services -------------- |
+//{ callbackEnableCallbacks()
 
-//{ callbackgoToService()
-
-bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
 
   if (!is_initialized)
     return false;
 
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
+  callbacks_enabled = req.data;
 
-  mrs_msgs::Vec4Request req_out;
-  req_out.goal = req.goal;
+  std_srvs::SetBoolRequest req_goto_out;
+  req_goto_out = req;
+
+  std_srvs::SetBoolRequest req_enable_callbacks;
+  req_enable_callbacks.data = false;
 
   mutex_tracker_list.lock();
   {
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+    // disable callbacks of all trackers
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  char message[100];
+  sprintf((char *)&message, "Callbacks: %s", motors ? "enabled" : "disabled");
+  res.message = message;
+  res.success = true;
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  return true;
+}
+
+//}
+
+// | -------------- setpoint topics and services -------------- |
+
+//{ callbackGoToService()
+
+bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  mrs_msgs::Vec4Request req_goto_out;
+  req_goto_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
@@ -961,12 +1022,17 @@ bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
 
 //}
 
-//{ callbackgoToTopic()
+//{ callbackGoToTopic()
 
-void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
+    return;
+  }
 
   bool tracker_response;
 
@@ -981,22 +1047,32 @@ void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstP
 
 //}
 
-//{ callbackgoToRelativeService()
+//{ callbackGoToRelativeService()
 
-bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 
-  if (!is_initialized)
-    return false;
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
 
-  mrs_msgs::Vec4Request req_out;
-  req_out.goal = req.goal;
+  mrs_msgs::Vec4Request req_goto_out;
+  req_goto_out.goal = req.goal;
 
   mutex_tracker_list.lock();
   {
-    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
@@ -1013,12 +1089,17 @@ bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, m
 
 //}
 
-//{ callbackgoToRelativeTopic()
+//{ callbackGoToRelativeTopic()
 
-void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto_relative topic through, the callbacks are disabled");
+    return;
+  }
 
   bool tracker_response;
 
@@ -1033,22 +1114,32 @@ void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStamp
 
 //}
 
-//{ callbackgoToAltitudeService()
+//{ callbackGoToAltitudeService()
 
-bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized)
-    return false;
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
 
-  mrs_msgs::Vec1Request req_out;
-  req_out.goal = req.goal;
+  mrs_msgs::Vec1Request req_goto_out;
+  req_goto_out.goal = req.goal;
 
   mutex_tracker_list.lock();
   {
-    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
       res = *tracker_response;
@@ -1065,12 +1156,17 @@ bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
 //}
 
-//{ callbackgoToAltitudeTopic()
+//{ callbackGoToAltitudeTopic()
 
-void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
+void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto_altitude topic through, the callbacks are disabled");
+    return;
+  }
 
   bool tracker_response;
 
@@ -1089,18 +1185,28 @@ void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &
 
 bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized)
-    return false;
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
 
-  mrs_msgs::Vec1Request req_out;
-  req_out.goal = req.goal;
+  mrs_msgs::Vec1Request req_goto_out;
+  req_goto_out.goal = req.goal;
 
   mutex_tracker_list.lock();
   {
-    tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+    tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
       res = *tracker_response;
@@ -1124,6 +1230,11 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the set_yaw topic through, the callbacks are disabled");
+    return;
+  }
+
   bool tracker_response;
 
   mutex_tracker_list.lock();
@@ -1141,18 +1252,28 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
 bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized)
-    return false;
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
 
-  mrs_msgs::Vec1Request req_out;
-  req_out.goal = req.goal;
+  mrs_msgs::Vec1Request req_goto_out;
+  req_goto_out.goal = req.goal;
 
   mutex_tracker_list.lock();
   {
-    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_out)));
+    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
       res = *tracker_response;
@@ -1176,6 +1297,11 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
   if (!is_initialized)
     return;
 
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the set_yaw_relative topic through, the callbacks are disabled");
+    return;
+  }
+
   bool tracker_response;
 
   mutex_tracker_list.lock();
@@ -1185,6 +1311,59 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw_relative' topic!", tracker_names[active_tracker_idx].c_str());
   }
+}
+
+//}
+
+// | --------------------- other services --------------------- |
+
+//{ callbackEmergencyGoToService()
+
+bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  callbacks_enabled = false;
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[100];
+
+  std_srvs::SetBoolRequest req_enable_callbacks;
+
+  mrs_msgs::Vec4Request req_goto_out;
+  req_goto_out.goal = req.goal;
+
+  mutex_tracker_list.lock();
+  {
+    // disable callbacks of all trackers
+    req_enable_callbacks.data = false;
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+    }
+
+    // enable the callbacks for the active tracker
+    req_enable_callbacks.data = true;
+    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+
+    // call the goto
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+
+    // disable the callbacks back again
+    req_enable_callbacks.data = false;
+    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  return true;
 }
 
 //}
