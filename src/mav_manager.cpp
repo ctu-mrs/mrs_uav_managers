@@ -541,10 +541,7 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
   mutex_odometry.unlock();
   service_client_goto.call(goto_out);
 
-  std_srvs::Trigger land_out;
   if (goto_out.response.success == true) {
-
-    service_client_land.call(land_out);
 
     res.success = goto_out.response.success;
     res.message = "Flying home for landing";

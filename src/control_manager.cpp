@@ -32,7 +32,7 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  bool is_initialized = false;
+  bool            is_initialized = false;
 
 private:
   pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
@@ -374,7 +374,8 @@ void ControlManager::onInit() {
 
 void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
   // --------------------------------------------------------------
   // |                publishing the tracker status               |
@@ -404,7 +405,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
   if (!got_odometry || active_tracker_idx <= 0) {
     return;
@@ -486,7 +488,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
 bool ControlManager::hover(std::string &message_out) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   char message[100];
 
@@ -537,7 +540,8 @@ bool ControlManager::hover(std::string &message_out) {
 
 void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
   mutex_odometry.lock();
   {
@@ -564,42 +568,46 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   nav_msgs::Odometry::ConstPtr        odometry_const_ptr(new nav_msgs::Odometry(odometry));
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
-  try {
+  mutex_tracker_list.lock();
+  {
+    try {
 
-    // for each tracker
-    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+      // for each tracker
+      for (unsigned int i = 0; i < tracker_list.size(); i++) {
 
-      if ((int)i == active_tracker_idx) {
+        if ((int)i == active_tracker_idx) {
 
-        // if it is the active one, update and retrieve the command
-        tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
+          // if it is the active one, update and retrieve the command
+          tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
 
-      } else {
+        } else {
 
-        // if it is not the active one, just update without retrieving the commadn
-        tracker_list[i]->update(odometry_const_ptr);
+          // if it is not the active one, just update without retrieving the commadn
+          tracker_list[i]->update(odometry_const_ptr);
+        }
+      }
+
+      if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
+
+        last_position_cmd = tracker_output_cmd;
+
+      } else if (active_tracker_idx > 0) {
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
+        // TODO: switch to failsave tracker, or stop outputting commands
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
+
+      } else if (active_tracker_idx == 0) {
+
+        last_position_cmd = tracker_output_cmd;
       }
     }
-
-    if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
-
-      last_position_cmd = tracker_output_cmd;
-
-    } else if (active_tracker_idx > 0) {
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
-      // TODO: switch to failsave tracker, or stop outputting commands
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
-
-    } else if (active_tracker_idx == 0) {
-
-      last_position_cmd = tracker_output_cmd;
+    catch (std::runtime_error &exrun) {
+      ROS_INFO("[ControlManager]: Exception while updateing trackers.");
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  catch (std::runtime_error &exrun) {
-    ROS_INFO("[ControlManager]: Exception while updateing trackers.");
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-  }
+  mutex_tracker_list.unlock();
 
   tf::Quaternion desired_orientation;
 
@@ -736,7 +744,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   char message[100];
 
@@ -887,7 +896,8 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
 bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   res.success = hover(res.message);
 
@@ -900,7 +910,8 @@ bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Tr
 
 bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   motors = req.data;
 
@@ -922,7 +933,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
 bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
@@ -953,9 +965,10 @@ bool ControlManager::callbackgoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
 
 void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
-  bool                   tracker_response;
+  bool tracker_response;
 
   mutex_tracker_list.lock();
   { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
@@ -972,7 +985,8 @@ void ControlManager::callbackgoToTopic(const mrs_msgs::TrackerPointStampedConstP
 
 bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1003,9 +1017,10 @@ bool ControlManager::callbackgoToRelativeService(mrs_msgs::Vec4::Request &req, m
 
 void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
-  bool                   tracker_response;
+  bool tracker_response;
 
   mutex_tracker_list.lock();
   { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
@@ -1022,7 +1037,8 @@ void ControlManager::callbackgoToRelativeTopic(const mrs_msgs::TrackerPointStamp
 
 bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1053,9 +1069,10 @@ bool ControlManager::callbackgoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
 void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
-  bool                   tracker_response;
+  bool tracker_response;
 
   mutex_tracker_list.lock();
   { tracker_response = tracker_list[active_tracker_idx]->goToAltitude(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
@@ -1072,7 +1089,8 @@ void ControlManager::callbackgoToAltitudeTopic(const std_msgs::Float64ConstPtr &
 
 bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1103,9 +1121,10 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
 
 void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
-  bool                   tracker_response;
+  bool tracker_response;
 
   mutex_tracker_list.lock();
   { tracker_response = tracker_list[active_tracker_idx]->setYaw(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
@@ -1122,7 +1141,8 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
 bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1153,9 +1173,10 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 
 void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg) {
 
-  if (!is_initialized) return;
+  if (!is_initialized)
+    return;
 
-  bool                   tracker_response;
+  bool tracker_response;
 
   mutex_tracker_list.lock();
   { tracker_response = tracker_list[active_tracker_idx]->setYawRelative(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
