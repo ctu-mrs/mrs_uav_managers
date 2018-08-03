@@ -35,6 +35,7 @@
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~motors_out" to="control_manager/motors" />
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
+      <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
 
     </node>
 
@@ -91,7 +92,7 @@
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~tracker_status_out" to="~tracker_status" />
-      <remap from="~cmd_pose_out" to="~cmd_pose" />
+      <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->

@@ -70,7 +70,7 @@ private:
   bool motors                  = 0;
 
   ros::Publisher publisher_attitude_cmd;
-  ros::Publisher publisher_cmd_pose;
+  ros::Publisher publisher_cmd_odom;
   ros::Publisher publisher_tracker_status;
 
   ros::ServiceServer service_switch_tracker;
@@ -79,17 +79,17 @@ private:
   ros::ServiceServer service_motors;
   ros::ServiceServer service_enable_callbacks;
 
-  ros::ServiceServer service_goTo;
-  ros::ServiceServer service_goTo_relative;
-  ros::ServiceServer service_goTo_altitude;
+  ros::ServiceServer service_goto;
+  ros::ServiceServer service_goto_relative;
+  ros::ServiceServer service_goto_altitude;
   ros::ServiceServer service_set_yaw;
   ros::ServiceServer service_set_yaw_relative;
 
   ros::ServiceServer service_emergencyGoTo;
 
-  ros::Subscriber subscriber_goTo;
-  ros::Subscriber subscriber_goTo_relative;
-  ros::Subscriber subscriber_goTo_altitude;
+  ros::Subscriber subscriber_goto;
+  ros::Subscriber subscriber_goto_relative;
+  ros::Subscriber subscriber_goto_altitude;
   ros::Subscriber subscriber_set_yaw;
   ros::Subscriber subscriber_set_yaw_relative;
 
@@ -330,7 +330,7 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
-  publisher_cmd_pose       = nh_.advertise<nav_msgs::Odometry>("cmd_pose_out", 1);
+  publisher_cmd_odom       = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
   publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
 
   // --------------------------------------------------------------
@@ -349,17 +349,17 @@ void ControlManager::onInit() {
 
   // | ---------------- setpoint command services --------------- |
 
-  service_goTo             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
-  service_goTo_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
-  service_goTo_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
+  service_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
+  service_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
+  service_goto_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
   service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
   service_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
   // | ----------------- setpoint command topics ---------------- |
 
-  subscriber_goTo             = nh_.subscribe("goto_in", 1, &ControlManager::callbackGoToTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goTo_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackGoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goTo_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackGoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goto             = nh_.subscribe("goto_in", 1, &ControlManager::callbackGoToTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goto_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackGoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_goto_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackGoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
   subscriber_set_yaw          = nh_.subscribe("set_yaw_in", 1, &ControlManager::callbackSetYawTopic, this, ros::TransportHints().tcpNoDelay());
   subscriber_set_yaw_relative = nh_.subscribe("set_yaw_relative_in", 1, &ControlManager::callbackSetYawRelativeTopic, this, ros::TransportHints().tcpNoDelay());
 
@@ -626,20 +626,20 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   tf::Quaternion desired_orientation;
 
-  // publish the cmd_pose topic
+  // publish the odom topic
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
-    nav_msgs::Odometry cmd_pose;
-    cmd_pose.header.stamp         = ros::Time::now();
-    cmd_pose.header.frame_id      = "local_origin";
-    cmd_pose.pose.pose.position   = tracker_output_cmd->position;
-    cmd_pose.twist.twist.linear.x = tracker_output_cmd->velocity.x;
-    cmd_pose.twist.twist.linear.y = tracker_output_cmd->velocity.y;
-    cmd_pose.twist.twist.linear.z = tracker_output_cmd->velocity.z;
+    nav_msgs::Odometry cmd_odom;
+    cmd_odom.header.stamp         = ros::Time::now();
+    cmd_odom.header.frame_id      = "local_origin";
+    cmd_odom.pose.pose.position   = tracker_output_cmd->position;
+    cmd_odom.twist.twist.linear.x = tracker_output_cmd->velocity.x;
+    cmd_odom.twist.twist.linear.y = tracker_output_cmd->velocity.y;
+    cmd_odom.twist.twist.linear.z = tracker_output_cmd->velocity.z;
     desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
     desired_orientation.normalize();
-    quaternionTFToMsg(desired_orientation, cmd_pose.pose.pose.orientation);
-    publisher_cmd_pose.publish(cmd_pose);
+    quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+    publisher_cmd_odom.publish(cmd_odom);
   }
 
   // --------------------------------------------------------------
@@ -1010,7 +1010,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo' service!", tracker_names[active_tracker_idx].c_str());
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }
@@ -1041,7 +1041,7 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo' topic!", tracker_names[active_tracker_idx].c_str());
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
   }
 }
 
@@ -1077,7 +1077,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo_relative' service!", tracker_names[active_tracker_idx].c_str());
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }
@@ -1108,7 +1108,7 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo_relative' topic!", tracker_names[active_tracker_idx].c_str());
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_relative' topic!", tracker_names[active_tracker_idx].c_str());
   }
 }
 
@@ -1144,7 +1144,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
       res = *tracker_response;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo_altitude' service!", tracker_names[active_tracker_idx].c_str());
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_altitude' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }
@@ -1175,7 +1175,7 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goTo_altitude' topic!", tracker_names[active_tracker_idx].c_str());
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_altitude' topic!", tracker_names[active_tracker_idx].c_str());
   }
 }
 
@@ -1356,7 +1356,7 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goTo' service!", tracker_names[active_tracker_idx].c_str());
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }
