@@ -955,7 +955,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   req_goto_out = req;
 
   std_srvs::SetBoolRequest req_enable_callbacks;
-  req_enable_callbacks.data = false;
+  req_enable_callbacks.data = callbacks_enabled;
 
   mutex_tracker_list.lock();
   {
