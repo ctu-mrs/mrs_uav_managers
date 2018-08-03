@@ -85,6 +85,7 @@ private:
   ros::ServiceClient service_client_switch_tracker;
   ros::ServiceClient service_client_land;
   ros::ServiceClient service_client_motors;
+  ros::ServiceClient service_client_enabled_callbacks;
   ros::ServiceClient service_client_emergency_goto;
 
 private:
@@ -156,11 +157,12 @@ void MavManager::onInit() {
   service_server_land      = nh_.advertiseService("land_in", &MavManager::callbackLand, this);
   service_server_land_home = nh_.advertiseService("land_home_in", &MavManager::callbackLandHome, this);
 
-  service_client_takeoff        = nh_.serviceClient<std_srvs::Trigger>("takeoff_out");
-  service_client_land           = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_switch_tracker = nh_.serviceClient<mrs_msgs::SwitchTracker>("switch_tracker_out");
-  service_client_motors         = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_emergency_goto = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
+  service_client_takeoff           = nh_.serviceClient<std_srvs::Trigger>("takeoff_out");
+  service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::SwitchTracker>("switch_tracker_out");
+  service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
+  service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
+  service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
 
   nh_.getParam("null_tracker", null_tracker_name_);
   nh_.getParam("landoff/landing_tracker", landing_tracker_name_);
@@ -274,6 +276,10 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
           mrs_msgs::SwitchTracker switch_tracker_out;
           switch_tracker_out.request.tracker = null_tracker_name_;
           service_client_switch_tracker.call(switch_tracker_out);
+
+          std_srvs::SetBool enable_callbacks_out;
+          enable_callbacks_out.request.data = true;
+          service_client_enabled_callbacks.call(enable_callbacks_out);
 
           changeLandingState(IDLE_STATE);
 
@@ -514,7 +520,8 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
 bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
-  if (!is_initialized) return false;
+  if (!is_initialized)
+    return false;
 
   char message[100];
 
