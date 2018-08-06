@@ -9,6 +9,7 @@
 #include <nodelet/loader.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
+#include <mrs_msgs/PositionCommand.h>
 
 #include <mutex>
 
@@ -69,6 +70,8 @@ private:
   int  failsafe_controller_idx = 0;
   bool motors                  = 0;
 
+  ros::Publisher publisher_control_output;
+  ros::Publisher publisher_position_cmd;
   ros::Publisher publisher_attitude_cmd;
   ros::Publisher publisher_cmd_odom;
   ros::Publisher publisher_tracker_status;
@@ -334,7 +337,9 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_attitude_cmd   = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_cmd_out", 1);
+  publisher_control_output = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd   = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd   = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
   publisher_cmd_odom       = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
   publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
 
@@ -648,9 +653,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mutex_last_position_cmd.lock();
   {
-    // publish the odom topic
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
+      // publish the odom topic (position command for debugging, e.g. rviz)
       nav_msgs::Odometry cmd_odom;
       cmd_odom.header.stamp         = ros::Time::now();
       cmd_odom.header.frame_id      = "local_origin";
@@ -662,6 +667,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       desired_orientation.normalize();
       quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
       publisher_cmd_odom.publish(cmd_odom);
+
+      // publish the full command structure
+      publisher_position_cmd.publish(last_position_cmd);
     }
   }
   mutex_last_position_cmd.unlock();
@@ -689,12 +697,19 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mutex_last_position_cmd.unlock();
   mutex_controller_list.unlock();
 
+  // | --------- publish the attitude_cmd for debugging --------- |
+
+  publisher_attitude_cmd.publish(controller_output_cmd);
+
   // --------------------------------------------------------------
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
   mavros_msgs::AttitudeTarget attitude_target;
-  bool                        should_publish = false;
+  attitude_target.header.stamp    = ros::Time::now();
+  attitude_target.header.frame_id = "local_origin";
+
+  bool should_publish = false;
 
   if (active_tracker_idx == 0 || !motors) {
 
@@ -710,9 +725,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     attitude_target.thrust = 0.0;
 
-    attitude_target.header.stamp    = ros::Time::now();
-    attitude_target.header.frame_id = "local_origin";
-
     should_publish = true;
 
   } else if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
@@ -726,9 +738,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
     attitude_target.thrust = 0.0;
-
-    attitude_target.header.stamp    = ros::Time::now();
-    attitude_target.header.frame_id = "local_origin";
 
     should_publish = true;
 
@@ -744,9 +753,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
     attitude_target.thrust = controller_output_cmd->thrust;
-
-    attitude_target.header.stamp    = ros::Time::now();
-    attitude_target.header.frame_id = "local_origin";
 
     should_publish = true;
   } else {
@@ -777,7 +783,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       return;
     }
 
-    publisher_attitude_cmd.publish(attitude_target);
+    publisher_control_output.publish(attitude_target);
   }
 }
 
