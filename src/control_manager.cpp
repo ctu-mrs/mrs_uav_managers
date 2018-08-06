@@ -94,7 +94,10 @@ private:
   ros::Subscriber subscriber_set_yaw_relative;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
+  std::mutex                          mutex_last_position_cmd;
+
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
+  std::mutex                          mutex_last_attitude_cmd;
 
 private:
   double max_tilt_angle_;
@@ -320,7 +323,9 @@ void ControlManager::onInit() {
   ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
 
   mutex_controller_list.lock();
+  mutex_last_attitude_cmd.lock();
   { controller_list[active_controller_idx]->activate(last_attitude_cmd); }
+  mutex_last_attitude_cmd.unlock();
   mutex_controller_list.unlock();
 
   motors = false;
@@ -427,15 +432,25 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
-    return;
+  mutex_last_attitude_cmd.lock();
+  mutex_last_position_cmd.lock();
+  {
+    if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
+      mutex_last_attitude_cmd.unlock();
+      mutex_last_position_cmd.unlock();
+      return;
+    }
   }
+  mutex_last_position_cmd.unlock();
+  mutex_last_attitude_cmd.unlock();
 
   char message[100];
 
   mutex_odometry.lock();
   mutex_tracker_list.lock();
   mutex_controller_list.lock();
+  mutex_last_position_cmd.lock();
+  mutex_last_attitude_cmd.lock();
   {
     double position_error_x = last_position_cmd->position.x - odometry_x;
     double position_error_y = last_position_cmd->position.y - odometry_y;
@@ -492,6 +507,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
       }
     }
   }
+  mutex_last_attitude_cmd.unlock();
+  mutex_last_position_cmd.unlock();
   mutex_controller_list.unlock();
   mutex_tracker_list.unlock();
   mutex_odometry.unlock();
@@ -507,6 +524,7 @@ bool ControlManager::hover(std::string &message_out) {
     return false;
 
   char message[100];
+  bool success = false;
 
   try {
 
@@ -521,7 +539,7 @@ bool ControlManager::hover(std::string &message_out) {
       active_tracker_idx = hover_tracker_idx;
 
       message_out = std::string(message);
-      return true;
+      success     = true;
     }
     catch (std::runtime_error &exrun) {
 
@@ -529,7 +547,7 @@ bool ControlManager::hover(std::string &message_out) {
       ROS_ERROR("[ControlManager]: %s", message);
 
       message_out = std::string(message);
-      return false;
+      success     = false;
     }
   }
   catch (std::runtime_error &exrun) {
@@ -539,10 +557,10 @@ bool ControlManager::hover(std::string &message_out) {
     ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
     message_out = std::string(message);
-    return false;
+    success     = false;
   }
 
-  return true;
+  return success;
 }
 
 //}
@@ -584,6 +602,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
   mutex_tracker_list.lock();
+  mutex_last_position_cmd.lock();
   {
     try {
 
@@ -622,25 +641,30 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
+  mutex_last_position_cmd.unlock();
   mutex_tracker_list.unlock();
 
   tf::Quaternion desired_orientation;
 
-  // publish the odom topic
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  mutex_last_position_cmd.lock();
+  {
+    // publish the odom topic
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
-    nav_msgs::Odometry cmd_odom;
-    cmd_odom.header.stamp         = ros::Time::now();
-    cmd_odom.header.frame_id      = "local_origin";
-    cmd_odom.pose.pose.position   = tracker_output_cmd->position;
-    cmd_odom.twist.twist.linear.x = tracker_output_cmd->velocity.x;
-    cmd_odom.twist.twist.linear.y = tracker_output_cmd->velocity.y;
-    cmd_odom.twist.twist.linear.z = tracker_output_cmd->velocity.z;
-    desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
-    desired_orientation.normalize();
-    quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
-    publisher_cmd_odom.publish(cmd_odom);
+      nav_msgs::Odometry cmd_odom;
+      cmd_odom.header.stamp         = ros::Time::now();
+      cmd_odom.header.frame_id      = "local_origin";
+      cmd_odom.pose.pose.position   = tracker_output_cmd->position;
+      cmd_odom.twist.twist.linear.x = tracker_output_cmd->velocity.x;
+      cmd_odom.twist.twist.linear.y = tracker_output_cmd->velocity.y;
+      cmd_odom.twist.twist.linear.z = tracker_output_cmd->velocity.z;
+      desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
+      desired_orientation.normalize();
+      quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+      publisher_cmd_odom.publish(cmd_odom);
+    }
   }
+  mutex_last_position_cmd.unlock();
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
@@ -649,6 +673,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
   mutex_controller_list.lock();
+  mutex_last_position_cmd.lock();
   {
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -661,6 +686,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       }
     }
   }
+  mutex_last_position_cmd.unlock();
   mutex_controller_list.unlock();
 
   // --------------------------------------------------------------
@@ -708,7 +734,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    last_attitude_cmd = controller_output_cmd;
+    mutex_last_attitude_cmd.lock();
+    { last_attitude_cmd = controller_output_cmd; }
+    mutex_last_attitude_cmd.unlock();
 
     // convert the RPY to quaternion
     desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->roll, controller_output_cmd->pitch, controller_output_cmd->yaw);
@@ -802,6 +830,8 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   }
 
   mutex_controller_list.lock();
+  mutex_last_position_cmd.lock();
+  mutex_last_attitude_cmd.lock();
   {
     try {
 
@@ -836,6 +866,8 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
+  mutex_last_attitude_cmd.unlock();
+  mutex_last_position_cmd.unlock();
   mutex_controller_list.unlock();
 
   res.message = message;
@@ -876,6 +908,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
   }
 
   mutex_controller_list.lock();
+  mutex_last_attitude_cmd.lock();
   {
     try {
 
@@ -899,6 +932,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
+  mutex_last_attitude_cmd.unlock();
   mutex_controller_list.unlock();
 
   res.message = message;
@@ -914,7 +948,11 @@ bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Tr
   if (!is_initialized)
     return false;
 
-  res.success = hover(res.message);
+  mutex_tracker_list.lock();
+  mutex_last_position_cmd.lock();
+  { res.success = hover(res.message); }
+  mutex_last_position_cmd.unlock();
+  mutex_tracker_list.unlock();
 
   return true;
 }
