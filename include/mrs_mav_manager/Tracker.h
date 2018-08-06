@@ -30,6 +30,7 @@
 namespace mrs_mav_manager
 {
 class Tracker {
+
 public:
   virtual ~Tracker(void) {
   }

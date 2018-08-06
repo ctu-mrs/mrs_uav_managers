@@ -38,6 +38,7 @@ private:
   ros::NodeHandle nh_;
   bool            is_active      = false;
   bool            is_initialized = false;
+  bool            callbacks_enabled = false;
 };
 
 NullTracker::NullTracker(void) {
@@ -118,7 +119,27 @@ const mrs_msgs::TrackerStatus::Ptr NullTracker::getStatus() {
 //{ enableCallbacks()
 
 const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) {
-  return std_srvs::SetBoolResponse::Ptr();
+
+  char                      message[100];
+  std_srvs::SetBoolResponse res;
+
+  if (cmd->data != callbacks_enabled) {
+
+    callbacks_enabled = cmd->data;
+
+    sprintf((char *)&message, "Callbacks %s", callbacks_enabled ? "enabled" : "disabled");
+
+    ROS_INFO("[MpcTracker]: %s", message);
+
+  } else {
+
+    sprintf((char *)&message, "Callbacks were already %s", callbacks_enabled ? "enabled" : "disabled");
+  }
+
+  res.message = message;
+  res.success = true;
+
+  return std_srvs::SetBoolResponse::ConstPtr(new std_srvs::SetBoolResponse(res));
 }
 
 //}
