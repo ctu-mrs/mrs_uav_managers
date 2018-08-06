@@ -21,6 +21,8 @@
 
 #include <std_srvs/SetBool.h>
 
+#include <mrs_lib/Profiler.h>
+
 namespace mrs_mav_manager
 {
 
@@ -144,6 +146,10 @@ private:
 private:
   ros::Timer safety_timer;
   void safetyTimer(const ros::TimerEvent &event);
+
+private:
+  mrs_lib::Profiler *profiler;
+  mrs_lib::Routine  *routine_callback_odometry;
 };
 
 //}
@@ -332,6 +338,13 @@ void ControlManager::onInit() {
   mutex_controller_list.unlock();
 
   motors = false;
+
+  // --------------------------------------------------------------
+  // |                          profiler                          |
+  // --------------------------------------------------------------
+
+  profiler                  = new mrs_lib::Profiler(nh_, "ControlManager");
+  routine_callback_odometry = profiler->registerRoutine("callbackOdometry");
 
   // --------------------------------------------------------------
   // |                         publishers                         |
@@ -581,6 +594,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  routine_callback_odometry->start();
+
   mutex_odometry.lock();
   {
     odometry = *msg;
@@ -785,6 +800,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     publisher_control_output.publish(attitude_target);
   }
+
+  routine_callback_odometry->end();
 }
 
 //}
