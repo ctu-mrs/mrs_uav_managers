@@ -714,7 +714,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
-  publisher_attitude_cmd.publish(controller_output_cmd);
+  if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+    publisher_attitude_cmd.publish(controller_output_cmd);
+  }
 
   // --------------------------------------------------------------
   // |                 Publish the control command                |
