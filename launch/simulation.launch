@@ -90,9 +90,11 @@
       <remap from="~set_yaw_relative_in" to="~set_yaw_relative" />
 
       <!-- Publishers -->
-      <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~tracker_status_out" to="~tracker_status" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
+      <remap from="~position_cmd_out" to="~position_cmd" />
+      <remap from="~attitude_cmd_out" to="~attitude_cmd" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
