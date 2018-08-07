@@ -10,6 +10,7 @@
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/AttitudeCommand.h>
 
 #include <mutex>
 
@@ -149,7 +150,7 @@ private:
 
 private:
   mrs_lib::Profiler *profiler;
-  mrs_lib::Routine  *routine_callback_odometry;
+  mrs_lib::Routine * routine_callback_odometry;
 };
 
 //}
@@ -161,6 +162,8 @@ void ControlManager::onInit() {
   ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
+
+  ROS_INFO("[ControlManager]: initializing");
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -714,7 +717,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
-  publisher_attitude_cmd.publish(controller_output_cmd);
+  if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+    publisher_attitude_cmd.publish(controller_output_cmd);
+  }
 
   // --------------------------------------------------------------
   // |                 Publish the control command                |
