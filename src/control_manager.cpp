@@ -430,7 +430,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   tracker_status.stamp   = ros::Time::now();
 
   try {
-    publisher_tracker_status.publish(tracker_status);
+    publisher_tracker_status.publish(mrs_msgs::TrackerStatusConstPtr(new mrs_msgs::TrackerStatus(tracker_status)));
   }
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
@@ -681,10 +681,18 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
       desired_orientation.normalize();
       quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
-      publisher_cmd_odom.publish(cmd_odom);
+      try {
+        publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
+      } catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
+      }
 
       // publish the full command structure
-      publisher_position_cmd.publish(last_position_cmd);
+      try {
+        publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd)); // the last_position_cmd is already a ConstPtr
+      } catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
+      }
     }
   }
   mutex_last_position_cmd.unlock();
@@ -715,7 +723,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // | --------- publish the attitude_cmd for debugging --------- |
 
   if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-    publisher_attitude_cmd.publish(controller_output_cmd);
+    try {
+      publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(controller_output_cmd)); // the control command is already a ConstPtr
+    } catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
+    }
   }
 
   // --------------------------------------------------------------
@@ -800,7 +812,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       return;
     }
 
-    publisher_control_output.publish(attitude_target);
+    try {
+      publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+    } catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+    }
   }
 
   routine_callback_odometry->end();
