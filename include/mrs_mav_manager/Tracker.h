@@ -40,7 +40,7 @@ public:
   virtual void deactivate(void)                                         = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
-  virtual const mrs_msgs::TrackerStatus::Ptr getStatus()                                            = 0;
+  virtual const mrs_msgs::TrackerStatus::Ptr        getStatus()                                     = 0;
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)           = 0;
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd)   = 0;
@@ -53,10 +53,10 @@ public:
 
   virtual bool goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg)         = 0;
   virtual bool goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg) = 0;
-  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg)      = 0;
-  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg)            = 0;
-  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg)    = 0;
+  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg)             = 0;
+  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg)                   = 0;
+  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg)           = 0;
 };
-}
+}  // namespace mrs_mav_manager
 
 #endif

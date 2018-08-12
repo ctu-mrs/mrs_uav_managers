@@ -36,8 +36,8 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  bool            is_active      = false;
-  bool            is_initialized = false;
+  bool            is_active         = false;
+  bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 };
 
@@ -233,7 +233,7 @@ const std_srvs::TriggerResponse::ConstPtr NullTracker::hover(const std_srvs::Tri
 }
 
 //}
-}
+}  // namespace mrs_mav_manager
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::NullTracker, mrs_mav_manager::Tracker)

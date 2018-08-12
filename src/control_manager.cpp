@@ -142,11 +142,11 @@ private:
 
 private:
   ros::Timer status_timer;
-  void statusTimer(const ros::TimerEvent &event);
+  void       statusTimer(const ros::TimerEvent &event);
 
 private:
   ros::Timer safety_timer;
-  void safetyTimer(const ros::TimerEvent &event);
+  void       safetyTimer(const ros::TimerEvent &event);
 
 private:
   mrs_lib::Profiler *profiler;
@@ -686,14 +686,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
       try {
         publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
-      } catch (...) {
+      }
+      catch (...) {
         ROS_ERROR("Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
       }
 
       // publish the full command structure
       try {
-        publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd)); // the last_position_cmd is already a ConstPtr
-      } catch (...) {
+        publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd));  // the last_position_cmd is already a ConstPtr
+      }
+      catch (...) {
         ROS_ERROR("Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
       }
     }
@@ -727,8 +729,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
     try {
-      publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(controller_output_cmd)); // the control command is already a ConstPtr
-    } catch (...) {
+      publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(controller_output_cmd));  // the control command is already a ConstPtr
+    }
+    catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
     }
   }
@@ -817,7 +820,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     try {
       publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
-    } catch (...) {
+    }
+    catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
     }
   }
@@ -1449,7 +1453,7 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
 }
 
 //}
-}
+}  // namespace mrs_mav_manager
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::ControlManager, nodelet::Nodelet)

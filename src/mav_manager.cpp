@@ -18,7 +18,8 @@ namespace mrs_mav_manager
 //{ class MavManager
 
 // state machine
-typedef enum {
+typedef enum
+{
 
   IDLE_STATE,
   FLY_HOME_STATE,
@@ -38,13 +39,13 @@ private:
 
 public:
   virtual void onInit();
-  bool callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
-  void changeLandingState(LandingStates_t new_state);
+  bool         callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool         callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool         callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  void         callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void         callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void         callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
+  void         changeLandingState(LandingStates_t new_state);
 
 private:
   ros::Subscriber    subscriber_odometry;
@@ -575,7 +576,7 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
 }
 
 //}
-}
+}  // namespace mrs_mav_manager
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::MavManager, nodelet::Nodelet)
