@@ -20,7 +20,7 @@ null_tracker: "mrs_mav_manager/NullTracker"
 
 safety:
 
-  max_tilt_angle: 60 # [deg]
+  max_tilt_angle: 90 # [deg]
   failsafe_hover_control_error: 10.5 # [m]
   failsafe_land_control_error: 30.0 # [m]
 
