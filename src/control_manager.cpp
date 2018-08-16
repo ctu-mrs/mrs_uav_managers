@@ -22,6 +22,8 @@
 
 #include <std_srvs/SetBool.h>
 
+#include <mrs_lib/ConvexPolygon.h>
+
 #include <mrs_lib/Profiler.h>
 
 namespace mrs_mav_manager
@@ -109,6 +111,13 @@ private:
   double max_tilt_angle_;
   double failsafe_hover_control_error_;
   double failsafe_land_control_error_;
+
+private:
+  mrs_lib::ConvexPolygon *safety_area;
+  bool                    use_safety_area;
+
+  Eigen::VectorXd projectPointOnSafetyBoundary(const Eigen::VectorXd point);
+  bool            isInSafetyArea(const Eigen::VectorXd point);
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
@@ -341,6 +350,55 @@ void ControlManager::onInit() {
   mutex_controller_list.unlock();
 
   motors = false;
+
+  // --------------------------------------------------------------
+  // |                         safety area                        |
+  // --------------------------------------------------------------
+
+  nh_.param("use_safety_area", use_safety_area, false);
+
+  if (use_safety_area) {
+
+    std::vector<double> tempList;
+    nh_.getParam("safety_area", tempList);
+
+    // check if the safety area has odd number of numbers (x, y coordinates)
+    if ((tempList.size() % 2) == 1) {
+
+      ROS_ERROR("[ControlManager]: Safety area is not correctly defined!, Exitting...");
+      ros::shutdown();
+    }
+
+    // how many points are there in the safety area?
+    int safety_area_size = tempList.size() / 2;
+
+    Eigen::MatrixXd tempMatrix = Eigen::MatrixXd::Zero(safety_area_size, 2);
+    int             tempIdx    = 0;
+    for (int i = 0; i < safety_area_size; i++) {
+      for (int j = 0; j < 2; j++) {
+        tempMatrix(i, j) = tempList[tempIdx++];
+      }
+    }
+
+    try {
+
+      safety_area = new mrs_lib::ConvexPolygon(tempMatrix);
+    }
+    catch (mrs_lib::ConvexPolygon::WrongNumberOfVertices) {
+
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of vertices was supplied to create the safety area.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::ConvexPolygon::PolygonNotConvexException) {
+
+      ROS_ERROR("[ControlManager]: Exception caught. Polygon supplied to create the safety area is not convex.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::ConvexPolygon::WrongNumberOfColumns) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of columns was supplied to the safety area.");
+      ros::shutdown();
+    }
+  }
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -1402,6 +1460,28 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
 //}
 
 // | --------------------- other services --------------------- |
+
+// | ----------------------- safety area ---------------------- |
+
+//{ isInSafetyArea()
+
+bool ControlManager::isInSafetyArea(const Eigen::VectorXd point) {
+
+  return true;
+}
+
+//}
+
+//{ projectPointOnSafetyBoundary()
+
+Eigen::VectorXd ControlManager::projectPointOnSafetyBoundary(const Eigen::VectorXd point) {
+
+  Eigen::Vector3d new_point;
+
+  return new_point;
+}
+
+//}
 
 //{ callbackEmergencyGoToService()
 
