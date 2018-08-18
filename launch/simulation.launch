@@ -42,6 +42,7 @@
     <!-- Control manager -->
     <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager $(arg uav_name)_nodelet_manager" output="screen">
 
+      <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
 
       <!-- Controller's configs -->
@@ -73,7 +74,6 @@
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
-      <rosparam ns="mpc_tracker" file="$(arg world_file)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
