@@ -44,6 +44,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
 
       <!-- Controller's configs -->
 

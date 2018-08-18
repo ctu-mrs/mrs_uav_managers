@@ -108,6 +108,9 @@ private:
   std::mutex                          mutex_last_attitude_cmd;
 
 private:
+  mrs_mav_manager::MotorParams motor_params_;
+
+private:
   double max_tilt_angle_;
   double failsafe_hover_control_error_;
   double failsafe_land_control_error_;
@@ -202,6 +205,19 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
+  nh_.param("hover_thrust/a", motor_params_.hover_thrust_a, -1000.0);
+  nh_.param("hover_thrust/b", motor_params_.hover_thrust_b, -1000.0);
+
+  if (motor_params_.hover_thrust_a < -999) {
+    ROS_ERROR("[ControlManager]: hover_thrust/a is not specified!");
+    ros::shutdown();
+  }
+
+  if (motor_params_.hover_thrust_b < -999) {
+    ROS_ERROR("[ControlManager]: hover_thrust/b is not specified!");
+    ros::shutdown();
+  }
+
   // --------------------------------------------------------------
   // |                        load trackers                       |
   // --------------------------------------------------------------
@@ -291,7 +307,7 @@ void ControlManager::onInit() {
 
       try {
         ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
-        controller_list[i]->initialize(nh_);
+        controller_list[i]->initialize(nh_, motor_params_);
       }
       catch (std::runtime_error &ex) {
         ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
