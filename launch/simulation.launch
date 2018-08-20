@@ -44,6 +44,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
 
       <!-- Controller's configs -->
 
@@ -78,6 +79,13 @@
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/rc_in" to="mavros/rc/in" />
+      <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
+      <remap from="~mpc_tracker/start_trajectory_following_in" to="~mpc_tracker/start_trajectory_following" />
+      <remap from="~mpc_tracker/stop_trajectory_following_in" to="~mpc_tracker/stop_trajectory_following" />
+      <remap from="~mpc_tracker/resume_trajectory_following_in" to="~mpc_tracker/resume_trajectory_following" />
+      <remap from="~mpc_tracker/fly_to_trajectory_start_in" to="~mpc_tracker/fly_to_trajectory_start" />
+      <remap from="~mpc_tracker/failsafe_in" to="~mpc_tracker/failsafe" />
+      <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />

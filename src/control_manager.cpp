@@ -108,6 +108,9 @@ private:
   std::mutex                          mutex_last_attitude_cmd;
 
 private:
+  mrs_mav_manager::MotorParams motor_params_;
+
+private:
   double max_tilt_angle_;
   double failsafe_hover_control_error_;
   double failsafe_land_control_error_;
@@ -202,6 +205,19 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
+  nh_.param("hover_thrust/a", motor_params_.hover_thrust_a, -1000.0);
+  nh_.param("hover_thrust/b", motor_params_.hover_thrust_b, -1000.0);
+
+  if (motor_params_.hover_thrust_a < -999) {
+    ROS_ERROR("[ControlManager]: hover_thrust/a is not specified!");
+    ros::shutdown();
+  }
+
+  if (motor_params_.hover_thrust_b < -999) {
+    ROS_ERROR("[ControlManager]: hover_thrust/b is not specified!");
+    ros::shutdown();
+  }
+
   // --------------------------------------------------------------
   // |                        load trackers                       |
   // --------------------------------------------------------------
@@ -291,7 +307,7 @@ void ControlManager::onInit() {
 
       try {
         ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
-        controller_list[i]->initialize(nh_);
+        controller_list[i]->initialize(nh_, motor_params_);
       }
       catch (std::runtime_error &ex) {
         ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
@@ -718,7 +734,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
         } else {
 
-          // if it is not the active one, just update without retrieving the commadn
+          // if it is not the active one, just update without retrieving the command
           tracker_list[i]->update(odometry_const_ptr);
         }
       }
@@ -763,6 +779,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
       desired_orientation.normalize();
       quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+
       try {
         publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
       }
@@ -821,7 +838,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mavros_msgs::AttitudeTarget attitude_target;
   attitude_target.header.stamp    = ros::Time::now();
-  attitude_target.header.frame_id = "local_origin";
+  attitude_target.header.frame_id = "base_link";
 
   bool should_publish = false;
 
@@ -865,6 +882,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->roll, controller_output_cmd->pitch, controller_output_cmd->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
 
     attitude_target.thrust = controller_output_cmd->thrust;
 
@@ -1175,7 +1196,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   mutex_last_position_cmd.lock();
   if (!isPointInSafetyArea3d(req.goal[0], req.goal[1], req.goal[2])) {
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -1222,7 +1243,7 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   mutex_last_position_cmd.lock();
   if (!isPointInSafetyArea3d(msg->position.x, msg->position.y, msg->position.z)) {
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
     return;
   }
   mutex_last_position_cmd.unlock();
@@ -1262,7 +1283,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   if (!isPointInSafetyArea3d(last_position_cmd->position.x+req.goal[0], last_position_cmd->position.y+req.goal[1], last_position_cmd->position.z+req.goal[2])) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -1312,7 +1333,7 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   if (!isPointInSafetyArea3d(last_position_cmd->position.x+msg->position.x, last_position_cmd->position.y+msg->position.y, last_position_cmd->position.z+msg->position.z)) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
     return;
   }
   mutex_odometry.unlock();
@@ -1354,7 +1375,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -1404,7 +1425,7 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
   if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
-    ROS_WARN("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+    ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
     return;
   }
   mutex_odometry.unlock();
