@@ -883,9 +883,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.body_rate.z = controller_output_cmd->yaw_rate;
-    attitude_target.body_rate.x = 1.0;
-    attitude_target.body_rate.y = 1.0;
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
 
     attitude_target.thrust = controller_output_cmd->thrust;
 
