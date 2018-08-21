@@ -236,7 +236,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
     {
       if (sqrt(pow(odometry_x - takeoff_x, 2) + pow(odometry_y - takeoff_y, 2)) < 0.5) {
 
-        ros::Duration wait(2.0);
+        ros::Duration wait(5.0);
         wait.sleep();
 
         ROS_INFO("[MavManager]: landing");
