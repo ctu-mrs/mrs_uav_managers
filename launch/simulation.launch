@@ -53,10 +53,10 @@
       <param name="pid_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~pid_controller/profiler" to="profiler" />
 
-      <!-- LSF -->
-      <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/simulation/f550/lsf.yaml" />
-      <param name="lsf_controller/uav_mass" value="$(arg uav_mass)" />
-      <remap from="~lsf_controller/profiler" to="profiler" />
+      <!-- NSF -->
+      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/simulation/f550/nsf.yaml" />
+      <param name="nsf_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- FailSafe -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/simulation/f550/failsafe.yaml" />
