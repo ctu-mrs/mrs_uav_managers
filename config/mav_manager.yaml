@@ -1,9 +1,25 @@
-landing_timer_rate: 10 # [Hz]
-
 null_tracker: "mrs_mav_manager/NullTracker"
 
 landoff:
+  rate: 10 # [Hz]
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   landing_tracker: "mrs_trackers/LandoffTracker"
   landing_cutoff_height:  0.30
   landing_cutoff_speed:  -0.1
+
+# gain_manager:
+#   rate: 30
+
+#   gains:
+
+#     optic_flow:
+#       horizontal: {kpxy: 0.15, kdxy: 0.15, kaxy: 1.0, kixy: 0.02}
+#       vertical: {kpz: 0.6, kvz: 0.2, kaz: 1.0}
+#       ki:  {x: 0.009, y: 0.009, z: 0.004}
+#       kib: {x: 0.001, y: 0.001, z: 0.001}
+
+#     gps:
+#       pos: {x: 11.0, y: 11.0, z: 9.6}
+#       vel: {x: 4.4, y: 4.4, z: 5.6}
+#       ki:  {x: 0.009, y: 0.009, z: 0.004}
+#       kib: {x: 0.001, y: 0.001, z: 0.001}
