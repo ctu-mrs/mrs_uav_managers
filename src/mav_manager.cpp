@@ -178,7 +178,7 @@ void MavManager::onInit() {
   param_loader.load_param("landoff/landing_cutoff_height", landing_cutoff_height_);
   param_loader.load_param("landoff/landing_cutoff_speed", landing_cutoff_speed_);
 
-  param_loader.load_param("landing_timer_rate", landing_timer_rate_);
+  param_loader.load_param("landoff/rate", landing_timer_rate_);
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
