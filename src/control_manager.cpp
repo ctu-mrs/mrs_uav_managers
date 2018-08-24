@@ -412,7 +412,7 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   profiler                  = new mrs_lib::Profiler(nh_, "ControlManager");
-  routine_callback_odometry = profiler->registerRoutine("callbackOdometry");
+  routine_callback_odometry = profiler->registerRoutine("control_and_tracker_update");
 
   // --------------------------------------------------------------
   // |                         publishers                         |

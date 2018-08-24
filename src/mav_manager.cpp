@@ -115,6 +115,8 @@ private:
 private:
   mrs_lib::Profiler *profiler;
   mrs_lib::Routine * routine_landing_timer;
+  mrs_lib::Routine * routine_callback_odometry;
+  mrs_lib::Routine * routine_callback_mavros_odometry;
 };
 
 //}
@@ -188,8 +190,10 @@ void MavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler              = new mrs_lib::Profiler(nh_, "MavManager");
-  routine_landing_timer = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
+  profiler                         = new mrs_lib::Profiler(nh_, "MavManager");
+  routine_landing_timer            = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
+  routine_callback_odometry        = profiler->registerRoutine("callbackOdometry");
+  routine_callback_mavros_odometry = profiler->registerRoutine("callbackMavrosOdometry");
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -324,6 +328,8 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  routine_callback_odometry->start();
+
   mutex_odometry.lock();
   {
     odometry = *msg;
@@ -341,6 +347,8 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mutex_odometry.unlock();
 
   got_odometry = true;
+
+  routine_callback_odometry->end();
 }
 
 //}
@@ -351,6 +359,8 @@ void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  routine_callback_mavros_odometry->start();
 
   mutex_mavros_odometry.lock();
   {
@@ -369,6 +379,8 @@ void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mutex_mavros_odometry.unlock();
 
   got_mavros_odometry = true;
+
+  routine_callback_mavros_odometry->end();
 }
 
 //}
