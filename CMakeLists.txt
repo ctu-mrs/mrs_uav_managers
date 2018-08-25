@@ -76,3 +76,16 @@ add_dependencies(MavManager
 target_link_libraries(MavManager
   ${catkin_LIBRARIES}
   )
+
+# GainManager
+
+add_library(GainManager src/gain_manager.cpp)
+
+add_dependencies(GainManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(GainManager
+  ${catkin_LIBRARIES}
+  )

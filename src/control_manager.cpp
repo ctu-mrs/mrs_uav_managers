@@ -1,5 +1,4 @@
-#include <mrs_msgs/SwitchTracker.h>
-#include <mrs_msgs/SwitchController.h>
+#include <mrs_msgs/String.h>
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
 #include <mrs_msgs/TrackerStatus.h>
@@ -130,8 +129,8 @@ private:
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
 
-  bool callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res);
-  bool callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res);
+  bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
 
   bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
@@ -909,7 +908,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //{ callbackSwitchTracker()
 
-bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req, mrs_msgs::SwitchTracker::Response &res) {
+bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
   if (!is_initialized)
     return false;
@@ -928,7 +927,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   int new_tracker_idx = -1;
 
   for (unsigned int i = 0; i < tracker_names.size(); i++) {
-    if (req.tracker.compare(tracker_names[i]) == 0) {
+    if (req.value.compare(tracker_names[i]) == 0) {
       new_tracker_idx = i;
     }
   }
@@ -936,7 +935,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   // check if the tracker exists
   if (new_tracker_idx < 0) {
 
-    sprintf((char *)&message, "The tracker %s does not exist!", req.tracker.c_str());
+    sprintf((char *)&message, "The tracker %s does not exist!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -946,7 +945,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   // check if the tracker is already active
   if (new_tracker_idx == active_tracker_idx) {
 
-    sprintf((char *)&message, "The tracker %s is already active!", req.tracker.c_str());
+    sprintf((char *)&message, "The tracker %s is already active!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
@@ -961,7 +960,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
 
       ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
       { tracker_list[new_tracker_idx]->activate(last_position_cmd); }
-      sprintf((char *)&message, "Tracker %s has been activated", req.tracker.c_str());
+      sprintf((char *)&message, "Tracker %s has been activated", req.value.c_str());
       ROS_INFO("[ControlManager]: %s", message);
       res.success = true;
 
@@ -986,7 +985,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
       }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.tracker.c_str());
+      ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.value.c_str());
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
@@ -999,14 +998,14 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::SwitchTracker::Request &req
   return true;
 }
 
-bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Request &req, mrs_msgs::SwitchController::Response &res) {
+bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
   char message[100];
 
   int new_controller_idx = -1;
 
   for (unsigned int i = 0; i < controller_names.size(); i++) {
-    if (req.controller.compare(controller_names[i]) == 0) {
+    if (req.value.compare(controller_names[i]) == 0) {
       new_controller_idx = i;
     }
   }
@@ -1014,7 +1013,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
   // check if the controller exists
   if (new_controller_idx < 0) {
 
-    sprintf((char *)&message, "The controller %s does not exist!", req.controller.c_str());
+    sprintf((char *)&message, "The controller %s does not exist!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -1024,7 +1023,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
   // check if the controller is not active
   if (new_controller_idx == active_controller_idx) {
 
-    sprintf((char *)&message, "The controller %s is already active!", req.controller.c_str());
+    sprintf((char *)&message, "The controller %s is already active!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
@@ -1038,7 +1037,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
 
       ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
       { controller_list[new_controller_idx]->activate(last_attitude_cmd); }
-      sprintf((char *)&message, "Controller %s has been activated", req.controller.c_str());
+      sprintf((char *)&message, "Controller %s has been activated", req.value.c_str());
       ROS_INFO("[ControlManager]: %s", message);
       res.success = true;
 
@@ -1052,7 +1051,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::SwitchController::Reques
       }
     }
     catch (std::runtime_error &exrun) {
-      ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.controller.c_str());
+      ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.value.c_str());
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
