@@ -1,0 +1,20 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <group ns="$(arg uav_name)">
+
+    <!-- MAV Manager -->
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="standalone mrs_mav_manager/GainManager" output="screen">
+
+      <rosparam file="$(find mrs_mav_manager)/config/gain_manager.yaml" />
+
+      <!-- Services -->
+      <remap from="~set_gains_in" to="~set_gains" />
+      <remap from="~set_gains_out" to="~set_gains_out" />
+
+    </node>
+
+  </group>
+
+</launch>

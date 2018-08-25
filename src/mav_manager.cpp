@@ -5,7 +5,7 @@
 #include <std_srvs/Trigger.h>
 #include <nav_msgs/Odometry.h>
 #include <mrs_msgs/Vec4.h>
-#include <mrs_msgs/SwitchTracker.h>
+#include <mrs_msgs/String.h>
 
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_lib/Profiler.h>
@@ -164,7 +164,7 @@ void MavManager::onInit() {
 
   service_client_takeoff           = nh_.serviceClient<std_srvs::Trigger>("takeoff_out");
   service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::SwitchTracker>("switch_tracker_out");
+  service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
   service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
   service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
@@ -240,8 +240,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 
         ROS_INFO("[MavManager]: landing");
 
-        mrs_msgs::SwitchTracker switch_tracker_out;
-        switch_tracker_out.request.tracker = landing_tracker_name_;
+        mrs_msgs::String switch_tracker_out;
+        switch_tracker_out.request.value = landing_tracker_name_;
         service_client_switch_tracker.call(switch_tracker_out);
 
         std_srvs::Trigger land_out;
@@ -273,8 +273,8 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
       {
         if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > landing_cutoff_speed_)) {
 
-          mrs_msgs::SwitchTracker switch_tracker_out;
-          switch_tracker_out.request.tracker = null_tracker_name_;
+          mrs_msgs::String switch_tracker_out;
+          switch_tracker_out.request.value = null_tracker_name_;
           service_client_switch_tracker.call(switch_tracker_out);
 
           std_srvs::SetBool enable_callbacks_out;
@@ -428,8 +428,8 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
 
   ROS_INFO("[MavManager]: taking off");
 
-  mrs_msgs::SwitchTracker switch_tracker_out;
-  switch_tracker_out.request.tracker = takeoff_tracker_name_;
+  mrs_msgs::String switch_tracker_out;
+  switch_tracker_out.request.value = takeoff_tracker_name_;
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger takeoff_out;
@@ -441,7 +441,7 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
     // if the takeoff was not successful, switch to NullTracker
     if (!takeoff_out.response.success) {
 
-      switch_tracker_out.request.tracker = null_tracker_name_;
+      switch_tracker_out.request.value = null_tracker_name_;
       service_client_switch_tracker.call(switch_tracker_out);
     }
 
@@ -495,8 +495,8 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
   ROS_INFO("[MavManager]: landing");
 
-  mrs_msgs::SwitchTracker switch_tracker_out;
-  switch_tracker_out.request.tracker = landing_tracker_name_;
+  mrs_msgs::String switch_tracker_out;
+  switch_tracker_out.request.value = landing_tracker_name_;
   service_client_switch_tracker.call(switch_tracker_out);
 
   std_srvs::Trigger land_out;

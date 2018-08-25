@@ -119,6 +119,17 @@
 
     </node>
 
+    <!-- MAV Manager -->
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="load mrs_mav_manager/GainManager $(arg uav_name)_nodelet_manager" output="screen">
+
+      <rosparam file="$(find mrs_mav_manager)/config/gain_manager.yaml" />
+
+      <!-- Services -->
+      <remap from="~set_gains_in" to="~set_gains" />
+      <remap from="~set_gains_out" to="control_manager/nsf_controller/set_parameters" />
+
+    </node>
+
   </group>
 
 </launch>
