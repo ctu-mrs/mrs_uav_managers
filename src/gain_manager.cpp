@@ -108,6 +108,7 @@ private:
   mrs_lib::Profiler *profiler;
   mrs_lib::Routine * routine_callback_odometry_diagnostics;
   mrs_lib::Routine * routine_callback_controller_status;
+  mrs_lib::Routine * routine_gain_schedulling_timer;
   ;
 };
 
@@ -279,6 +280,7 @@ void GainManager::onInit() {
   // --------------------------------------------------------------
 
   profiler                              = new mrs_lib::Profiler(nh_, "GainManager");
+  routine_gain_schedulling_timer        = profiler->registerRoutine("gainSchedullingTimer", gain_scheduling_rate_, 0.01);
   routine_callback_odometry_diagnostics = profiler->registerRoutine("callbackOdometryDiagnostics");
   routine_callback_controller_status    = profiler->registerRoutine("callbackControllerStatus");
 
@@ -312,8 +314,6 @@ bool GainManager::setGains(std::string gains_name) {
 
   dynamic_reconfigure::Config          conf;
   dynamic_reconfigure::DoubleParameter param;
-
-  ROS_INFO("[GainManager]: %f", it->second.kpz);
 
   param.name  = "kpxy";
   param.value = it->second.kpxy;
@@ -463,6 +463,16 @@ void GainManager::gainSchedulingTimer(const ros::TimerEvent &event) {
     return;
   }
 
+  mutex_controller_status.lock();
+  if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
+    ROS_WARN_THROTTLE(1.0, "[MavManager]: can't do gain schedulling, the NSF controller is not running!");
+    mutex_controller_status.unlock();
+    return;
+  }
+  mutex_controller_status.unlock();
+
+  routine_gain_schedulling_timer->start(event);
+
   // someone should put some fancy ifs here...
   if (odometry_diagnostics.odometry_mode.mode != last_odometry_mode) {
 
@@ -505,6 +515,8 @@ void GainManager::gainSchedulingTimer(const ros::TimerEvent &event) {
       last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
     }
   }
+
+  routine_gain_schedulling_timer->start(event);
 }
 
 //}

@@ -6,6 +6,7 @@
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
+#include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/Float64Stamped.h>
 
 #include <mrs_lib/ConvexPolygon.h>
@@ -85,6 +86,7 @@ private:
   ros::Publisher publisher_attitude_cmd;
   ros::Publisher publisher_cmd_odom;
   ros::Publisher publisher_tracker_status;
+  ros::Publisher publisher_controller_status;
 
   ros::ServiceServer service_switch_tracker;
   ros::ServiceServer service_switch_controller;
@@ -424,11 +426,12 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd   = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd   = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_cmd_odom       = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_tracker_status = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
+  publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
+  publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -515,6 +518,27 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   }
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
+  }
+
+  // --------------------------------------------------------------
+  // |              publishing the controller status              |
+  // --------------------------------------------------------------
+
+  mrs_msgs::ControllerStatus::Ptr controller_status_ptr;
+  mrs_msgs::ControllerStatus      controller_status;
+
+  controller_status_ptr = controller_list[active_controller_idx]->getStatus();
+
+  controller_status = mrs_msgs::ControllerStatus(*controller_status_ptr);
+
+  controller_status.controller = controller_names[active_controller_idx];
+  controller_status.stamp      = ros::Time::now();
+
+  try {
+    publisher_controller_status.publish(mrs_msgs::ControllerStatusConstPtr(new mrs_msgs::ControllerStatus(controller_status)));
+  }
+  catch (...) {
+    ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
   }
 }
 
