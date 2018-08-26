@@ -313,8 +313,6 @@ bool GainManager::setGains(std::string gains_name) {
   dynamic_reconfigure::Config          conf;
   dynamic_reconfigure::DoubleParameter param;
 
-  ROS_INFO("[GainManager]: %f", it->second.kpz);
-
   param.name  = "kpxy";
   param.value = it->second.kpxy;
   conf.doubles.push_back(param);
