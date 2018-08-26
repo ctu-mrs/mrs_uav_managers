@@ -17,7 +17,7 @@
 namespace mrs_mav_manager
 {
 
-//{ class MavManager
+/* //{ class MavManager */
 
 // state machine
 typedef enum
@@ -112,6 +112,7 @@ private:
 
   void landingTimer(const ros::TimerEvent &event);
 
+  // | ------------------------ profiler ------------------------ |
 private:
   mrs_lib::Profiler *profiler;
   mrs_lib::Routine * routine_landing_timer;
@@ -121,7 +122,7 @@ private:
 
 //}
 
-//{ changeLandingState()
+/* //{ changeLandingState() */
 
 void MavManager::changeLandingState(LandingStates_t new_state) {
 
@@ -144,7 +145,7 @@ void MavManager::changeLandingState(LandingStates_t new_state) {
 
 //}
 
-//{ onInit()
+/* //{ onInit() */
 
 void MavManager::onInit() {
 
@@ -190,10 +191,10 @@ void MavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                         = new mrs_lib::Profiler(nh_, "MavManager");
-  routine_landing_timer            = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
-  routine_callback_odometry        = profiler->registerRoutine("callbackOdometry");
-  routine_callback_mavros_odometry = profiler->registerRoutine("callbackMavrosOdometry");
+  profiler                              = new mrs_lib::Profiler(nh_, "MavManager");
+  routine_landing_timer                 = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
+  routine_callback_odometry             = profiler->registerRoutine("callbackOdometry");
+  routine_callback_mavros_odometry      = profiler->registerRoutine("callbackMavrosOdometry");
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -218,7 +219,7 @@ void MavManager::onInit() {
 // |                           timers                           |
 // --------------------------------------------------------------
 
-//{ landingTimer()
+/* //{ landingTimer() */
 
 void MavManager::landingTimer(const ros::TimerEvent &event) {
 
@@ -305,7 +306,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
-//{ callbackTrackerStatus()
+/* //{ callbackTrackerStatus() */
 
 void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
 
@@ -321,7 +322,7 @@ void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &ms
 
 //}
 
-//{ callbackOdometry()
+/* //{ callbackOdometry() */
 
 void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
@@ -353,7 +354,7 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
-//{ callbackMavrosOdometry()
+/* //{ callbackMavrosOdometry() */
 
 void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
@@ -385,7 +386,7 @@ void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
-//{ callbackTakeoff()
+/* //{ callbackTakeoff() */
 
 bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
@@ -468,7 +469,7 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
 
 //}
 
-//{ callbackLand()
+/* //{ callbackLand() */
 
 bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
@@ -524,7 +525,7 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
 //}
 
-//{ callbackLandHome()
+/* //{ callbackLandHome() */
 
 bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 

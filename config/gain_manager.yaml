@@ -1,9 +1,33 @@
 gains: [
-  "optic_flow",
-  "gps",
+  "super_soft_for_optflow", # opt
+  "gps_soft",  # gps
+  "gps_tight", # rtk
 ]
 
-optic_flow:
+gain_scheduling:
+
+  rate: 30
+
+  # list of allowed gains per localization mode
+  VIO_allowed: ["super_soft_for_optflow"]
+  ICP_allowed: ["super_soft_for_optflow"]
+  RTK_allowed: ["gps_soft", "gps_tight", "super_soft_for_optflow"]
+  OPTFLOWGPS_allowed: ["gps_soft", "super_soft_for_optflow"]
+  GPS_allowed: ["gps_soft", 'super_soft_for_optflow']
+  OPTFLOW_allowed: ["super_soft_for_optflow"]
+  OTHER_allowed: ["super_soft_for_optflow"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  VIO_fallback: "super_soft_for_optflow"
+  ICP_fallback: "super_soft_for_optflow"
+  RTK_fallback: "gps_tight"
+  OPTFLOWGPS_fallback: "gps_soft"
+  GPS_fallback: "gps_soft"
+  OPTFLOW_fallback: "super_soft_for_optflow"
+  OTHER_fallback: "super_soft_for_optflow"
+
+super_soft_for_optflow:
 
   horizontal:
     kp: 0.15
@@ -25,7 +49,29 @@ optic_flow:
     km: 1.0
     km_lim: 1.0
 
-gps:
+gps_soft:
+
+  horizontal:
+    kp: 0.30
+    kv: 0.25
+    ka: 1.0
+
+    kib: 0.01
+    kib_lim: 0.15
+
+    kiw: 0.01
+    kiw_lim: 0.3
+
+  vertical:
+    kp: 0.6
+    kv: 0.2
+    ka: 1.0
+
+  weight_estimator:
+    km: 1.0
+    km_lim: 1.0 # [kg]
+
+gps_tight:
 
   horizontal:
     kp: 0.60
