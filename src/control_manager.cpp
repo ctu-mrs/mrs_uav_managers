@@ -1,31 +1,29 @@
+#include <ros/ros.h>
+#include <ros/package.h>
+#include <nodelet/nodelet.h>
+
 #include <mrs_msgs/String.h>
+#include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/AttitudeCommand.h>
+#include <mrs_msgs/TrackerStatus.h>
+#include <mrs_msgs/Float64Stamped.h>
+
+#include <mrs_lib/ConvexPolygon.h>
+#include <mrs_lib/Profiler.h>
+#include <mrs_lib/ParamLoader.h>
+
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
-#include <mrs_msgs/TrackerStatus.h>
+
+#include <mavros_msgs/AttitudeTarget.h>
+#include <std_srvs/SetBool.h>
 
 #include <pluginlib/class_loader.h>
 
 #include <nodelet/loader.h>
 
-#include <mavros_msgs/AttitudeTarget.h>
-#include <mrs_msgs/PositionCommand.h>
-#include <mrs_msgs/AttitudeCommand.h>
-
 #include <mutex>
-
 #include <tf/transform_datatypes.h>
-
-#include <ros/package.h>
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
-
-#include <std_srvs/SetBool.h>
-
-#include <mrs_lib/ConvexPolygon.h>
-
-#include <mrs_lib/Profiler.h>
-
-#include <mrs_lib/ParamLoader.h>
 
 namespace mrs_mav_manager
 {
@@ -69,6 +67,11 @@ private:
   double             odometry_pitch;
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
+
+  ros::Subscriber subscriber_max_height;
+  double          max_height;
+  bool            got_max_height = false;
+  std::mutex      mutex_max_height;
 
   int  active_tracker_idx      = 0;
   int  active_controller_idx   = 0;
@@ -128,6 +131,7 @@ private:
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
@@ -427,7 +431,8 @@ void ControlManager::onInit() {
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry   = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_max_height = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -902,6 +907,23 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   }
 
   routine_callback_odometry->end();
+}
+
+//}
+
+/* callbackMaxHeight //{ */
+
+void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mutex_max_height.lock();
+  {
+    got_max_height = true;
+    max_height = msg->value;
+  }
+  mutex_max_height.unlock();
 }
 
 //}

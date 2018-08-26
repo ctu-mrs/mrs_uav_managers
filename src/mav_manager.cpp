@@ -14,6 +14,8 @@
 
 #include <mrs_lib/ParamLoader.h>
 
+#include <mrs_msgs/OdometryDiag.h>
+
 namespace mrs_mav_manager
 {
 
@@ -47,6 +49,7 @@ public:
   void         callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
   void         callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg);
   void         callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
+  void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
   void         changeLandingState(LandingStates_t new_state);
 
 private:
@@ -78,6 +81,12 @@ private:
   bool                    got_tracker_status = false;
   mrs_msgs::TrackerStatus tracker_status;
   std::mutex              mutex_tracker_status;
+
+private:
+  ros::Subscriber        subscriber_odometry_diagnostics;
+  bool                   got_odometry_diagnostics = false;
+  mrs_msgs::OdometryDiag odometry_diagnostics;
+  std::mutex             mutex_odometry_diagnostics;
 
 private:
   ros::ServiceServer service_server_takeoff;
@@ -157,6 +166,8 @@ void MavManager::onInit() {
   subscriber_odometry        = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_odometry = nh_.subscribe("mavros_odometry_in", 1, &MavManager::callbackMavrosOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_tracker_status  = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry_diagnostics =
+      nh_.subscribe("odometry_diagnostics_in", 1, &MavManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
   service_server_takeoff   = nh_.advertiseService("takeoff_in", &MavManager::callbackTakeoff, this);
   service_server_land      = nh_.advertiseService("land_in", &MavManager::callbackLand, this);
@@ -321,6 +332,21 @@ void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &ms
 
 //}
 
+//{ callbackOdometryDiagnostics()
+
+void MavManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mutex_tracker_status.lock();
+  { odometry_diagnostics = *msg; }
+  mutex_tracker_status.unlock();
+
+  got_odometry_diagnostics = true;
+}
+
+//}
 //{ callbackOdometry()
 
 void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {

@@ -20,6 +20,7 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
 
       <!-- Publishers -->
