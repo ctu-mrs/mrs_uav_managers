@@ -20,7 +20,6 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
-      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
 
       <!-- Publishers -->
@@ -94,6 +93,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~max_height_in" to="odometry/max_altitude" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
@@ -117,13 +117,18 @@
       <remap from="~motors_in" to="~motors" />
       <remap from="~emergency_goto_in" to="~emergency_goto" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
+      <remap from="~set_gains_out" to="gain_manager/set_gains" />
 
     </node>
 
-    <!-- MAV Manager -->
+    <!-- Gain Manager -->
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="load mrs_mav_manager/GainManager $(arg uav_name)_nodelet_manager" output="screen">
 
       <rosparam file="$(find mrs_mav_manager)/config/gain_manager.yaml" />
+
+      <!-- Subscribers -->
+      <remap from="~controller_status_in" to="control_manager/controller_status" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
 
       <!-- Services -->
       <remap from="~set_gains_in" to="~set_gains" />

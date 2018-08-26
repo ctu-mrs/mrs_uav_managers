@@ -28,7 +28,7 @@
 namespace mrs_mav_manager
 {
 
-//{ class ControlManager
+/* //{ class ControlManager */
 
 class ControlManager : public nodelet::Nodelet {
 
@@ -72,6 +72,7 @@ private:
   double          max_height;
   bool            got_max_height = false;
   std::mutex      mutex_max_height;
+  std::mutex      mutex_min_height;
 
   int  active_tracker_idx      = 0;
   int  active_controller_idx   = 0;
@@ -122,12 +123,14 @@ private:
 private:
   mrs_lib::ConvexPolygon *    safety_area_polygon;
   bool                        use_safety_area_;
-  double                      max_altitude_;
-  double                      min_altitude_;
+  double                      min_height;
   mrs_mav_manager::SafetyArea safety_area;
+  std::mutex                  mutex_safety_area;
 
   bool isPointInSafetyArea2d(const double x, const double y);
   bool isPointInSafetyArea3d(const double x, const double y, const double z);
+  bool getMinHeight(void);
+  bool getMaxHeight(void);
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
@@ -175,7 +178,7 @@ private:
 
 //}
 
-//{ onInit()
+/* //{ onInit() */
 
 void ControlManager::onInit() {
 
@@ -358,8 +361,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   param_loader.load_param("safety_area/use_safety_area", use_safety_area_);
-  param_loader.load_param("safety_area/max_altitude", max_altitude_);
-  param_loader.load_param("safety_area/min_altitude", min_altitude_);
+  param_loader.load_param("safety_area/min_height", max_height);
+  param_loader.load_param("safety_area/min_height", min_height);
 
   if (use_safety_area_) {
 
@@ -404,11 +407,11 @@ void ControlManager::onInit() {
     }
   }
 
-  safety_area.max_altitude          = max_altitude_;
-  safety_area.min_altitude          = min_altitude_;
   safety_area.use_safety_area       = use_safety_area_;
   safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1, _2);
   safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1, _2, _3);
+  safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+  safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -486,7 +489,7 @@ void ControlManager::onInit() {
 // |                           timers                           |
 // --------------------------------------------------------------
 
-//{ statusTimer()
+/* //{ statusTimer() */
 
 void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
@@ -517,7 +520,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 //}
 
-//{ safetyTimer()
+/* //{ safetyTimer() */
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
@@ -612,7 +615,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
 //}
 
-//{ hover()
+/* //{ hover() */
 
 bool ControlManager::hover(std::string &message_out) {
 
@@ -665,12 +668,17 @@ bool ControlManager::hover(std::string &message_out) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
-//{ callbackOdometry()
+/* //{ callbackOdometry() */
 
 void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  if (!got_max_height) {
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: waiting, missing max_height");
+    return;
+  }
 
   routine_callback_odometry->start();
 
@@ -921,14 +929,14 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
   mutex_max_height.lock();
   {
     got_max_height = true;
-    max_height = msg->value;
+    max_height     = msg->value;
   }
   mutex_max_height.unlock();
 }
 
 //}
 
-//{ callbackSwitchTracker()
+/* //{ callbackSwitchTracker() */
 
 bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
@@ -1086,7 +1094,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
 //}
 
-//{ callbackHover()
+/* //{ callbackHover() */
 
 bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
@@ -1104,7 +1112,7 @@ bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Tr
 
 //}
 
-//{ callbackMotors()
+/* //{ callbackMotors() */
 
 bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
 
@@ -1135,7 +1143,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
 //}
 
-//{ callbackEnableCallbacks()
+/* //{ callbackEnableCallbacks() */
 
 bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
 
@@ -1173,7 +1181,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
 
 // | -------------- setpoint topics and services -------------- |
 
-//{ callbackGoToService()
+/* //{ callbackGoToService() */
 
 bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 
@@ -1225,7 +1233,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
 
 //}
 
-//{ callbackGoToTopic()
+/* //{ callbackGoToTopic() */
 
 void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
@@ -1258,7 +1266,7 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
 
 //}
 
-//{ callbackGoToRelativeService()
+/* //{ callbackGoToRelativeService() */
 
 bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 
@@ -1314,7 +1322,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
 
 //}
 
-//{ callbackGoToRelativeTopic()
+/* //{ callbackGoToRelativeTopic() */
 
 void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
@@ -1352,7 +1360,7 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
 
 //}
 
-//{ callbackGoToAltitudeService()
+/* //{ callbackGoToAltitudeService() */
 
 bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
@@ -1407,7 +1415,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
 //}
 
-//{ callbackGoToAltitudeTopic()
+/* //{ callbackGoToAltitudeTopic() */
 
 void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
 
@@ -1443,7 +1451,7 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
 
 //}
 
-//{ callbackSetYawService()
+/* //{ callbackSetYawService() */
 
 bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
@@ -1485,7 +1493,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
 
 //}
 
-//{ callbackSetYawTopic()
+/* //{ callbackSetYawTopic() */
 
 void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
@@ -1510,7 +1518,7 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
 //}
 
-//{ callbackSetYawRelativeService()
+/* //{ callbackSetYawRelativeService() */
 
 bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
 
@@ -1552,7 +1560,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 
 //}
 
-//{ callbackSetYawRelativeTopic()
+/* //{ callbackSetYawRelativeTopic() */
 
 void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg) {
 
@@ -1579,7 +1587,7 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
 
 // | --------------------- other services --------------------- |
 
-//{ isInSafetyArea3d()
+/* //{ isInSafetyArea3d() */
 
 bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const double z) {
 
@@ -1587,16 +1595,24 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
     return true;
   }
 
-  if (safety_area_polygon->isPointIn(x, y) && z >= min_altitude_ && z <= max_altitude_) {
-    return true;
+  mutex_max_height.lock();
+  mutex_min_height.lock();
+  {
+    if (safety_area_polygon->isPointIn(x, y) && z >= min_height && z <= max_height) {
+      mutex_min_height.unlock();
+      mutex_max_height.unlock();
+      return true;
+    }
   }
+  mutex_min_height.unlock();
+  mutex_max_height.unlock();
 
   return false;
 }
 
 //}
 
-//{ isInSafetyArea2d()
+/* //{ isInSafetyArea2d() */
 
 bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
@@ -1613,7 +1629,37 @@ bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
 //}
 
-//{ callbackEmergencyGoToService()
+/* //{ getMaxHeight() */
+
+bool ControlManager::getMaxHeight(void) {
+
+  double temp_double;
+
+  mutex_max_height.lock();
+  { temp_double = max_height; }
+  mutex_max_height.unlock();
+
+  return temp_double;
+}
+
+//}
+
+/* //{ getMinHeight() */
+
+bool ControlManager::getMinHeight(void) {
+
+  double temp_double;
+
+  mutex_min_height.lock();
+  { temp_double = min_height; }
+  mutex_min_height.unlock();
+
+  return temp_double;
+}
+
+//}
+
+/* //{ callbackEmergencyGoToService() */
 
 bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
 

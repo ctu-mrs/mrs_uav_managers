@@ -33,14 +33,17 @@ namespace mrs_mav_manager
 {
 
 typedef boost::function<bool(const double x, const double y, const double z)> isPointInSafetyArea3d_t;
-typedef boost::function<bool(const double x, const double y)> isPointInSafetyArea2d_t;
+typedef boost::function<bool(const double x, const double y)>                 isPointInSafetyArea2d_t;
+typedef boost::function<double(void)>                                         getMaxHeight_t;
+typedef boost::function<double(void)>                                         getMinHeight_t;
 
 struct SafetyArea
 {
   mrs_mav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
   mrs_mav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
-  double                                 max_altitude, min_altitude;
-  bool                                   use_safety_area;
+  mrs_mav_manager::getMaxHeight_t          getMaxHeight;
+  mrs_mav_manager::getMinHeight_t          getMinHeight;
+  bool                                     use_safety_area;
 };
 
 class Tracker {
