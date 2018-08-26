@@ -393,16 +393,59 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
   if (!is_initialized)
     return false;
 
-  if (!setGains(req.value)) {
-    res.message = "those gains do not exist";
-    res.success = false;
-    return true;
+  bool success = false;
+  switch (odometry_diagnostics.odometry_mode.mode) {
+
+    case mrs_msgs::OdometryMode::VIO:
+      success = stringInVector(req.value, VIO_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::ICP:
+      success = stringInVector(req.value, ICP_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::RTK:
+      success = stringInVector(req.value, RTK_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::OPTFLOWGPS:
+      success = stringInVector(req.value, OPTFLOWGPS_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::GPS:
+      success = stringInVector(req.value, GPS_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::OPTFLOW:
+      success = stringInVector(req.value, OPTFLOW_allowed_gains);
+      break;
+
+    case mrs_msgs::OdometryMode::OTHER:
+      success = stringInVector(req.value, OTHER_allowed_gains);
+      break;
   }
 
-  res.message = "New gains set";
-  res.success = true;
+  if (success) {
+    if (!setGains(req.value)) {
 
-  return true;
+      res.message = "those gains do not exist";
+      res.success = false;
+      return true;
+
+    } else {
+
+      res.message = "gains set";
+      res.success = true;
+      return true;
+    }
+  } else {
+    char message[200];
+    sprintf((char *)&message, "Can't set '%s' gains, they are not aare not allowed given current odometry mode.", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[GainManager]: %s", message);
+    return true;
+  }
 }
 
 //}
