@@ -440,7 +440,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
     }
   } else {
     char message[200];
-    sprintf((char *)&message, "Can't set '%s' gains, they are not aare not allowed given current odometry mode.", req.value.c_str());
+    sprintf((char *)&message, "Can't set '%s' gains; not allowed given the current odometry mode.", req.value.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[GainManager]: %s", message);
