@@ -135,6 +135,9 @@
       <remap from="~set_gains_in" to="~set_gains" />
       <remap from="~set_gains_out" to="control_manager/nsf_controller/set_parameters" />
 
+      <!-- Publishers -->
+      <remap from="~current_gains_out" to="~current_gains" />
+
     </node>
 
   </group>

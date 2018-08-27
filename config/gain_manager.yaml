@@ -74,7 +74,7 @@ gps_soft:
 gps_tight:
 
   horizontal:
-    kp: 0.60
+    kp: 0.50
     kv: 0.30
     ka: 1.0
 

@@ -255,7 +255,7 @@ void GainManager::onInit() {
   }
 
   current_gains      = "";
-  last_odometry_mode = mrs_msgs::OdometryMode::OTHER;
+  last_odometry_mode = 0;
 
   // | ------------------------ services ------------------------ |
 
@@ -559,7 +559,17 @@ void GainManager::gainSchedulingTimer(const ros::TimerEvent &event) {
     }
   }
 
-  routine_gain_schedulling_timer->start(event);
+  std_msgs::String str_out;
+  str_out.data = current_gains;
+
+  try {
+    publisher_current_gains.publish(str_out);
+  }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_gains.getTopic().c_str());
+  }
+
+  routine_gain_schedulling_timer->end();
 }
 
 //}
