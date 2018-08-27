@@ -23,6 +23,10 @@
 #include <std_srvs/SetBoolRequest.h>
 #include <std_srvs/SetBoolResponse.h>
 
+#include <mrs_msgs/TrackerConstraints.h>
+#include <mrs_msgs/TrackerConstraintsRequest.h>
+#include <mrs_msgs/TrackerConstraintsResponse.h>
+
 #include <std_msgs/Float64.h>
 
 #include <mrs_msgs/TrackerPointStamped.h>
@@ -37,7 +41,7 @@ typedef boost::function<bool(const double x, const double y)>                 is
 typedef boost::function<double(void)>                                         getMaxHeight_t;
 typedef boost::function<double(void)>                                         getMinHeight_t;
 
-struct SafetyArea
+struct SafetyArea_t
 {
   mrs_mav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
   mrs_mav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
@@ -52,9 +56,9 @@ public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea const *safety_area) = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                     = 0;
-  virtual void deactivate(void)                                                                             = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area) = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                       = 0;
+  virtual void deactivate(void)                                                                               = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus::Ptr        getStatus()                                     = 0;
@@ -73,6 +77,8 @@ public:
   virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg)             = 0;
   virtual bool setYaw(const std_msgs::Float64ConstPtr &msg)                   = 0;
   virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg)           = 0;
+
+  virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &constraints) = 0;
 };
 }  // namespace mrs_mav_manager
 

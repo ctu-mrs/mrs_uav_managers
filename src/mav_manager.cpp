@@ -191,10 +191,10 @@ void MavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                              = new mrs_lib::Profiler(nh_, "MavManager");
-  routine_landing_timer                 = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
-  routine_callback_odometry             = profiler->registerRoutine("callbackOdometry");
-  routine_callback_mavros_odometry      = profiler->registerRoutine("callbackMavrosOdometry");
+  profiler                         = new mrs_lib::Profiler(nh_, "MavManager");
+  routine_landing_timer            = profiler->registerRoutine("main", landing_timer_rate_, 0.002);
+  routine_callback_odometry        = profiler->registerRoutine("callbackOdometry");
+  routine_callback_mavros_odometry = profiler->registerRoutine("callbackMavrosOdometry");
 
   // --------------------------------------------------------------
   // |                           timers                           |
