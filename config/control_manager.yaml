@@ -10,7 +10,6 @@ trackers : [
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/NsfController",
-  "mrs_controllers/PidController",
   "mrs_controllers/FailsafeController",
 ]
 
@@ -20,9 +19,9 @@ null_tracker: "mrs_mav_manager/NullTracker"
 
 safety:
 
-  max_tilt_angle: 90 # [deg]
-  failsafe_hover_control_error: 10.5 # [m]
-  failsafe_land_control_error: 30.0 # [m]
+  max_tilt_angle: 50 # [deg]
+  failsafe_hover_control_error: 1.5 # [m]
+  failsafe_land_control_error: 3.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
   hover_tracker: "mrs_trackers/LandoffTracker"
