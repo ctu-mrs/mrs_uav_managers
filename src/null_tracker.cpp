@@ -5,14 +5,14 @@
 namespace mrs_mav_manager
 {
 
-//{ class NullTracker
+/* //{ class NullTracker */
 
 class NullTracker : public mrs_mav_manager::Tracker {
 
 public:
   NullTracker(void);
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea const *safety_area);
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area);
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
   virtual void deactivate(void);
 
@@ -34,6 +34,8 @@ public:
 
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
+  virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &cmd);
+
 private:
   ros::NodeHandle nh_;
   bool            is_active         = false;
@@ -48,9 +50,9 @@ NullTracker::NullTracker(void) {
 
 // | ------------------- trackers interface ------------------- |
 
-//{ initialize()
+/* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea const *safety_area) {
+void NullTracker::initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -63,7 +65,7 @@ void NullTracker::initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::
 
 //}
 
-//{ activate()
+/* //{ activate() */
 
 bool NullTracker::activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) {
 
@@ -74,7 +76,7 @@ bool NullTracker::activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) {
 
 //}
 
-//{ deactivate()
+/* //{ deactivate() */
 
 void NullTracker::deactivate(void) {
 
@@ -84,7 +86,7 @@ void NullTracker::deactivate(void) {
 
 //}
 
-//{ update()
+/* //{ update() */
 
 const mrs_msgs::PositionCommand::ConstPtr NullTracker::update(const nav_msgs::Odometry::ConstPtr &msg) {
 
@@ -93,7 +95,7 @@ const mrs_msgs::PositionCommand::ConstPtr NullTracker::update(const nav_msgs::Od
 
 //}
 
-//{ getStatus()
+/* //{ getStatus() */
 
 const mrs_msgs::TrackerStatus::Ptr NullTracker::getStatus() {
 
@@ -116,7 +118,7 @@ const mrs_msgs::TrackerStatus::Ptr NullTracker::getStatus() {
 
 //}
 
-//{ enableCallbacks()
+/* //{ enableCallbacks() */
 
 const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) {
 
@@ -146,7 +148,7 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
 
 // | -------------- setpoint topics and services -------------- |
 
-//{ goTo() service
+/* //{ goTo() service */
 
 const mrs_msgs::Vec4Response::ConstPtr NullTracker::goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd) {
   return mrs_msgs::Vec4Response::Ptr();
@@ -154,7 +156,7 @@ const mrs_msgs::Vec4Response::ConstPtr NullTracker::goTo(const mrs_msgs::Vec4Req
 
 //}
 
-//{ goTo() topic
+/* //{ goTo() topic */
 
 bool NullTracker::goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
   return false;
@@ -162,7 +164,7 @@ bool NullTracker::goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
 
 //}
 
-//{ goToRelative() topic
+/* //{ goToRelative() topic */
 
 const mrs_msgs::Vec4Response::ConstPtr NullTracker::goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd) {
   return mrs_msgs::Vec4Response::Ptr();
@@ -170,7 +172,7 @@ const mrs_msgs::Vec4Response::ConstPtr NullTracker::goToRelative(const mrs_msgs:
 
 //}
 
-//{ goToRelative() topic
+/* //{ goToRelative() topic */
 
 bool NullTracker::goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
   return false;
@@ -178,7 +180,7 @@ bool NullTracker::goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg)
 
 //}
 
-//{ goToAltitude() service
+/* //{ goToAltitude() service */
 
 const mrs_msgs::Vec1Response::ConstPtr NullTracker::goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd) {
   return mrs_msgs::Vec1Response::Ptr();
@@ -186,7 +188,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::goToAltitude(const mrs_msgs:
 
 //}
 
-//{ goToAltitude() topic
+/* //{ goToAltitude() topic */
 
 bool NullTracker::goToAltitude(const std_msgs::Float64ConstPtr &msg) {
   return false;
@@ -194,7 +196,7 @@ bool NullTracker::goToAltitude(const std_msgs::Float64ConstPtr &msg) {
 
 //}
 
-//{ setYaw() service
+/* //{ setYaw() service */
 
 const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYaw(const mrs_msgs::Vec1Request::ConstPtr &cmd) {
   return mrs_msgs::Vec1Response::Ptr();
@@ -202,7 +204,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYaw(const mrs_msgs::Vec1R
 
 //}
 
-//{ setYaw() topic
+/* //{ setYaw() topic */
 
 bool NullTracker::setYaw(const std_msgs::Float64ConstPtr &msg) {
   return false;
@@ -210,7 +212,7 @@ bool NullTracker::setYaw(const std_msgs::Float64ConstPtr &msg) {
 
 //}
 
-//{ setYawRelative() service
+/* //{ setYawRelative() service */
 
 const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYawRelative(const mrs_msgs::Vec1Request::ConstPtr &cmd) {
   return mrs_msgs::Vec1Response::Ptr();
@@ -218,7 +220,7 @@ const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYawRelative(const mrs_msg
 
 //}
 
-//{ setYawRelative() topic
+/* //{ setYawRelative() topic */
 
 bool NullTracker::setYawRelative(const std_msgs::Float64ConstPtr &msg) {
   return false;
@@ -226,13 +228,23 @@ bool NullTracker::setYawRelative(const std_msgs::Float64ConstPtr &msg) {
 
 //}
 
-//{ hover() hover
+/* //{ hover() service */
 
 const std_srvs::TriggerResponse::ConstPtr NullTracker::hover(const std_srvs::TriggerRequest::ConstPtr &cmd) {
   return std_srvs::TriggerResponse::Ptr();
 }
 
 //}
+
+/* //{ setConstraints() service */
+
+const mrs_msgs::TrackerConstraintsResponse::ConstPtr NullTracker::setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &cmd) {
+
+  return mrs_msgs::TrackerConstraintsResponse::Ptr();
+}
+
+//}
+
 }  // namespace mrs_mav_manager
 
 #include <pluginlib/class_list_macros.h>

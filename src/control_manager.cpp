@@ -93,6 +93,7 @@ private:
   ros::ServiceServer service_hover;
   ros::ServiceServer service_motors;
   ros::ServiceServer service_enable_callbacks;
+  ros::ServiceServer service_set_constraints;
 
   ros::ServiceServer service_goto;
   ros::ServiceServer service_goto_relative;
@@ -123,11 +124,11 @@ private:
   double failsafe_land_control_error_;
 
 private:
-  mrs_lib::ConvexPolygon *    safety_area_polygon;
-  bool                        use_safety_area_;
-  double                      min_height;
-  mrs_mav_manager::SafetyArea safety_area;
-  std::mutex                  mutex_safety_area;
+  mrs_lib::ConvexPolygon *      safety_area_polygon;
+  bool                          use_safety_area_;
+  double                        min_height;
+  mrs_mav_manager::SafetyArea_t safety_area;
+  std::mutex                    mutex_safety_area;
 
   bool isPointInSafetyArea2d(const double x, const double y);
   bool isPointInSafetyArea3d(const double x, const double y, const double z);
@@ -161,6 +162,7 @@ private:
   bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
   bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
 private:
   bool callbacks_enabled = true;
@@ -447,6 +449,7 @@ void ControlManager::onInit() {
   service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
   service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
   service_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+  service_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
 
   // | ---------------- setpoint command services --------------- |
 
@@ -473,7 +476,7 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   status_timer = nh_.createTimer(ros::Rate(10), &ControlManager::statusTimer, this);
-  safety_timer = nh_.createTimer(ros::Rate(100), &ControlManager::safetyTimer, this);
+  safety_timer = nh_.createTimer(ros::Rate(200), &ControlManager::safetyTimer, this);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -567,7 +570,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   mutex_last_position_cmd.unlock();
   mutex_last_attitude_cmd.unlock();
 
-  char message[100];
+  char message[200];
 
   mutex_odometry.lock();
   mutex_tracker_list.lock();
@@ -646,7 +649,7 @@ bool ControlManager::hover(std::string &message_out) {
   if (!is_initialized)
     return false;
 
-  char message[100];
+  char message[200];
   bool success = false;
 
   try {
@@ -967,7 +970,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   if (!is_initialized)
     return false;
 
-  char message[100];
+  char message[200];
 
   if (!got_odometry) {
 
@@ -1054,7 +1057,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
 bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
-  char message[100];
+  char message[200];
 
   int new_controller_idx = -1;
 
@@ -1155,7 +1158,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   motors = req.data;
 
-  char message[100];
+  char message[200];
   sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
   res.message = message;
   res.success = true;
@@ -1191,12 +1194,47 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   }
   mutex_tracker_list.unlock();
 
-  char message[100];
+  char message[200];
   sprintf((char *)&message, "Callbacks: %s", motors ? "enabled" : "disabled");
   res.message = message;
   res.success = true;
 
   ROS_INFO("[ControlManager]: %s", message);
+
+  return true;
+}
+
+//}
+
+/* callbackSetConstraints() //{ */
+
+bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res) {
+
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+
+  mrs_msgs::TrackerConstraintsRequest req_constraints;
+  req_constraints = req;
+
+  mutex_tracker_list.lock();
+  {
+    // for each tracker
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+
+      // if it is the active one, update and retrieve the command
+      tracker_response =
+          tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
+    }
+  }
+  mutex_tracker_list.unlock();
+
+  res.message = "Setting constraints";
+  res.success = true;
 
   return true;
 }
@@ -1233,7 +1271,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   mrs_msgs::Vec4Request req_goto_out;
   req_goto_out.goal = req.goal;
@@ -1322,7 +1360,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   mrs_msgs::Vec4Request req_goto_out;
   req_goto_out.goal = req.goal;
@@ -1415,7 +1453,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
@@ -1493,7 +1531,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
   }
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
@@ -1560,7 +1598,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
   }
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
@@ -1693,7 +1731,7 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
   callbacks_enabled = false;
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[100];
+  char                             message[200];
 
   std_srvs::SetBoolRequest req_enable_callbacks;
 
