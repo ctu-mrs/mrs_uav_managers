@@ -7,6 +7,8 @@
 #include <mrs_msgs/OdometryDiag.h>
 #include <mrs_msgs/OdometryMode.h>
 #include <mrs_msgs/ControllerStatus.h>
+#include <mrs_msgs/TrackerConstraints.h>
+#include <mrs_msgs/TrackerConstraintsRequest.h>
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
@@ -41,51 +43,44 @@ private:
   bool            is_initialized = false;
 
 private:
-  std::vector<std::string>       gain_names;
+  std::vector<std::string> odometry_mode_names_;
+
+  std::vector<std::string>       gain_names_;
   std::map<std::string, Gains_t> gains;
 
-  // | --------------------- fallback gains --------------------- |
-private:
-  std::string VIO_fallback_gain;
-  std::string ICP_fallback_gain;
-  std::string RTK_fallback_gain;
-  std::string OPTFLOWGPS_fallback_gain;
-  std::string GPS_fallback_gain;
-  std::string OPTFLOW_fallback_gain;
-  std::string OTHER_fallback_gain;
+  std::vector<std::string>                                   constraint_names_;
+  std::map<std::string, mrs_msgs::TrackerConstraintsRequest> constraints;
 
-  // | ---------------------- allowed gains --------------------- |
 private:
-  std::vector<std::string> VIO_allowed_gains;
-  std::vector<std::string> ICP_allowed_gains;
-  std::vector<std::string> RTK_allowed_gains;
-  std::vector<std::string> OPTFLOWGPS_allowed_gains;
-  std::vector<std::string> GPS_allowed_gains;
-  std::vector<std::string> OPTFLOW_allowed_gains;
-  std::vector<std::string> OTHER_allowed_gains;
+private:
+  std::map<std::string, std::vector<std::string>> map_mode_allowed_gains;
+  std::map<std::string, std::string>              map_mode_fallback_gains;
+
+private:
+  std::map<std::string, std::vector<std::string>> map_mode_allowed_constraints;
+  std::map<std::string, std::string>              map_mode_fallback_constraints;
 
 public:
   virtual void onInit();
   bool         callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool         callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
   void         callbackControllerStatus(const mrs_msgs::ControllerStatusConstPtr &msg);
 
   bool setGains(std::string gains_name);
+  bool setConstraints(std::string constraints_names);
 
   bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 
 private:
-  ros::ServiceServer service_server_takeoff;
+  ros::ServiceServer service_server_set_gains;
+  ros::ServiceServer service_server_set_constraints;
+
   ros::ServiceClient service_client_set_gains;
+  ros::ServiceClient service_client_set_constraints;
 
   ros::Publisher publisher_current_gains;
-
-  // | -------------------- gain scheduling -------------------- |
-private:
-  ros::Timer gain_scheduling_timer;
-  double     gain_scheduling_rate_;
-
-  void gainSchedulingTimer(const ros::TimerEvent &event);
+  ros::Publisher publisher_current_constraints;
 
 private:
   ros::Subscriber        subscriber_odometry_diagnostics;
@@ -93,22 +88,35 @@ private:
   mrs_msgs::OdometryDiag odometry_diagnostics;
   std::mutex             mutex_odometry_diagnostics;
 
+  // | ------------- constraint and gain management ------------- |
+
+private:
+  mrs_msgs::OdometryMode::_mode_type last_odometry_mode;
+
+  void       managementTimer(const ros::TimerEvent &event);
+  ros::Timer management_timer;
+  double     rate_;
+
+  // | --------------------- gain management -------------------- |
+
 private:
   ros::Subscriber            subscriber_controller_status;
   bool                       got_controller_status = false;
   mrs_msgs::ControllerStatus controller_status;
   std::mutex                 mutex_controller_status;
 
-private:
-  std::string                        current_gains;
-  mrs_msgs::OdometryMode::_mode_type last_odometry_mode;
+  std::string current_gains;
+
+  // | ------------------ constraint management ----------------- |
+
+  std::string current_constraints;
 
   // | ------------------------ profiler ------------------------ |
 private:
   mrs_lib::Profiler *profiler;
   mrs_lib::Routine * routine_callback_odometry_diagnostics;
   mrs_lib::Routine * routine_callback_controller_status;
-  mrs_lib::Routine * routine_gain_schedulling_timer;
+  mrs_lib::Routine * routine_gain_management_timer;
   ;
 };
 
@@ -127,11 +135,16 @@ void GainManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
-  param_loader.load_param("gains", gain_names);
-  param_loader.load_param("gain_scheduling/rate", gain_scheduling_rate_);
+  param_loader.load_param("gains", gain_names_);
+  param_loader.load_param("constraints", constraint_names_);
+
+  param_loader.load_param("odometry_modes", odometry_mode_names_);
+  param_loader.load_param("rate", rate_);
 
   std::vector<std::string>::iterator it;
-  for (it = gain_names.begin(); it != gain_names.end(); ++it) {
+
+  // loading gain_names
+  for (it = gain_names_.begin(); it != gain_names_.end(); ++it) {
     ROS_INFO_STREAM("[GainManager]: loading gains \"" << *it << "\"");
 
     Gains_t new_gains;
@@ -154,113 +167,106 @@ void GainManager::onInit() {
     gains.insert(std::pair<std::string, Gains_t>(*it, new_gains));
   }
 
-  // load the allowed gain lists
-  param_loader.load_param("gain_scheduling/VIO_allowed", VIO_allowed_gains);
-  for (it = VIO_allowed_gains.begin(); it != VIO_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of VIO_allowed_gains ('%s') is not a valid gain!", it->c_str());
+  // loading the allowed gains lists
+  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+
+    std::vector<std::string> temp_vector;
+    param_loader.load_param("gain_management/allowed_gains/" + *it, temp_vector);
+
+    std::vector<std::string>::iterator it2;
+    for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
+      if (!stringInVector(*it2, gain_names_)) {
+        ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
+        ros::shutdown();
+      }
+    }
+
+    map_mode_allowed_gains.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
+  }
+
+  // loading the fallback gains
+  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+
+    std::string temp_str;
+    param_loader.load_param("gain_management/fallback_gains/" + *it, temp_str);
+
+    if (!stringInVector(temp_str, map_mode_allowed_gains.at(*it))) {
+      ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
+
+    map_mode_fallback_gains.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  param_loader.load_param("gain_scheduling/ICP_allowed", ICP_allowed_gains);
-  for (it = ICP_allowed_gains.begin(); it != ICP_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of ICP_allowed_gains ('%s') is not a valid gain!", it->c_str());
+  // loading constraint names
+  for (it = constraint_names_.begin(); it != constraint_names_.end(); ++it) {
+    ROS_INFO_STREAM("[GainManager]: loading constraints \"" << *it << "\"");
+
+    mrs_msgs::TrackerConstraintsRequest new_constraints;
+
+    param_loader.load_param(*it + "/horizontal/speed", new_constraints.horizontal_speed);
+    param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.horizontal_acceleration);
+    param_loader.load_param(*it + "/horizontal/jerk", new_constraints.horizontal_jerk);
+
+    param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.vertical_ascending_speed);
+    param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.vertical_ascending_acceleration);
+    param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.vertical_ascending_jerk);
+
+    param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.vertical_descending_speed);
+    param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.vertical_descending_acceleration);
+    param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.vertical_descending_jerk);
+
+    param_loader.load_param(*it + "/yaw/speed", new_constraints.yaw_speed);
+    param_loader.load_param(*it + "/yaw/acceleration", new_constraints.yaw_acceleration);
+    param_loader.load_param(*it + "/yaw/jerk", new_constraints.yaw_jerk);
+
+    constraints.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsRequest>(*it, new_constraints));
+  }
+
+  // loading the allowed constraints lists
+  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+
+    std::vector<std::string> temp_vector;
+    param_loader.load_param("constraint_management/allowed_constraints/" + *it, temp_vector);
+
+    std::vector<std::string>::iterator it2;
+    for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
+      if (!stringInVector(*it2, constraint_names_)) {
+        ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
+        ros::shutdown();
+      }
+    }
+
+    map_mode_allowed_constraints.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
+  }
+
+  // loading the fallback constraints
+  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+
+    std::string temp_str;
+    param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
+
+    if (!stringInVector(temp_str, map_mode_allowed_constraints.at(*it))) {
+      ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
+
+    map_mode_fallback_constraints.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  param_loader.load_param("gain_scheduling/RTK_allowed", RTK_allowed_gains);
-  for (it = RTK_allowed_gains.begin(); it != RTK_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of RTK_allowed_gains ('%s') is not a valid gain!", it->c_str());
-      ros::shutdown();
-    }
-  }
+  ROS_INFO("[GainManager]: done loading dynamical params");
 
-  param_loader.load_param("gain_scheduling/OPTFLOWGPS_allowed", OPTFLOWGPS_allowed_gains);
-  for (it = OPTFLOWGPS_allowed_gains.begin(); it != OPTFLOWGPS_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of OPTFLOWGPS_allowed_gains ('%s') is not a valid gain!", it->c_str());
-      ros::shutdown();
-    }
-  }
-
-  param_loader.load_param("gain_scheduling/GPS_allowed", GPS_allowed_gains);
-  for (it = GPS_allowed_gains.begin(); it != GPS_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of GPS_allowed_gains ('%s') is not a valid gain!", it->c_str());
-      ros::shutdown();
-    }
-  }
-
-  param_loader.load_param("gain_scheduling/OPTFLOW_allowed", OPTFLOW_allowed_gains);
-  for (it = OPTFLOW_allowed_gains.begin(); it != OPTFLOW_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of OPTFLOW_allowed_gains ('%s') is not a valid gain!", it->c_str());
-      ros::shutdown();
-    }
-  }
-
-  param_loader.load_param("gain_scheduling/OTHER_allowed", OTHER_allowed_gains);
-  for (it = OTHER_allowed_gains.begin(); it != OTHER_allowed_gains.end(); ++it) {
-    if (!stringInVector(*it, gain_names)) {
-      ROS_ERROR("[GainManager]: the element of OTHER_allowed_gains ('%s') is not a valid gain!", it->c_str());
-      ros::shutdown();
-    }
-  }
-
-  // load the fallback gains and check that they are in the allowed
-  param_loader.load_param("gain_scheduling/VIO_fallback", VIO_fallback_gain);
-  if (!stringInVector(VIO_fallback_gain, VIO_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the VIO_fallback_gain '%s' is not cantained in VIO_allowed_gains!", VIO_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/ICP_fallback", ICP_fallback_gain);
-  if (!stringInVector(ICP_fallback_gain, ICP_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the ICP_fallback_gain '%s' is not cantained in ICP_allowed_gains!", ICP_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/RTK_fallback", RTK_fallback_gain);
-  if (!stringInVector(RTK_fallback_gain, RTK_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the RTK_fallback_gain '%s' is not cantained in RTK_allowed_gains!", RTK_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/OPTFLOWGPS_fallback", OPTFLOWGPS_fallback_gain);
-  if (!stringInVector(OPTFLOWGPS_fallback_gain, OPTFLOWGPS_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the OPTFLOWGPS_fallback_gain '%s' is not cantained in OPTFLOWGPS_allowed_gains!", OPTFLOWGPS_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/GPS_fallback", GPS_fallback_gain);
-  if (!stringInVector(GPS_fallback_gain, GPS_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the GPS_fallback_gain '%s' is not cantained in GPS_allowed_gains!", GPS_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/OPTFLOW_fallback", OPTFLOW_fallback_gain);
-  if (!stringInVector(OPTFLOW_fallback_gain, OPTFLOW_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the OPTFLOW_fallback_gain '%s' is not cantained in OPTFLOW_allowed_gains!", OPTFLOW_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  param_loader.load_param("gain_scheduling/OTHER_fallback", OTHER_fallback_gain);
-  if (!stringInVector(OTHER_fallback_gain, OTHER_allowed_gains)) {
-    ROS_ERROR("[GainManager]: the OTHER_fallback_gain '%s' is not cantained in OTHER_allowed_gains!", OTHER_fallback_gain.c_str());
-    ros::shutdown();
-  }
-
-  current_gains      = "";
-  last_odometry_mode = 0;
+  current_gains       = "";
+  current_constraints = "";
+  last_odometry_mode  = -1;
 
   // | ------------------------ services ------------------------ |
 
-  service_server_takeoff   = nh_.advertiseService("set_gains_in", &GainManager::callbackSetGains, this);
-  service_client_set_gains = nh_.serviceClient<dynamic_reconfigure::Reconfigure>("set_gains_out");
+  service_server_set_gains       = nh_.advertiseService("set_gains_in", &GainManager::callbackSetGains, this);
+  service_server_set_constraints = nh_.advertiseService("set_constraints_in", &GainManager::callbackSetConstraints, this);
+
+  service_client_set_gains       = nh_.serviceClient<dynamic_reconfigure::Reconfigure>("set_gains_out");
+  service_client_set_constraints = nh_.serviceClient<mrs_msgs::TrackerConstraints>("set_constraints_out");
 
   // | ----------------------- subscribers ---------------------- |
   subscriber_odometry_diagnostics =
@@ -269,18 +275,19 @@ void GainManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_current_gains = nh_.advertise<std_msgs::String>("current_gains_out", 1);
+  publisher_current_gains       = nh_.advertise<std_msgs::String>("current_gains_out", 1);
+  publisher_current_constraints = nh_.advertise<std_msgs::String>("current_constraints_out", 1);
 
   // | ------------------------- timers ------------------------- |
 
-  gain_scheduling_timer = nh_.createTimer(ros::Rate(gain_scheduling_rate_), &GainManager::gainSchedulingTimer, this);
+  management_timer = nh_.createTimer(ros::Rate(rate_), &GainManager::managementTimer, this);
 
   // --------------------------------------------------------------
   // |                          profiler                          |
   // --------------------------------------------------------------
 
   profiler                              = new mrs_lib::Profiler(nh_, "GainManager");
-  routine_gain_schedulling_timer        = profiler->registerRoutine("gainSchedullingTimer", gain_scheduling_rate_, 0.01);
+  routine_gain_management_timer         = profiler->registerRoutine("gainManagementTimer", rate_, 0.01);
   routine_callback_odometry_diagnostics = profiler->registerRoutine("callbackOdometryDiagnostics");
   routine_callback_controller_status    = profiler->registerRoutine("callbackControllerStatus");
 
@@ -382,6 +389,30 @@ bool GainManager::setGains(std::string gains_name) {
 
 //}
 
+/* setConstraints() //{ */
+
+bool GainManager::setConstraints(std::string constraints_names) {
+
+  std::map<std::string, mrs_msgs::TrackerConstraintsRequest>::iterator it;
+  it = constraints.find(constraints_names);
+
+  if (it == constraints.end()) {
+    return false;
+  }
+
+  mrs_msgs::TrackerConstraints new_constraints;
+
+  new_constraints.request = it->second;
+
+  service_client_set_constraints.call(new_constraints);
+
+  current_constraints = constraints_names;
+
+  return new_constraints.response.success;
+}
+
+//}
+
 // --------------------------------------------------------------
 // |                          callbacks                         |
 // --------------------------------------------------------------
@@ -393,57 +424,85 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
   if (!is_initialized)
     return false;
 
-  bool success = false;
-  switch (odometry_diagnostics.odometry_mode.mode) {
+  char message[200];
 
-    case mrs_msgs::OdometryMode::VIO:
-      success = stringInVector(req.value, VIO_allowed_gains);
-      break;
+  if (!stringInVector(req.value, gain_names_)) {
 
-    case mrs_msgs::OdometryMode::ICP:
-      success = stringInVector(req.value, ICP_allowed_gains);
-      break;
-
-    case mrs_msgs::OdometryMode::RTK:
-      success = stringInVector(req.value, RTK_allowed_gains);
-      break;
-
-    case mrs_msgs::OdometryMode::OPTFLOWGPS:
-      success = stringInVector(req.value, OPTFLOWGPS_allowed_gains);
-      break;
-
-    case mrs_msgs::OdometryMode::GPS:
-      success = stringInVector(req.value, GPS_allowed_gains);
-      break;
-
-    case mrs_msgs::OdometryMode::OPTFLOW:
-      success = stringInVector(req.value, OPTFLOW_allowed_gains);
-      break;
-
-    case mrs_msgs::OdometryMode::OTHER:
-      success = stringInVector(req.value, OTHER_allowed_gains);
-      break;
-  }
-
-  if (success) {
-    if (!setGains(req.value)) {
-
-      res.message = "those gains do not exist";
-      res.success = false;
-      return true;
-
-    } else {
-
-      res.message = "gains set";
-      res.success = true;
-      return true;
-    }
-  } else {
-    char message[200];
-    sprintf((char *)&message, "Can't set '%s' gains; not allowed given the current odometry mode.", req.value.c_str());
+    sprintf((char *)&message, "The gains '%s' do not exist (in the gain_manager's config).", req.value.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[GainManager]: %s", message);
+    return true;
+  }
+
+  if (!stringInVector(req.value, map_mode_allowed_gains.at(odometry_diagnostics.odometry_mode.name))) {
+
+    sprintf((char *)&message, "The gains '%s' are not allowed given the current odometry mode.", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[GainManager]: %s", message);
+    return true;
+  }
+
+  // try to set the gains
+  if (!setGains(req.value)) {
+
+    res.message = "the controller can't set the gains";
+    res.success = false;
+    return true;
+
+  } else {
+
+    sprintf((char *)&message, "The gains '%s' are set.", req.value.c_str());
+    res.message = message;
+    res.success = true;
+    ROS_INFO("[GainManager]: %s", message);
+    return true;
+  }
+}
+
+//}
+
+/* //{ callbackSetGains() */
+
+bool GainManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  char message[200];
+
+  if (!stringInVector(req.value, constraint_names_)) {
+
+    sprintf((char *)&message, "The constraints '%s' do not exist (in the gain_manager's config).", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[GainManager]: %s", message);
+    return true;
+  }
+
+  if (!stringInVector(req.value, map_mode_allowed_constraints.at(odometry_diagnostics.odometry_mode.name))) {
+
+    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry mode.", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[GainManager]: %s", message);
+    return true;
+  }
+
+  // try to set the gains
+  if (!setConstraints(req.value)) {
+
+    res.message = "the control_manager can't set the constraints";
+    res.success = false;
+    return true;
+
+  } else {
+
+    sprintf((char *)&message, "The constraints '%s' are set.", req.value.c_str());
+    res.message = message;
+    res.success = true;
+    ROS_INFO("[GainManager]: %s", message);
     return true;
   }
 }
@@ -494,68 +553,56 @@ void GainManager::callbackControllerStatus(const mrs_msgs::ControllerStatusConst
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* gainschedulingTimer() //{ */
+/* managementTimer() //{ */
 
-void GainManager::gainSchedulingTimer(const ros::TimerEvent &event) {
+void GainManager::managementTimer(const ros::TimerEvent &event) {
 
   if (!is_initialized)
     return;
 
   if (!got_odometry_diagnostics) {
-    ROS_WARN_THROTTLE(1.0, "[MavManager]: can't do gain schedulling, missing odometry diagnostics!");
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, missing odometry diagnostics!");
     return;
   }
 
   mutex_controller_status.lock();
   if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
-    ROS_WARN_THROTTLE(1.0, "[MavManager]: can't do gain schedulling, the NSF controller is not running!");
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the NSF controller is not running!");
     mutex_controller_status.unlock();
     return;
   }
   mutex_controller_status.unlock();
 
-  routine_gain_schedulling_timer->start(event);
+  routine_gain_management_timer->start(event);
 
-  // someone should put some fancy ifs here...
+  // | --- automatically set gains when odometry mode schanges -- |
   if (odometry_diagnostics.odometry_mode.mode != last_odometry_mode) {
 
     ROS_WARN("[GainManager]: the odometry mode has changed! %d -> %d", last_odometry_mode, odometry_diagnostics.odometry_mode.mode);
 
-    bool success = false;
+    std::map<std::string, std::string>::iterator it;
+    it = map_mode_fallback_gains.find(odometry_diagnostics.odometry_mode.name);
 
-    switch (odometry_diagnostics.odometry_mode.mode) {
+    if (it == map_mode_fallback_gains.end()) {
 
-      case mrs_msgs::OdometryMode::VIO:
-        success = setGains(VIO_fallback_gain);
-        break;
+      ROS_ERROR("[GainManager]: the odometry mode %s was not specified in the gain_manager's config!", odometry_diagnostics.odometry_mode.name.c_str());
 
-      case mrs_msgs::OdometryMode::ICP:
-        success = setGains(ICP_fallback_gain);
-        break;
-
-      case mrs_msgs::OdometryMode::RTK:
-        success = setGains(RTK_fallback_gain);
-        break;
-
-      case mrs_msgs::OdometryMode::OPTFLOWGPS:
-        success = setGains(OPTFLOWGPS_fallback_gain);
-        break;
-
-      case mrs_msgs::OdometryMode::GPS:
-        success = setGains(GPS_fallback_gain);
-        break;
-
-      case mrs_msgs::OdometryMode::OPTFLOW:
-        success = setGains(OPTFLOW_fallback_gain);
-        break;
-
-      case mrs_msgs::OdometryMode::OTHER:
-        success = setGains(OTHER_fallback_gain);
-        break;
+    } else {
+      if (setGains(it->second)) {
+        last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
+      }
     }
 
-    if (success) {
-      last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
+    it = map_mode_fallback_constraints.find(odometry_diagnostics.odometry_mode.name);
+
+    if (it == map_mode_fallback_constraints.end()) {
+
+      ROS_ERROR("[GainManager]: the odometry mode %s was not specified in the constraint_manager's config!", odometry_diagnostics.odometry_mode.name.c_str());
+
+    } else {
+      if (setConstraints(it->second)) {
+        last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
+      }
     }
   }
 
@@ -569,7 +616,15 @@ void GainManager::gainSchedulingTimer(const ros::TimerEvent &event) {
     ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_gains.getTopic().c_str());
   }
 
-  routine_gain_schedulling_timer->end();
+  str_out.data = current_constraints;
+  try {
+    publisher_current_constraints.publish(str_out);
+  }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
+  }
+
+  routine_gain_management_timer->end();
 }
 
 //}

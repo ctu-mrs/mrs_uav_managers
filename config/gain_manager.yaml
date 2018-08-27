@@ -1,94 +1,67 @@
-gains: [
-  "super_soft_for_optflow", # opt
-  "gps_soft",  # gps
-  "gps_tight", # rtk
+rate: 30
+
+odometry_modes: [
+  "VIO",
+  "ICP",
+  "RTK",
+  "OPTFLOWGPS",
+  "GPS",
+  "OPTFLOW",
+  "OTHER",
 ]
 
-gain_scheduling:
+gains: [
+  "supersoft",
+  "soft",
+]
 
-  rate: 30
+constraints: [
+  "slow",
+  "medium",
+]
 
-  # list of allowed gains per localization mode
-  VIO_allowed: ["super_soft_for_optflow"]
-  ICP_allowed: ["super_soft_for_optflow"]
-  RTK_allowed: ["gps_soft", "gps_tight", "super_soft_for_optflow"]
-  OPTFLOWGPS_allowed: ["gps_soft", "super_soft_for_optflow"]
-  GPS_allowed: ["gps_soft", 'super_soft_for_optflow']
-  OPTFLOW_allowed: ["super_soft_for_optflow"]
-  OTHER_allowed: ["super_soft_for_optflow"]
+gain_management:
+
+  # list of allowed gains per odometry mode
+  allowed_gains:
+    VIO: ["supersoft"]
+    ICP: ["supersoft"]
+    RTK: ["soft", "supersoft"]
+    OPTFLOWGPS: ["soft", "supersoft"]
+    GPS: ["soft", 'supersoft']
+    OPTFLOW: ["supersoft"]
+    OTHER: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
-  VIO_fallback: "super_soft_for_optflow"
-  ICP_fallback: "super_soft_for_optflow"
-  RTK_fallback: "gps_tight"
-  OPTFLOWGPS_fallback: "gps_soft"
-  GPS_fallback: "gps_soft"
-  OPTFLOW_fallback: "super_soft_for_optflow"
-  OTHER_fallback: "super_soft_for_optflow"
+  fallback_gains:
+    VIO: "supersoft"
+    ICP: "supersoft"
+    RTK: "soft"
+    OPTFLOWGPS: "soft"
+    GPS: "soft"
+    OPTFLOW: "supersoft"
+    OTHER: "supersoft"
 
-super_soft_for_optflow:
+constraint_management:
 
-  horizontal:
-    kp: 0.15
-    kv: 0.15
-    ka: 1.0
+  # list of allowed gains per odometry mode
+  allowed_constraints:
+    VIO: ["slow"]
+    ICP: ["slow"]
+    RTK: ["slow", "medium"]
+    OPTFLOWGPS: ["slow"]
+    GPS: ["slow", 'medium']
+    OPTFLOW: ["slow"]
+    OTHER: ["slow"]
 
-    kib: 0.01
-    kib_lim: 0.15
-
-    kiw: 0.01
-    kiw_lim: 0.3
-
-  vertical:
-    kp: 0.6
-    kv: 0.2
-    ka: 1.0
-
-  weight_estimator:
-    km: 1.0
-    km_lim: 1.0
-
-gps_soft:
-
-  horizontal:
-    kp: 0.30
-    kv: 0.25
-    ka: 1.0
-
-    kib: 0.01
-    kib_lim: 0.15
-
-    kiw: 0.01
-    kiw_lim: 0.3
-
-  vertical:
-    kp: 0.6
-    kv: 0.2
-    ka: 1.0
-
-  weight_estimator:
-    km: 1.0
-    km_lim: 1.0 # [kg]
-
-gps_tight:
-
-  horizontal:
-    kp: 0.50
-    kv: 0.30
-    ka: 1.0
-
-    kib: 0.01
-    kib_lim: 0.15
-
-    kiw: 0.01
-    kiw_lim: 0.3
-
-  vertical:
-    kp: 0.6
-    kv: 0.2
-    ka: 1.0
-
-  weight_estimator:
-    km: 1.0
-    km_lim: 1.0 # [kg]
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_constraints:
+    VIO: "slow"
+    ICP: "slow"
+    RTK: "medium"
+    OPTFLOWGPS: "slow"
+    GPS: "medium"
+    OPTFLOW: "slow"
+    OTHER: "slow"
