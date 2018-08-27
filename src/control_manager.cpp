@@ -959,8 +959,6 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
     max_height     = msg->value;
   }
   mutex_max_height.unlock();
-
-  ROS_INFO("[ControlManager]: setting max height to %f", max_height);
 }
 
 //}
