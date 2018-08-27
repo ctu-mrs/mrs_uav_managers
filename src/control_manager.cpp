@@ -130,10 +130,10 @@ private:
   mrs_mav_manager::SafetyArea_t safety_area;
   std::mutex                    mutex_safety_area;
 
-  bool isPointInSafetyArea2d(const double x, const double y);
-  bool isPointInSafetyArea3d(const double x, const double y, const double z);
-  bool getMinHeight(void);
-  bool getMaxHeight(void);
+  bool   isPointInSafetyArea2d(const double x, const double y);
+  bool   isPointInSafetyArea3d(const double x, const double y, const double z);
+  double getMinHeight(void);
+  double getMaxHeight(void);
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
@@ -365,8 +365,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   param_loader.load_param("safety_area/use_safety_area", use_safety_area_);
-  param_loader.load_param("safety_area/min_height", max_height);
   param_loader.load_param("safety_area/min_height", min_height);
+  param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
 
@@ -959,6 +959,8 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
     max_height     = msg->value;
   }
   mutex_max_height.unlock();
+
+  ROS_INFO("[ControlManager]: setting max height to %f", max_height);
 }
 
 //}
@@ -1693,7 +1695,7 @@ bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
 /* //{ getMaxHeight() */
 
-bool ControlManager::getMaxHeight(void) {
+double ControlManager::getMaxHeight(void) {
 
   double temp_double;
 
@@ -1708,7 +1710,7 @@ bool ControlManager::getMaxHeight(void) {
 
 /* //{ getMinHeight() */
 
-bool ControlManager::getMinHeight(void) {
+double ControlManager::getMinHeight(void) {
 
   double temp_double;
 
