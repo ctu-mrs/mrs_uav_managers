@@ -9,7 +9,7 @@ trackers : [
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
-  "mrs_controllers/LsfController",
+  "mrs_controllers/NsfController",
   "mrs_controllers/PidController",
   "mrs_controllers/FailsafeController",
 ]

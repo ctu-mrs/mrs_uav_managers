@@ -26,6 +26,8 @@
 
 #include <mrs_lib/Profiler.h>
 
+#include <mrs_lib/ParamLoader.h>
+
 namespace mrs_mav_manager
 {
 
@@ -108,16 +110,22 @@ private:
   std::mutex                          mutex_last_attitude_cmd;
 
 private:
+  mrs_mav_manager::MotorParams motor_params_;
+
+private:
   double max_tilt_angle_;
   double failsafe_hover_control_error_;
   double failsafe_land_control_error_;
 
 private:
-  mrs_lib::ConvexPolygon *safety_area;
-  bool                    use_safety_area;
+  mrs_lib::ConvexPolygon *    safety_area_polygon;
+  bool                        use_safety_area_;
+  double                      max_altitude_;
+  double                      min_altitude_;
+  mrs_mav_manager::SafetyArea safety_area;
 
-  Eigen::VectorXd projectPointOnSafetyBoundary(const Eigen::VectorXd point);
-  bool            isInSafetyArea(const Eigen::VectorXd point);
+  bool isPointInSafetyArea2d(const double x, const double y);
+  bool isPointInSafetyArea3d(const double x, const double y, const double z);
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
@@ -178,33 +186,24 @@ void ControlManager::onInit() {
   // |                           params                           |
   // --------------------------------------------------------------
 
-  nh_.getParam("safety/hover_tracker", hover_tracker_name_);
-  nh_.getParam("safety/failsafe_controller", failsafe_controller_name_);
-  nh_.param("safety/max_tilt_angle", max_tilt_angle_, -1.0);
-  nh_.param("safety/failsafe_hover_control_error", failsafe_hover_control_error_, -1.0);
-  nh_.param("safety/failsafe_land_control_error", failsafe_land_control_error_, -1.0);
+  mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
 
-  if (max_tilt_angle_ < 0) {
-    ROS_ERROR("[ControlManager]: max_tilt_angle was not specified!");
-    ros::shutdown();
-  }
+  param_loader.load_param("safety/hover_tracker", hover_tracker_name_);
+  param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
-  if (failsafe_hover_control_error_ < 0) {
-    ROS_ERROR("[ControlManager]: failsafe_hover_control_error_ was not specified!");
-    ros::shutdown();
-  }
+  param_loader.load_param("safety/max_tilt_angle", max_tilt_angle_);
+  param_loader.load_param("safety/failsafe_hover_control_error", failsafe_hover_control_error_);
+  param_loader.load_param("safety/failsafe_land_control_error", failsafe_land_control_error_);
 
-  if (failsafe_land_control_error_ < 0) {
-    ROS_ERROR("[ControlManager]: failsafe_land_control_error_ was not specified!");
-    ros::shutdown();
-  }
+  param_loader.load_param("hover_thrust/a", motor_params_.hover_thrust_a);
+  param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
   // --------------------------------------------------------------
 
-  nh_.getParam("trackers", tracker_names);
-  nh_.getParam("null_tracker", null_tracker_name_);
+  param_loader.load_param("trackers", tracker_names);
+  param_loader.load_param("null_tracker", null_tracker_name_);
   tracker_names.insert(tracker_names.begin(), null_tracker_name_);
 
   tracker_loader = new pluginlib::ClassLoader<mrs_mav_manager::Tracker>("mrs_mav_manager", "mrs_mav_manager::Tracker");
@@ -235,7 +234,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, tracker_names[i].c_str());
-      tracker_list[i]->initialize(nh_);
+      tracker_list[i]->initialize(nh_, &safety_area);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
@@ -250,7 +249,7 @@ void ControlManager::onInit() {
   // |                      load controllers                      |
   // --------------------------------------------------------------
 
-  nh_.getParam("controllers", controller_names);
+  param_loader.load_param("controllers", controller_names);
 
   controller_loader = new pluginlib::ClassLoader<mrs_mav_manager::Controller>("mrs_mav_manager", "mrs_mav_manager::Controller");
 
@@ -288,7 +287,7 @@ void ControlManager::onInit() {
 
       try {
         ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
-        controller_list[i]->initialize(nh_);
+        controller_list[i]->initialize(nh_, motor_params_);
       }
       catch (std::runtime_error &ex) {
         ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
@@ -355,12 +354,14 @@ void ControlManager::onInit() {
   // |                         safety area                        |
   // --------------------------------------------------------------
 
-  nh_.param("use_safety_area", use_safety_area, false);
+  param_loader.load_param("safety_area/use_safety_area", use_safety_area_);
+  param_loader.load_param("safety_area/max_altitude", max_altitude_);
+  param_loader.load_param("safety_area/min_altitude", min_altitude_);
 
-  if (use_safety_area) {
+  if (use_safety_area_) {
 
     std::vector<double> tempList;
-    nh_.getParam("safety_area", tempList);
+    param_loader.load_param("safety_area/safety_area", tempList);
 
     // check if the safety area has odd number of numbers (x, y coordinates)
     if ((tempList.size() % 2) == 1) {
@@ -382,7 +383,7 @@ void ControlManager::onInit() {
 
     try {
 
-      safety_area = new mrs_lib::ConvexPolygon(tempMatrix);
+      safety_area_polygon = new mrs_lib::ConvexPolygon(tempMatrix);
     }
     catch (mrs_lib::ConvexPolygon::WrongNumberOfVertices) {
 
@@ -399,6 +400,12 @@ void ControlManager::onInit() {
       ros::shutdown();
     }
   }
+
+  safety_area.max_altitude          = max_altitude_;
+  safety_area.min_altitude          = min_altitude_;
+  safety_area.use_safety_area       = use_safety_area_;
+  safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1, _2);
+  safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1, _2, _3);
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -458,9 +465,15 @@ void ControlManager::onInit() {
   status_timer = nh_.createTimer(ros::Rate(10), &ControlManager::statusTimer, this);
   safety_timer = nh_.createTimer(ros::Rate(100), &ControlManager::safetyTimer, this);
 
-  ROS_INFO("[ControlManager]: initialized");
+  // | ----------------------- finish init ---------------------- |
+
+  if (!param_loader.loaded_successfully()) {
+    ros::shutdown();
+  }
 
   is_initialized = true;
+
+  ROS_INFO("[ControlManager]: initialized");
 }
 
 //}
@@ -697,7 +710,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
         } else {
 
-          // if it is not the active one, just update without retrieving the commadn
+          // if it is not the active one, just update without retrieving the command
           tracker_list[i]->update(odometry_const_ptr);
         }
       }
@@ -742,6 +755,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
       desired_orientation.normalize();
       quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+
       try {
         publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
       }
@@ -800,7 +814,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mavros_msgs::AttitudeTarget attitude_target;
   attitude_target.header.stamp    = ros::Time::now();
-  attitude_target.header.frame_id = "local_origin";
+  attitude_target.header.frame_id = "base_link";
 
   bool should_publish = false;
 
@@ -844,6 +858,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->roll, controller_output_cmd->pitch, controller_output_cmd->yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
 
     attitude_target.thrust = controller_output_cmd->thrust;
 
@@ -1072,6 +1090,16 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   if (!is_initialized)
     return false;
 
+  mutex_odometry.lock();
+  if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
+    mutex_odometry.unlock();
+    ROS_ERROR("[ControlManager]: Can't turn motors on, the UAV is outside of the safety area!");
+    res.message = "the UAV is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+  mutex_odometry.unlock();
+
   motors = req.data;
 
   char message[100];
@@ -1141,6 +1169,16 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     return true;
   }
 
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(req.goal[0], req.goal[1], req.goal[2])) {
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+  mutex_last_position_cmd.unlock();
+
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
 
@@ -1178,6 +1216,14 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     return;
   }
 
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(msg->position.x, msg->position.y, msg->position.z)) {
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+    return;
+  }
+  mutex_last_position_cmd.unlock();
+
   bool tracker_response;
 
   mutex_tracker_list.lock();
@@ -1207,6 +1253,20 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
     res.success = false;
     return true;
   }
+
+  mutex_odometry.lock();
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x + req.goal[0], last_position_cmd->position.y + req.goal[1],
+                             last_position_cmd->position.z + req.goal[2])) {
+    mutex_odometry.unlock();
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+  mutex_odometry.unlock();
+  mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1245,6 +1305,19 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
     return;
   }
 
+  mutex_odometry.lock();
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x + msg->position.x, last_position_cmd->position.y + msg->position.y,
+                             last_position_cmd->position.z + msg->position.z)) {
+    mutex_odometry.unlock();
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+    return;
+  }
+  mutex_odometry.unlock();
+  mutex_last_position_cmd.unlock();
+
+
   bool tracker_response;
 
   mutex_tracker_list.lock();
@@ -1274,6 +1347,19 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
     res.success = false;
     return true;
   }
+
+  mutex_odometry.lock();
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
+    mutex_odometry.unlock();
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+  mutex_odometry.unlock();
+  mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[100];
@@ -1311,6 +1397,17 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
     ROS_WARN("[ControlManager]: not passing the goto_altitude topic through, the callbacks are disabled");
     return;
   }
+
+  mutex_odometry.lock();
+  mutex_last_position_cmd.lock();
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
+    mutex_odometry.unlock();
+    mutex_last_position_cmd.unlock();
+    ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+    return;
+  }
+  mutex_odometry.unlock();
+  mutex_last_position_cmd.unlock();
 
   bool tracker_response;
 
@@ -1461,24 +1558,36 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
 
 // | --------------------- other services --------------------- |
 
-// | ----------------------- safety area ---------------------- |
+//{ isInSafetyArea3d()
 
-//{ isInSafetyArea()
+bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const double z) {
 
-bool ControlManager::isInSafetyArea(const Eigen::VectorXd point) {
+  if (!use_safety_area_) {
+    return true;
+  }
 
-  return true;
+  if (safety_area_polygon->isPointIn(x, y) && z >= min_altitude_ && z <= max_altitude_) {
+    return true;
+  }
+
+  return false;
 }
 
 //}
 
-//{ projectPointOnSafetyBoundary()
+//{ isInSafetyArea2d()
 
-Eigen::VectorXd ControlManager::projectPointOnSafetyBoundary(const Eigen::VectorXd point) {
+bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
-  Eigen::Vector3d new_point;
+  if (!use_safety_area_) {
+    return true;
+  }
 
-  return new_point;
+  if (safety_area_polygon->isPointIn(x, y)) {
+    return true;
+  }
+
+  return false;
 }
 
 //}
@@ -1533,6 +1642,7 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
 }
 
 //}
+
 }  // namespace mrs_mav_manager
 
 #include <pluginlib/class_list_macros.h>

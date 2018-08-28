@@ -12,6 +12,8 @@
 
 #include <tf/transform_datatypes.h>
 
+#include <mrs_lib/ParamLoader.h>
+
 namespace mrs_mav_manager
 {
 
@@ -165,29 +167,16 @@ void MavManager::onInit() {
   service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
 
-  nh_.getParam("null_tracker", null_tracker_name_);
-  nh_.getParam("landoff/landing_tracker", landing_tracker_name_);
-  nh_.getParam("landoff/takeoff_tracker", takeoff_tracker_name_);
+  mrs_lib::ParamLoader param_loader(nh_, "MavManager");
 
-  nh_.param("landoff/landing_cutoff_height", landing_cutoff_height_, -1.0);
-  nh_.param("landoff/landing_cutoff_speed", landing_cutoff_speed_, -1000.0);
+  param_loader.load_param("null_tracker", null_tracker_name_);
+  param_loader.load_param("landoff/landing_tracker", landing_tracker_name_);
+  param_loader.load_param("landoff/takeoff_tracker", takeoff_tracker_name_);
 
-  nh_.param("landing_timer_rate", landing_timer_rate_, -1.0);
+  param_loader.load_param("landoff/landing_cutoff_height", landing_cutoff_height_);
+  param_loader.load_param("landoff/landing_cutoff_speed", landing_cutoff_speed_);
 
-  if (landing_cutoff_height_ < 0) {
-    ROS_ERROR("[MavManager]: landoff/landing_cutoff_height was not specified!");
-    ros::shutdown();
-  }
-
-  if (landing_cutoff_speed_ < -999) {
-    ROS_ERROR("[MavManager]: landoff/landing_cutoff_speed was not specified!");
-    ros::shutdown();
-  }
-
-  if (landing_timer_rate_ < 0) {
-    ROS_ERROR("[MavManager]: landing_timer_rate was not specified!");
-    ros::shutdown();
-  }
+  param_loader.load_param("landing_timer_rate", landing_timer_rate_);
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
@@ -208,9 +197,15 @@ void MavManager::onInit() {
 
   landing_timer = nh_.createTimer(ros::Rate(landing_timer_rate_), &MavManager::landingTimer, this);
 
-  ROS_INFO("[MavManager]: initilized");
+  // | ----------------------- finish init ---------------------- |
+
+  if (!param_loader.loaded_successfully()) {
+    ros::shutdown();
+  }
 
   is_initialized = true;
+
+  ROS_INFO("[MavManager]: initilized");
 }
 
 //}
@@ -236,7 +231,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
     {
       if (sqrt(pow(odometry_x - takeoff_x, 2) + pow(odometry_y - takeoff_y, 2)) < 0.5) {
 
-        ros::Duration wait(2.0);
+        ros::Duration wait(5.0);
         wait.sleep();
 
         ROS_INFO("[MavManager]: landing");
