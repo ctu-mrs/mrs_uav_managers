@@ -4,5 +4,5 @@ landoff:
   rate: 10 # [Hz]
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   landing_tracker: "mrs_trackers/LandoffTracker"
-  landing_cutoff_height:  0.30
-  landing_cutoff_speed:  -0.1
+  landing_cutoff_height:  0.1
+  landing_cutoff_speed:  -0.05
