@@ -13,6 +13,7 @@ odometry_modes: [
 gains: [
   "supersoft",
   "soft",
+  "tight",
 ]
 
 constraints: [
@@ -29,7 +30,7 @@ gain_management:
     RTK: ["soft", "supersoft"]
     OPTFLOWGPS: ["soft", "supersoft"]
     GPS: ["soft", 'supersoft']
-    OPTFLOW: ["supersoft"]
+    OPTFLOW: ["supersoft", "soft", "tight"]
     OTHER: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
@@ -40,7 +41,7 @@ gain_management:
     RTK: "soft"
     OPTFLOWGPS: "soft"
     GPS: "soft"
-    OPTFLOW: "supersoft"
+    OPTFLOW: "soft"
     OTHER: "supersoft"
 
 constraint_management:
