@@ -130,9 +130,9 @@
     <!-- Gain Manager -->
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="load mrs_mav_manager/GainManager $(arg uav_name)_nodelet_manager" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/gain_manager.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/gains.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/constraints.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/gains.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/constraints.yaml" />
 
       <!-- Subscribers -->
       <remap from="~controller_status_in" to="control_manager/controller_status" />

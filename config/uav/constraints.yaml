@@ -1,0 +1,47 @@
+slow:
+
+  horizontal:
+    speed: 2.5
+    acceleration: 2.0
+    jerk: 2.0
+
+  vertical:
+
+    ascending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+
+    descending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+
+  yaw:
+    speed: 0.4
+    acceleration: 0.5
+    jerk: 0.5
+
+medium:
+
+  horizontal:
+    speed: 4.0
+    acceleration: 2.0
+    jerk: 2.0
+
+  vertical:
+
+    ascending:
+      speed: 2.0
+      acceleration: 1.0
+      jerk: 2.0
+
+    descending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+
+  yaw:
+    speed: 0.4
+    acceleration: 0.5
+    jerk: 0.5
