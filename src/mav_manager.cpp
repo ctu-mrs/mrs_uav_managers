@@ -51,7 +51,6 @@ public:
   bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
   void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
@@ -69,18 +68,6 @@ private:
   double             odometry_pitch;
   std::mutex         mutex_odometry;
   bool               got_odometry = false;
-
-private:
-  ros::Subscriber    subscriber_mavros_odometry;
-  std::mutex         mutex_mavros_odometry;
-  nav_msgs::Odometry mavros_odometry;
-  double             mavros_odometry_x;
-  double             mavros_odometry_y;
-  double             mavros_odometry_z;
-  double             mavros_odometry_yaw;
-  double             mavros_odometry_roll;
-  double             mavros_odometry_pitch;
-  bool               got_mavros_odometry = false;
 
 private:
   ros::Subscriber         subscriber_tracker_status;
@@ -154,7 +141,6 @@ private:
   mrs_lib::Routine * routine_landing_timer;
   mrs_lib::Routine * routine_takeoff_timer;
   mrs_lib::Routine * routine_callback_odometry;
-  mrs_lib::Routine * routine_callback_mavros_odometry;
   mrs_lib::Routine * routine_callback_target_attitude;
   mrs_lib::Routine * routine_callback_attitude_command;
 };
@@ -198,7 +184,6 @@ void MavManager::onInit() {
   ROS_INFO("[MavManager]: initializing");
 
   subscriber_odometry         = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_odometry  = nh_.subscribe("mavros_odometry_in", 1, &MavManager::callbackMavrosOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
   subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &MavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &MavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
@@ -248,7 +233,6 @@ void MavManager::onInit() {
   routine_landing_timer             = profiler->registerRoutine("landingTimer", landing_timer_rate_, 0.002);
   routine_takeoff_timer             = profiler->registerRoutine("takeoffTimer", takeoff_timer_rate_, 0.002);
   routine_callback_odometry         = profiler->registerRoutine("callbackOdometry");
-  routine_callback_mavros_odometry  = profiler->registerRoutine("callbackMavrosOdometry");
   routine_callback_target_attitude  = profiler->registerRoutine("callbackTargetAttitude");
   routine_callback_attitude_command = profiler->registerRoutine("callbackAttitudeCommand");
 
@@ -327,9 +311,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
       mutex_odometry.lock();
-      mutex_mavros_odometry.lock();
       {
-        /* if ((odometry_z < landing_cutoff_height_) && (mavros_odometry.twist.twist.linear.z > landing_cutoff_speed_)) { */
         // recalculate the mass based on the thrust
         double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
@@ -351,7 +333,6 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
           landing_timer.stop();
         }
       }
-      mutex_mavros_odometry.unlock();
       mutex_odometry.unlock();
 
     } else {
@@ -497,38 +478,6 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
-/* //{ callbackMavrosOdometry() */
-
-void MavManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  routine_callback_mavros_odometry->start();
-
-  mutex_mavros_odometry.lock();
-  {
-    mavros_odometry = *msg;
-
-    mavros_odometry_x = mavros_odometry.pose.pose.position.x;
-    mavros_odometry_y = mavros_odometry.pose.pose.position.y;
-    mavros_odometry_z = mavros_odometry.pose.pose.position.z;
-
-    // calculate the euler angles
-    tf::Quaternion quaternion_odometry;
-    quaternionMsgToTF(mavros_odometry.pose.pose.orientation, quaternion_odometry);
-    tf::Matrix3x3 m(quaternion_odometry);
-    m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
-  }
-  mutex_mavros_odometry.unlock();
-
-  got_mavros_odometry = true;
-
-  routine_callback_mavros_odometry->end();
-}
-
-//}
-
 /* //{ callbackTakeoff() */
 
 bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
@@ -538,7 +487,7 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
 
   char message[100];
 
-  if (!(got_odometry && got_mavros_odometry)) {
+  if (!got_odometry) {
     sprintf((char *)&message, "Can't takeoff, missing odometry!");
     res.message = message;
     res.success = false;
@@ -636,7 +585,7 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
   char message[100];
 
-  if (!(got_odometry && got_mavros_odometry)) {
+  if (!got_odometry) {
     sprintf((char *)&message, "Can't land, missing odometry!");
     res.message = message;
     res.success = false;
@@ -702,7 +651,7 @@ bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Tri
 
   char message[100];
 
-  if (!(got_odometry && got_mavros_odometry)) {
+  if (!got_odometry) {
     sprintf((char *)&message, "Can't land, missing odometry!");
     res.message = message;
     res.success = false;
