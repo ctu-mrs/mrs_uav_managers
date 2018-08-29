@@ -44,7 +44,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params_new_esc.yaml" />
 
       <!-- Controller's configs -->
 
