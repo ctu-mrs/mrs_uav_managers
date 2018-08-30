@@ -114,6 +114,7 @@ private:
   // | ------------------------ profiler ------------------------ |
 private:
   mrs_lib::Profiler *profiler;
+  bool profiler_enabled_ = false;
   mrs_lib::Routine * routine_callback_odometry_diagnostics;
   mrs_lib::Routine * routine_callback_controller_status;
   mrs_lib::Routine * routine_gain_management_timer;
@@ -135,6 +136,9 @@ void GainManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
+
+  param_loader.load_param("enable_profiler", profiler_enabled_);
+
   param_loader.load_param("gains", gain_names_);
   param_loader.load_param("constraints", constraint_names_);
 
@@ -286,7 +290,7 @@ void GainManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                              = new mrs_lib::Profiler(nh_, "GainManager");
+  profiler                              = new mrs_lib::Profiler(nh_, "GainManager", profiler_enabled_);
   routine_gain_management_timer         = profiler->registerRoutine("gainManagementTimer", rate_, 0.01);
   routine_callback_odometry_diagnostics = profiler->registerRoutine("callbackOdometryDiagnostics");
   routine_callback_controller_status    = profiler->registerRoutine("callbackControllerStatus");

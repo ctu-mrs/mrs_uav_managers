@@ -177,6 +177,7 @@ private:
 
 private:
   mrs_lib::Profiler *profiler;
+  bool profiler_enabled_ = false;
   mrs_lib::Routine * routine_callback_odometry;
 };
 
@@ -197,6 +198,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
+
+  param_loader.load_param("enable_profiler", profiler_enabled_);
 
   param_loader.load_param("safety/hover_tracker", hover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
@@ -421,7 +424,7 @@ void ControlManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                  = new mrs_lib::Profiler(nh_, "ControlManager");
+  profiler                  = new mrs_lib::Profiler(nh_, "ControlManager", profiler_enabled_);
   routine_callback_odometry = profiler->registerRoutine("control_and_tracker_update");
 
   // --------------------------------------------------------------
