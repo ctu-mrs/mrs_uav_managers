@@ -23,7 +23,7 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 0.50
+    kp: 0.40
     kv: 0.25
     ka: 1.0
 
@@ -45,7 +45,7 @@ soft:
 tight:
 
   horizontal:
-    kp: 0.60
+    kp: 0.50
     kv: 0.30
     ka: 1.0
 

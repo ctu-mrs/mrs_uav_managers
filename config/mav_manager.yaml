@@ -1,5 +1,10 @@
 null_tracker: "mrs_mav_manager/NullTracker"
 
+max_height_checking:
+
+  rate: 10 # [Hz]
+  safety_height_offset: 0.5 # how much lower to descend bellow the max height
+
 takeoff:
   rate: 10 # [Hz]
   takeoff_tracker: "mrs_trackers/LandoffTracker"
