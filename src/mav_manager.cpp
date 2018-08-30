@@ -153,6 +153,7 @@ private:
   // | ------------------------ profiler ------------------------ |
 private:
   mrs_lib::Profiler *profiler;
+  bool               profiler_enabled_ = false;
   mrs_lib::Routine * routine_landing_timer;
   mrs_lib::Routine * routine_takeoff_timer;
   mrs_lib::Routine * routine_max_height_timer;
@@ -219,6 +220,8 @@ void MavManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "MavManager");
 
+  param_loader.load_param("enable_profiler", profiler_enabled_);
+
   param_loader.load_param("null_tracker", null_tracker_name_);
 
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
@@ -250,7 +253,7 @@ void MavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                          = new mrs_lib::Profiler(nh_, "MavManager");
+  profiler                          = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
   routine_landing_timer             = profiler->registerRoutine("landingTimer", landing_timer_rate_, 0.002);
   routine_takeoff_timer             = profiler->registerRoutine("takeoffTimer", takeoff_timer_rate_, 0.002);
   routine_max_height_timer          = profiler->registerRoutine("maxHeightTimer", max_height_checking_rate_, 0.002);
