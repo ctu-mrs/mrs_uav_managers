@@ -1,7 +1,8 @@
 <launch>
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
-  <arg name="uav_mass" default="$(optenv UAV_MASS uav)" />
+  <arg name="uav_mass" default="$(optenv UAV_MASS)" />
+  <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml" />
   <arg name="g" default="9.8" />
 
@@ -148,6 +149,7 @@
       <!-- Publishers -->
       <remap from="~current_gains_out" to="~current_gains" />
       <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~profiler" to="profiler" />
 
     </node>
 
