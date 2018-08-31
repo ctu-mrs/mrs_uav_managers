@@ -19,4 +19,4 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_height:  0.4
-  landing_cutoff_mass_difference:  0.5 # [kg]
+  landing_cutoff_mass_difference:  1.0 # [kg]

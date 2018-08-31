@@ -59,6 +59,7 @@ public:
   virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area) = 0;
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                       = 0;
   virtual void deactivate(void)                                                                               = 0;
+  virtual void switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg)                                  = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus::Ptr        getStatus()                                     = 0;

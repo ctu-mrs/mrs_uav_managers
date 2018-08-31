@@ -19,6 +19,7 @@ public:
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg);
   virtual const mrs_msgs::TrackerStatus::Ptr        getStatus();
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
+  virtual void                                      switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg);
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd);
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd);
@@ -82,6 +83,13 @@ void NullTracker::deactivate(void) {
 
   ROS_INFO("[NullTracker]: deactivated");
   is_active = false;
+}
+
+//}
+
+/* switchOdometrySource() //{ */
+
+void NullTracker::switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg) {
 }
 
 //}
