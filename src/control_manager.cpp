@@ -26,6 +26,8 @@
 #include <mutex>
 #include <tf/transform_datatypes.h>
 
+#define STRING_EQUAL 0
+
 namespace mrs_mav_manager
 {
 
@@ -712,6 +714,22 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   routine_callback_odometry->start();
 
+  // | -- prepare an OdometryConstPtr for trackers&controllers -- |
+
+  nav_msgs::Odometry::ConstPtr        odometry_const_ptr(new nav_msgs::Odometry(*msg));
+
+  // | ----- check for change in odometry frame of reference ---- |
+
+  if (got_odometry) {
+    if (odometry.header.frame_id.compare(msg->header.frame_id) != STRING_EQUAL) {
+
+      ROS_INFO("[ControlManager]: detecting change of odometry frame");
+      tracker_list[active_tracker_idx]->update(odometry_const_ptr);
+    } 
+  }
+
+  // | -------------------- copy the odometry ------------------- |
+
   mutex_odometry.lock();
   {
     odometry = *msg;
@@ -734,7 +752,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  nav_msgs::Odometry::ConstPtr        odometry_const_ptr(new nav_msgs::Odometry(odometry));
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
   mutex_tracker_list.lock();

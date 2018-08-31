@@ -421,8 +421,6 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
     return;
 
   if (!got_max_height || !got_odometry) {
-    ROS_WARN_THROTTLE(1.0, "[MavManager]: missing data (odometry: %s, max height: %s), can't check if its not exceeded!", got_odometry ? "OK" : "MISSING",
-                      got_max_height ? "OK" : "MISSING");
     return;
   }
 
