@@ -83,6 +83,9 @@ private:
   int  failsafe_controller_idx = 0;
   bool motors                  = 0;
 
+  int status_timer_rate_ = 0;
+  int safety_timer_rate_ = 0;
+
   ros::Publisher publisher_control_output;
   ros::Publisher publisher_position_cmd;
   ros::Publisher publisher_attitude_cmd;
@@ -179,8 +182,12 @@ private:
 
 private:
   mrs_lib::Profiler *profiler;
-  bool profiler_enabled_ = false;
-  mrs_lib::Routine * routine_callback_odometry;
+  bool               profiler_enabled_ = false;
+
+  mrs_lib::Routine *routine_status_timer;
+  mrs_lib::Routine *routine_safety_timer;
+
+  mrs_lib::Routine *routine_callback_odometry;
 };
 
 //}
@@ -203,12 +210,16 @@ void ControlManager::onInit() {
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
+  param_loader.load_param("status_timer_rate", status_timer_rate_);
+
   param_loader.load_param("safety/hover_tracker", hover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
   param_loader.load_param("safety/max_tilt_angle", max_tilt_angle_);
   param_loader.load_param("safety/failsafe_hover_control_error", failsafe_hover_control_error_);
   param_loader.load_param("safety/failsafe_land_control_error", failsafe_land_control_error_);
+
+  param_loader.load_param("safety/timer_rate", safety_timer_rate_);
 
   param_loader.load_param("hover_thrust/a", motor_params_.hover_thrust_a);
   param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
@@ -426,8 +437,11 @@ void ControlManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                  = new mrs_lib::Profiler(nh_, "ControlManager", profiler_enabled_);
+  profiler = new mrs_lib::Profiler(nh_, "ControlManager", profiler_enabled_);
+
   routine_callback_odometry = profiler->registerRoutine("control_and_tracker_update");
+  routine_status_timer      = profiler->registerRoutine("stausTimer", status_timer_rate_, 0.01);
+  routine_safety_timer      = profiler->registerRoutine("safetyTimer", safety_timer_rate_, 0.04);
 
   // --------------------------------------------------------------
   // |                         publishers                         |
@@ -480,8 +494,8 @@ void ControlManager::onInit() {
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  status_timer = nh_.createTimer(ros::Rate(10), &ControlManager::statusTimer, this);
-  safety_timer = nh_.createTimer(ros::Rate(200), &ControlManager::safetyTimer, this);
+  status_timer = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
+  safety_timer = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -506,6 +520,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
   if (!is_initialized)
     return;
+
+  routine_status_timer->start(event);
 
   // --------------------------------------------------------------
   // |                publishing the tracker status               |
@@ -548,6 +564,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
   }
+
+  routine_status_timer->end();
 }
 
 //}
@@ -563,12 +581,15 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
   }
 
+  routine_safety_timer->start(event);
+
   mutex_last_attitude_cmd.lock();
   mutex_last_position_cmd.lock();
   {
     if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
       mutex_last_attitude_cmd.unlock();
       mutex_last_position_cmd.unlock();
+      routine_safety_timer->end();
       return;
     }
   }
@@ -643,6 +664,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   mutex_controller_list.unlock();
   mutex_tracker_list.unlock();
   mutex_odometry.unlock();
+
+  routine_safety_timer->end();
 }
 
 //}
@@ -716,7 +739,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   // | -- prepare an OdometryConstPtr for trackers&controllers -- |
 
-  nav_msgs::Odometry::ConstPtr        odometry_const_ptr(new nav_msgs::Odometry(*msg));
+  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(*msg));
 
   // | ----- check for change in odometry frame of reference ---- |
 
@@ -725,7 +748,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
       ROS_INFO("[ControlManager]: detecting change of odometry frame");
       tracker_list[active_tracker_idx]->update(odometry_const_ptr);
-    } 
+    }
   }
 
   // | -------------------- copy the odometry ------------------- |
@@ -1143,7 +1166,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
 /* //{ callbackHover() */
 
-bool ControlManager::callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
