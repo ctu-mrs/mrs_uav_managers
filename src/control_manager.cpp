@@ -744,10 +744,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_odometry) {
-    if (odometry.header.frame_id.compare(msg->header.frame_id) != STRING_EQUAL) {
+    if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting change of odometry frame");
-      tracker_list[active_tracker_idx]->update(odometry_const_ptr);
+      tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
     }
   }
 
