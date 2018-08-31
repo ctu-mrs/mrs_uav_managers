@@ -254,9 +254,11 @@ void MavManager::onInit() {
   // --------------------------------------------------------------
 
   profiler                          = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
+
   routine_landing_timer             = profiler->registerRoutine("landingTimer", landing_timer_rate_, 0.002);
   routine_takeoff_timer             = profiler->registerRoutine("takeoffTimer", takeoff_timer_rate_, 0.002);
   routine_max_height_timer          = profiler->registerRoutine("maxHeightTimer", max_height_checking_rate_, 0.002);
+
   routine_callback_odometry         = profiler->registerRoutine("callbackOdometry");
   routine_callback_target_attitude  = profiler->registerRoutine("callbackTargetAttitude");
   routine_callback_attitude_command = profiler->registerRoutine("callbackAttitudeCommand");
@@ -381,7 +383,7 @@ void MavManager::takeoffTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  routine_takeoff_timer->start();
+  routine_takeoff_timer->start(event);
 
   if (takingoff) {
     mutex_odometry.lock();
@@ -421,12 +423,10 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
     return;
 
   if (!got_max_height || !got_odometry) {
-    ROS_WARN_THROTTLE(1.0, "[MavManager]: missing data (odometry: %s, max height: %s), can't check if its not exceeded!", got_odometry ? "OK" : "MISSING",
-                      got_max_height ? "OK" : "MISSING");
     return;
   }
 
-  routine_max_height_timer->start();
+  routine_max_height_timer->start(event);
 
   mutex_odometry.lock();
   mutex_max_height.lock();
@@ -604,7 +604,7 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 /* //{ callbackTakeoff() */
 
-bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool MavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
@@ -710,7 +710,7 @@ bool MavManager::callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trig
 
 /* //{ callbackLand() */
 
-bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool MavManager::callbackLand([[maybe_unused]]  std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
@@ -776,7 +776,7 @@ bool MavManager::callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger
 
 /* //{ callbackLandHome() */
 
-bool MavManager::callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool MavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
