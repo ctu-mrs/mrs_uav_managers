@@ -437,7 +437,6 @@ void ControlManager::onInit() {
 
   profiler = new mrs_lib::Profiler(nh_, "ControlManager", profiler_enabled_);
 
-
   // --------------------------------------------------------------
   // |                         publishers                         |
   // --------------------------------------------------------------
@@ -567,21 +566,21 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
-  if (reseting_odometry) {
-    ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
-    return;
-  }
-
   mrs_lib::ScopeUnset unset_running(running_safety_timer);
 
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
+
   if (!got_odometry || active_tracker_idx <= 0) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
+  if (reseting_odometry) {
+    ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
+    return;
+  }
 
   mutex_last_attitude_cmd.lock();
   mutex_last_position_cmd.lock();
@@ -667,58 +666,11 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
 //}
 
-/* //{ hover() */
-
-bool ControlManager::hover(std::string &message_out) {
-
-  if (!is_initialized)
-    return false;
-
-  char message[200];
-  bool success = false;
-
-  try {
-
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
-    tracker_list[hover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
-
-    // super important, switch the active tracker idx
-    try {
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = hover_tracker_idx;
-
-      message_out = std::string(message);
-      success     = true;
-    }
-    catch (std::runtime_error &exrun) {
-
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
-
-      message_out = std::string(message);
-      success     = false;
-    }
-  }
-  catch (std::runtime_error &exrun) {
-
-    sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-
-    message_out = std::string(message);
-    success     = false;
-  }
-
-  return success;
-}
-
-//}
-
 // --------------------------------------------------------------
 // |                          callbacks                         |
 // --------------------------------------------------------------
+
+// | --------------------- topic callbacks -------------------- |
 
 /* //{ callbackOdometry() */
 
@@ -731,8 +683,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     ROS_ERROR("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
   }
-
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("control_and_tracker_update");
 
   // | -- prepare an OdometryConstPtr for trackers&controllers -- |
 
@@ -1004,12 +954,14 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
-/* callbackMaxHeight //{ */
+/* callbackMaxHeight() //{ */
 
 void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMaxHeight");
 
   mutex_max_height.lock();
   {
@@ -1020,6 +972,8 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 }
 
 //}
+
+// | -------------------- service callbacks ------------------- |
 
 /* //{ callbackSwitchTracker() */
 
@@ -1826,6 +1780,59 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
   mutex_tracker_list.unlock();
 
   return true;
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
+
+/* //{ hover() */
+
+bool ControlManager::hover(std::string &message_out) {
+
+  if (!is_initialized)
+    return false;
+
+  char message[200];
+  bool success = false;
+
+  try {
+
+    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
+    tracker_list[hover_tracker_idx]->activate(last_position_cmd);
+    sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
+    ROS_INFO("[ControlManager]: %s", message);
+
+    // super important, switch the active tracker idx
+    try {
+      tracker_list[active_tracker_idx]->deactivate();
+      active_tracker_idx = hover_tracker_idx;
+
+      message_out = std::string(message);
+      success     = true;
+    }
+    catch (std::runtime_error &exrun) {
+
+      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      message_out = std::string(message);
+      success     = false;
+    }
+  }
+  catch (std::runtime_error &exrun) {
+
+    sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+
+    message_out = std::string(message);
+    success     = false;
+  }
+
+  return success;
 }
 
 //}

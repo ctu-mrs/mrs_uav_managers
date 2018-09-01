@@ -281,11 +281,11 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("landingTimer", landing_timer_rate_, 0.004, event);
+
   if (current_state_landing == IDLE_STATE) {
     return;
   } else if (current_state_landing == FLY_HOME_STATE) {
-
-    mrs_lib::Routine profiler_routine = profiler->createRoutine("landingTimer", landing_timer_rate_, 0.002, event);
 
     mutex_odometry.lock();
     {
@@ -365,7 +365,7 @@ void MavManager::takeoffTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("takeoffTimer", takeoff_timer_rate_, 0.002, event);
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("takeoffTimer", takeoff_timer_rate_, 0.004, event);
 
   if (takingoff) {
     mutex_odometry.lock();
@@ -402,11 +402,11 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("maxHeightTimer", max_height_checking_rate_, 0.004, event);
+
   if (!got_max_height || !got_odometry) {
     return;
   }
-
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("maxHeightTimer", max_height_checking_rate_, 0.002, event);
 
   mutex_odometry.lock();
   mutex_max_height.lock();
@@ -472,12 +472,16 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
+// | --------------------- topic callbacks -------------------- |
+
 /* //{ callbackTrackerStatus() */
 
 void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTrackerStatus");
 
   mutex_tracker_status.lock();
   { tracker_status = *msg; }
@@ -571,6 +575,8 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 }
 
 //}
+
+// | -------------------- service callbacks ------------------- |
 
 /* //{ callbackTakeoff() */
 
