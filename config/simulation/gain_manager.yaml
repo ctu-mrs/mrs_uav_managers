@@ -63,6 +63,6 @@ constraint_management:
     ICP: "slow"
     RTK: "medium"
     OPTFLOWGPS: "slow"
-    GPS: "medium"
+    GPS: "slow"
     OPTFLOW: "slow"
     OTHER: "slow"
