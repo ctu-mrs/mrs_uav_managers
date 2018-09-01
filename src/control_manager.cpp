@@ -12,6 +12,7 @@
 #include <mrs_lib/ConvexPolygon.h>
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/Utils.h>
 
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
@@ -179,6 +180,8 @@ private:
 private:
   ros::Timer safety_timer;
   void       safetyTimer(const ros::TimerEvent &event);
+  bool       running_safety_timer = false;
+  double     reseting_odometry    = false;
 
 private:
   mrs_lib::Profiler *profiler;
@@ -564,6 +567,13 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
+  if (reseting_odometry) {
+    ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
+    return; 
+  }
+
+  mrs_lib::ContextUnset unset_running(running_safety_timer);
+
   if (!is_initialized)
     return;
 
@@ -608,7 +618,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
       // check if the controller is not active
       if (hover_tracker_idx != active_tracker_idx) {
 
-        ROS_ERROR("[ControlManager]: Activating safety hover: max_tilt_angle_=%f, control_error=%f", max_tilt_angle_, control_error);
+        ROS_ERROR("[ControlManager]: Activating safety hover: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
         std::string message_out;
         hover(message_out);
@@ -718,7 +728,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     return;
 
   if (!got_max_height) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: waiting, missing max_height");
+    ROS_ERROR("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
   }
 
@@ -733,12 +743,26 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (got_odometry) {
     if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
-      ROS_INFO("[ControlManager]: detecting change of odometry frame");
+      ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+
+      reseting_odometry = true;
+
+      // we have to stop safety timer, otherwise it will interfere
+      safety_timer.stop();
+      // wait for the safety timer to stop if its running
+      while (running_safety_timer) {
+        ROS_INFO("[MpcTracker]: waiting for safety timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
       tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
     }
   }
 
-  // | -------------------- copy the odometry ------------------- |
+  // --------------------------------------------------------------
+  // |                      copy the odometry                     |
+  // --------------------------------------------------------------
 
   mutex_odometry.lock();
   {
@@ -969,6 +993,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
     }
+  }
+
+  if (reseting_odometry) {
+
+    safety_timer.start();
+    reseting_odometry = false;
   }
 }
 
