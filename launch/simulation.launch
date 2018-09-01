@@ -17,6 +17,7 @@
     <!-- MAV Manager -->
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager $(arg uav_name)_nodelet_manager" output="screen">
 
+      <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/mav_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
 

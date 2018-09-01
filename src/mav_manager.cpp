@@ -235,6 +235,7 @@ void MavManager::onInit() {
 
   param_loader.load_param("max_height_checking/rate", max_height_checking_rate_);
   param_loader.load_param("max_height_checking/safety_height_offset", max_height_offset_);
+  param_loader.load_param("safety_area/max_height", max_height);
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
