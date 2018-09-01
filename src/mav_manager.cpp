@@ -261,6 +261,7 @@ void MavManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[MavManager]: Could not load all parameters!");
     ros::shutdown();
   }
 

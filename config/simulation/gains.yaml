@@ -1,9 +1,9 @@
 supersoft:
 
   horizontal:
-    kp: 0.15
-    kv: 0.15
-    ka: 1.0
+    kp: 0.20
+    kv: 0.20
+    ka: 0.5
 
     kib: 0.01
     kib_lim: 0.15

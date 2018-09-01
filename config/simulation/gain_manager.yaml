@@ -1,4 +1,4 @@
-rate: 30
+rate: 25
 
 odometry_modes: [
   "VIO",
@@ -63,6 +63,6 @@ constraint_management:
     ICP: "slow"
     RTK: "medium"
     OPTFLOWGPS: "slow"
-    GPS: "slow"
+    GPS: "medium"
     OPTFLOW: "slow"
     OTHER: "slow"

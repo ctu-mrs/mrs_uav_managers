@@ -494,6 +494,7 @@ void ControlManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[ControlManager]: Could not load all parameters!");
     ros::shutdown();
   }
 

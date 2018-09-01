@@ -95,7 +95,7 @@ private:
 
   void       managementTimer(const ros::TimerEvent &event);
   ros::Timer management_timer;
-  double     rate_;
+  int        rate_;
 
   // | --------------------- gain management -------------------- |
 
@@ -292,6 +292,7 @@ void GainManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[GainManager]: Could not load all parameters!");
     ros::shutdown();
   }
 
