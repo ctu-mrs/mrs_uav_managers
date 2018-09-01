@@ -569,10 +569,10 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   if (reseting_odometry) {
     ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
-    return; 
+    return;
   }
 
-  mrs_lib::ContextUnset unset_running(running_safety_timer);
+  mrs_lib::ScopeUnset unset_running(running_safety_timer);
 
   if (!is_initialized)
     return;
