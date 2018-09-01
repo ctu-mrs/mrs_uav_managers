@@ -3,7 +3,7 @@ slow:
   horizontal:
     speed: 2.0
     acceleration: 1.0
-    jerk: 2.0
+    jerk: 1.0
 
   vertical:
 
