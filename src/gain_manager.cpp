@@ -271,8 +271,8 @@ void GainManager::onInit() {
 
   // | ----------------------- subscribers ---------------------- |
   subscriber_odometry_diagnostics =
-      nh_.subscribe("odometry_diagnostics_in", 1, &GainManager::callbackOdometryDiagnostics, this, ros::TransportHints().udp());
-  subscriber_controller_status = nh_.subscribe("controller_status_in", 1, &GainManager::callbackControllerStatus, this, ros::TransportHints().udp());
+      nh_.subscribe("odometry_diagnostics_in", 1, &GainManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
+  subscriber_controller_status = nh_.subscribe("controller_status_in", 1, &GainManager::callbackControllerStatus, this, ros::TransportHints().tcpNoDelay());
 
   // | ----------------------- publishers ----------------------- |
 
