@@ -249,7 +249,6 @@ void MavManager::onInit() {
 
   profiler = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
 
-
   // --------------------------------------------------------------
   // |                           timers                           |
   // --------------------------------------------------------------
