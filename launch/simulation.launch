@@ -3,8 +3,14 @@
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
+  <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml" />
   <arg name="g" default="9.8" />
+
+  <arg unless="$(arg standalone)" name="nodelet" value="load"/>
+  <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
+  <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg uav_name)_nodelet_manager"/>
+  <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
 
   <!-- Nodelet Manager -->
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
@@ -15,7 +21,7 @@
   <group ns="$(arg uav_name)">
 
     <!-- MAV Manager -->
-    <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager $(arg uav_name)_nodelet_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="mav_manager" args="$(arg nodelet) mrs_mav_manager/MavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/mav_manager.yaml" />
@@ -51,7 +57,7 @@
     </node>
 
     <!-- Control manager -->
-    <node pkg="nodelet" type="nodelet" name="control_manager" args="load mrs_mav_manager/ControlManager $(arg uav_name)_nodelet_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_mav_manager/ControlManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
@@ -138,7 +144,7 @@
     </node>
 
     <!-- Gain Manager -->
-    <node pkg="nodelet" type="nodelet" name="gain_manager" args="load mrs_mav_manager/GainManager $(arg uav_name)_nodelet_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_mav_manager/GainManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager.yaml" />
       <rosparam file="$(find mrs_mav_manager)/config/simulation/gains.yaml" />
