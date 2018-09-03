@@ -25,6 +25,7 @@
 #include <nodelet/loader.h>
 
 #include <mutex>
+#include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
 
 #define STRING_EQUAL 0
@@ -42,6 +43,7 @@ public:
 private:
   ros::NodeHandle nh_;
   bool            is_initialized = false;
+  std::string     uav_name_;
 
 private:
   pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
@@ -171,6 +173,9 @@ private:
   bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
 private:
+  Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
+
+private:
   bool callbacks_enabled = true;
 
 private:
@@ -205,6 +210,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
+
+  param_loader.load_param("uav_name", uav_name_);
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
@@ -1320,8 +1327,33 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     return;
   }
 
+  mrs_msgs::TrackerPointStamped request;
+
+  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+    // rotate it from the frame of the drone
+    Eigen::Vector2d des(msg->position.x, msg->position.y);
+    des = rotateVector(des, odometry_yaw);
+
+    mutex_odometry.lock();
+    {
+      request.position.x   = des[0] + odometry_x;
+      request.position.y   = des[1] + odometry_y;
+      request.position.z   = msg->position.z + odometry_z;
+      request.position.yaw = msg->position.yaw + odometry_yaw;
+    }
+    mutex_odometry.unlock();
+
+  } else {
+
+    request.position.x   = msg->position.x;
+    request.position.y   = msg->position.y;
+    request.position.z   = msg->position.z;
+    request.position.yaw = msg->position.yaw;
+  }
+
   mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(msg->position.x, msg->position.y, msg->position.z)) {
+  if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
     mutex_last_position_cmd.unlock();
     ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
     return;
@@ -1331,7 +1363,7 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   bool tracker_response;
 
   mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
@@ -1409,10 +1441,36 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
     return;
   }
 
+  mrs_msgs::TrackerPointStamped request;
+
+  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+    // rotate it from the frame of the drone
+    Eigen::Vector2d des(msg->position.x, msg->position.y);
+    des = rotateVector(des, odometry_yaw);
+
+    mutex_odometry.lock();
+    mutex_last_position_cmd.lock();
+    {
+      request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
+      request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
+      request.position.z   = msg->position.z + odometry_z - last_position_cmd->position.z;
+      request.position.yaw = msg->position.yaw + odometry_yaw - last_position_cmd->yaw;
+    }
+    mutex_last_position_cmd.unlock();
+    mutex_odometry.unlock();
+
+  } else {
+
+    request.position.x   = msg->position.x;
+    request.position.y   = msg->position.y;
+    request.position.z   = msg->position.z;
+    request.position.yaw = msg->position.yaw;
+  }
+
   mutex_odometry.lock();
   mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x + msg->position.x, last_position_cmd->position.y + msg->position.y,
-                             last_position_cmd->position.z + msg->position.z)) {
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y, last_position_cmd->position.z + request.position.z)) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
     ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
@@ -1421,11 +1479,10 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   mutex_odometry.unlock();
   mutex_last_position_cmd.unlock();
 
-
   bool tracker_response;
 
   mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
@@ -1834,6 +1891,17 @@ bool ControlManager::hover(std::string &message_out) {
   }
 
   return success;
+}
+
+//}
+
+/* rotateVector() //{ */
+
+Eigen::Vector2d ControlManager::rotateVector(const Eigen::Vector2d vector_in, double angle) {
+
+  Eigen::Rotation2D<double> rot2(angle);
+
+  return rot2.toRotationMatrix() * vector_in;
 }
 
 //}

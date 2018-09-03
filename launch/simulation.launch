@@ -63,6 +63,7 @@
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="uav_name" type="string" value="$(arg uav_name)" />
 
       <!-- Controller's configs -->
 
