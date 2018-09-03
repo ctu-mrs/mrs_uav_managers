@@ -1,6 +1,6 @@
 rate: 30
 
-odometry_modes: [
+estimator_types: [
   "VIO",
   "ICP",
   "RTK",

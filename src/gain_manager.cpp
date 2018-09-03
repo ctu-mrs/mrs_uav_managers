@@ -5,7 +5,7 @@
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/OdometryDiag.h>
-#include <mrs_msgs/OdometryMode.h>
+#include <mrs_msgs/EstimatorType.h>
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/TrackerConstraints.h>
 #include <mrs_msgs/TrackerConstraintsRequest.h>
@@ -43,7 +43,7 @@ private:
   bool            is_initialized = false;
 
 private:
-  std::vector<std::string> odometry_mode_names_;
+  std::vector<std::string> estimator_type_names_;
 
   std::vector<std::string>       gain_names_;
   std::map<std::string, Gains_t> gains;
@@ -53,12 +53,12 @@ private:
 
 private:
 private:
-  std::map<std::string, std::vector<std::string>> map_mode_allowed_gains;
-  std::map<std::string, std::string>              map_mode_fallback_gains;
+  std::map<std::string, std::vector<std::string>> map_type_allowed_gains;
+  std::map<std::string, std::string>              map_type_fallback_gains;
 
 private:
-  std::map<std::string, std::vector<std::string>> map_mode_allowed_constraints;
-  std::map<std::string, std::string>              map_mode_fallback_constraints;
+  std::map<std::string, std::vector<std::string>> map_type_allowed_constraints;
+  std::map<std::string, std::string>              map_type_fallback_constraints;
 
 public:
   virtual void onInit();
@@ -91,7 +91,7 @@ private:
   // | ------------- constraint and gain management ------------- |
 
 private:
-  mrs_msgs::OdometryMode::_mode_type last_odometry_mode;
+  mrs_msgs::EstimatorType::_type_type last_estimator_type;
 
   void       managementTimer(const ros::TimerEvent &event);
   ros::Timer management_timer;
@@ -142,7 +142,7 @@ void GainManager::onInit() {
   param_loader.load_param("gains", gain_names_);
   param_loader.load_param("constraints", constraint_names_);
 
-  param_loader.load_param("odometry_modes", odometry_mode_names_);
+  param_loader.load_param("estimator_types", estimator_type_names_);
   param_loader.load_param("rate", rate_);
 
   std::vector<std::string>::iterator it;
@@ -172,7 +172,7 @@ void GainManager::onInit() {
   }
 
   // loading the allowed gains lists
-  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
     param_loader.load_param("gain_management/allowed_gains/" + *it, temp_vector);
@@ -185,21 +185,21 @@ void GainManager::onInit() {
       }
     }
 
-    map_mode_allowed_gains.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
+    map_type_allowed_gains.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
   }
 
   // loading the fallback gains
-  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
     param_loader.load_param("gain_management/fallback_gains/" + *it, temp_str);
 
-    if (!stringInVector(temp_str, map_mode_allowed_gains.at(*it))) {
+    if (!stringInVector(temp_str, map_type_allowed_gains.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
-    map_mode_fallback_gains.insert(std::pair<std::string, std::string>(*it, temp_str));
+    map_type_fallback_gains.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
   // loading constraint names
@@ -228,7 +228,7 @@ void GainManager::onInit() {
   }
 
   // loading the allowed constraints lists
-  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
     param_loader.load_param("constraint_management/allowed_constraints/" + *it, temp_vector);
@@ -241,28 +241,28 @@ void GainManager::onInit() {
       }
     }
 
-    map_mode_allowed_constraints.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
+    map_type_allowed_constraints.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
   }
 
   // loading the fallback constraints
-  for (it = odometry_mode_names_.begin(); it != odometry_mode_names_.end(); ++it) {
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
     param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
 
-    if (!stringInVector(temp_str, map_mode_allowed_constraints.at(*it))) {
+    if (!stringInVector(temp_str, map_type_allowed_constraints.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
-    map_mode_fallback_constraints.insert(std::pair<std::string, std::string>(*it, temp_str));
+    map_type_fallback_constraints.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
   ROS_INFO("[GainManager]: done loading dynamical params");
 
   current_gains       = "";
   current_constraints = "";
-  last_odometry_mode  = -1;
+  last_estimator_type  = -1;
 
   // | ------------------------ services ------------------------ |
 
@@ -439,9 +439,9 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
     return true;
   }
 
-  if (!stringInVector(req.value, map_mode_allowed_gains.at(odometry_diagnostics.odometry_mode.name))) {
+  if (!stringInVector(req.value, map_type_allowed_gains.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The gains '%s' are not allowed given the current odometry mode.", req.value.c_str());
+    sprintf((char *)&message, "The gains '%s' are not allowed given the current odometry.type.", req.value.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[GainManager]: %s", message);
@@ -485,9 +485,9 @@ bool GainManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msg
     return true;
   }
 
-  if (!stringInVector(req.value, map_mode_allowed_constraints.at(odometry_diagnostics.odometry_mode.name))) {
+  if (!stringInVector(req.value, map_type_allowed_constraints.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry mode.", req.value.c_str());
+    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[GainManager]: %s", message);
@@ -579,33 +579,33 @@ void GainManager::managementTimer(const ros::TimerEvent &event) {
 
   routine_gain_management_timer->start(event);
 
-  // | --- automatically set gains when odometry mode schanges -- |
-  if (odometry_diagnostics.odometry_mode.mode != last_odometry_mode) {
+  // | --- automatically set gains when odometry.type schanges -- |
+  if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-    ROS_WARN("[GainManager]: the odometry mode has changed! %d -> %d", last_odometry_mode, odometry_diagnostics.odometry_mode.mode);
+    ROS_WARN("[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
     std::map<std::string, std::string>::iterator it;
-    it = map_mode_fallback_gains.find(odometry_diagnostics.odometry_mode.name);
+    it = map_type_fallback_gains.find(odometry_diagnostics.estimator_type.name);
 
-    if (it == map_mode_fallback_gains.end()) {
+    if (it == map_type_fallback_gains.end()) {
 
-      ROS_ERROR("[GainManager]: the odometry mode %s was not specified in the gain_manager's config!", odometry_diagnostics.odometry_mode.name.c_str());
+      ROS_ERROR("[GainManager]: the odometry.type %s was not specified in the gain_manager's config!", odometry_diagnostics.estimator_type.name.c_str());
 
     } else {
       if (setGains(it->second)) {
-        last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
+        last_estimator_type = odometry_diagnostics.estimator_type.type;
       }
     }
 
-    it = map_mode_fallback_constraints.find(odometry_diagnostics.odometry_mode.name);
+    it = map_type_fallback_constraints.find(odometry_diagnostics.estimator_type.name);
 
-    if (it == map_mode_fallback_constraints.end()) {
+    if (it == map_type_fallback_constraints.end()) {
 
-      ROS_ERROR("[GainManager]: the odometry mode %s was not specified in the constraint_manager's config!", odometry_diagnostics.odometry_mode.name.c_str());
+      ROS_ERROR("[GainManager]: the odometry.type %s was not specified in the constraint_manager's config!", odometry_diagnostics.estimator_type.name.c_str());
 
     } else {
       if (setConstraints(it->second)) {
-        last_odometry_mode = odometry_diagnostics.odometry_mode.mode;
+        last_estimator_type = odometry_diagnostics.estimator_type.type;
       }
     }
   }

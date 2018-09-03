@@ -25,7 +25,7 @@
       <param name="g" value="$(arg g)" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
       <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
@@ -105,7 +105,7 @@
       <remap from="~mpc_tracker/setpoint_pose_out" to="~mpc_tracker/setpoint_pose" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
 
       <!-- Subscribers and Services -->
