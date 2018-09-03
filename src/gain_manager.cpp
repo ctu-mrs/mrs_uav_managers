@@ -427,9 +427,11 @@ void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstP
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryDiagnostics");
 
-  mutex_odometry_diagnostics.lock();
-  { odometry_diagnostics = *msg; }
-  mutex_odometry_diagnostics.unlock();
+  {
+    std::scoped_lock lock(mutex_odometry_diagnostics);
+
+    odometry_diagnostics = *msg;
+  }
 
   got_odometry_diagnostics = true;
 }
@@ -445,9 +447,11 @@ void GainManager::callbackControllerStatus(const mrs_msgs::ControllerStatusConst
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControllerStatus");
 
-  mutex_controller_status.lock();
-  { controller_status = *msg; }
-  mutex_controller_status.unlock();
+  {
+    std::scoped_lock lock(mutex_controller_status);
+
+    controller_status = *msg;
+  }
 
   got_controller_status = true;
 }
@@ -566,13 +570,14 @@ void GainManager::managementTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  mutex_controller_status.lock();
-  if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the NSF controller is not running!");
-    mutex_controller_status.unlock();
-    return;
+  {
+    std::scoped_lock lock(mutex_controller_status);
+
+    if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the NSF controller is not running!");
+      return;
+    }
   }
-  mutex_controller_status.unlock();
 
   // | --- automatically set gains when odometry mode schanges -- |
   if (odometry_diagnostics.odometry_mode.mode != last_odometry_mode) {
