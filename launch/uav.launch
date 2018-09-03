@@ -17,6 +17,7 @@
     <!-- MAV Manager -->
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager $(arg uav_name)_nodelet_manager" output="screen">
 
+      <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/mav_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params_new_esc.yaml" />
 
@@ -56,6 +57,7 @@
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params_new_esc.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="uav_name" type="string" value="$(arg uav_name)" />
 
       <!-- Controller's configs -->
 
@@ -101,8 +103,7 @@
       <remap from="~mpc_tracker/failsafe_in" to="~mpc_tracker/failsafe" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
-      <remap from="~mpc_tracker/cmd_pose_out" to="~mpc_tracker/cmd_pose" />
-      <remap from="~mpc_tracker/setpoint_pose_out" to="~mpc_tracker/setpoint_pose" />
+      <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />

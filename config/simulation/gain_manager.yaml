@@ -1,4 +1,4 @@
-rate: 30
+rate: 25
 
 estimator_types: [
   "VIO",
@@ -29,7 +29,7 @@ gain_management:
     ICP: ["supersoft"]
     RTK: ["soft", "supersoft"]
     OPTFLOWGPS: ["soft", "supersoft"]
-    GPS: ["soft", 'supersoft']
+    GPS: ["soft", 'supersoft', 'tight']
     OPTFLOW: ["supersoft"]
     OTHER: ["supersoft"]
 
@@ -40,7 +40,7 @@ gain_management:
     ICP: "supersoft"
     RTK: "soft"
     OPTFLOWGPS: "soft"
-    GPS: "soft"
+    GPS: "tight"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
 

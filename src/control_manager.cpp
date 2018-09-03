@@ -12,6 +12,7 @@
 #include <mrs_lib/ConvexPolygon.h>
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/Utils.h>
 
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
@@ -24,6 +25,7 @@
 #include <nodelet/loader.h>
 
 #include <mutex>
+#include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
 
 #define STRING_EQUAL 0
@@ -41,6 +43,7 @@ public:
 private:
   ros::NodeHandle nh_;
   bool            is_initialized = false;
+  std::string     uav_name_;
 
 private:
   pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
@@ -170,6 +173,9 @@ private:
   bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
 private:
+  Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
+
+private:
   bool callbacks_enabled = true;
 
 private:
@@ -179,15 +185,12 @@ private:
 private:
   ros::Timer safety_timer;
   void       safetyTimer(const ros::TimerEvent &event);
+  bool       running_safety_timer = false;
+  double     reseting_odometry    = false;
 
 private:
   mrs_lib::Profiler *profiler;
   bool               profiler_enabled_ = false;
-
-  mrs_lib::Routine *routine_status_timer;
-  mrs_lib::Routine *routine_safety_timer;
-
-  mrs_lib::Routine *routine_callback_odometry;
 };
 
 //}
@@ -207,6 +210,8 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
+
+  param_loader.load_param("uav_name", uav_name_);
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
@@ -439,10 +444,6 @@ void ControlManager::onInit() {
 
   profiler = new mrs_lib::Profiler(nh_, "ControlManager", profiler_enabled_);
 
-  routine_callback_odometry = profiler->registerRoutine("control_and_tracker_update");
-  routine_status_timer      = profiler->registerRoutine("stausTimer", status_timer_rate_, 0.01);
-  routine_safety_timer      = profiler->registerRoutine("safetyTimer", safety_timer_rate_, 0.04);
-
   // --------------------------------------------------------------
   // |                         publishers                         |
   // --------------------------------------------------------------
@@ -500,6 +501,7 @@ void ControlManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[ControlManager]: Could not load all parameters!");
     ros::shutdown();
   }
 
@@ -521,7 +523,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  routine_status_timer->start(event);
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("stausTimer", status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
   // |                publishing the tracker status               |
@@ -564,8 +566,6 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
   }
-
-  routine_status_timer->end();
 }
 
 //}
@@ -574,14 +574,21 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
+  mrs_lib::ScopeUnset unset_running(running_safety_timer);
+
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
   if (!got_odometry || active_tracker_idx <= 0) {
     return;
   }
 
-  routine_safety_timer->start(event);
+  if (reseting_odometry) {
+    ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
+    return;
+  }
 
   mutex_last_attitude_cmd.lock();
   mutex_last_position_cmd.lock();
@@ -589,7 +596,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
       mutex_last_attitude_cmd.unlock();
       mutex_last_position_cmd.unlock();
-      routine_safety_timer->end();
       return;
     }
   }
@@ -619,7 +625,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
       // check if the controller is not active
       if (hover_tracker_idx != active_tracker_idx) {
 
-        ROS_ERROR("[ControlManager]: Activating safety hover: max_tilt_angle_=%f, control_error=%f", max_tilt_angle_, control_error);
+        ROS_ERROR("[ControlManager]: Activating safety hover: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
         std::string message_out;
         hover(message_out);
@@ -664,57 +670,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   mutex_controller_list.unlock();
   mutex_tracker_list.unlock();
   mutex_odometry.unlock();
-
-  routine_safety_timer->end();
-}
-
-//}
-
-/* //{ hover() */
-
-bool ControlManager::hover(std::string &message_out) {
-
-  if (!is_initialized)
-    return false;
-
-  char message[200];
-  bool success = false;
-
-  try {
-
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
-    tracker_list[hover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
-
-    // super important, switch the active tracker idx
-    try {
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = hover_tracker_idx;
-
-      message_out = std::string(message);
-      success     = true;
-    }
-    catch (std::runtime_error &exrun) {
-
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
-
-      message_out = std::string(message);
-      success     = false;
-    }
-  }
-  catch (std::runtime_error &exrun) {
-
-    sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
-    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-
-    message_out = std::string(message);
-    success     = false;
-  }
-
-  return success;
 }
 
 //}
@@ -722,6 +677,8 @@ bool ControlManager::hover(std::string &message_out) {
 // --------------------------------------------------------------
 // |                          callbacks                         |
 // --------------------------------------------------------------
+
+// | --------------------- topic callbacks -------------------- |
 
 /* //{ callbackOdometry() */
 
@@ -731,11 +688,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     return;
 
   if (!got_max_height) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: waiting, missing max_height");
+    ROS_ERROR("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
   }
-
-  routine_callback_odometry->start();
 
   // | -- prepare an OdometryConstPtr for trackers&controllers -- |
 
@@ -746,12 +701,26 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (got_odometry) {
     if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
-      ROS_INFO("[ControlManager]: detecting change of odometry frame");
+      ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+
+      reseting_odometry = true;
+
+      // we have to stop safety timer, otherwise it will interfere
+      safety_timer.stop();
+      // wait for the safety timer to stop if its running
+      while (running_safety_timer) {
+        ROS_INFO("[MpcTracker]: waiting for safety timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
       tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
     }
   }
 
-  // | -------------------- copy the odometry ------------------- |
+  // --------------------------------------------------------------
+  // |                      copy the odometry                     |
+  // --------------------------------------------------------------
 
   mutex_odometry.lock();
   {
@@ -984,17 +953,23 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     }
   }
 
-  routine_callback_odometry->end();
+  if (reseting_odometry) {
+
+    safety_timer.start();
+    reseting_odometry = false;
+  }
 }
 
 //}
 
-/* callbackMaxHeight //{ */
+/* callbackMaxHeight() //{ */
 
 void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMaxHeight");
 
   mutex_max_height.lock();
   {
@@ -1005,6 +980,8 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 }
 
 //}
+
+// | -------------------- service callbacks ------------------- |
 
 /* //{ callbackSwitchTracker() */
 
@@ -1350,8 +1327,33 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     return;
   }
 
+  mrs_msgs::TrackerPointStamped request;
+
+  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+    // rotate it from the frame of the drone
+    Eigen::Vector2d des(msg->position.x, msg->position.y);
+    des = rotateVector(des, odometry_yaw);
+
+    mutex_odometry.lock();
+    {
+      request.position.x   = des[0] + odometry_x;
+      request.position.y   = des[1] + odometry_y;
+      request.position.z   = msg->position.z + odometry_z;
+      request.position.yaw = msg->position.yaw + odometry_yaw;
+    }
+    mutex_odometry.unlock();
+
+  } else {
+
+    request.position.x   = msg->position.x;
+    request.position.y   = msg->position.y;
+    request.position.z   = msg->position.z;
+    request.position.yaw = msg->position.yaw;
+  }
+
   mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(msg->position.x, msg->position.y, msg->position.z)) {
+  if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
     mutex_last_position_cmd.unlock();
     ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
     return;
@@ -1361,7 +1363,7 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   bool tracker_response;
 
   mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
@@ -1439,10 +1441,36 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
     return;
   }
 
+  mrs_msgs::TrackerPointStamped request;
+
+  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+    // rotate it from the frame of the drone
+    Eigen::Vector2d des(msg->position.x, msg->position.y);
+    des = rotateVector(des, odometry_yaw);
+
+    mutex_odometry.lock();
+    mutex_last_position_cmd.lock();
+    {
+      request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
+      request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
+      request.position.z   = msg->position.z + odometry_z - last_position_cmd->position.z;
+      request.position.yaw = msg->position.yaw + odometry_yaw - last_position_cmd->yaw;
+    }
+    mutex_last_position_cmd.unlock();
+    mutex_odometry.unlock();
+
+  } else {
+
+    request.position.x   = msg->position.x;
+    request.position.y   = msg->position.y;
+    request.position.z   = msg->position.z;
+    request.position.yaw = msg->position.yaw;
+  }
+
   mutex_odometry.lock();
   mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x + msg->position.x, last_position_cmd->position.y + msg->position.y,
-                             last_position_cmd->position.z + msg->position.z)) {
+  if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y, last_position_cmd->position.z + request.position.z)) {
     mutex_odometry.unlock();
     mutex_last_position_cmd.unlock();
     ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
@@ -1451,11 +1479,10 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   mutex_odometry.unlock();
   mutex_last_position_cmd.unlock();
 
-
   bool tracker_response;
 
   mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(*msg))); }
+  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
   mutex_tracker_list.unlock();
 
   if (!tracker_response) {
@@ -1811,6 +1838,70 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
   mutex_tracker_list.unlock();
 
   return true;
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
+
+/* //{ hover() */
+
+bool ControlManager::hover(std::string &message_out) {
+
+  if (!is_initialized)
+    return false;
+
+  char message[200];
+  bool success = false;
+
+  try {
+
+    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
+    tracker_list[hover_tracker_idx]->activate(last_position_cmd);
+    sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
+    ROS_INFO("[ControlManager]: %s", message);
+
+    // super important, switch the active tracker idx
+    try {
+      tracker_list[active_tracker_idx]->deactivate();
+      active_tracker_idx = hover_tracker_idx;
+
+      message_out = std::string(message);
+      success     = true;
+    }
+    catch (std::runtime_error &exrun) {
+
+      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      message_out = std::string(message);
+      success     = false;
+    }
+  }
+  catch (std::runtime_error &exrun) {
+
+    sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+
+    message_out = std::string(message);
+    success     = false;
+  }
+
+  return success;
+}
+
+//}
+
+/* rotateVector() //{ */
+
+Eigen::Vector2d ControlManager::rotateVector(const Eigen::Vector2d vector_in, double angle) {
+
+  Eigen::Rotation2D<double> rot2(angle);
+
+  return rot2.toRotationMatrix() * vector_in;
 }
 
 //}

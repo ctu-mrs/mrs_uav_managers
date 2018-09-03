@@ -154,13 +154,6 @@ private:
 private:
   mrs_lib::Profiler *profiler;
   bool               profiler_enabled_ = false;
-  mrs_lib::Routine * routine_landing_timer;
-  mrs_lib::Routine * routine_takeoff_timer;
-  mrs_lib::Routine * routine_max_height_timer;
-  mrs_lib::Routine * routine_callback_odometry;
-  mrs_lib::Routine * routine_callback_target_attitude;
-  mrs_lib::Routine * routine_callback_attitude_command;
-  mrs_lib::Routine * routine_callback_max_height;
 };
 
 //}
@@ -178,11 +171,14 @@ void MavManager::changeLandingState(LandingStates_t new_state) {
       break;
     case FLY_HOME_STATE:
       break;
-    case LANDING_STATE:
-      mutex_attitude_command.lock();
-      { landing_uav_mass_ = uav_mass_ + attitude_command.mass_difference; }
-      mutex_attitude_command.unlock();
-      break;
+    case LANDING_STATE: {
+
+      std::scoped_lock lock(mutex_attitude_command);
+
+      landing_uav_mass_ = uav_mass_ + attitude_command.mass_difference;
+    }
+
+    break;
   }
 
   // just for ROS_INFO
@@ -242,6 +238,7 @@ void MavManager::onInit() {
 
   param_loader.load_param("max_height_checking/rate", max_height_checking_rate_);
   param_loader.load_param("max_height_checking/safety_height_offset", max_height_offset_);
+  param_loader.load_param("safety_area/max_height", max_height);
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
@@ -253,16 +250,7 @@ void MavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                          = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
-
-  routine_landing_timer             = profiler->registerRoutine("landingTimer", landing_timer_rate_, 0.002);
-  routine_takeoff_timer             = profiler->registerRoutine("takeoffTimer", takeoff_timer_rate_, 0.002);
-  routine_max_height_timer          = profiler->registerRoutine("maxHeightTimer", max_height_checking_rate_, 0.002);
-
-  routine_callback_odometry         = profiler->registerRoutine("callbackOdometry");
-  routine_callback_target_attitude  = profiler->registerRoutine("callbackTargetAttitude");
-  routine_callback_attitude_command = profiler->registerRoutine("callbackAttitudeCommand");
-  routine_callback_max_height       = profiler->registerRoutine("callbackMaxHeight");
+  profiler = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -275,6 +263,7 @@ void MavManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[MavManager]: Could not load all parameters!");
     ros::shutdown();
   }
 
@@ -296,51 +285,58 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("landingTimer", landing_timer_rate_, 0.01, event);
+
   if (current_state_landing == IDLE_STATE) {
+
     return;
+
   } else if (current_state_landing == FLY_HOME_STATE) {
 
-    routine_landing_timer->start(event);
+    double temp_odom_x, temp_odom_y;
 
-    mutex_odometry.lock();
     {
-      if (sqrt(pow(odometry_x - takeoff_x, 2) + pow(odometry_y - takeoff_y, 2)) < 0.5) {
+      std::scoped_lock lock(mutex_odometry);
 
-        ros::Duration wait(5.0);
+      temp_odom_x = odometry_x;
+      temp_odom_y = odometry_y;
+    }
+
+    if (sqrt(pow(temp_odom_x - takeoff_x, 2) + pow(temp_odom_y - takeoff_y, 2)) < 0.5) {
+
+      ros::Duration wait(5.0);
+      wait.sleep();
+
+      ROS_INFO("[MavManager]: landing");
+
+      mrs_msgs::String switch_tracker_out;
+      switch_tracker_out.request.value = landing_tracker_name_;
+      service_client_switch_tracker.call(switch_tracker_out);
+
+      std_srvs::Trigger land_out;
+      if (switch_tracker_out.response.success == true) {
+
+        service_client_land.call(land_out);
+
+        ros::Duration wait(1.0);
         wait.sleep();
 
-        ROS_INFO("[MavManager]: landing");
+        changeLandingState(LANDING_STATE);
 
-        mrs_msgs::String switch_tracker_out;
-        switch_tracker_out.request.value = landing_tracker_name_;
-        service_client_switch_tracker.call(switch_tracker_out);
+      } else {
 
-        std_srvs::Trigger land_out;
-        if (switch_tracker_out.response.success == true) {
-
-          service_client_land.call(land_out);
-
-          ros::Duration wait(1.0);
-          wait.sleep();
-
-          changeLandingState(LANDING_STATE);
-
-        } else {
-
-          changeLandingState(IDLE_STATE);
-        }
+        changeLandingState(IDLE_STATE);
       }
     }
-    mutex_odometry.unlock();
 
   } else if (current_state_landing == LANDING_STATE) {
 
-    routine_landing_timer->start(event);
 
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
-      mutex_odometry.lock();
       {
+        std::scoped_lock lock(mutex_odometry);
+
         // recalculate the mass based on the thrust
         double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
@@ -362,15 +358,12 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
           landing_timer.stop();
         }
       }
-      mutex_odometry.unlock();
 
     } else {
 
       ROS_ERROR("[MavManager]: incorrect tracker detected during landing!");
       /* changeLandingState(IDLE_STATE); */
     }
-
-    routine_landing_timer->end();
   }
 }
 
@@ -383,11 +376,12 @@ void MavManager::takeoffTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  routine_takeoff_timer->start(event);
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("takeoffTimer", takeoff_timer_rate_, 0.004, event);
 
   if (takingoff) {
-    mutex_odometry.lock();
     {
+      std::scoped_lock lock(mutex_odometry);
+
       if (fabs(takeoff_height_ - odometry_z) < 0.2) {
         ROS_INFO("[MavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
 
@@ -407,10 +401,7 @@ void MavManager::takeoffTimer(const ros::TimerEvent &event) {
         takeoff_timer.stop();
       }
     }
-    mutex_odometry.unlock();
   }
-
-  routine_takeoff_timer->end();
 }
 
 //}
@@ -422,18 +413,18 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("maxHeightTimer", max_height_checking_rate_, 0.004, event);
+
   if (!got_max_height || !got_odometry) {
     return;
   }
 
-  routine_max_height_timer->start(event);
-
-  mutex_odometry.lock();
-  mutex_max_height.lock();
   {
+    std::scoped_lock lock(mutex_max_height, mutex_odometry);
+
     if (!fixing_max_height) {
 
-      if (odometry_z > max_height) {
+      if (odometry_z > max_height+0.25) {
 
         ROS_WARN("[MavManager]: max height exceeded: %f >  %f, triggering safety goto", odometry_z, max_height);
 
@@ -452,9 +443,11 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
         goto_out.request.goal[2] = max_height - fabs(max_height_offset_);
         goto_out.request.goal[3] = odometry_yaw;
 
-        mutex_services.lock();
-        { service_client_emergency_goto.call(goto_out); }
-        mutex_services.unlock();
+        {
+          std::scoped_lock lock(mutex_services);
+
+          service_client_emergency_goto.call(goto_out);
+        }
 
         if (goto_out.response.success == true) {
 
@@ -482,10 +475,6 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
       }
     }
   }
-  mutex_max_height.unlock();
-  mutex_odometry.unlock();
-
-  routine_max_height_timer->end();
 }
 
 //}
@@ -494,6 +483,8 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
+// | --------------------- topic callbacks -------------------- |
+
 /* //{ callbackTrackerStatus() */
 
 void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
@@ -501,9 +492,12 @@ void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &ms
   if (!is_initialized)
     return;
 
-  mutex_tracker_status.lock();
-  { tracker_status = *msg; }
-  mutex_tracker_status.unlock();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTrackerStatus");
+
+  {
+    std::scoped_lock lock(mutex_tracker_status);
+    tracker_status = *msg;
+  }
 
   got_tracker_status = true;
 }
@@ -517,15 +511,14 @@ void MavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
   if (!is_initialized)
     return;
 
-  routine_callback_target_attitude->start();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTargetAttitude");
 
-  mutex_tracker_status.lock();
-  { target_attitude = *msg; }
-  mutex_tracker_status.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_status);
+    target_attitude = *msg;
+  }
 
   got_target_attitude = true;
-
-  routine_callback_target_attitude->end();
 }
 
 //}
@@ -537,15 +530,14 @@ void MavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr
   if (!is_initialized)
     return;
 
-  routine_callback_attitude_command->start();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackAttitudeCommand");
 
-  mutex_attitude_command.lock();
-  { attitude_command = *msg; }
-  mutex_attitude_command.unlock();
+  {
+    std::scoped_lock lock(mutex_attitude_command);
+    attitude_command = *msg;
+  }
 
   got_attitude_command = true;
-
-  routine_callback_attitude_command->end();
 }
 
 //}
@@ -557,15 +549,14 @@ void MavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) 
   if (!is_initialized)
     return;
 
-  routine_callback_max_height->start();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMaxHeight");
 
-  mutex_max_height.lock();
-  { max_height = msg->value; }
-  mutex_max_height.unlock();
+  {
+    std::scoped_lock lock(mutex_max_height);
+    max_height = msg->value;
+  }
 
   got_max_height = true;
-
-  routine_callback_max_height->end();
 }
 
 //}
@@ -577,10 +568,11 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
-  routine_callback_odometry->start();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
 
-  mutex_odometry.lock();
   {
+    std::scoped_lock lock(mutex_odometry);
+
     odometry = *msg;
 
     odometry_x = odometry.pose.pose.position.x;
@@ -593,14 +585,13 @@ void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
   }
-  mutex_odometry.unlock();
 
   got_odometry = true;
-
-  routine_callback_odometry->end();
 }
 
 //}
+
+// | -------------------- service callbacks ------------------- |
 
 /* //{ callbackTakeoff() */
 
@@ -683,12 +674,12 @@ bool MavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
       res.success = takeoff_out.response.success;
       res.message = takeoff_out.response.message;
 
-      mutex_odometry.lock();
       {
+        std::scoped_lock lock(mutex_odometry);
+
         takeoff_x = odometry_x;
         takeoff_y = odometry_y;
       }
-      mutex_odometry.unlock();
 
       ROS_INFO("[MavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
 
@@ -710,7 +701,7 @@ bool MavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
 /* //{ callbackLand() */
 
-bool MavManager::callbackLand([[maybe_unused]]  std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool MavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
@@ -818,17 +809,20 @@ bool MavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   ROS_INFO("[MavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
 
   mrs_msgs::Vec4 goto_out;
-  mutex_odometry.lock();
   {
+    std::scoped_lock lock(mutex_odometry);
+
     goto_out.request.goal[0] = takeoff_x;
     goto_out.request.goal[1] = takeoff_y;
     goto_out.request.goal[2] = odometry_z;
     goto_out.request.goal[3] = odometry_yaw;
   }
-  mutex_odometry.unlock();
-  mutex_services.lock();
-  { service_client_emergency_goto.call(goto_out); }
-  mutex_services.unlock();
+
+  {
+    std::scoped_lock lock(mutex_services);
+
+    service_client_emergency_goto.call(goto_out);
+  }
 
   if (goto_out.response.success == true) {
 

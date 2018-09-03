@@ -95,7 +95,7 @@ private:
 
   void       managementTimer(const ros::TimerEvent &event);
   ros::Timer management_timer;
-  double     rate_;
+  int        rate_;
 
   // | --------------------- gain management -------------------- |
 
@@ -114,10 +114,7 @@ private:
   // | ------------------------ profiler ------------------------ |
 private:
   mrs_lib::Profiler *profiler;
-  bool profiler_enabled_ = false;
-  mrs_lib::Routine * routine_callback_odometry_diagnostics;
-  mrs_lib::Routine * routine_callback_controller_status;
-  mrs_lib::Routine * routine_gain_management_timer;
+  bool               profiler_enabled_ = false;
   ;
 };
 
@@ -290,14 +287,12 @@ void GainManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler                              = new mrs_lib::Profiler(nh_, "GainManager", profiler_enabled_);
-  routine_gain_management_timer         = profiler->registerRoutine("gainManagementTimer", rate_, 0.01);
-  routine_callback_odometry_diagnostics = profiler->registerRoutine("callbackOdometryDiagnostics");
-  routine_callback_controller_status    = profiler->registerRoutine("callbackControllerStatus");
+  profiler = new mrs_lib::Profiler(nh_, "GainManager", profiler_enabled_);
 
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[GainManager]: Could not load all parameters!");
     ros::shutdown();
   }
 
@@ -421,6 +416,50 @@ bool GainManager::setConstraints(std::string constraints_names) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
+// | --------------------- topic callbacks -------------------- |
+
+/* //{ callbackOdometryDiagnostics() */
+
+void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryDiagnostics");
+
+  {
+    std::scoped_lock lock(mutex_odometry_diagnostics);
+
+    odometry_diagnostics = *msg;
+  }
+
+  got_odometry_diagnostics = true;
+}
+
+//}
+
+/* callbackControllerStatus() //{ */
+
+void GainManager::callbackControllerStatus(const mrs_msgs::ControllerStatusConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControllerStatus");
+
+  {
+    std::scoped_lock lock(mutex_controller_status);
+
+    controller_status = *msg;
+  }
+
+  got_controller_status = true;
+}
+
+//}
+
+// | -------------------- service callbacks ------------------- |
+
 /* //{ callbackSetGains() */
 
 bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
@@ -513,46 +552,6 @@ bool GainManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msg
 
 //}
 
-/* //{ callbackOdometryDiagnostics() */
-
-void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  routine_callback_odometry_diagnostics->start();
-
-  mutex_odometry_diagnostics.lock();
-  { odometry_diagnostics = *msg; }
-  mutex_odometry_diagnostics.unlock();
-
-  got_odometry_diagnostics = true;
-
-  routine_callback_odometry_diagnostics->end();
-}
-
-//}
-
-/* callbackControllerStatus() //{ */
-
-void GainManager::callbackControllerStatus(const mrs_msgs::ControllerStatusConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  routine_callback_controller_status->start();
-
-  mutex_controller_status.lock();
-  { controller_status = *msg; }
-  mutex_controller_status.unlock();
-
-  got_controller_status = true;
-
-  routine_callback_controller_status->end();
-}
-
-//}
-
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
@@ -564,20 +563,21 @@ void GainManager::managementTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("gainManagementTimer", rate_, 0.01, event);
+
   if (!got_odometry_diagnostics) {
     ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, missing odometry diagnostics!");
     return;
   }
 
-  mutex_controller_status.lock();
-  if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the NSF controller is not running!");
-    mutex_controller_status.unlock();
-    return;
-  }
-  mutex_controller_status.unlock();
+  {
+    std::scoped_lock lock(mutex_controller_status);
 
-  routine_gain_management_timer->start(event);
+    if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/NsfController") == STRING_EQUAL)) {
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the NSF controller is not running!");
+      return;
+    }
+  }
 
   // | --- automatically set gains when odometry.type schanges -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
@@ -627,11 +627,13 @@ void GainManager::managementTimer(const ros::TimerEvent &event) {
   catch (...) {
     ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
   }
-
-  routine_gain_management_timer->end();
 }
 
 //}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
 
 /* stringInVector() //{ */
 
