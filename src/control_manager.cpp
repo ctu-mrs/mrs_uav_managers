@@ -205,6 +205,9 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: initializing");
 
+  last_attitude_cmd = mrs_msgs::AttitudeCommand::Ptr();
+  last_position_cmd = mrs_msgs::PositionCommand::Ptr();
+
   // --------------------------------------------------------------
   // |                           params                           |
   // --------------------------------------------------------------
@@ -288,44 +291,33 @@ void ControlManager::onInit() {
 
     std::string controller_name = controller_names[i];
 
-    mutex_controller_list.lock();
-    {
-      try {
-        ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
-        controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
-      }
-      catch (pluginlib::CreateClassException &ex1) {
-        ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
-        ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-        mutex_controller_list.unlock();
-        return;
-      }
-      catch (pluginlib::PluginlibException &ex) {
-        ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
-        ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-        mutex_controller_list.unlock();
-        return;
-      }
+    try {
+      ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
+      controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
     }
-    mutex_controller_list.unlock();
+    catch (pluginlib::CreateClassException &ex1) {
+      ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
+      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
+      return;
+    }
+    catch (pluginlib::PluginlibException &ex) {
+      ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
+      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
+      return;
+    }
   }
 
   ROS_INFO("[ControlManager]: controllers were loaded");
 
-  mutex_controller_list.lock();
-  {
-    for (unsigned long i = 0; i < controller_list.size(); i++) {
-
-      try {
-        ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
-        controller_list[i]->initialize(nh_, motor_params_);
-      }
-      catch (std::runtime_error &ex) {
-        ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
-      }
+  for (unsigned long i = 0; i < controller_list.size(); i++) {
+    try {
+      ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
+      controller_list[i]->initialize(nh_, motor_params_);
+    }
+    catch (std::runtime_error &ex) {
+      ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
     }
   }
-  mutex_controller_list.unlock();
 
   ROS_INFO("[ControlManager]: controllers were initialized");
 
@@ -373,11 +365,7 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
 
-  mutex_controller_list.lock();
-  mutex_last_attitude_cmd.lock();
-  { controller_list[active_controller_idx]->activate(last_attitude_cmd); }
-  mutex_last_attitude_cmd.unlock();
-  mutex_controller_list.unlock();
+  controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
   motors = false;
 
@@ -391,30 +379,11 @@ void ControlManager::onInit() {
 
   if (use_safety_area_) {
 
-    std::vector<double> tempList;
-    param_loader.load_param("safety_area/safety_area", tempList);
-
-    // check if the safety area has odd number of numbers (x, y coordinates)
-    if ((tempList.size() % 2) == 1) {
-
-      ROS_ERROR("[ControlManager]: Safety area is not correctly defined!, Exitting...");
-      ros::shutdown();
-    }
-
-    // how many points are there in the safety area?
-    int safety_area_size = tempList.size() / 2;
-
-    Eigen::MatrixXd tempMatrix = Eigen::MatrixXd::Zero(safety_area_size, 2);
-    int             tempIdx    = 0;
-    for (int i = 0; i < safety_area_size; i++) {
-      for (int j = 0; j < 2; j++) {
-        tempMatrix(i, j) = tempList[tempIdx++];
-      }
-    }
+    Eigen::MatrixXd safety_area_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
 
     try {
 
-      safety_area_polygon = new mrs_lib::ConvexPolygon(tempMatrix);
+      safety_area_polygon = new mrs_lib::ConvexPolygon(safety_area_points);
     }
     catch (mrs_lib::ConvexPolygon::WrongNumberOfVertices) {
 
@@ -590,35 +559,36 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  mutex_last_attitude_cmd.lock();
-  mutex_last_position_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd);
+
     if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
-      mutex_last_attitude_cmd.unlock();
-      mutex_last_position_cmd.unlock();
       return;
     }
   }
-  mutex_last_position_cmd.unlock();
-  mutex_last_attitude_cmd.unlock();
 
   char message[200];
 
-  mutex_odometry.lock();
-  mutex_tracker_list.lock();
-  mutex_controller_list.lock();
-  mutex_last_position_cmd.lock();
-  mutex_last_attitude_cmd.lock();
+  double position_error_x;
+  double position_error_y;
+  double position_error_z;
   {
-    double position_error_x = last_position_cmd->position.x - odometry_x;
-    double position_error_y = last_position_cmd->position.y - odometry_y;
-    double position_error_z = last_position_cmd->position.z - odometry_z;
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    double control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
+    position_error_x = last_position_cmd->position.x - odometry_x;
+    position_error_y = last_position_cmd->position.y - odometry_y;
+    position_error_z = last_position_cmd->position.z - odometry_z;
+  }
 
-    // --------------------------------------------------------------
-    // |   activate failsafe hover for tilt_angle/controller error  |
-    // --------------------------------------------------------------
+
+  double control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
+
+  // --------------------------------------------------------------
+  // |   activate failsafe hover for tilt_angle/controller error  |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_odometry);
 
     if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > failsafe_hover_control_error_) {
 
@@ -631,45 +601,48 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
         hover(message_out);
       }
     }
+  }
 
-    // --------------------------------------------------------------
-    // |   activate the failsafe controller in case of large error  |
-    // --------------------------------------------------------------
+  // --------------------------------------------------------------
+  // |   activate the failsafe controller in case of large error  |
+  // --------------------------------------------------------------
 
-    if (control_error > failsafe_land_control_error_) {
+  if (control_error > failsafe_land_control_error_) {
 
-      if (failsafe_controller_idx != active_controller_idx) {
+    if (failsafe_controller_idx != active_controller_idx) {
 
-        ROS_ERROR("[ControlManager]: Activating safety land: control_error=%f", control_error);
+      ROS_ERROR("[ControlManager]: Activating safety land: control_error=%f", control_error);
 
-        try {
+      try {
 
-          ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
+        ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
+        {
+          std::scoped_lock lock(mutex_last_attitude_cmd, mutex_controller_list);
+
           controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
-          sprintf((char *)&message, "Controller %s has been activated", failsafe_controller_name_.c_str());
-          ROS_INFO("[ControlManager]: %s", message);
+        }
+        sprintf((char *)&message, "Controller %s has been activated", failsafe_controller_name_.c_str());
+        ROS_INFO("[ControlManager]: %s", message);
 
-          // super important, switch the active controller idx
-          try {
+        // super important, switch the active controller idx
+        try {
+          {
+            std::scoped_lock lock(mutex_controller_list);
+
             controller_list[active_controller_idx]->deactivate();
-            active_controller_idx = failsafe_controller_idx;
           }
-          catch (std::runtime_error &exrun) {
-            ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_tracker_idx].c_str());
-          }
+          active_controller_idx = failsafe_controller_idx;
         }
         catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Error during activation of controller %s", failsafe_controller_name_.c_str());
-          ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_tracker_idx].c_str());
         }
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_ERROR("[ControlManager]: Error during activation of controller %s", failsafe_controller_name_.c_str());
+        ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
       }
     }
   }
-  mutex_last_attitude_cmd.unlock();
-  mutex_last_position_cmd.unlock();
-  mutex_controller_list.unlock();
-  mutex_tracker_list.unlock();
-  mutex_odometry.unlock();
 }
 
 //}
@@ -722,8 +695,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // |                      copy the odometry                     |
   // --------------------------------------------------------------
 
-  mutex_odometry.lock();
   {
+    std::scoped_lock lock(mutex_odometry);
+
     odometry = *msg;
 
     odometry_x = odometry.pose.pose.position.x;
@@ -736,7 +710,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
   }
-  mutex_odometry.unlock();
 
   got_odometry = true;
 
@@ -746,9 +719,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
-  mutex_tracker_list.lock();
-  mutex_last_position_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_tracker_list);
+
     try {
 
       // for each tracker
@@ -786,13 +759,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  mutex_last_position_cmd.unlock();
-  mutex_tracker_list.unlock();
 
   tf::Quaternion desired_orientation;
 
-  mutex_last_position_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
       // publish the odom topic (position command for debugging, e.g. rviz)
@@ -823,7 +795,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       }
     }
   }
-  mutex_last_position_cmd.unlock();
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
@@ -831,9 +802,9 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
-  mutex_controller_list.lock();
-  mutex_last_position_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
+
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
       try {
@@ -845,8 +816,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       }
     }
   }
-  mutex_last_position_cmd.unlock();
-  mutex_controller_list.unlock();
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
@@ -901,9 +870,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    mutex_last_attitude_cmd.lock();
-    { last_attitude_cmd = controller_output_cmd; }
-    mutex_last_attitude_cmd.unlock();
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      last_attitude_cmd = controller_output_cmd;
+    }
 
     // convert the RPY to quaternion
     desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->roll, controller_output_cmd->pitch, controller_output_cmd->yaw);
@@ -971,12 +942,12 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMaxHeight");
 
-  mutex_max_height.lock();
   {
+    std::scoped_lock lock(mutex_max_height);
+
     got_max_height = true;
     max_height     = msg->value;
   }
-  mutex_max_height.unlock();
 }
 
 //}
@@ -1029,10 +1000,9 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
     return true;
   }
 
-  mutex_controller_list.lock();
-  mutex_last_position_cmd.lock();
-  mutex_last_attitude_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_last_position_cmd, mutex_tracker_list);
+
     try {
 
       ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
@@ -1066,14 +1036,15 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  mutex_last_attitude_cmd.unlock();
-  mutex_last_position_cmd.unlock();
-  mutex_controller_list.unlock();
 
   res.message = message;
 
   return true;
 }
+
+//}
+
+/* callbackSwitchController() //{ */
 
 bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
@@ -1107,9 +1078,9 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
     return true;
   }
 
-  mutex_controller_list.lock();
-  mutex_last_attitude_cmd.lock();
   {
+    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_controller_list);
+
     try {
 
       ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
@@ -1132,8 +1103,6 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
   }
-  mutex_last_attitude_cmd.unlock();
-  mutex_controller_list.unlock();
 
   res.message = message;
   return true;
@@ -1148,11 +1117,7 @@ bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request &
   if (!is_initialized)
     return false;
 
-  mutex_tracker_list.lock();
-  mutex_last_position_cmd.lock();
-  { res.success = hover(res.message); }
-  mutex_last_position_cmd.unlock();
-  mutex_tracker_list.unlock();
+  res.success = hover(res.message);
 
   return true;
 }
@@ -1166,15 +1131,16 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   if (!is_initialized)
     return false;
 
-  mutex_odometry.lock();
-  if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
-    mutex_odometry.unlock();
-    ROS_ERROR("[ControlManager]: Can't turn motors on, the UAV is outside of the safety area!");
-    res.message = "the UAV is outside of the safety area";
-    res.success = false;
-    return true;
+  {
+    std::scoped_lock lock(mutex_odometry);
+
+    if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
+      ROS_ERROR("[ControlManager]: Can't turn motors on, the UAV is outside of the safety area!");
+      res.message = "the UAV is outside of the safety area";
+      res.success = false;
+      return true;
+    }
   }
-  mutex_odometry.unlock();
 
   motors = req.data;
 
@@ -1205,14 +1171,14 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   std_srvs::SetBoolRequest req_enable_callbacks;
   req_enable_callbacks.data = callbacks_enabled;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     // disable callbacks of all trackers
     for (unsigned int i = 0; i < tracker_list.size(); i++) {
       tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
     }
   }
-  mutex_tracker_list.unlock();
 
   char message[200];
   sprintf((char *)&message, "Callbacks: %s", motors ? "enabled" : "disabled");
@@ -1241,8 +1207,9 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
   mrs_msgs::TrackerConstraintsRequest req_constraints;
   req_constraints = req;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     // for each tracker
     for (unsigned int i = 0; i < tracker_list.size(); i++) {
 
@@ -1251,7 +1218,6 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
           tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
     }
   }
-  mutex_tracker_list.unlock();
 
   res.message = "Setting constraints";
   res.success = true;
@@ -1280,15 +1246,16 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     return true;
   }
 
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(req.goal[0], req.goal[1], req.goal[2])) {
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
-    res.message = "the point is outside of the safety area";
-    res.success = false;
-    return true;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (!isPointInSafetyArea3d(req.goal[0], req.goal[1], req.goal[2])) {
+      ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+      res.message = "the point is outside of the safety area";
+      res.success = false;
+      return true;
+    }
   }
-  mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[200];
@@ -1296,8 +1263,9 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   mrs_msgs::Vec4Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
@@ -1308,7 +1276,6 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1335,14 +1302,14 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     Eigen::Vector2d des(msg->position.x, msg->position.y);
     des = rotateVector(des, odometry_yaw);
 
-    mutex_odometry.lock();
     {
+      std::scoped_lock lock(mutex_odometry);
+
       request.position.x   = des[0] + odometry_x;
       request.position.y   = des[1] + odometry_y;
       request.position.z   = msg->position.z + odometry_z;
       request.position.yaw = msg->position.yaw + odometry_yaw;
     }
-    mutex_odometry.unlock();
 
   } else {
 
@@ -1352,19 +1319,22 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     request.position.yaw = msg->position.yaw;
   }
 
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
-    return;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
+      ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+      return;
+    }
   }
-  mutex_last_position_cmd.unlock();
 
   bool tracker_response;
 
-  mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
-  mutex_tracker_list.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
+  }
 
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
@@ -1390,19 +1360,17 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
     return true;
   }
 
-  mutex_odometry.lock();
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x + req.goal[0], last_position_cmd->position.y + req.goal[1],
-                             last_position_cmd->position.z + req.goal[2])) {
-    mutex_odometry.unlock();
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
-    res.message = "the point is outside of the safety area";
-    res.success = false;
-    return true;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+
+    if (!isPointInSafetyArea3d(last_position_cmd->position.x + req.goal[0], last_position_cmd->position.y + req.goal[1],
+                               last_position_cmd->position.z + req.goal[2])) {
+      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+      res.message = "the point is outside of the safety area";
+      res.success = false;
+      return true;
+    }
   }
-  mutex_odometry.unlock();
-  mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[200];
@@ -1410,8 +1378,9 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   mrs_msgs::Vec4Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
@@ -1422,7 +1391,6 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1449,16 +1417,14 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
     Eigen::Vector2d des(msg->position.x, msg->position.y);
     des = rotateVector(des, odometry_yaw);
 
-    mutex_odometry.lock();
-    mutex_last_position_cmd.lock();
     {
+      std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+
       request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
       request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
       request.position.z   = msg->position.z + odometry_z - last_position_cmd->position.z;
       request.position.yaw = msg->position.yaw + odometry_yaw - last_position_cmd->yaw;
     }
-    mutex_last_position_cmd.unlock();
-    mutex_odometry.unlock();
 
   } else {
 
@@ -1468,22 +1434,23 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
     request.position.yaw = msg->position.yaw;
   }
 
-  mutex_odometry.lock();
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y, last_position_cmd->position.z + request.position.z)) {
-    mutex_odometry.unlock();
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
-    return;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+
+    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
+                               last_position_cmd->position.z + request.position.z)) {
+      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+      return;
+    }
   }
-  mutex_odometry.unlock();
-  mutex_last_position_cmd.unlock();
 
   bool tracker_response;
 
-  mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request))); }
-  mutex_tracker_list.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
+  }
 
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_relative' topic!", tracker_names[active_tracker_idx].c_str());
@@ -1509,18 +1476,16 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
     return true;
   }
 
-  mutex_odometry.lock();
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
-    mutex_odometry.unlock();
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
-    res.message = "the point is outside of the safety area";
-    res.success = false;
-    return true;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+
+    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
+      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+      res.message = "the point is outside of the safety area";
+      res.success = false;
+      return true;
+    }
   }
-  mutex_odometry.unlock();
-  mutex_last_position_cmd.unlock();
 
   mrs_msgs::Vec1Response::ConstPtr tracker_response;
   char                             message[200];
@@ -1528,8 +1493,9 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
@@ -1540,7 +1506,6 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1559,22 +1524,22 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
     return;
   }
 
-  mutex_odometry.lock();
-  mutex_last_position_cmd.lock();
-  if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
-    mutex_odometry.unlock();
-    mutex_last_position_cmd.unlock();
-    ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
-    return;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+
+    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
+      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+      return;
+    }
   }
-  mutex_odometry.unlock();
-  mutex_last_position_cmd.unlock();
 
   bool tracker_response;
 
-  mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->goToAltitude(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
-  mutex_tracker_list.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
+  }
 
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_altitude' topic!", tracker_names[active_tracker_idx].c_str());
@@ -1606,8 +1571,9 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
@@ -1618,7 +1584,6 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1639,9 +1604,11 @@ void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
 
   bool tracker_response;
 
-  mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->setYaw(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
-  mutex_tracker_list.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->setYaw(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
+  }
 
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw' topic!", tracker_names[active_tracker_idx].c_str());
@@ -1673,8 +1640,9 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
   mrs_msgs::Vec1Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
 
     if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
@@ -1685,7 +1653,6 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1706,9 +1673,11 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
 
   bool tracker_response;
 
-  mutex_tracker_list.lock();
-  { tracker_response = tracker_list[active_tracker_idx]->setYawRelative(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg))); }
-  mutex_tracker_list.unlock();
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
+  }
 
   if (!tracker_response) {
     ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw_relative' topic!", tracker_names[active_tracker_idx].c_str());
@@ -1727,17 +1696,11 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
     return true;
   }
 
-  mutex_max_height.lock();
-  mutex_min_height.lock();
-  {
-    if (safety_area_polygon->isPointIn(x, y) && z >= min_height && z <= max_height) {
-      mutex_min_height.unlock();
-      mutex_max_height.unlock();
-      return true;
-    }
+  std::scoped_lock lock(mutex_min_height, mutex_max_height);
+
+  if (safety_area_polygon->isPointIn(x, y) && z >= min_height && z <= max_height) {
+    return true;
   }
-  mutex_min_height.unlock();
-  mutex_max_height.unlock();
 
   return false;
 }
@@ -1765,13 +1728,9 @@ bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
 double ControlManager::getMaxHeight(void) {
 
-  double temp_double;
+  std::scoped_lock lock(mutex_max_height);
 
-  mutex_max_height.lock();
-  { temp_double = max_height; }
-  mutex_max_height.unlock();
-
-  return temp_double;
+  return max_height;
 }
 
 //}
@@ -1780,13 +1739,9 @@ double ControlManager::getMaxHeight(void) {
 
 double ControlManager::getMinHeight(void) {
 
-  double temp_double;
+  std::scoped_lock lock(mutex_min_height);
 
-  mutex_min_height.lock();
-  { temp_double = min_height; }
-  mutex_min_height.unlock();
-
-  return temp_double;
+  return min_height;
 }
 
 //}
@@ -1808,8 +1763,9 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
   mrs_msgs::Vec4Request req_goto_out;
   req_goto_out.goal = req.goal;
 
-  mutex_tracker_list.lock();
   {
+    std::scoped_lock lock(mutex_tracker_list);
+
     // disable callbacks of all trackers
     req_enable_callbacks.data = false;
     for (unsigned int i = 0; i < tracker_list.size(); i++) {
@@ -1835,7 +1791,6 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
       res.success = false;
     }
   }
-  mutex_tracker_list.unlock();
 
   return true;
 }
@@ -1853,6 +1808,8 @@ bool ControlManager::hover(std::string &message_out) {
   if (!is_initialized)
     return false;
 
+  std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd);
+
   char message[200];
   bool success = false;
 
@@ -1865,7 +1822,9 @@ bool ControlManager::hover(std::string &message_out) {
 
     // super important, switch the active tracker idx
     try {
+
       tracker_list[active_tracker_idx]->deactivate();
+
       active_tracker_idx = hover_tracker_idx;
 
       message_out = std::string(message);
