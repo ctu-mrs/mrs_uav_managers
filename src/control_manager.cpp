@@ -136,7 +136,6 @@ private:
   bool                          use_safety_area_;
   double                        min_height;
   mrs_mav_manager::SafetyArea_t safety_area;
-  std::mutex                    mutex_safety_area;
 
   bool   isPointInSafetyArea2d(const double x, const double y);
   bool   isPointInSafetyArea3d(const double x, const double y, const double z);
@@ -1696,7 +1695,7 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
     return true;
   }
 
-  std::scoped_lock lock(mutex_min_height, mutex_max_height);
+  std::scoped_lock lock(mutex_max_height, mutex_min_height);
 
   if (safety_area_polygon->isPointIn(x, y) && z >= min_height && z <= max_height) {
     return true;
