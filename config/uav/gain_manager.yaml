@@ -19,6 +19,7 @@ gains: [
 constraints: [
   "slow",
   "medium",
+  "fast",
 ]
 
 gain_management:
@@ -41,7 +42,7 @@ gain_management:
     RTK: "soft"
     OPTFLOWGPS: "soft"
     GPS: "soft"
-    OPTFLOW: "soft"
+    OPTFLOW: "supersoft"
     OTHER: "supersoft"
 
 constraint_management:
@@ -50,9 +51,9 @@ constraint_management:
   allowed_constraints:
     VIO: ["slow"]
     ICP: ["slow"]
-    RTK: ["slow", "medium"]
+    RTK: ["slow", "medium", "fast"]
     OPTFLOWGPS: ["slow"]
-    GPS: ["slow", 'medium']
+    GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow"]
     OTHER: ["slow"]
 
