@@ -104,6 +104,7 @@
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
       <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
+      <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
@@ -129,6 +130,7 @@
       <remap from="~switch_tracker_in" to="~switch_tracker" />
       <remap from="~switch_controller_in" to="~switch_controller" />
       <remap from="~hover_in" to="~hover" />
+      <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />
       <remap from="~emergency_goto_in" to="~emergency_goto" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />

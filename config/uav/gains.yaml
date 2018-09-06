@@ -24,7 +24,7 @@ soft:
 
   horizontal:
     kp: 0.30
-    kv: 0.10
+    kv: 0.15
     ka: 1.0
 
     kib: 0.01
