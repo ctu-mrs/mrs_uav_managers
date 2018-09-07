@@ -1,8 +1,8 @@
 supersoft:
 
   horizontal:
-    kp: 0.20
-    kv: 0.15
+    kp: 0.12
+    kv: 0.10
     ka: 1.0
 
     kib: 0.01
