@@ -105,6 +105,7 @@ private:
   ros::ServiceServer service_set_constraints;
 
   ros::ServiceServer service_goto;
+  ros::ServiceServer service_goto_fcu;
   ros::ServiceServer service_goto_relative;
   ros::ServiceServer service_goto_altitude;
   ros::ServiceServer service_set_yaw;
@@ -157,6 +158,7 @@ private:
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
   void callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   void callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
   void callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
   void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
@@ -445,6 +447,7 @@ void ControlManager::onInit() {
   // | ---------------- setpoint command services --------------- |
 
   service_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
+  service_goto_fcu         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGoToFcuService, this);
   service_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
   service_goto_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
   service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
@@ -1269,6 +1272,66 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     std::scoped_lock lock(mutex_tracker_list);
 
     tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackGoToFcuService() */
+
+bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::Vec4Request request;
+  Eigen::Vector2d       des(req.goal[0], req.goal[1]);
+
+  {
+    std::scoped_lock lock(mutex_odometry);
+    // rotate it from the frame of the drone
+    des = rotateVector(des, odometry_yaw);
+
+    request.goal[0] = des[0] + odometry_x;
+    request.goal[1] = des[1] + odometry_y;
+    request.goal[2] = req.goal[2] + odometry_z;
+    request.goal[3] = req.goal[3] + odometry_yaw;
+  }
+
+  if (!isPointInSafetyArea3d(request.goal[0], request.goal[1], request.goal[2])) {
+    ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[200];
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(request)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;

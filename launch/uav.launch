@@ -112,6 +112,7 @@
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
+      <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
       <remap from="~set_yaw_in" to="~set_yaw" />
