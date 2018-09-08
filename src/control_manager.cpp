@@ -99,11 +99,13 @@ private:
   ros::ServiceServer service_switch_tracker;
   ros::ServiceServer service_switch_controller;
   ros::ServiceServer service_hover;
+  ros::ServiceServer service_ehover;
   ros::ServiceServer service_motors;
   ros::ServiceServer service_enable_callbacks;
   ros::ServiceServer service_set_constraints;
 
   ros::ServiceServer service_goto;
+  ros::ServiceServer service_goto_fcu;
   ros::ServiceServer service_goto_relative;
   ros::ServiceServer service_goto_altitude;
   ros::ServiceServer service_set_yaw;
@@ -156,6 +158,7 @@ private:
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
   void callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
+  bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   void callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
   void callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
   void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
@@ -163,8 +166,9 @@ private:
 
   bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
-  bool hover(std::string &message_out);
-  bool callbackHover(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool ehover(std::string &message_out);
+  bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
   bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
@@ -434,7 +438,8 @@ void ControlManager::onInit() {
 
   service_switch_tracker    = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
   service_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
+  service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
+  service_ehover            = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
   service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
   service_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
   service_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
@@ -442,6 +447,7 @@ void ControlManager::onInit() {
   // | ---------------- setpoint command services --------------- |
 
   service_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
+  service_goto_fcu         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGoToFcuService, this);
   service_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
   service_goto_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
   service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
@@ -597,7 +603,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
         ROS_ERROR("[ControlManager]: Activating safety hover: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
         std::string message_out;
-        hover(message_out);
+        ehover(message_out);
       }
     }
   }
@@ -1109,14 +1115,14 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
 //}
 
-/* //{ callbackHover() */
+/* //{ callbackEHover() */
 
-bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
   if (!is_initialized)
     return false;
 
-  res.success = hover(res.message);
+  res.success = ehover(res.message);
 
   return true;
 }
@@ -1266,6 +1272,66 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     std::scoped_lock lock(mutex_tracker_list);
 
     tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+
+    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
+      res = *tracker_response;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackGoToFcuService() */
+
+bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::Vec4Request request;
+  Eigen::Vector2d       des(req.goal[0], req.goal[1]);
+
+  {
+    std::scoped_lock lock(mutex_odometry);
+    // rotate it from the frame of the drone
+    des = rotateVector(des, odometry_yaw);
+
+    request.goal[0] = des[0] + odometry_x;
+    request.goal[1] = des[1] + odometry_y;
+    request.goal[2] = req.goal[2] + odometry_z;
+    request.goal[3] = req.goal[3] + odometry_yaw;
+  }
+
+  if (!isPointInSafetyArea3d(request.goal[0], request.goal[1], request.goal[2])) {
+    ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::Vec4Response::ConstPtr tracker_response;
+  char                             message[200];
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(request)));
 
     if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
       res = *tracker_response;
@@ -1685,6 +1751,35 @@ void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr
 
 //}
 
+/* //{ callbackHoverService() */
+
+bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  std::scoped_lock lock(mutex_tracker_list);
+
+  std_srvs::TriggerResponse::ConstPtr tracker_response;
+  char                                message[200];
+
+  std_srvs::TriggerRequest hover_out;
+
+  tracker_response = tracker_list[active_tracker_idx]->hover(std_srvs::TriggerRequest::ConstPtr(new std_srvs::TriggerRequest(hover_out)));
+
+  if (tracker_response != std_srvs::TriggerResponse::Ptr()) {
+    res = *tracker_response;
+  } else {
+    sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
+    res.message = message;
+    res.success = false;
+  }
+
+  return true;
+}
+
+//}
+
 // | --------------------- other services --------------------- |
 
 /* //{ isInSafetyArea3d() */
@@ -1802,7 +1897,7 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
 
 /* //{ hover() */
 
-bool ControlManager::hover(std::string &message_out) {
+bool ControlManager::ehover(std::string &message_out) {
 
   if (!is_initialized)
     return false;

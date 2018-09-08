@@ -134,7 +134,7 @@ private:
   ros::Timer  landing_timer;
   std::string landing_tracker_name_;
   double      landing_cutoff_height_;
-  double      landing_cutoff_mass_difference_;
+  double      landing_cutoff_mass_factor_;
   double      landing_timer_rate_;
   bool        landing = false;
   double      uav_mass_;
@@ -228,7 +228,7 @@ void MavManager::onInit() {
   param_loader.load_param("landing/rate", landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
   param_loader.load_param("landing/landing_cutoff_height", landing_cutoff_height_);
-  param_loader.load_param("landing/landing_cutoff_mass_difference", landing_cutoff_mass_difference_);
+  param_loader.load_param("landing/landing_cutoff_mass_factor", landing_cutoff_mass_factor_);
 
   param_loader.load_param("uav_mass", uav_mass_);
   param_loader.load_param("g", g_);
@@ -341,7 +341,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
         double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
-        if ((odometry_z < landing_cutoff_height_) && (thrust_mass_estimate + landing_cutoff_mass_difference_ < landing_uav_mass_)) {
+        if ((odometry_z < landing_cutoff_height_) && (thrust_mass_estimate < landing_cutoff_mass_factor_*landing_uav_mass_)) {
 
           mrs_msgs::String switch_tracker_out;
           switch_tracker_out.request.value = null_tracker_name_;
