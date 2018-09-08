@@ -1,0 +1,68 @@
+rate: 25
+
+estimator_types: [
+  "VIO",
+  "ICP",
+  "RTK",
+  "OPTFLOWGPS",
+  "GPS",
+  "OPTFLOW",
+  "OTHER",
+]
+
+gains: [
+  "supersoft",
+  "soft",
+  "tight",
+]
+
+constraints: [
+  "slow",
+  "medium",
+]
+
+gain_management:
+
+  # list of allowed gains per odometry mode
+  allowed_gains:
+    VIO: ["supersoft"]
+    ICP: ["supersoft"]
+    RTK: ["soft", "supersoft"]
+    OPTFLOWGPS: ["soft", "supersoft"]
+    GPS: ["soft", 'supersoft', 'tight']
+    OPTFLOW: ["supersoft"]
+    OTHER: ["supersoft"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_gains:
+    VIO: "supersoft"
+    ICP: "supersoft"
+    RTK: "soft"
+    OPTFLOWGPS: "soft"
+    GPS: "soft"
+    OPTFLOW: "supersoft"
+    OTHER: "supersoft"
+
+constraint_management:
+
+  # list of allowed gains per odometry mode
+  allowed_constraints:
+    VIO: ["slow"]
+    ICP: ["slow"]
+    RTK: ["slow", "medium"]
+    OPTFLOWGPS: ["slow"]
+    GPS: ["slow", 'medium']
+    OPTFLOW: ["slow"]
+    OTHER: ["slow"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_constraints:
+    VIO: "slow"
+    ICP: "slow"
+    RTK: "medium"
+    OPTFLOWGPS: "slow"
+    GPS: "medium"
+    OPTFLOW: "slow"
+    OTHER: "slow"
