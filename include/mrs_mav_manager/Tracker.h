@@ -27,17 +27,31 @@
 
 #include <mrs_msgs/TrackerPointStamped.h>
 
+#include <Eigen/Eigen>
+
 namespace mrs_mav_manager
 {
+
+typedef boost::function<bool(const double x, const double y, const double z)> isPointInSafetyArea3d_t;
+typedef boost::function<bool(const double x, const double y)> isPointInSafetyArea2d_t;
+
+struct SafetyArea
+{
+  mrs_mav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
+  mrs_mav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
+  double                                 max_altitude, min_altitude;
+  bool                                   use_safety_area;
+};
+
 class Tracker {
 
 public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh)             = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd) = 0;
-  virtual void deactivate(void)                                         = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea const *safety_area) = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                     = 0;
+  virtual void deactivate(void)                                                                             = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus::Ptr        getStatus()                                     = 0;
