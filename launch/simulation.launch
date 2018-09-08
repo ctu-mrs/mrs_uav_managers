@@ -38,6 +38,7 @@
       <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
+      <remap from="~height_in" to="odometry/altitude" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />

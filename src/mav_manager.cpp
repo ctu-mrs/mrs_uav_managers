@@ -56,6 +56,7 @@ public:
   void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
+  void callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
   void changeLandingState(LandingStates_t new_state);
 
@@ -80,6 +81,12 @@ private:
   bool            fixing_max_height = false;
   int             max_height_checking_rate_;
   double          max_height_offset_;
+
+private:
+  ros::Subscriber subscriber_height;
+  double          height;
+  std::mutex      mutex_height;
+  bool            got_height = false;
 
 private:
   ros::Subscriber         subscriber_tracker_status;
@@ -202,6 +209,7 @@ void MavManager::onInit() {
   subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &MavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &MavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &MavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_height           = nh_.subscribe("height_in", 1, &MavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
 
   service_server_takeoff   = nh_.advertiseService("takeoff_in", &MavManager::callbackTakeoff, this);
   service_server_land      = nh_.advertiseService("land_in", &MavManager::callbackLand, this);
@@ -335,13 +343,13 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
     if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
 
       {
-        std::scoped_lock lock(mutex_odometry);
+        std::scoped_lock lock(mutex_height);
 
         // recalculate the mass based on the thrust
         double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
-        if ((odometry_z < landing_cutoff_height_) && (thrust_mass_estimate < landing_cutoff_mass_factor_*landing_uav_mass_)) {
+        if ((height < landing_cutoff_height_) && (thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_)) {
 
           mrs_msgs::String switch_tracker_out;
           switch_tracker_out.request.value = null_tracker_name_;
@@ -424,7 +432,7 @@ void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
     if (!fixing_max_height) {
 
-      if (odometry_z > max_height+0.25) {
+      if (odometry_z > max_height + 0.25) {
 
         ROS_WARN("[MavManager]: max height exceeded: %f >  %f, triggering safety goto", odometry_z, max_height);
 
@@ -561,6 +569,25 @@ void MavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) 
 
 //}
 
+/* //{ callbackHeight() */
+
+void MavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackHeight");
+
+  {
+    std::scoped_lock lock(mutex_height);
+    height = msg->value;
+  }
+
+  got_height = true;
+}
+
+//}
+
 /* //{ callbackOdometry() */
 
 void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
@@ -628,6 +655,14 @@ bool MavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
   if (!got_max_height) {
     sprintf((char *)&message, "Can't takeoff, missing max height");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[MavManager]: %s", message);
+    return true;
+  }
+
+  if (!got_height) {
+    sprintf((char *)&message, "Can't takeoff, missing height");
     res.message = message;
     res.success = false;
     ROS_ERROR("[MavManager]: %s", message);
