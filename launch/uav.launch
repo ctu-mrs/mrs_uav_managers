@@ -1,8 +1,10 @@
 <launch>
 
-  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
-  <arg name="uav_mass" default="$(optenv UAV_MASS uav)"/>
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
+  <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
+  <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="world_file" default="$(find mrs_main)/config/world_current.yaml"/>
+  <arg name="g" default="9.8" />
 
   <!-- Nodelet Manager -->
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
@@ -15,12 +17,22 @@
     <!-- MAV Manager -->
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="load mrs_mav_manager/MavManager $(arg uav_name)_nodelet_manager" output="screen">
 
+      <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/mav_manager.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params_new_esc.yaml" />
+
+      <param name="uav_mass" value="$(arg uav_mass)" />
+      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="g" value="$(arg g)" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
+      <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
+      <remap from="~max_height_in" to="odometry/max_altitude" />
+      <remap from="~height_in" to="odometry/altitude" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
@@ -44,22 +56,23 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_mav_manager)/config/control_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params_new_esc.yaml" />
+      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="uav_name" type="string" value="$(arg uav_name)" />
 
       <!-- Controller's configs -->
 
-      <!-- PID -->
-      <rosparam ns="pid_controller" file="$(find mrs_controllers)/config/uav/f550/pid.yaml" />
-      <param name="pid_controller/uav_mass" value="$(arg uav_mass)" />
-      <remap from="~pid_controller/profiler" to="profiler" />
-
-      <!-- LSF -->
-      <rosparam ns="lsf_controller" file="$(find mrs_controllers)/config/uav/f550/lsf.yaml" />
-      <param name="lsf_controller/uav_mass" value="$(arg uav_mass)" />
-      <remap from="~lsf_controller/profiler" to="profiler" />
+      <!-- NSF -->
+      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/uav/f550/nsf.yaml" />
+      <param name="nsf_controller/g" value="$(arg g)" />
+      <param name="nsf_controller/enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="nsf_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- FailSafe -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/uav/f550/failsafe.yaml" />
+      <param name="failsafe_controller/g" value="$(arg g)" />
+      <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
 
@@ -67,14 +80,18 @@
 
       <!-- LineTracker -->
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/line_tracker.yaml" />
+      <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/landoff_tracker.yaml" />
+      <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
+      <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/mpc_tracker.yaml" />
+      <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
@@ -87,14 +104,16 @@
       <remap from="~mpc_tracker/failsafe_in" to="~mpc_tracker/failsafe" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
-      <remap from="~mpc_tracker/cmd_pose_out" to="~mpc_tracker/cmd_pose" />
-      <remap from="~mpc_tracker/setpoint_pose_out" to="~mpc_tracker/setpoint_pose" />
+      <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
+      <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_in" to="odometry/new_odom" />
+      <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~max_height_in" to="odometry/max_altitude" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
+      <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
       <remap from="~set_yaw_in" to="~set_yaw" />
@@ -103,6 +122,7 @@
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~tracker_status_out" to="~tracker_status" />
+      <remap from="~controller_status_out" to="~controller_status" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
@@ -112,9 +132,37 @@
       <remap from="~switch_tracker_in" to="~switch_tracker" />
       <remap from="~switch_controller_in" to="~switch_controller" />
       <remap from="~hover_in" to="~hover" />
+      <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />
       <remap from="~emergency_goto_in" to="~emergency_goto" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
+      <remap from="~set_gains_out" to="gain_manager/set_gains" />
+      <remap from="~set_constraints_in" to="control_manager/set_constraints" />
+
+    </node>
+
+    <!-- Gain Manager -->
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="load mrs_mav_manager/GainManager $(arg uav_name)_nodelet_manager" output="screen">
+
+      <rosparam file="$(find mrs_mav_manager)/config/uav/gain_manager.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/uav/gains.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/uav/constraints.yaml" />
+      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+
+      <!-- Subscribers -->
+      <remap from="~controller_status_in" to="control_manager/controller_status" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+
+      <!-- Services -->
+      <remap from="~set_gains_in" to="~set_gains" />
+      <remap from="~set_gains_out" to="control_manager/nsf_controller/set_parameters" />
+      <remap from="~set_constraints_in" to="~set_constraints" />
+      <remap from="~set_constraints_out" to="control_manager/set_constraints" />
+
+      <!-- Publishers -->
+      <remap from="~current_gains_out" to="~current_gains" />
+      <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~profiler" to="profiler" />
 
     </node>
 

@@ -1,0 +1,5 @@
+<library path="lib/libGainManager">
+  <class name="mrs_mav_manager/GainManager" type="mrs_mav_manager::GainManager" base_class_type="nodelet::Nodelet">
+    <description>GainManager nodelet</description>
+  </class>
+</library>

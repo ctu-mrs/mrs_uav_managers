@@ -29,7 +29,7 @@ public:
 
   virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &       odometry,
                                                            const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
-  virtual const mrs_msgs::ControllerStatus::Ptr     status()                                                     = 0;
+  virtual const mrs_msgs::ControllerStatus::Ptr     getStatus()                                                  = 0;
 };
 }  // namespace mrs_mav_manager
 
