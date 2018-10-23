@@ -1,6 +1,7 @@
 rate: 25
 
 estimator_types: [
+  "OBJECT",
   "VIO",
   "ICP",
   "RTK",
@@ -25,6 +26,7 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
+    OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     ICP: ["supersoft"]
     RTK: ["soft", "supersoft"]
@@ -36,6 +38,7 @@ gain_management:
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
+    OBJECT: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
     RTK: "soft"
@@ -48,6 +51,7 @@ constraint_management:
 
   # list of allowed gains per odometry mode
   allowed_constraints:
+    OBJECT: ["slow"]
     VIO: ["slow"]
     ICP: ["slow"]
     RTK: ["slow", "medium"]
@@ -59,6 +63,7 @@ constraint_management:
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_constraints:
+    OBJECT: "slow"
     VIO: "slow"
     ICP: "slow"
     RTK: "medium"
