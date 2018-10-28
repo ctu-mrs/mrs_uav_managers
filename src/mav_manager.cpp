@@ -349,7 +349,7 @@ void MavManager::landingTimer(const ros::TimerEvent &event) {
         double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
-        if ((height < landing_cutoff_height_) && (thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_)) {
+        if ((height < landing_cutoff_height_) && ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
           mrs_msgs::String switch_tracker_out;
           switch_tracker_out.request.value = null_tracker_name_;
