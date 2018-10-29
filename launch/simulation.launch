@@ -75,6 +75,13 @@
       <param name="nsf_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
+      <!-- SO3 -->
+      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/simulation/f550/so3.yaml" />
+      <param name="so3_controller/g" value="$(arg g)" />
+      <param name="so3_controller/enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~so3_controller/profiler" to="profiler" />
+
       <!-- FailSafe -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/simulation/f550/failsafe.yaml" />
       <param name="failsafe_controller/g" value="$(arg g)" />

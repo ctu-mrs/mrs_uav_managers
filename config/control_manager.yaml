@@ -10,6 +10,7 @@ trackers : [
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/NsfController",
+  "mrs_controllers/So3Controller",
   "mrs_controllers/FailsafeController",
 ]
 
