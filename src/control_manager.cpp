@@ -93,6 +93,7 @@ namespace mrs_mav_manager
     ros::Publisher publisher_position_cmd;
     ros::Publisher publisher_attitude_cmd;
     ros::Publisher publisher_cmd_odom;
+    ros::Publisher publisher_target_attitude;
     ros::Publisher publisher_tracker_status;
     ros::Publisher publisher_controller_status;
 
@@ -424,6 +425,7 @@ namespace mrs_mav_manager
     publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
     publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
     publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+    publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
     publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
     publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
 
@@ -882,11 +884,13 @@ namespace mrs_mav_manager
         last_attitude_cmd = controller_output_cmd;
       }
 
+      attitude_target.thrust = controller_output_cmd->thrust;
+
       if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {
 
         // convert the RPY to quaternion
-        desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->euler_attitude.roll, controller_output_cmd->euler_attitude.pitch,
-                                                          controller_output_cmd->euler_attitude.yaw);
+        desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->euler_attitude.x, controller_output_cmd->euler_attitude.y,
+                                                          controller_output_cmd->euler_attitude.z);
         desired_orientation.normalize();
         quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
@@ -908,14 +912,23 @@ namespace mrs_mav_manager
 
       } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
 
-        attitude_target.body_rate.x = last_attitude_cmd->attitude_rate.roll;
-        attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.pitch;
-        attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.yaw;
+        attitude_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
+        attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
+        attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
+
+        attitude_target.orientation = last_attitude_cmd->quter_attitude;
 
         attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
-      }
 
-      attitude_target.thrust = controller_output_cmd->thrust;
+        // when controlling with angular rates, PixHawk does not publish the
+        // target_attitude topic anymore, thus we need do it here
+        try {
+          publisher_target_attitude.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+        }
+        catch (...) {
+          ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+        }
+      }
 
       should_publish = true;
     } else {
