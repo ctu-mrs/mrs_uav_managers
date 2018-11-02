@@ -14,6 +14,8 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
 
+#include <sensor_msgs/Joy.h>
+
 #include <mrs_mav_manager/Controller.h>
 #include <mrs_mav_manager/Tracker.h>
 
@@ -104,6 +106,7 @@ namespace mrs_mav_manager
     ros::ServiceServer service_motors;
     ros::ServiceServer service_enable_callbacks;
     ros::ServiceServer service_set_constraints;
+    ros::ServiceServer service_use_joystick;
 
     ros::ServiceServer service_goto;
     ros::ServiceServer service_goto_fcu;
@@ -195,6 +198,11 @@ namespace mrs_mav_manager
   private:
     mrs_lib::Profiler *profiler;
     bool               profiler_enabled_ = false;
+
+  private:
+    ros::Subscriber subscriber_joystick;
+    void            callbackJoystic(const sensor_msgs::Joy &msg);
+    bool            callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   };
 
   //}
@@ -435,6 +443,7 @@ namespace mrs_mav_manager
 
     subscriber_odometry   = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
     subscriber_max_height = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+    subscriber_joystick   = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
 
     // | -------------------- general services -------------------- |
 
@@ -445,6 +454,7 @@ namespace mrs_mav_manager
     service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
     service_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
     service_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+    service_use_joystick      = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
 
     // | ---------------- setpoint command services --------------- |
 
@@ -785,7 +795,12 @@ namespace mrs_mav_manager
         cmd_odom.twist.twist.linear.z = tracker_output_cmd->velocity.z;
         desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
         desired_orientation.normalize();
-        quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+
+        if (tracker_output_cmd->use_quat_attitude) {
+          cmd_odom.pose.pose.orientation = tracker_output_cmd->attitude;
+        } else {
+          quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+        }
 
         try {
           publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
@@ -990,6 +1005,33 @@ namespace mrs_mav_manager
 
       got_max_height = true;
       max_height     = msg->value;
+    }
+  }
+
+  //}
+
+  /* callbackJoystick() //{ */
+
+  void ControlManager::callbackJoystic(const sensor_msgs::Joy &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
+
+    if (msg.buttons[0] == 1 && tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
+        controller_names[active_controller_idx].compare("mrs_controllers/AttitudeController") == 0) {
+
+      mrs_msgs::StringRequest controller_srv;
+      controller_srv.value = "mrs_controllers/So3Controller";
+
+      mrs_msgs::StringRequest tracker_srv;
+      tracker_srv.value = "mrs_trackers/MpcTracker";
+
+      mrs_msgs::StringResponse response;
+
+      callbackSwitchTracker(tracker_srv, response);
+      callbackSwitchController(controller_srv, response);
     }
   }
 
@@ -1812,6 +1854,26 @@ namespace mrs_mav_manager
       res.message = message;
       res.success = false;
     }
+
+    return true;
+  }
+
+  //}
+
+  /* callbackUseJoystick() //{ */
+
+  bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+    mrs_msgs::StringRequest controller_srv;
+    controller_srv.value = "mrs_controllers/AttitudeController";
+
+    mrs_msgs::StringRequest tracker_srv;
+    tracker_srv.value = "mrs_trackers/JoyTracker";
+
+    mrs_msgs::StringResponse response;
+
+    callbackSwitchTracker(tracker_srv, response);
+    callbackSwitchController(controller_srv, response);
 
     return true;
   }

@@ -82,6 +82,13 @@
       <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
+      <!-- Attitude controller -->
+      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/simulation/f550/attitude.yaml" />
+      <param name="attitude_controller/g" value="$(arg g)" />
+      <param name="attitude_controller/enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="attitude_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~attitude_controller/profiler" to="profiler" />
+
       <!-- FailSafe -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/simulation/f550/failsafe.yaml" />
       <param name="failsafe_controller/g" value="$(arg g)" />
@@ -95,6 +102,12 @@
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/simulation/line_tracker.yaml" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
+
+      <!-- JoyTracker -->
+      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/simulation/joy_tracker.yaml" />
+      <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
+      <remap from="~joy_tracker/profiler" to="profiler" />
+      <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/simulation/landoff_tracker.yaml" />
@@ -124,6 +137,7 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
+      <remap from="~joystick_in" to="/joy" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
@@ -153,6 +167,7 @@
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
       <remap from="~set_constraints_in" to="control_manager/set_constraints" />
+      <remap from="~use_joystick_in" to="control_manager/use_joystick" />
 
     </node>
 
