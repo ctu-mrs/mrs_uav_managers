@@ -203,6 +203,8 @@ namespace mrs_mav_manager
     ros::Subscriber subscriber_joystick;
     void            callbackJoystic(const sensor_msgs::Joy &msg);
     bool            callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+    ros::Time       joy_last_start_time;
+    bool            joy_start_pressed = false;
   };
 
   //}
@@ -1017,9 +1019,10 @@ namespace mrs_mav_manager
     if (!is_initialized)
       return;
 
+
     mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
 
-    if (msg.buttons[0] == 1 && tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
+    if ((msg.buttons[0] == 1 || msg.buttons[6] == 1) && tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
         controller_names[active_controller_idx].compare("mrs_controllers/AttitudeController") == 0) {
 
       mrs_msgs::StringRequest controller_srv;
@@ -1027,6 +1030,27 @@ namespace mrs_mav_manager
 
       mrs_msgs::StringRequest tracker_srv;
       tracker_srv.value = "mrs_trackers/MpcTracker";
+
+      mrs_msgs::StringResponse response;
+
+      callbackSwitchTracker(tracker_srv, response);
+      callbackSwitchController(controller_srv, response);
+    }
+
+    if (msg.buttons[7] == 1) {
+
+      joy_last_start_time = ros::Time::now();
+      joy_start_pressed = true;
+
+    } else if (joy_start_pressed && (ros::Time::now() - joy_last_start_time).toSec() > 3.0) {
+
+      joy_start_pressed = false;
+
+      mrs_msgs::StringRequest controller_srv;
+      controller_srv.value = "mrs_controllers/AttitudeController";
+
+      mrs_msgs::StringRequest tracker_srv;
+      tracker_srv.value = "mrs_trackers/JoyTracker";
 
       mrs_msgs::StringResponse response;
 
