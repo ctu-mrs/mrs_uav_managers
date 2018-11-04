@@ -1,20 +1,28 @@
 supersoft:
 
   horizontal:
-    kp: 0.12
-    kv: 0.10
+    kp: 4.0
+    kv: 2.5
     ka: 1.0
 
-    kib: 0.01
-    kib_lim: 0.15
+    attitude:
+      kq: 8.0
+      kw: 0.0
 
-    kiw: 0.01
-    kiw_lim: 0.3
+    kib: 1.5
+    kib_lim: 5.0
+
+    kiw: 1.5
+    kiw_lim: 5.0
 
   vertical:
-    kp: 0.6
-    kv: 0.2
+    kp: 150.0
+    kv: 70.0
     ka: 1.0
+
+    attitude:
+      kq: 20.0
+      kw: 5.0
 
   weight_estimator:
     km: 1.0
@@ -23,20 +31,28 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 0.3
-    kv: 0.22
+    kp: 10.0
+    kv: 5.0
     ka: 1.0
 
-    kib: 0.01
-    kib_lim: 0.15
+    attitude:
+      kq: 8.0
+      kw: 0.0
 
-    kiw: 0.01
-    kiw_lim: 0.3
+    kib: 1.5
+    kib_lim: 5.0
+
+    kiw: 1.5
+    kiw_lim: 5.0
 
   vertical:
-    kp: 0.6
-    kv: 0.2
+    kp: 150.0
+    kv: 70.0
     ka: 1.0
+
+    attitude:
+      kq: 20.0
+      kw: 5.0
 
   weight_estimator:
     km: 1.0
@@ -45,20 +61,28 @@ soft:
 tight:
 
   horizontal:
-    kp: 0.50
-    kv: 0.25
+    kp: 20.0
+    kv: 10.0
     ka: 1.0
 
-    kib: 0.01
-    kib_lim: 0.15
+    attitude:
+      kq: 8.0
+      kw: 0.0
 
-    kiw: 0.01
-    kiw_lim: 0.3
+    kib: 1.5
+    kib_lim: 5.0
+
+    kiw: 1.5
+    kiw_lim: 5.0
 
   vertical:
-    kp: 0.6
-    kv: 0.2
+    kp: 150.0
+    kv: 70.0
     ka: 1.0
+
+    attitude:
+      kq: 20.0
+      kw: 5.0
 
   weight_estimator:
     km: 1.0

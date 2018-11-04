@@ -185,7 +185,7 @@
 
       <!-- Services -->
       <remap from="~set_gains_in" to="~set_gains" />
-      <remap from="~set_gains_out" to="control_manager/nsf_controller/set_parameters" />
+      <remap from="~set_gains_out" to="control_manager/so3_controller/set_parameters" />
       <remap from="~set_constraints_in" to="~set_constraints" />
       <remap from="~set_constraints_out" to="control_manager/set_constraints" />
 

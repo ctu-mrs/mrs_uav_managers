@@ -20,6 +20,7 @@ gains: [
 constraints: [
   "slow",
   "medium",
+  "fast",
 ]
 
 gain_management:
@@ -29,7 +30,7 @@ gain_management:
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     ICP: ["supersoft"]
-    RTK: ["soft", "supersoft"]
+    RTK: ["soft", "supersoft", "tight"]
     OPTFLOWGPS: ["soft", "supersoft"]
     GPS: ["soft", 'supersoft', 'tight']
     OPTFLOW: ["supersoft"]
@@ -41,7 +42,7 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
-    RTK: "soft"
+    RTK: "tight"
     OPTFLOWGPS: "soft"
     GPS: "soft"
     OPTFLOW: "supersoft"
@@ -54,9 +55,9 @@ constraint_management:
     OBJECT: ["slow"]
     VIO: ["slow"]
     ICP: ["slow"]
-    RTK: ["slow", "medium"]
+    RTK: ["slow", "medium", "fast"]
     OPTFLOWGPS: ["slow"]
-    GPS: ["slow", 'medium']
+    GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow"]
     OTHER: ["slow"]
 
@@ -66,7 +67,7 @@ constraint_management:
     OBJECT: "slow"
     VIO: "slow"
     ICP: "slow"
-    RTK: "medium"
+    RTK: "fast"
     OPTFLOWGPS: "slow"
     GPS: "medium"
     OPTFLOW: "slow"
