@@ -9,8 +9,8 @@ supersoft:
       kq: 8.0
       kw: 0.0
 
-    kib: 1.5
-    kib_lim: 5.0
+    kib: 1.0
+    kib_lim: 1.0
 
     kiw: 1.5
     kiw_lim: 5.0
@@ -39,8 +39,8 @@ soft:
       kq: 8.0
       kw: 0.0
 
-    kib: 1.5
-    kib_lim: 5.0
+    kib: 1.0
+    kib_lim: 1.0
 
     kiw: 1.5
     kiw_lim: 5.0
@@ -69,8 +69,8 @@ tight:
       kq: 8.0
       kw: 0.0
 
-    kib: 1.5
-    kib_lim: 5.0
+    kib: 1.0
+    kib_lim: 1.0
 
     kiw: 1.5
     kiw_lim: 5.0
