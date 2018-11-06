@@ -17,12 +17,6 @@ gains: [
   "tight",
 ]
 
-constraints: [
-  "slow",
-  "medium",
-  "fast",
-]
-
 gain_management:
 
   # list of allowed gains per odometry mode
@@ -47,28 +41,3 @@ gain_management:
     GPS: "tight"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
-
-constraint_management:
-
-  # list of allowed gains per odometry mode
-  allowed_constraints:
-    OBJECT: ["slow"]
-    VIO: ["slow"]
-    ICP: ["slow"]
-    RTK: ["slow", "medium", "fast"]
-    OPTFLOWGPS: ["slow"]
-    GPS: ["slow", "medium", "fast"]
-    OPTFLOW: ["slow"]
-    OTHER: ["slow"]
-
-  # those gains will be used automatically when a localization mode switches
-  # and the current gains are not in the allowed list (next paragraphs)
-  fallback_constraints:
-    OBJECT: "slow"
-    VIO: "slow"
-    ICP: "slow"
-    RTK: "fast"
-    OPTFLOWGPS: "slow"
-    GPS: "fast"
-    OPTFLOW: "slow"
-    OTHER: "slow"

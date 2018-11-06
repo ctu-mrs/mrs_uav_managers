@@ -69,3 +69,27 @@ fast:
     speed: 0.4
     acceleration: 0.5
     jerk: 0.5
+
+insane:
+
+  horizontal:
+    speed: 3.5
+    acceleration: 2.0
+    jerk: 2.0
+
+  vertical:
+
+    ascending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+
+    descending:
+      speed: 30.0
+      acceleration: 20.0
+      jerk: 10.0
+
+  yaw:
+    speed: 0.4
+    acceleration: 0.5
+    jerk: 0.5
