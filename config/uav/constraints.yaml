@@ -85,8 +85,8 @@ insane:
       jerk: 2.0
 
     descending:
-      speed: 30.0
-      acceleration: 20.0
+      speed: 20.0
+      acceleration: 10.0
       jerk: 10.0
 
   yaw:

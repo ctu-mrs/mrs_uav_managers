@@ -26,9 +26,9 @@ safety:
 
   timer_rate: 100 # [Hz]
 
-  max_tilt_angle: 50 # [deg]
-  failsafe_hover_control_error: 10.5 # [m]
-  failsafe_land_control_error: 30.0 # [m]
+  max_tilt_angle: 1000 # [deg]
+  failsafe_hover_control_error: 100.5 # [m]
+  failsafe_land_control_error: 100.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
   hover_tracker: "mrs_trackers/LandoffTracker"

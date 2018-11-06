@@ -956,23 +956,23 @@ namespace mrs_mav_manager
 
       // test the output
       if (!std::isfinite(attitude_target.orientation.x)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.x\"!!!");
         return;
       }
       if (!std::isfinite(attitude_target.orientation.y)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.y\"!!!");
         return;
       }
       if (!std::isfinite(attitude_target.orientation.z)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.z\"!!!");
         return;
       }
       if (!std::isfinite(attitude_target.orientation.w)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.w\"!!!");
         return;
       }
       if (!std::isfinite(attitude_target.thrust)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.\"!!!");
+        ROS_ERROR("NaN detected in variable \"attitude_target.thrust\"!!!");
         return;
       }
 

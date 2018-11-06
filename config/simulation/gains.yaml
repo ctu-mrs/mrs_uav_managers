@@ -61,8 +61,8 @@ soft:
 tight:
 
   horizontal:
-    kp: 10.0
-    kv: 5.0
+    kp: 15.0
+    kv: 12.0
     ka: 1.0
 
     attitude:
