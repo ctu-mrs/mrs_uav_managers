@@ -128,7 +128,7 @@
       <remap from="~mpc_tracker/resume_trajectory_following_in" to="~mpc_tracker/resume_trajectory_following" />
       <remap from="~mpc_tracker/fly_to_trajectory_start_in" to="~mpc_tracker/fly_to_trajectory_start" />
       <remap from="~mpc_tracker/failsafe_in" to="~mpc_tracker/failsafe" />
-      <remap from="~mpc_tracker/set_mpc_matrix_in" to="~mpc_tracker/set_matrices" />
+      <remap from="~mpc_tracker/set_mpc_matrix_in" to="~mpc_tracker/set_Q" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
       <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
