@@ -81,31 +81,3 @@ fast:
     acceleration: 2.0
     jerk: 3.0
     snap: 5.0
-
-insane:
-
-  horizontal:
-    speed: 8.3
-    acceleration: 3.0
-    jerk: 3.0
-    snap: 5.0
-
-  vertical:
-
-    ascending:
-      speed: 10.0
-      acceleration: 3.0
-      jerk: 5.0
-      snap: 5.0
-
-    descending:
-      speed: 20.0
-      acceleration: 8.0
-      jerk: 10.0
-      snap: 10.0
-
-  yaw:
-    speed: 2.0
-    acceleration: 2.0
-    jerk: 3.0
-    snap: 5.0
