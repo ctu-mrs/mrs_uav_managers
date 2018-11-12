@@ -1,0 +1,22 @@
+null_tracker: "mrs_mav_manager/NullTracker"
+
+max_height_checking:
+
+  rate: 10 # [Hz]
+  safety_height_offset: 0.5 # how much lower to descend bellow the max height
+
+takeoff:
+  rate: 10 # [Hz]
+  takeoff_tracker: "mrs_trackers/LandoffTracker"
+  after_takeoff_tracker: "mrs_trackers/MpcTracker"
+
+  takeoff_height: 1.0
+
+landing:
+
+  rate: 10 # [Hz]
+  landing_tracker: "mrs_trackers/LandoffTracker"
+
+  # those two must apply simultaneously
+  landing_cutoff_height:  0.75
+  landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?

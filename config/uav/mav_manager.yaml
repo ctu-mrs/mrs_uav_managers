@@ -10,7 +10,7 @@ takeoff:
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   after_takeoff_tracker: "mrs_trackers/MpcTracker"
 
-  takeoff_height: 1.0
+  takeoff_height: 1.5
 
 landing:
 
@@ -19,4 +19,4 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_height:  0.5
-  landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
+  landing_cutoff_mass_factor:  0.75 # how much light does the drone appear to be?

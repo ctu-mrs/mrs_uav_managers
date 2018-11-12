@@ -25,7 +25,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib
-  LIBRARIES ControlManager MavManager
+  LIBRARIES GainManager ConstraintManager ControlManager MavManager
   )
 
 ###########
@@ -87,5 +87,18 @@ add_dependencies(GainManager
   )
 
 target_link_libraries(GainManager
+  ${catkin_LIBRARIES}
+  )
+
+# ConstraintManager
+
+add_library(ConstraintManager src/constraint_manager.cpp)
+
+add_dependencies(ConstraintManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(ConstraintManager
   ${catkin_LIBRARIES}
   )
