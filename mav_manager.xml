@@ -1,5 +1,0 @@
-<library path="lib/libMavManager">
-  <class name="mrs_mav_manager/MavManager" type="mrs_mav_manager::MavManager" base_class_type="nodelet::Nodelet">
-    <description>MavManager nodelet</description>
-  </class>
-</library>
