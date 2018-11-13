@@ -99,24 +99,24 @@
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/f450/line_tracker.yaml" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- JoyTracker -->
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/uav/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/uav/f450/joy_tracker.yaml" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- LandoffTracker -->
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/f450/landoff_tracker.yaml" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
 
       <!-- MpcTracker -->
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/f450/mpc_tracker.yaml" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
