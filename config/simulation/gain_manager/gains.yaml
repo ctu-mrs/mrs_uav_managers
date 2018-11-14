@@ -16,8 +16,8 @@ supersoft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 40.0
+    kv: 20.0
     ka: 1.0
 
     attitude:
@@ -46,8 +46,8 @@ soft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 40.0
+    kv: 20.0
     ka: 1.0
 
     attitude:
@@ -76,8 +76,8 @@ tight:
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 40.0
+    kv: 20.0
     ka: 1.0
 
     attitude:
