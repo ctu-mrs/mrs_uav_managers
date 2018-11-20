@@ -38,6 +38,6 @@ gain_management:
     ICP: "supersoft"
     RTK: "tight"
     OPTFLOWGPS: "soft"
-    GPS: "tight"
+    GPS: "soft"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
