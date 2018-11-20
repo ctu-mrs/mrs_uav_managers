@@ -120,6 +120,7 @@
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
+      <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/rc_in" to="mavros/rc/in" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
