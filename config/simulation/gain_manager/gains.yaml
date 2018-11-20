@@ -61,23 +61,23 @@ soft:
 tight:
 
   horizontal:
-    kp: 12.0
-    kv: 9.0
+    kp: 20.0
+    kv: 12.0
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 20.0
       kw: 0.0
 
-    kib: 2.0
+    kib: 0.5
     kib_lim: 10.0
 
-    kiw: 2.0
+    kiw: 0.5
     kiw_lim: 10.0
 
   vertical:
-    kp: 40.0
-    kv: 20.0
+    kp: 100.0
+    kv: 50.0
     ka: 1.0
 
     attitude:
