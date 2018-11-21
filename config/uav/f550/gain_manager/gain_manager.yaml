@@ -13,6 +13,7 @@ estimator_types: [
 
 gains: [
   "supersoft",
+  "soft",
 ]
 
 gain_management:
@@ -24,7 +25,7 @@ gain_management:
     ICP: ["supersoft"]
     RTK: ["supersoft"]
     OPTFLOWGPS: ["supersoft"]
-    GPS: ["supersoft"]
+    GPS: ["supersoft", "soft"]
     OPTFLOW: ["supersoft"]
     OTHER: ["supersoft"]
 
@@ -36,6 +37,6 @@ gain_management:
     ICP: "supersoft"
     RTK: "supersoft"
     OPTFLOWGPS: "supersoft"
-    GPS: "supersoft"
+    GPS: "soft"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
