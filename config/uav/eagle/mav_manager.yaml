@@ -10,7 +10,7 @@ takeoff:
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   after_takeoff_tracker: "mrs_trackers/MpcTracker"
 
-  takeoff_height: 2.0
+  takeoff_height: 3.0
 
 landing:
 

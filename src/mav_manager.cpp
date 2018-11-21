@@ -670,7 +670,8 @@ namespace mrs_mav_manager
       return true;
     }
 
-    if (odometry_z > 0.5) {
+    // TODO: make it parametric
+    if (odometry_z > 1.0) {
       sprintf((char *)&message, "Can't takeoff, already in the air!");
       res.message = message;
       res.success = false;
