@@ -77,7 +77,7 @@ fast:
       snap: 5.0
 
   yaw:
-    speed: 2.0
-    acceleration: 2.0
-    jerk: 3.0
-    snap: 5.0
+    speed: 3.14
+    acceleration: 10.0
+    jerk: 20.0
+    snap: 10.0
