@@ -1,12 +1,12 @@
 supersoft:
 
   horizontal:
-    kp: 3.0
-    kv: 2.0
+    kp: 6.0
+    kv: 4.0
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 5.0
       kw: 0.0
 
     kib: 0.2
@@ -22,7 +22,7 @@ supersoft:
 
     attitude:
       kq: 5.0
-      kw: 2.0
+      kw: 1.0
 
   weight_estimator:
     km: 1.0
