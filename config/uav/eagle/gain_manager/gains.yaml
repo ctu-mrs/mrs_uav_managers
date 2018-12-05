@@ -32,7 +32,7 @@ soft:
 
   horizontal:
     kp: 3.75
-    kv: 2.70
+    kv: 2.0
     ka: 1.0
 
     attitude:
