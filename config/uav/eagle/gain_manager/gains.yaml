@@ -51,7 +51,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 20.0
+      kq: 5.0
       kw: 2.0
 
   weight_estimator:
