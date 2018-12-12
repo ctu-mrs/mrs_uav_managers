@@ -32,7 +32,7 @@ soft:
 
   horizontal:
     kp: 3.75
-    kv: 2.70
+    kv: 2.0
     ka: 1.0
 
     attitude:
@@ -51,7 +51,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 20.0
+      kq: 5.0
       kw: 2.0
 
   weight_estimator:
