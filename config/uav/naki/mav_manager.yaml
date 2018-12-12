@@ -10,7 +10,9 @@ takeoff:
   takeoff_tracker: "mrs_trackers/LandoffTracker"
   after_takeoff_tracker: "mrs_trackers/MpcTracker"
 
-  takeoff_height: 1.5
+  takeoff_height: 2.0
+
+  ground_limit_height: 1.0 # under which height the takeoff can happen
 
 landing:
 

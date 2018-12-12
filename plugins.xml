@@ -1,0 +1,23 @@
+<library path="lib/libMavManager">
+  <class name="mrs_mav_manager/MavManager" type="mrs_mav_manager::MavManager" base_class_type="nodelet::Nodelet">
+    <description>MavManager nodelet</description>
+  </class>
+</library>
+
+<library path="lib/libControlManager">
+  <class name="mrs_mav_manager/ControlManager" type="mrs_mav_manager::ControlManager" base_class_type="nodelet::Nodelet">
+    <description>ControlManager nodelet</description>
+  </class>
+</library>
+
+<library path="lib/libConstraintManager">
+  <class name="mrs_mav_manager/ConstraintManager" type="mrs_mav_manager::ConstraintManager" base_class_type="nodelet::Nodelet">
+    <description>ConstraintManager nodelet</description>
+  </class>
+</library>
+
+<library path="lib/libGainManager">
+  <class name="mrs_mav_manager/GainManager" type="mrs_mav_manager::GainManager" base_class_type="nodelet::Nodelet">
+    <description>GainManager nodelet</description>
+  </class>
+</library>

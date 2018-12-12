@@ -126,6 +126,7 @@ namespace mrs_mav_manager
 
   private:
     double takeoff_height_;
+    double ground_limit_height_;
 
   private:
     std::string null_tracker_name_;
@@ -232,6 +233,7 @@ namespace mrs_mav_manager
     param_loader.load_param("takeoff/after_takeoff_tracker", after_takeoff_tracker_name_);
     param_loader.load_param("takeoff/takeoff_tracker", takeoff_tracker_name_);
     param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
+    param_loader.load_param("takeoff/ground_limit_height", ground_limit_height_);
 
     param_loader.load_param("landing/rate", landing_timer_rate_);
     param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
@@ -670,7 +672,7 @@ namespace mrs_mav_manager
       return true;
     }
 
-    if (odometry_z > 0.5) {
+    if (odometry_z > ground_limit_height_) {
       sprintf((char *)&message, "Can't takeoff, already in the air!");
       res.message = message;
       res.success = false;

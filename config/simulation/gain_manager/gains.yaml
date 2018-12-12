@@ -1,8 +1,8 @@
 supersoft:
 
   horizontal:
-    kp: 4.0
-    kv: 2.5
+    kp: 1.333333
+    kv: 0.833333
     ka: 1.0
 
     attitude:
@@ -16,8 +16,8 @@ supersoft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 13.333333
+    kv: 6.666667
     ka: 1.0
 
     attitude:
@@ -31,23 +31,23 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 6.0
-    kv: 3.0
+    kp: 3.333333
+    kv: 2.0
     ka: 1.0
 
     attitude:
-      kq: 6.0
+      kq: 10.0
       kw: 0.0
 
-    kib: 1.0
+    kib: 0.1
     kib_lim: 10.0
 
-    kiw: 1.0
+    kiw: 0.1
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 33.333333
+    kv: 16.666667
     ka: 1.0
 
     attitude:
@@ -61,23 +61,23 @@ soft:
 tight:
 
   horizontal:
-    kp: 12.0
-    kv: 9.0
+    kp: 6.666667
+    kv: 4.0
     ka: 1.0
 
     attitude:
       kq: 10.0
       kw: 0.0
 
-    kib: 2.0
+    kib: 0.5
     kib_lim: 10.0
 
-    kiw: 2.0
+    kiw: 0.5
     kiw_lim: 10.0
 
   vertical:
-    kp: 150.0
-    kv: 70.0
+    kp: 33.333333
+    kv: 16.666667
     ka: 1.0
 
     attitude:

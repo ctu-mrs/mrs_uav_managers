@@ -7,9 +7,6 @@
 
   <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
 
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
@@ -34,10 +31,7 @@
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
-    <nodelet plugin="${prefix}/control_manager.xml" />
-    <nodelet plugin="${prefix}/mav_manager.xml" />
-    <nodelet plugin="${prefix}/gain_manager.xml" />
-    <nodelet plugin="${prefix}/constraint_manager.xml" />
+    <nodelet plugin="${prefix}/plugins.xml" />
     <mrs_mav_manager plugin="${prefix}/null_tracker.xml" />
   </export>
 

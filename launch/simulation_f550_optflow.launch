@@ -4,7 +4,7 @@
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
-  <arg name="world_file" default="$(find mrs_main)/config/world_current.yaml" />
+  <arg name="world_file" default="$(find mrs_main)/config/world_simulation.yaml" />
   <arg name="g" default="9.8" />
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
@@ -16,7 +16,7 @@
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f450.launch" />
+  <include file="$(find mrs_odometry)/launch/simulation_f550_optflow.launch" />
 
   <group ns="$(arg uav_name)">
 
@@ -24,8 +24,8 @@
     <node pkg="nodelet" type="nodelet" name="mav_manager" args="$(arg nodelet) mrs_mav_manager/MavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/mav_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f450/motor_params.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/mav_manager.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
@@ -61,36 +61,36 @@
     <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_mav_manager/ControlManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/control_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f450/motor_params.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/control_manager.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
 
       <!-- Controller's configs -->
 
       <!-- NSF -->
-      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/uav/f450/nsf.yaml" />
+      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/simulation/f550/nsf.yaml" />
       <param name="nsf_controller/g" value="$(arg g)" />
       <param name="nsf_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="nsf_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- SO3 -->
-      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/uav/f450/so3.yaml" />
+      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/simulation/f550/so3.yaml" />
       <param name="so3_controller/g" value="$(arg g)" />
       <param name="so3_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
       <!-- Attitude controller -->
-      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/uav/f450/attitude.yaml" />
+      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/simulation/f550/attitude.yaml" />
       <param name="attitude_controller/g" value="$(arg g)" />
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="attitude_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
 
       <!-- FailSafe -->
-      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/uav/f450/failsafe.yaml" />
+      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/simulation/f550/failsafe.yaml" />
       <param name="failsafe_controller/g" value="$(arg g)" />
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
@@ -99,24 +99,24 @@
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/f450/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/simulation/line_tracker.yaml" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- JoyTracker -->
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/uav/f450/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/simulation/joy_tracker.yaml" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- LandoffTracker -->
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/f450/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/simulation/landoff_tracker.yaml" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
 
       <!-- MpcTracker -->
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/f450/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
@@ -176,8 +176,8 @@
     <!-- Gain Manager -->
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_mav_manager/GainManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager/gains.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
@@ -197,8 +197,8 @@
     <!-- Constraint Manager -->
     <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_mav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/uav/f450/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_mav_manager)/config/simulation/constraint_manager/constraints.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
