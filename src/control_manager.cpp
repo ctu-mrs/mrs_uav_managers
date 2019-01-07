@@ -118,6 +118,7 @@ namespace mrs_mav_manager
     ros::ServiceServer service_emergencyGoTo;
 
     ros::Subscriber subscriber_goto;
+    ros::Subscriber subscriber_goto_fcu;
     ros::Subscriber subscriber_goto_relative;
     ros::Subscriber subscriber_goto_altitude;
     ros::Subscriber subscriber_set_yaw;
@@ -156,13 +157,14 @@ namespace mrs_mav_manager
     bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
 
     bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+    bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
     bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
     bool callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
     bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
     bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
     void callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-    bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+    void callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
     void callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
     void callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
     void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
@@ -470,6 +472,7 @@ namespace mrs_mav_manager
     // | ----------------- setpoint command topics ---------------- |
 
     subscriber_goto          = nh_.subscribe("goto_in", 1, &ControlManager::callbackGoToTopic, this, ros::TransportHints().tcpNoDelay());
+    subscriber_goto_fcu      = nh_.subscribe("goto_fcu_in", 1, &ControlManager::callbackGoToFcuTopic, this, ros::TransportHints().tcpNoDelay());
     subscriber_goto_relative = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackGoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
     subscriber_goto_altitude = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackGoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
     subscriber_set_yaw       = nh_.subscribe("set_yaw_in", 1, &ControlManager::callbackSetYawTopic, this, ros::TransportHints().tcpNoDelay());
@@ -1040,7 +1043,7 @@ namespace mrs_mav_manager
     if (msg.buttons[7] == 1) {
 
       joy_last_start_time = ros::Time::now();
-      joy_start_pressed = true;
+      joy_start_pressed   = true;
 
     } else if (joy_start_pressed && (ros::Time::now() - joy_last_start_time).toSec() > 3.0) {
 
@@ -1447,6 +1450,55 @@ namespace mrs_mav_manager
     }
 
     return true;
+  }
+
+  //}
+
+  /* //{ callbackGoToFcuTopic() */
+
+  void ControlManager::callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+
+    if (!is_initialized) {
+      return;
+    }
+
+    if (!callbacks_enabled) {
+      ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
+      return;
+    }
+
+    mrs_msgs::TrackerPointStamped request;
+    Eigen::Vector2d               des(msg->position.x, msg->position.y);
+
+    {
+      std::scoped_lock lock(mutex_odometry);
+      // rotate it from the frame of the drone
+      des = rotateVector(des, odometry_yaw);
+
+      request.position.x   = des[0] + odometry_x;
+      request.position.y   = des[1] + odometry_y;
+      request.position.z   = msg->position.z + odometry_z;
+      request.position.yaw = msg->position.yaw + odometry_yaw;
+    }
+
+    if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
+      ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, the point is outside of the safety area!");
+      return;
+    }
+
+    bool tracker_response;
+
+    {
+      std::scoped_lock lock(mutex_tracker_list);
+
+      tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
+
+      if (!tracker_response) {
+        ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
+      }
+    }
+
+    return;
   }
 
   //}
