@@ -6,6 +6,10 @@
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_main)/config/world_current.yaml" />
   <arg name="g" default="9.8" />
+  <arg name="debug" default="false" />
+
+  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
@@ -16,7 +20,9 @@
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f550.launch" />
+  <include file="$(find mrs_odometry)/launch/simulation_f550_optflow.launch" >
+    <arg name="debug" value="$(arg debug)"/>
+  </include>
 
   <group ns="$(arg uav_name)">
 
