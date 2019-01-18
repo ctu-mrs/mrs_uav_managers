@@ -20,7 +20,7 @@
   <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/simulation_f550_optflow.launch" >
+  <include file="$(find mrs_odometry)/launch/eagle.launch" >
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
