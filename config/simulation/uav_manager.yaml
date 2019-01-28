@@ -1,4 +1,4 @@
-null_tracker: "mrs_mav_manager/NullTracker"
+null_tracker: "mrs_uav_manager/NullTracker"
 
 max_height_checking:
 
