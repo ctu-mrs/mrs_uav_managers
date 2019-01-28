@@ -4,7 +4,7 @@
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
-  <arg name="world_file" default="$(find mrs_main)/config/world_current.yaml" />
+  <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml" />
   <arg name="g" default="9.8" />
   <arg name="debug" default="false" />
 
@@ -17,7 +17,7 @@
   <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
 
   <!-- Nodelet Manager -->
-  <include file="$(find mrs_main)/launch/nodelet_manager.launch" />
+  <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
   <include file="$(find mrs_odometry)/launch/f450_pixgarm.launch" >
