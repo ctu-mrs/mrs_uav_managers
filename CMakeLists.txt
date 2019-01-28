@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(mrs_mav_manager)
+project(mrs_uav_manager)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -25,7 +25,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib
-  LIBRARIES GainManager ConstraintManager ControlManager MavManager
+  LIBRARIES GainManager ConstraintManager ControlManager UavManager
   )
 
 ###########
@@ -64,16 +64,16 @@ add_dependencies(NullTracker
 
 target_link_libraries(NullTracker ${catkin_LIBRARIES})
 
-# MavManager
+# UavManager
 
-add_library(MavManager src/mav_manager.cpp)
+add_library(UavManager src/uav_manager.cpp)
 
-add_dependencies(MavManager
+add_dependencies(UavManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(MavManager
+target_link_libraries(UavManager
   ${catkin_LIBRARIES}
   )
 

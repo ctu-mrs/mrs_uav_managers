@@ -20,10 +20,10 @@
 
 #include <mrs_lib/ParamLoader.h>
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
-  /* //{ class MavManager */
+  /* //{ class UavManager */
 
   // state machine
   typedef enum
@@ -39,7 +39,7 @@ namespace mrs_mav_manager
 
       "IDLING", "FLYING HOME", "LANDING"};
 
-  class MavManager : public nodelet::Nodelet {
+  class UavManager : public nodelet::Nodelet {
 
   private:
     ros::NodeHandle nh_;
@@ -168,7 +168,7 @@ namespace mrs_mav_manager
 
   /* //{ changeLandingState() */
 
-  void MavManager::changeLandingState(LandingStates_t new_state) {
+  void UavManager::changeLandingState(LandingStates_t new_state) {
 
     previous_state_landing = current_state_landing;
     current_state_landing  = new_state;
@@ -190,31 +190,31 @@ namespace mrs_mav_manager
     }
 
     // just for ROS_INFO
-    ROS_INFO("[MavManager]: Switching landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+    ROS_INFO("[UavManager]: Switching landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
   }
 
   //}
 
   /* //{ onInit() */
 
-  void MavManager::onInit() {
+  void UavManager::onInit() {
 
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
     ros::Time::waitForValid();
 
-    ROS_INFO("[MavManager]: initializing");
+    ROS_INFO("[UavManager]: initializing");
 
-    subscriber_odometry         = nh_.subscribe("odometry_in", 1, &MavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-    subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &MavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
-    subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &MavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
-    subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &MavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
-    subscriber_max_height       = nh_.subscribe("max_height_in", 1, &MavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-    subscriber_height           = nh_.subscribe("height_in", 1, &MavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
+    subscriber_odometry         = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+    subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &UavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
+    subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &UavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
+    subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
+    subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+    subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
 
-    service_server_takeoff   = nh_.advertiseService("takeoff_in", &MavManager::callbackTakeoff, this);
-    service_server_land      = nh_.advertiseService("land_in", &MavManager::callbackLand, this);
-    service_server_land_home = nh_.advertiseService("land_home_in", &MavManager::callbackLandHome, this);
+    service_server_takeoff   = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
+    service_server_land      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
+    service_server_land_home = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
 
     service_client_takeoff           = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
     service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
@@ -223,7 +223,7 @@ namespace mrs_mav_manager
     service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
     service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
 
-    mrs_lib::ParamLoader param_loader(nh_, "MavManager");
+    mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
     param_loader.load_param("enable_profiler", profiler_enabled_);
 
@@ -260,26 +260,26 @@ namespace mrs_mav_manager
     // |                          profiler                          |
     // --------------------------------------------------------------
 
-    profiler = new mrs_lib::Profiler(nh_, "MavManager", profiler_enabled_);
+    profiler = new mrs_lib::Profiler(nh_, "UavManager", profiler_enabled_);
 
     // --------------------------------------------------------------
     // |                           timers                           |
     // --------------------------------------------------------------
 
-    landing_timer    = nh_.createTimer(ros::Rate(landing_timer_rate_), &MavManager::landingTimer, this, false, false);
-    takeoff_timer    = nh_.createTimer(ros::Rate(takeoff_timer_rate_), &MavManager::takeoffTimer, this, false, false);
-    max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &MavManager::maxHeightTimer, this);
+    landing_timer    = nh_.createTimer(ros::Rate(landing_timer_rate_), &UavManager::landingTimer, this, false, false);
+    takeoff_timer    = nh_.createTimer(ros::Rate(takeoff_timer_rate_), &UavManager::takeoffTimer, this, false, false);
+    max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &UavManager::maxHeightTimer, this);
 
     // | ----------------------- finish init ---------------------- |
 
     if (!param_loader.loaded_successfully()) {
-      ROS_ERROR("[MavManager]: Could not load all parameters!");
+      ROS_ERROR("[UavManager]: Could not load all parameters!");
       ros::shutdown();
     }
 
     is_initialized = true;
 
-    ROS_INFO("[MavManager]: initilized");
+    ROS_INFO("[UavManager]: initilized");
   }
 
   //}
@@ -290,7 +290,7 @@ namespace mrs_mav_manager
 
   /* //{ landingTimer() */
 
-  void MavManager::landingTimer(const ros::TimerEvent &event) {
+  void UavManager::landingTimer(const ros::TimerEvent &event) {
 
     if (!is_initialized)
       return;
@@ -317,7 +317,7 @@ namespace mrs_mav_manager
         ros::Duration wait(5.0);
         wait.sleep();
 
-        ROS_INFO("[MavManager]: landing");
+        ROS_INFO("[UavManager]: landing");
 
         mrs_msgs::String switch_tracker_out;
         switch_tracker_out.request.value = landing_tracker_name_;
@@ -349,7 +349,7 @@ namespace mrs_mav_manager
 
           // recalculate the mass based on the thrust
           double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
-          ROS_INFO("[MavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
+          ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
           if ((height < landing_cutoff_height_) &&
               ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
@@ -364,7 +364,7 @@ namespace mrs_mav_manager
 
             changeLandingState(IDLE_STATE);
 
-            ROS_INFO("[MavManager]: landing finished");
+            ROS_INFO("[UavManager]: landing finished");
 
             landing_timer.stop();
           }
@@ -372,7 +372,7 @@ namespace mrs_mav_manager
 
       } else {
 
-        ROS_ERROR("[MavManager]: incorrect tracker detected during landing!");
+        ROS_ERROR("[UavManager]: incorrect tracker detected during landing!");
         /* changeLandingState(IDLE_STATE); */
       }
     }
@@ -382,7 +382,7 @@ namespace mrs_mav_manager
 
   /* //{ takeoffTimer() */
 
-  void MavManager::takeoffTimer(const ros::TimerEvent &event) {
+  void UavManager::takeoffTimer(const ros::TimerEvent &event) {
 
     if (!is_initialized)
       return;
@@ -394,7 +394,7 @@ namespace mrs_mav_manager
         std::scoped_lock lock(mutex_odometry);
 
         if (fabs(takeoff_height_ - odometry_z) < 0.2) {
-          ROS_INFO("[MavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
+          ROS_INFO("[UavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
 
           mrs_msgs::String switch_tracker_out;
           switch_tracker_out.request.value = after_takeoff_tracker_name_;
@@ -402,11 +402,11 @@ namespace mrs_mav_manager
 
           if (switch_tracker_out.response.success == true) {
 
-            ROS_INFO("[MavManager]: switched to %s", after_takeoff_tracker_name_.c_str());
+            ROS_INFO("[UavManager]: switched to %s", after_takeoff_tracker_name_.c_str());
 
           } else {
 
-            ROS_ERROR("[MavManager]: could not switch to %s: %s", after_takeoff_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
+            ROS_ERROR("[UavManager]: could not switch to %s: %s", after_takeoff_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
           }
 
           takeoff_timer.stop();
@@ -419,7 +419,7 @@ namespace mrs_mav_manager
 
   /* //{ maxHeightTimer() */
 
-  void MavManager::maxHeightTimer(const ros::TimerEvent &event) {
+  void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
     if (!is_initialized)
       return;
@@ -437,7 +437,7 @@ namespace mrs_mav_manager
 
         if (odometry_z > max_height + 0.25) {
 
-          ROS_WARN("[MavManager]: max height exceeded: %f >  %f, triggering safety goto", odometry_z, max_height);
+          ROS_WARN("[UavManager]: max height exceeded: %f >  %f, triggering safety goto", odometry_z, max_height);
 
           // get the current odometry
           double current_horizontal_speed = sqrt(pow(odometry.twist.twist.linear.x, 2) + pow(odometry.twist.twist.linear.y, 2));
@@ -462,13 +462,13 @@ namespace mrs_mav_manager
 
           if (goto_out.response.success == true) {
 
-            ROS_INFO("[MavManager]: descending");
+            ROS_INFO("[UavManager]: descending");
 
             fixing_max_height = true;
 
           } else {
 
-            ROS_ERROR("[MavManager]: goto failed: %s", goto_out.response.message.c_str());
+            ROS_ERROR("[UavManager]: goto failed: %s", goto_out.response.message.c_str());
           }
         }
 
@@ -480,7 +480,7 @@ namespace mrs_mav_manager
           enable_callbacks_out.request.data = true;
           service_client_enabled_callbacks.call(enable_callbacks_out);
 
-          ROS_WARN("[MavManager]: safety height reached, enabling callbacks");
+          ROS_WARN("[UavManager]: safety height reached, enabling callbacks");
 
           fixing_max_height = false;
         }
@@ -498,7 +498,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackTrackerStatus() */
 
-  void MavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
+  void UavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -517,7 +517,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackTargetAttitude() */
 
-  void MavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg) {
+  void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -536,7 +536,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackAttitudeCommand() */
 
-  void MavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg) {
+  void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -555,7 +555,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackMaxHeight() */
 
-  void MavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+  void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -574,7 +574,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackHeight() */
 
-  void MavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+  void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -593,7 +593,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackOdometry() */
 
-  void MavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+  void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     if (!is_initialized)
       return;
@@ -625,7 +625,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackTakeoff() */
 
-  bool MavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+  bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
     if (!is_initialized)
       return false;
@@ -636,7 +636,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, missing odometry!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -644,7 +644,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, missing tracker status!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -652,7 +652,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, missing target attitude!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -660,7 +660,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, missing max height");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -668,7 +668,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, missing height");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -676,7 +676,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, already in the air!");
       res.message = message;
       res.success = false;
-      ROS_WARN("[MavManager]: %s", message);
+      ROS_WARN("[UavManager]: %s", message);
       return true;
     }
 
@@ -684,11 +684,11 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
       res.message = message;
       res.success = false;
-      ROS_WARN("[MavManager]: %s", message);
+      ROS_WARN("[UavManager]: %s", message);
       return true;
     }
 
-    ROS_INFO("[MavManager]: taking off");
+    ROS_INFO("[UavManager]: taking off");
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = takeoff_tracker_name_;
@@ -719,7 +719,7 @@ namespace mrs_mav_manager
           takeoff_y = odometry_y;
         }
 
-        ROS_INFO("[MavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
+        ROS_INFO("[UavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
 
         takingoff = true;
 
@@ -739,7 +739,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackLand() */
 
-  bool MavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+  bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
     if (!is_initialized)
       return false;
@@ -750,7 +750,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing odometry!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -758,7 +758,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing tracker status!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -766,11 +766,11 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing attitude command!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
-    ROS_INFO("[MavManager]: landing");
+    ROS_INFO("[UavManager]: landing");
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = landing_tracker_name_;
@@ -805,7 +805,7 @@ namespace mrs_mav_manager
 
   /* //{ callbackLandHome() */
 
-  bool MavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+  bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
     if (!is_initialized)
       return false;
@@ -816,7 +816,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing odometry!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -824,7 +824,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing tracker status!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -832,7 +832,7 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, missing attitude command!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -840,11 +840,11 @@ namespace mrs_mav_manager
       sprintf((char *)&message, "Can't land, descedning to safety height!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[MavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
-    ROS_INFO("[MavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
+    ROS_INFO("[UavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
 
     mrs_msgs::Vec4 goto_out;
     {
@@ -885,7 +885,7 @@ namespace mrs_mav_manager
   }
 
   //}
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::MavManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::UavManager, nodelet::Nodelet)

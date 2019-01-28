@@ -9,7 +9,7 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <nav_msgs/Odometry.h>
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
 struct MotorParams
@@ -23,7 +23,7 @@ public:
   virtual ~Controller(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::MotorParams motor_params) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::MotorParams motor_params) = 0;
   virtual bool activate(const mrs_msgs::AttitudeCommand::ConstPtr &cmd)                                = 0;
   virtual void deactivate(void)                                                                        = 0;
 
@@ -31,6 +31,6 @@ public:
                                                            const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
   virtual const mrs_msgs::ControllerStatus::Ptr     getStatus()                                                  = 0;
 };
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #endif

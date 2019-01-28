@@ -17,7 +17,7 @@
 
 #define STRING_EQUAL 0
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
   /* //{ class GainManager */
@@ -498,7 +498,7 @@ namespace mrs_mav_manager
 
   //}
 
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::GainManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::GainManager, nodelet::Nodelet)

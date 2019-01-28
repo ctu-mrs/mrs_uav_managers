@@ -27,10 +27,10 @@
   <group ns="$(arg uav_name)">
 
     <!-- MAV Manager -->
-    <node pkg="nodelet" type="nodelet" name="mav_manager" args="$(arg nodelet) mrs_mav_manager/MavManager $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/mav_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/uav_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
@@ -64,10 +64,10 @@
     </node>
 
     <!-- Control manager -->
-    <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_mav_manager/ControlManager $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_uav_manager/ControlManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/control_manager.yaml" />
       <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
@@ -180,10 +180,10 @@
     </node>
 
     <!-- Gain Manager -->
-    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_mav_manager/GainManager $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_manager/GainManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/gain_manager/gains.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
@@ -201,10 +201,10 @@
     </node>
 
     <!-- Constraint Manager -->
-    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_mav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_mav_manager)/config/simulation/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/simulation/constraint_manager/constraints.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->

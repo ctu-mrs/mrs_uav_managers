@@ -16,8 +16,8 @@
 
 #include <sensor_msgs/Joy.h>
 
-#include <mrs_mav_manager/Controller.h>
-#include <mrs_mav_manager/Tracker.h>
+#include <mrs_uav_manager/Controller.h>
+#include <mrs_uav_manager/Tracker.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <std_srvs/SetBool.h>
@@ -32,7 +32,7 @@
 
 #define STRING_EQUAL 0
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
   /* //{ class ControlManager */
@@ -48,14 +48,14 @@ namespace mrs_mav_manager
     std::string     uav_name_;
 
   private:
-    pluginlib::ClassLoader<mrs_mav_manager::Tracker> *   tracker_loader;
-    pluginlib::ClassLoader<mrs_mav_manager::Controller> *controller_loader;
+    pluginlib::ClassLoader<mrs_uav_manager::Tracker> *   tracker_loader;
+    pluginlib::ClassLoader<mrs_uav_manager::Controller> *controller_loader;
 
     std::vector<std::string> tracker_names;
     std::vector<std::string> controller_names;
 
-    std::vector<boost::shared_ptr<mrs_mav_manager::Tracker>>    tracker_list;
-    std::vector<boost::shared_ptr<mrs_mav_manager::Controller>> controller_list;
+    std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>>    tracker_list;
+    std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list;
 
     std::string null_tracker_name_;
     std::string hover_tracker_name_;
@@ -131,7 +131,7 @@ namespace mrs_mav_manager
     std::mutex                          mutex_last_attitude_cmd;
 
   private:
-    mrs_mav_manager::MotorParams motor_params_;
+    mrs_uav_manager::MotorParams motor_params_;
 
   private:
     double max_tilt_angle_;
@@ -142,7 +142,7 @@ namespace mrs_mav_manager
     mrs_lib::ConvexPolygon *      safety_area_polygon;
     bool                          use_safety_area_;
     double                        min_height;
-    mrs_mav_manager::SafetyArea_t safety_area;
+    mrs_uav_manager::SafetyArea_t safety_area;
 
     bool   isPointInSafetyArea2d(const double x, const double y);
     bool   isPointInSafetyArea3d(const double x, const double y, const double z);
@@ -256,7 +256,7 @@ namespace mrs_mav_manager
     param_loader.load_param("null_tracker", null_tracker_name_);
     tracker_names.insert(tracker_names.begin(), null_tracker_name_);
 
-    tracker_loader = new pluginlib::ClassLoader<mrs_mav_manager::Tracker>("mrs_mav_manager", "mrs_mav_manager::Tracker");
+    tracker_loader = new pluginlib::ClassLoader<mrs_uav_manager::Tracker>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
     for (unsigned long i = 0; i < tracker_names.size(); i++) {
 
@@ -301,7 +301,7 @@ namespace mrs_mav_manager
 
     param_loader.load_param("controllers", controller_names);
 
-    controller_loader = new pluginlib::ClassLoader<mrs_mav_manager::Controller>("mrs_mav_manager", "mrs_mav_manager::Controller");
+    controller_loader = new pluginlib::ClassLoader<mrs_uav_manager::Controller>("mrs_uav_manager", "mrs_uav_manager::Controller");
 
     for (unsigned long i = 0; i < controller_names.size(); i++) {
 
@@ -2135,7 +2135,7 @@ namespace mrs_mav_manager
 
   //}
 
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::ControlManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::ControlManager, nodelet::Nodelet)

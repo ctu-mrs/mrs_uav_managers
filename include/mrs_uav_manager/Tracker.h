@@ -33,7 +33,7 @@
 
 #include <Eigen/Eigen>
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
 typedef boost::function<bool(const double x, const double y, const double z)> isPointInSafetyArea3d_t;
@@ -43,10 +43,10 @@ typedef boost::function<double(void)>                                         ge
 
 struct SafetyArea_t
 {
-  mrs_mav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
-  mrs_mav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
-  mrs_mav_manager::getMaxHeight_t          getMaxHeight;
-  mrs_mav_manager::getMinHeight_t          getMinHeight;
+  mrs_uav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
+  mrs_uav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
+  mrs_uav_manager::getMaxHeight_t          getMaxHeight;
+  mrs_uav_manager::getMinHeight_t          getMinHeight;
   bool                                     use_safety_area;
 };
 
@@ -56,7 +56,7 @@ public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area) = 0;
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                       = 0;
   virtual void deactivate(void)                                                                               = 0;
   virtual void switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg)                                  = 0;
@@ -81,6 +81,6 @@ public:
 
   virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &constraints) = 0;
 };
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #endif

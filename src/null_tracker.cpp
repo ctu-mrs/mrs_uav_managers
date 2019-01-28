@@ -1,18 +1,18 @@
 #include <ros/ros.h>
 
-#include <mrs_mav_manager/Tracker.h>
+#include <mrs_uav_manager/Tracker.h>
 
-namespace mrs_mav_manager
+namespace mrs_uav_manager
 {
 
 /* //{ class NullTracker */
 
-class NullTracker : public mrs_mav_manager::Tracker {
+class NullTracker : public mrs_uav_manager::Tracker {
 
 public:
   NullTracker(void);
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area);
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area);
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
   virtual void deactivate(void);
 
@@ -53,7 +53,7 @@ NullTracker::NullTracker(void) {
 
 /* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, mrs_mav_manager::SafetyArea_t const *safety_area) {
+void NullTracker::initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -253,7 +253,7 @@ const mrs_msgs::TrackerConstraintsResponse::ConstPtr NullTracker::setConstraints
 
 //}
 
-}  // namespace mrs_mav_manager
+}  // namespace mrs_uav_manager
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_mav_manager::NullTracker, mrs_mav_manager::Tracker)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::NullTracker, mrs_uav_manager::Tracker)
