@@ -31,8 +31,8 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 3.333333
-    kv: 2.0
+    kp: 2.8
+    kv: 1.5
     ka: 1.0
 
     attitude:
