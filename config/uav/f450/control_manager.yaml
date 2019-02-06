@@ -18,7 +18,7 @@ controllers : [
 
 # - this is the "do nothing tracker", which is active when no other is
 # - NullTracker is defined in the mrs_uav_manager package
-null_tracker: "mrs_mav_manager/NullTracker"
+null_tracker: "mrs_uav_manager/NullTracker"
 
 status_timer_rate:  10 # [Hz]
 
