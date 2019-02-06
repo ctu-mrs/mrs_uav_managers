@@ -7,8 +7,6 @@ estimator_types: [
   "RTK",
   "OPTFLOWGPS",
   "GPS",
-  "GPS_GYRO",
-  "GPS_COMPASS",
   "OPTFLOW",
   "OTHER",
 ]
@@ -29,8 +27,6 @@ constraint_management:
     RTK: ["slow"]
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
-    GPS_GYRO: ["slow", "medium", "fast"]
-    GPS_COMPASS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow"]
     OTHER: ["slow"]
 
@@ -43,7 +39,5 @@ constraint_management:
     RTK: "slow"
     OPTFLOWGPS: "slow"
     GPS: "slow"
-    GPS_GYRO: "slow"
-    GPS_COMPASS: "slow"
     OPTFLOW: "slow"
     OTHER: "slow"
