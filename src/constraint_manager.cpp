@@ -216,12 +216,13 @@ namespace mrs_uav_manager
 
   /* setConstraints() //{ */
 
-  bool ConstraintManager::setConstraints(std::string constraints_names) {
+  bool ConstraintManager::setConstraints(std::string constraints_name) {
 
     std::map<std::string, mrs_msgs::TrackerConstraintsRequest>::iterator it;
-    it = constraints.find(constraints_names);
+    it = constraints.find(constraints_name);
 
     if (it == constraints.end()) {
+      ROS_ERROR("[ConstraintManager]: could not setConstraints(), the constraint name \"%s\" is not on the list", constraints_name.c_str());
       return false;
     }
 
@@ -231,7 +232,7 @@ namespace mrs_uav_manager
 
     service_client_set_constraints.call(new_constraints);
 
-    current_constraints = constraints_names;
+    current_constraints = constraints_name;
 
     return new_constraints.response.success;
   }
