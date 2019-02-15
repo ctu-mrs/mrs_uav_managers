@@ -24,7 +24,7 @@ constraint_management:
     OBJECT: ["slow"]
     VIO: ["slow"]
     ICP: ["slow"]
-    RTK: ["slow"]
+    RTK: ["slow", "medium", "fast"]
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow"]
