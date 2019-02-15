@@ -334,7 +334,7 @@ namespace mrs_uav_manager
     // | --- automatically set constraints when odometry.type schanges -- |
     if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-      ROS_WARN("[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
       std::map<std::string, std::string>::iterator it;
 
@@ -348,6 +348,8 @@ namespace mrs_uav_manager
       } else {
         if (setConstraints(it->second)) {
           last_estimator_type = odometry_diagnostics.estimator_type.type;
+        } else {
+          ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
         }
       }
     }
