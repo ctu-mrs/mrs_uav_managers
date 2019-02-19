@@ -446,7 +446,7 @@ namespace mrs_uav_manager
       std::scoped_lock lock(mutex_controller_status);
 
       if (!(got_controller_status && controller_status.controller.compare("mrs_controllers/So3Controller") == STRING_EQUAL)) {
-        ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, the SO3 controller is not running!");
+        ROS_INFO_THROTTLE(1.0, "[GainManager]: can't do gain management, the SO3 controller is not running!");
         return;
       }
     }
@@ -454,7 +454,7 @@ namespace mrs_uav_manager
     // | --- automatically set gains when odometry.type schanges -- |
     if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-      ROS_WARN("[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
       std::map<std::string, std::string>::iterator it;
       it = map_type_fallback_gains.find(odometry_diagnostics.estimator_type.name);
@@ -464,6 +464,8 @@ namespace mrs_uav_manager
       } else {
         if (setGains(it->second)) {
           last_estimator_type = odometry_diagnostics.estimator_type.type;
+        } else {
+          ROS_ERROR_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
         }
       }
     }

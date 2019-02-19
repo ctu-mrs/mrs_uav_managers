@@ -337,14 +337,11 @@ namespace mrs_uav_manager
       ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
       std::map<std::string, std::string>::iterator it;
-
       it = map_type_fallback_constraints.find(odometry_diagnostics.estimator_type.name);
 
       if (it == map_type_fallback_constraints.end()) {
-
         ROS_ERROR("[ConstraintManager]: the odometry.type %s was not specified in the constraint_manager's config!",
                   odometry_diagnostics.estimator_type.name.c_str());
-
       } else {
         if (setConstraints(it->second)) {
           last_estimator_type = odometry_diagnostics.estimator_type.type;
