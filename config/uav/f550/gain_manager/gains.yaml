@@ -46,12 +46,12 @@ soft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 21.7
-    kv: 13.0
+    kp: 8.6
+    kv: 4.3
     ka: 1.0
 
     attitude:
-      kq: 20.0
+      kq: 8.0
       kw: 2.0
 
   weight_estimator:
