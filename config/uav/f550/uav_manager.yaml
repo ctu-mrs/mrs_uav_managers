@@ -21,4 +21,4 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_height:  0.5
-  landing_cutoff_mass_factor:  0.75 # how much light does the drone appear to be?
+  landing_cutoff_mass_factor:  0.3 # how much light does the drone appear to be?
