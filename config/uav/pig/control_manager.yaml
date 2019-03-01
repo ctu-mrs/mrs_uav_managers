@@ -1,0 +1,37 @@
+# - list of names of dynamically loaded trackers
+# - trackers follow the mrs_uav_manager/Tracker.h interface
+trackers : [
+  "mrs_trackers/LandoffTracker",
+  "mrs_trackers/LineTracker",
+  "mrs_trackers/MpcTracker",
+  "mrs_trackers/JoyTracker",
+]
+
+# - list of names of dynamically loaded controllers
+# - controllers follow the mrs_uav_manager/Controller.h interface
+controllers : [
+  "mrs_controllers/So3Controller",
+  "mrs_controllers/NsfController",
+  "mrs_controllers/FailsafeController",
+  "mrs_controllers/AttitudeController",
+]
+
+# - this is the "do nothing tracker", which is active when no other is
+# - NullTracker is defined in the mrs_uav_manager package
+null_tracker: "mrs_uav_manager/NullTracker"
+
+status_timer_rate:  10 # [Hz]
+
+safety:
+
+  timer_rate: 100 # [Hz]
+
+  max_tilt_angle: 60 # [deg]
+  failsafe_hover_control_error: 1.5 # [m]
+  failsafe_land_control_error: 3.0 # [m]
+
+  # - this tracker will be used for calling the emergancy hover routine
+  hover_tracker: "mrs_trackers/LandoffTracker"
+
+  # - this controller will be used for emergancy landing
+  failsafe_controller: "mrs_controllers/FailsafeController"
