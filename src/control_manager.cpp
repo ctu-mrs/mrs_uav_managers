@@ -1948,6 +1948,7 @@ namespace mrs_uav_manager
 
     mrs_msgs::StringResponse response;
 
+    // TODO: check if success and fill the response
     callbackSwitchTracker(tracker_srv, response);
     callbackSwitchController(controller_srv, response);
 
