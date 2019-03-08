@@ -27,7 +27,7 @@ constraint_management:
     RTK: ["slow", "medium", "fast"]
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
-    OPTFLOW: ["slow"]
+    OPTFLOW: ["slow", "medium", "fast"]
     OTHER: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
