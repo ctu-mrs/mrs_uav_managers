@@ -16,7 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
   )
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
+# -march=native flag must be set either in all or none nodes that are linked together, otherwise segfaults due to mismatched vectorization of Eigen occur
+set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color -O3 -march=native")
+# set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
 
 ###################################
 ## catkin specific configuration ##
