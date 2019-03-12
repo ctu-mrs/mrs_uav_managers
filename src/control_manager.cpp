@@ -1118,29 +1118,37 @@ namespace mrs_uav_manager
       try {
 
         ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[new_tracker_idx].c_str());
-        { tracker_list[new_tracker_idx]->activate(last_position_cmd); }
-        sprintf((char *)&message, "Tracker %s has been activated", req.value.c_str());
-        ROS_INFO("[ControlManager]: %s", message);
-        res.success = true;
 
-        // super important, switch which the active tracker idx
-        try {
-          tracker_list[active_tracker_idx]->deactivate();
+        if (!tracker_list[new_tracker_idx]->activate(last_position_cmd)) {
 
-          // if switching from null tracker, activate the active the controller
-          if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
-            controller_list[active_controller_idx]->activate(last_attitude_cmd);
+          sprintf((char *)&message, "Tracker %s was not activated", req.value.c_str());
+          ROS_WARN("[ControlManager]: %s", message);
+          res.success = true;
+        } else {
 
-            // if switching to null tracker, deactivate the active controller
-          } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
+          sprintf((char *)&message, "Tracker %s has been activated", req.value.c_str());
+          ROS_INFO("[ControlManager]: %s", message);
+          res.success = true;
 
-            controller_list[active_controller_idx]->deactivate();
+          // super important, switch which the active tracker idx
+          try {
+            tracker_list[active_tracker_idx]->deactivate();
+
+            // if switching from null tracker, activate the active the controller
+            if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
+              controller_list[active_controller_idx]->activate(last_attitude_cmd);
+
+              // if switching to null tracker, deactivate the active controller
+            } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
+
+              controller_list[active_controller_idx]->deactivate();
+            }
+
+            active_tracker_idx = new_tracker_idx;
           }
-
-          active_tracker_idx = new_tracker_idx;
-        }
-        catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+          catch (std::runtime_error &exrun) {
+            ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+          }
         }
       }
       catch (std::runtime_error &exrun) {

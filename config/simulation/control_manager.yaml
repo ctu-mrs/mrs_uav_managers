@@ -5,6 +5,7 @@ trackers : [
   "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
   "mrs_trackers/JoyTracker",
+  "mrs_trackers/MatlabTracker",
 ]
 
 # - list of names of dynamically loaded controllers
