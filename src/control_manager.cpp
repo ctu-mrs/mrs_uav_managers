@@ -2152,7 +2152,7 @@ namespace mrs_uav_manager
   // |                          routines                          |
   // --------------------------------------------------------------
 
-  /* //{ hover() */
+  /* //{ ehover() */
 
   bool ControlManager::ehover(std::string &message_out) {
 
