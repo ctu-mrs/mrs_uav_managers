@@ -116,7 +116,7 @@
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
-      <!-- JoyTracker -->
+      <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/simulation/matlab_tracker.yaml" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
