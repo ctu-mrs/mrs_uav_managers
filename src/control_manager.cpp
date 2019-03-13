@@ -94,6 +94,7 @@ namespace mrs_uav_manager
     ros::Publisher publisher_control_output;
     ros::Publisher publisher_position_cmd;
     ros::Publisher publisher_attitude_cmd;
+    ros::Publisher publisher_thrust_force;
     ros::Publisher publisher_cmd_odom;
     ros::Publisher publisher_target_attitude;
     ros::Publisher publisher_tracker_status;
@@ -132,6 +133,7 @@ namespace mrs_uav_manager
 
   private:
     mrs_uav_manager::MotorParams motor_params_;
+    double                       g_;
 
   private:
     double max_tilt_angle_;
@@ -247,6 +249,7 @@ namespace mrs_uav_manager
 
     param_loader.load_param("hover_thrust/a", motor_params_.hover_thrust_a);
     param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
+    param_loader.load_param("g", g_);
 
     // --------------------------------------------------------------
     // |                        load trackers                       |
@@ -436,6 +439,7 @@ namespace mrs_uav_manager
     publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
     publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
     publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+    publisher_thrust_force      = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
     publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
     publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
     publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
@@ -853,6 +857,22 @@ namespace mrs_uav_manager
       }
       catch (...) {
         ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
+      }
+    }
+
+    // | ------------ publish the desired thrust force ------------ |
+
+    if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+      mrs_msgs::Float64Stamped thrust_out;
+      thrust_out.header.stamp = ros::Time::now();
+      thrust_out.value        = (pow((controller_output_cmd->thrust - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_) * 10.0;
+
+      try {
+        publisher_thrust_force.publish(thrust_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_thrust_force.getTopic().c_str());
       }
     }
 
