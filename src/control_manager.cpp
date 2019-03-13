@@ -1,3 +1,5 @@
+/* includes //{ */
+
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
@@ -29,6 +31,8 @@
 #include <mutex>
 #include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
+
+//}
 
 #define STRING_EQUAL 0
 
@@ -1143,7 +1147,8 @@ namespace mrs_uav_manager
 
           sprintf((char *)&message, "Tracker %s was not activated", req.value.c_str());
           ROS_WARN("[ControlManager]: %s", message);
-          res.success = true;
+          res.success = false;
+
         } else {
 
           sprintf((char *)&message, "Tracker %s has been activated", req.value.c_str());
@@ -1224,18 +1229,27 @@ namespace mrs_uav_manager
       try {
 
         ROS_INFO("[ControlManager]: Activating controller %s", controller_names[new_controller_idx].c_str());
-        { controller_list[new_controller_idx]->activate(last_attitude_cmd); }
-        sprintf((char *)&message, "Controller %s has been activated", req.value.c_str());
-        ROS_INFO("[ControlManager]: %s", message);
-        res.success = true;
+        if (!controller_list[new_controller_idx]->activate(last_attitude_cmd)) {
 
-        // super important, switch which the active controller idx
-        try {
-          controller_list[active_controller_idx]->deactivate();
-          active_controller_idx = new_controller_idx;
-        }
-        catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
+          sprintf((char *)&message, "Controller %s was not activated", req.value.c_str());
+          ROS_WARN("[ControlManager]: %s", message);
+          res.success = false;
+
+        } else {
+
+          sprintf((char *)&message, "Controller %s has been activated", req.value.c_str());
+          ROS_INFO("[ControlManager]: %s", message);
+          res.success = true;
+
+          // super important, switch which the active controller idx
+          try {
+
+            controller_list[active_controller_idx]->deactivate();
+            active_controller_idx = new_controller_idx;
+          }
+          catch (std::runtime_error &exrun) {
+            ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_controller_idx].c_str());
+          }
         }
       }
       catch (std::runtime_error &exrun) {
@@ -1968,6 +1982,8 @@ namespace mrs_uav_manager
 
   bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
+    char message[400];
+
     mrs_msgs::StringRequest controller_srv;
     controller_srv.value = "mrs_controllers/AttitudeController";
 
@@ -1976,9 +1992,45 @@ namespace mrs_uav_manager
 
     mrs_msgs::StringResponse response;
 
-    // TODO: check if success and fill the response
     callbackSwitchTracker(tracker_srv, response);
+
+    if (!response.success) {
+
+      sprintf((char *)&message, "Switching to JoyTracker was unsuccssfull: %s", response.message.c_str());
+      res.success = false;
+      res.message = message;
+
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      return true;
+    }
+
     callbackSwitchController(controller_srv, response);
+
+    if (!response.success) {
+
+      sprintf((char *)&message, "Switching to AttitudeController was unsuccssfull: %s", response.message.c_str());
+      res.success = false;
+      res.message = message;
+
+      // switch back to hover tracker
+      tracker_srv.value = hover_tracker_name_;
+      callbackSwitchTracker(tracker_srv, response);
+
+      // switch back to safety controller
+      controller_srv.value = failsafe_controller_name_;
+      callbackSwitchController(controller_srv, response);
+
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      return true;
+    }
+
+    sprintf((char *)&message, "Switched to JoyTracker");
+    res.success = true;
+    res.message = message;
+
+    ROS_INFO("[ControlManager]: %s", message);
 
     return true;
   }
@@ -2107,7 +2159,7 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return false;
 
-    std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd);
+    std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_controller_list);
 
     char message[200];
     bool success = false;
@@ -2123,11 +2175,9 @@ namespace mrs_uav_manager
       try {
 
         tracker_list[active_tracker_idx]->deactivate();
-
         active_tracker_idx = hover_tracker_idx;
 
-        message_out = std::string(message);
-        success     = true;
+        success = true;
       }
       catch (std::runtime_error &exrun) {
 
@@ -2146,6 +2196,45 @@ namespace mrs_uav_manager
 
       message_out = std::string(message);
       success     = false;
+    }
+
+    try {
+
+      ROS_INFO("[ControlManager]: Activating controller %s", controller_names[0].c_str());
+      { controller_list[0]->activate(last_attitude_cmd); }
+      sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
+      ROS_INFO("[ControlManager]: %s", message);
+
+      // super important, switch which the active controller idx
+      try {
+
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = 0;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
+    }
+    catch (std::runtime_error &exrun) {
+
+      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", hover_tracker_name_.c_str());
+      ROS_ERROR("[ControlManager]: %s", message);
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+
+      message_out = std::string(message);
+      success     = false;
+    }
+
+    if (success) {
+      sprintf((char *)&message, "[ControlManager]: ehover activated.");
+      message_out = std::string(message);
     }
 
     return success;
