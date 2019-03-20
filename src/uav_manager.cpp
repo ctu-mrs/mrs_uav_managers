@@ -351,6 +351,7 @@ namespace mrs_uav_manager
           double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
           ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
+          // condition for automatic motor turn off
           if ((height < landing_cutoff_height_) &&
               ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
@@ -712,6 +713,7 @@ namespace mrs_uav_manager
         res.success = takeoff_out.response.success;
         res.message = takeoff_out.response.message;
 
+        // remember the take off point
         {
           std::scoped_lock lock(mutex_odometry);
 
@@ -726,6 +728,7 @@ namespace mrs_uav_manager
         takeoff_timer.start();
       }
 
+      // could not activate the landoff tracker!
     } else {
 
       res.success = switch_tracker_out.response.success;

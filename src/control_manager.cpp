@@ -90,7 +90,7 @@ namespace mrs_uav_manager
     int  active_controller_idx   = 0;
     int  hover_tracker_idx       = 0;
     int  failsafe_controller_idx = 0;
-    bool motors                  = 0;
+    bool motors                  = false;
 
     int status_timer_rate_ = 0;
     int safety_timer_rate_ = 0;
@@ -1161,12 +1161,14 @@ namespace mrs_uav_manager
 
             // if switching from null tracker, activate the active the controller
             if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
+
               controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
               // if switching to null tracker, deactivate the active controller
             } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
 
               controller_list[active_controller_idx]->deactivate();
+
             }
 
             active_tracker_idx = new_tracker_idx;
@@ -1296,7 +1298,21 @@ namespace mrs_uav_manager
       }
     }
 
+    // set 'enable motors' to the desired value
     motors = req.data;
+
+    // if switching motors off, switch to NullTracker
+    if (!motors) {
+      
+      // request
+      mrs_msgs::StringRequest tracker_srv;
+      tracker_srv.value = null_tracker_name_;
+
+      // response (not used)
+      mrs_msgs::StringResponse response;
+
+      callbackSwitchTracker(tracker_srv, response);
+    } 
 
     char message[200];
     sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
