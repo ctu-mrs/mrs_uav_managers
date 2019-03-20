@@ -1168,7 +1168,6 @@ namespace mrs_uav_manager
             } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
 
               controller_list[active_controller_idx]->deactivate();
-
             }
 
             active_tracker_idx = new_tracker_idx;
@@ -1303,7 +1302,7 @@ namespace mrs_uav_manager
 
     // if switching motors off, switch to NullTracker
     if (!motors) {
-      
+
       // request
       mrs_msgs::StringRequest tracker_srv;
       tracker_srv.value = null_tracker_name_;
@@ -1312,7 +1311,7 @@ namespace mrs_uav_manager
       mrs_msgs::StringResponse response;
 
       callbackSwitchTracker(tracker_srv, response);
-    } 
+    }
 
     char message[200];
     sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
@@ -1427,9 +1426,20 @@ namespace mrs_uav_manager
       }
     }
 
+    // check number validity
+    for (int i = 0; i < 4; i++) {
+      if (!std::isfinite(req.goal[i])) {
+        ROS_ERROR("NaN detected in variable \"req.goal[%d]\"!!!", i);
+        res.message = "NaNs/infs in the goal!";
+        res.success = false;
+        return true;
+      }
+    }
+
     mrs_msgs::Vec4Response::ConstPtr tracker_response;
     char                             message[200];
 
+    // prepare the message for current tracker
     mrs_msgs::Vec4Request req_goto_out;
     req_goto_out.goal = req.goal;
 
@@ -1469,6 +1479,17 @@ namespace mrs_uav_manager
       return true;
     }
 
+    // check number validity
+    for (int i = 0; i < 4; i++) {
+      if (!std::isfinite(req.goal[i])) {
+        ROS_ERROR("NaN detected in variable \"req.goal[%d]\"!!!", i);
+        res.message = "NaNs/infs in the goal!";
+        res.success = false;
+        return true;
+      }
+    }
+
+    // prepare the message for current tracker
     mrs_msgs::Vec4Request request;
     Eigen::Vector2d       des(req.goal[0], req.goal[1]);
 
@@ -1525,6 +1546,27 @@ namespace mrs_uav_manager
       return;
     }
 
+    if (!std::isfinite(msg->position.x)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.y)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.z)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.yaw)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
+      return;
+    }
+
+    // prepare the message for current tracker
     mrs_msgs::TrackerPointStamped request;
     Eigen::Vector2d               des(msg->position.x, msg->position.y);
 
@@ -1573,6 +1615,27 @@ namespace mrs_uav_manager
       return;
     }
 
+    if (!std::isfinite(msg->position.x)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.y)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.z)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.yaw)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
+      return;
+    }
+
+    // prepare the message for current tracker
     mrs_msgs::TrackerPointStamped request;
 
     if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
@@ -1639,6 +1702,16 @@ namespace mrs_uav_manager
       return true;
     }
 
+    // check number validity
+    for (int i = 0; i < 4; i++) {
+      if (!std::isfinite(req.goal[i])) {
+        ROS_ERROR("NaN detected in variable \"req.goal[%d]\"!!!", i);
+        res.message = "NaNs/infs in the goal!";
+        res.success = false;
+        return true;
+      }
+    }
+
     {
       std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
@@ -1654,6 +1727,7 @@ namespace mrs_uav_manager
     mrs_msgs::Vec4Response::ConstPtr tracker_response;
     char                             message[200];
 
+    // prepare the message for current tracker
     mrs_msgs::Vec4Request req_goto_out;
     req_goto_out.goal = req.goal;
 
@@ -1688,6 +1762,27 @@ namespace mrs_uav_manager
       return;
     }
 
+    if (!std::isfinite(msg->position.x)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.y)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.z)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
+      return;
+    }
+
+    if (!std::isfinite(msg->position.yaw)) {
+      ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
+      return;
+    }
+
+    // prepare the message for current tracker
     mrs_msgs::TrackerPointStamped request;
 
     if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
@@ -1755,6 +1850,14 @@ namespace mrs_uav_manager
       return true;
     }
 
+    // check number validity
+    if (!std::isfinite(req.goal)) {
+      ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+      res.message = "NaNs/infs in the goal!";
+      res.success = false;
+      return true;
+    }
+
     {
       std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
@@ -1769,6 +1872,7 @@ namespace mrs_uav_manager
     mrs_msgs::Vec1Response::ConstPtr tracker_response;
     char                             message[200];
 
+    // prepare the message for current tracker
     mrs_msgs::Vec1Request req_goto_out;
     req_goto_out.goal = req.goal;
 
@@ -1800,6 +1904,11 @@ namespace mrs_uav_manager
 
     if (!callbacks_enabled) {
       ROS_WARN("[ControlManager]: not passing the goto_altitude topic through, the callbacks are disabled");
+      return;
+    }
+
+    if (!std::isfinite(msg->data)) {
+      ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
       return;
     }
 
@@ -1844,9 +1953,18 @@ namespace mrs_uav_manager
       return true;
     }
 
+    // check number validity
+    if (!std::isfinite(req.goal)) {
+      ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+      res.message = "NaNs/infs in the goal!";
+      res.success = false;
+      return true;
+    }
+
     mrs_msgs::Vec1Response::ConstPtr tracker_response;
     char                             message[200];
 
+    // prepare the message for current tracker
     mrs_msgs::Vec1Request req_goto_out;
     req_goto_out.goal = req.goal;
 
@@ -1878,6 +1996,11 @@ namespace mrs_uav_manager
 
     if (!callbacks_enabled) {
       ROS_WARN("[ControlManager]: not passing the set_yaw topic through, the callbacks are disabled");
+      return;
+    }
+
+    if (!std::isfinite(msg->data)) {
+      ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
       return;
     }
 
@@ -1913,9 +2036,18 @@ namespace mrs_uav_manager
       return true;
     }
 
+    // check number validity
+    if (!std::isfinite(req.goal)) {
+      ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+      res.message = "NaNs/infs in the goal!";
+      res.success = false;
+      return true;
+    }
+
     mrs_msgs::Vec1Response::ConstPtr tracker_response;
     char                             message[200];
 
+    // prepare the message for current tracker
     mrs_msgs::Vec1Request req_goto_out;
     req_goto_out.goal = req.goal;
 
@@ -1947,6 +2079,11 @@ namespace mrs_uav_manager
 
     if (!callbacks_enabled) {
       ROS_WARN("[ControlManager]: not passing the set_yaw_relative topic through, the callbacks are disabled");
+      return;
+    }
+
+    if (!std::isfinite(msg->data)) {
+      ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
       return;
     }
 
