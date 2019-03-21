@@ -36,3 +36,7 @@ safety:
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"
+
+  elanding_timer_rate: 10
+  elanding_cutoff_height:  1.0
+  elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?

@@ -36,9 +36,9 @@ namespace mrs_uav_manager
 
   } LandingStates_t;
 
-  const char *state_names[3] = {
+  const char *state_names[4] = {
 
-      "IDLING", "FLYING HOME", "LANDING"};
+      "IDLING", "FLYING HOME", "LANDING", "EMERGANCY LANDING"};
 
   class UavManager : public nodelet::Nodelet {
 
@@ -132,6 +132,7 @@ namespace mrs_uav_manager
     ros::ServiceClient service_client_motors;
     ros::ServiceClient service_client_enabled_callbacks;
     ros::ServiceClient service_client_emergency_goto;
+    ros::ServiceClient service_client_arm;
 
     std::mutex mutex_services;
 
@@ -243,6 +244,7 @@ namespace mrs_uav_manager
     service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
     service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
     service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
+    service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
 
     mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
@@ -379,17 +381,34 @@ namespace mrs_uav_manager
           if ((height < landing_cutoff_height_) &&
               ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
-            mrs_msgs::String switch_tracker_out;
-            switch_tracker_out.request.value = null_tracker_name_;
-            service_client_switch_tracker.call(switch_tracker_out);
+            if (current_state_landing == LANDING_STATE) {
 
-            std_srvs::SetBool enable_callbacks_out;
-            enable_callbacks_out.request.data = true;
-            service_client_enabled_callbacks.call(enable_callbacks_out);
+              mrs_msgs::String switch_tracker_out;
+              switch_tracker_out.request.value = null_tracker_name_;
+              service_client_switch_tracker.call(switch_tracker_out);
 
-            changeLandingState(IDLE_STATE);
+              std_srvs::SetBool enable_callbacks_out;
+              enable_callbacks_out.request.data = true;
+              service_client_enabled_callbacks.call(enable_callbacks_out);
 
-            ROS_INFO("[UavManager]: landing finished");
+              changeLandingState(IDLE_STATE);
+
+              ROS_INFO("[UavManager]: landing finished");
+
+            } else {  // emergancy landing
+
+              std_srvs::SetBool arm_out;
+              arm_out.request.data = false;
+              service_client_arm.call(arm_out);
+
+              std_srvs::SetBool enable_callbacks_out;
+              enable_callbacks_out.request.data = true;
+              service_client_enabled_callbacks.call(enable_callbacks_out);
+
+              changeLandingState(IDLE_STATE);
+
+              ROS_WARN("[UavManager]: emergancy landing finished");
+            }
 
             landing_timer.stop();
           }
@@ -398,7 +417,6 @@ namespace mrs_uav_manager
       } else {
 
         ROS_ERROR("[UavManager]: incorrect tracker detected during landing!");
-        /* changeLandingState(IDLE_STATE); */
       }
     }
   }
