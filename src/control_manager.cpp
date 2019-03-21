@@ -22,6 +22,7 @@
 #include <mrs_uav_manager/Tracker.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
+#include <mavros_msgs/CommandBool.h>
 #include <std_srvs/SetBool.h>
 
 #include <pluginlib/class_loader.h>
@@ -104,23 +105,26 @@ namespace mrs_uav_manager
     ros::Publisher publisher_tracker_status;
     ros::Publisher publisher_controller_status;
 
-    ros::ServiceServer service_switch_tracker;
-    ros::ServiceServer service_switch_controller;
-    ros::ServiceServer service_hover;
-    ros::ServiceServer service_ehover;
-    ros::ServiceServer service_motors;
-    ros::ServiceServer service_enable_callbacks;
-    ros::ServiceServer service_set_constraints;
-    ros::ServiceServer service_use_joystick;
+    ros::ServiceServer service_server_switch_tracker;
+    ros::ServiceServer service_server_switch_controller;
+    ros::ServiceServer service_server_hover;
+    ros::ServiceServer service_server_ehover;
+    ros::ServiceServer service_server_motors;
+    ros::ServiceServer service_server_arm;
+    ros::ServiceServer service_server_enable_callbacks;
+    ros::ServiceServer service_server_set_constraints;
+    ros::ServiceServer service_server_use_joystick;
 
-    ros::ServiceServer service_goto;
-    ros::ServiceServer service_goto_fcu;
-    ros::ServiceServer service_goto_relative;
-    ros::ServiceServer service_goto_altitude;
-    ros::ServiceServer service_set_yaw;
-    ros::ServiceServer service_set_yaw_relative;
+    ros::ServiceServer service_server_goto;
+    ros::ServiceServer service_server_goto_fcu;
+    ros::ServiceServer service_server_goto_relative;
+    ros::ServiceServer service_server_goto_altitude;
+    ros::ServiceServer service_server_set_yaw;
+    ros::ServiceServer service_server_set_yaw_relative;
 
-    ros::ServiceServer service_emergencyGoTo;
+    ros::ServiceServer service_server_emergency_goto;
+
+    ros::ServiceClient service_client_arm;
 
     ros::Subscriber subscriber_goto;
     ros::Subscriber subscriber_goto_fcu;
@@ -183,6 +187,7 @@ namespace mrs_uav_manager
     bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
     bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+    bool callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
     bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
     bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
@@ -459,23 +464,27 @@ namespace mrs_uav_manager
 
     // | -------------------- general services -------------------- |
 
-    service_switch_tracker    = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-    service_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-    service_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
-    service_ehover            = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
-    service_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
-    service_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-    service_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-    service_use_joystick      = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+    service_server_switch_tracker    = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+    service_server_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+    service_server_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
+    service_server_ehover            = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
+    service_server_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+    service_server_arm               = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+    service_server_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+    service_server_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+    service_server_use_joystick      = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+    service_server_use_joystick      = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+
+    service_client_arm = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
 
     // | ---------------- setpoint command services --------------- |
 
-    service_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
-    service_goto_fcu         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGoToFcuService, this);
-    service_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
-    service_goto_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
-    service_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
-    service_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
+    service_server_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
+    service_server_goto_fcu         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGoToFcuService, this);
+    service_server_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
+    service_server_goto_altitude    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGoToAltitudeService, this);
+    service_server_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
+    service_server_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
     // | ----------------- setpoint command topics ---------------- |
 
@@ -489,7 +498,7 @@ namespace mrs_uav_manager
 
     // | --------------------- other services --------------------- |
 
-    service_emergencyGoTo = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
+    service_server_emergency_goto = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
 
     // --------------------------------------------------------------
     // |                           timers                           |
@@ -1319,6 +1328,36 @@ namespace mrs_uav_manager
     res.success = true;
 
     ROS_INFO("[ControlManager]: %s", message);
+
+    return true;
+  }
+
+  //}
+
+  /* callbackArm() //{ */
+
+  bool ControlManager::callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+
+    char message[200];
+
+    if (req.data) {
+
+      sprintf((char *)&message, "Not allowed to arm the drone.");
+      res.message = message;
+      res.success = true;
+
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      return true;
+    }
+
+    mavros_msgs::CommandBool srv_out;
+    srv_out.request.value = req.data;
+
+    service_client_arm.call(srv_out);
+
+    res.success = srv_out.response.success;
+    res.message = srv_out.response.result;
 
     return true;
   }

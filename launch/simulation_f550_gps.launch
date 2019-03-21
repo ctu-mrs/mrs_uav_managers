@@ -186,6 +186,8 @@
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
       <remap from="~set_constraints_in" to="control_manager/set_constraints" />
       <remap from="~use_joystick_in" to="control_manager/use_joystick" />
+      <remap from="~arm_out" to="mavros/cmd/arming" />
+      <remap from="~arm_in" to="~arm" />
 
     </node>
 
