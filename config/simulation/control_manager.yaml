@@ -32,7 +32,7 @@ safety:
   failsafe_land_control_error: 100.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
-  hover_tracker: "mrs_trackers/LandoffTracker"
+  failsafe_tracker: "mrs_trackers/LandoffTracker"
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"

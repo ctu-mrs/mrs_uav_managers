@@ -76,7 +76,7 @@ namespace mrs_uav_manager
     std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list;
 
     std::string null_tracker_name_;
-    std::string hover_tracker_name_;
+    std::string failsafe_tracker_name_;
 
     std::string failsafe_controller_name_;
 
@@ -102,7 +102,7 @@ namespace mrs_uav_manager
 
     int active_tracker_idx      = 0;
     int active_controller_idx   = 0;
-    int hover_tracker_idx       = 0;
+    int failsafe_tracker_idx       = 0;
     int failsafe_controller_idx = 0;
 
     void switchMotors(bool in);
@@ -281,7 +281,7 @@ namespace mrs_uav_manager
 
     param_loader.load_param("status_timer_rate", status_timer_rate_);
 
-    param_loader.load_param("safety/hover_tracker", hover_tracker_name_);
+    param_loader.load_param("safety/hover_tracker", failsafe_tracker_name_);
     param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
     param_loader.load_param("safety/max_tilt_angle", max_tilt_angle_);
@@ -398,9 +398,9 @@ namespace mrs_uav_manager
 
       std::string tracker_name = tracker_names[i];
 
-      if (tracker_name.compare(hover_tracker_name_) == 0) {
+      if (tracker_name.compare(failsafe_tracker_name_) == 0) {
         hover_tracker_check = true;
-        hover_tracker_idx   = i;
+        failsafe_tracker_idx   = i;
         break;
       }
     }
@@ -684,12 +684,12 @@ namespace mrs_uav_manager
       if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > failsafe_hover_control_error_) {
 
         // check if the controller is not active
-        if (hover_tracker_idx != active_tracker_idx) {
+        if (failsafe_tracker_idx != active_tracker_idx) {
 
-          ROS_ERROR("[ControlManager]: Activating safety hover: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
+          ROS_ERROR("[ControlManager]: Activating emergancy land: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
           std::string message_out;
-          ehover(message_out);
+          eland(message_out);
         }
       }
     }
@@ -702,7 +702,7 @@ namespace mrs_uav_manager
 
       if (failsafe_controller_idx != active_controller_idx) {
 
-        ROS_ERROR("[ControlManager]: Activating safety land: control_error=%f", control_error);
+        ROS_ERROR("[ControlManager]: Activating failsafe: control_error=%f", control_error);
 
         try {
 
@@ -774,7 +774,7 @@ namespace mrs_uav_manager
         switchMotors(false);
 
         // disarm the drone
-        std_srvs::SetBool srv_out;
+        mavros_msgs::CommandBool srv_out;
         service_client_arm.call(srv_out);
 
         // TODO: handle the result?
@@ -2318,7 +2318,7 @@ namespace mrs_uav_manager
       res.message = message;
 
       // switch back to hover tracker
-      tracker_srv.value = hover_tracker_name_;
+      tracker_srv.value = failsafe_tracker_name_;
       callbackSwitchTracker(tracker_srv, response);
 
       // switch back to safety controller
@@ -2530,16 +2530,16 @@ namespace mrs_uav_manager
 
     try {
 
-      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
-      tracker_list[hover_tracker_idx]->activate(last_position_cmd);
-      sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[failsafe_tracker_idx].c_str());
+      tracker_list[failsafe_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", failsafe_tracker_name_.c_str());
       ROS_INFO("[ControlManager]: %s", message);
 
       // super important, switch the active tracker idx
       try {
 
         tracker_list[active_tracker_idx]->deactivate();
-        active_tracker_idx = hover_tracker_idx;
+        active_tracker_idx = failsafe_tracker_idx;
 
         success = true;
       }
@@ -2554,7 +2554,7 @@ namespace mrs_uav_manager
     }
     catch (std::runtime_error &exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
+      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", failsafe_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -2587,7 +2587,7 @@ namespace mrs_uav_manager
     }
     catch (std::runtime_error &exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", hover_tracker_name_.c_str());
+      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", failsafe_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -2619,16 +2619,16 @@ namespace mrs_uav_manager
 
     try {
 
-      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[hover_tracker_idx].c_str());
-      tracker_list[hover_tracker_idx]->activate(last_position_cmd);
-      sprintf((char *)&message, "Tracker %s has been activated", hover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[failsafe_tracker_idx].c_str());
+      tracker_list[failsafe_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", failsafe_tracker_name_.c_str());
       ROS_INFO("[ControlManager]: %s", message);
 
       // super important, switch the active tracker idx
       try {
 
         tracker_list[active_tracker_idx]->deactivate();
-        active_tracker_idx = hover_tracker_idx;
+        active_tracker_idx = failsafe_tracker_idx;
 
         success = true;
       }
@@ -2643,7 +2643,7 @@ namespace mrs_uav_manager
     }
     catch (std::runtime_error &exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", hover_tracker_name_.c_str());
+      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", failsafe_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -2676,7 +2676,7 @@ namespace mrs_uav_manager
     }
     catch (std::runtime_error &exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", hover_tracker_name_.c_str());
+      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", failsafe_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
