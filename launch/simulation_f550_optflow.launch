@@ -46,7 +46,7 @@
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gains_in" to="gain_manager/current_gains" />
-      <remap from="~constraints_in" to="gain_manager/current_constraints" />
+      <remap from="~constraints_in" to="constraint_manager/current_constraints" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
