@@ -87,11 +87,13 @@ namespace mrs_uav_manager
     std::mutex      mutex_max_height;
     std::mutex      mutex_min_height;
 
-    int  active_tracker_idx      = 0;
-    int  active_controller_idx   = 0;
-    int  hover_tracker_idx       = 0;
-    int  failsafe_controller_idx = 0;
-    bool motors                  = false;
+    int active_tracker_idx      = 0;
+    int active_controller_idx   = 0;
+    int hover_tracker_idx       = 0;
+    int failsafe_controller_idx = 0;
+
+    void switchMotors(bool in);
+    bool motors = false;
 
     int status_timer_rate_ = 0;
     int safety_timer_rate_ = 0;
@@ -538,42 +540,51 @@ namespace mrs_uav_manager
     // |                publishing the tracker status               |
     // --------------------------------------------------------------
 
-    mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
-    mrs_msgs::TrackerStatus      tracker_status;
+    {
 
-    tracker_status_ptr = tracker_list[active_tracker_idx]->getStatus();
+      std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
+      mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
+      mrs_msgs::TrackerStatus      tracker_status;
 
-    tracker_status.tracker = tracker_names[active_tracker_idx];
-    tracker_status.stamp   = ros::Time::now();
+      tracker_status_ptr = tracker_list[active_tracker_idx]->getStatus();
 
-    try {
-      publisher_tracker_status.publish(mrs_msgs::TrackerStatusConstPtr(new mrs_msgs::TrackerStatus(tracker_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
+      tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
+
+      tracker_status.tracker = tracker_names[active_tracker_idx];
+      tracker_status.stamp   = ros::Time::now();
+
+      try {
+        publisher_tracker_status.publish(mrs_msgs::TrackerStatusConstPtr(new mrs_msgs::TrackerStatus(tracker_status)));
+      }
+      catch (...) {
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
+      }
     }
 
     // --------------------------------------------------------------
     // |              publishing the controller status              |
     // --------------------------------------------------------------
 
-    mrs_msgs::ControllerStatus::Ptr controller_status_ptr;
-    mrs_msgs::ControllerStatus      controller_status;
+    {
+      std::scoped_lock lock(mutex_controller_list);
 
-    controller_status_ptr = controller_list[active_controller_idx]->getStatus();
+      mrs_msgs::ControllerStatus::Ptr controller_status_ptr;
+      mrs_msgs::ControllerStatus      controller_status;
 
-    controller_status = mrs_msgs::ControllerStatus(*controller_status_ptr);
+      controller_status_ptr = controller_list[active_controller_idx]->getStatus();
 
-    controller_status.controller = controller_names[active_controller_idx];
-    controller_status.stamp      = ros::Time::now();
+      controller_status = mrs_msgs::ControllerStatus(*controller_status_ptr);
 
-    try {
-      publisher_controller_status.publish(mrs_msgs::ControllerStatusConstPtr(new mrs_msgs::ControllerStatus(controller_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
+      controller_status.controller = controller_names[active_controller_idx];
+      controller_status.stamp      = ros::Time::now();
+
+      try {
+        publisher_controller_status.publish(mrs_msgs::ControllerStatusConstPtr(new mrs_msgs::ControllerStatus(controller_status)));
+      }
+      catch (...) {
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
+      }
     }
   }
 
@@ -1166,16 +1177,20 @@ namespace mrs_uav_manager
 
           // super important, switch which the active tracker idx
           try {
+
+            ROS_INFO("[ControlManager]: deactivating %s", tracker_names[active_tracker_idx].c_str());
             tracker_list[active_tracker_idx]->deactivate();
 
             // if switching from null tracker, activate the active the controller
             if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
 
+              ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", controller_names[active_controller_idx].c_str());
               controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
               // if switching to null tracker, deactivate the active controller
             } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
 
+              ROS_INFO("[ControlManager]: deactivating %s due to switching to NullTracker", controller_names[active_controller_idx].c_str());
               controller_list[active_controller_idx]->deactivate();
             }
 
@@ -1306,21 +1321,7 @@ namespace mrs_uav_manager
       }
     }
 
-    // set 'enable motors' to the desired value
-    motors = req.data;
-
-    // if switching motors off, switch to NullTracker
-    if (!motors) {
-
-      // request
-      mrs_msgs::StringRequest tracker_srv;
-      tracker_srv.value = null_tracker_name_;
-
-      // response (not used)
-      mrs_msgs::StringResponse response;
-
-      callbackSwitchTracker(tracker_srv, response);
-    }
+    switchMotors(req.data);
 
     char message[200];
     sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
@@ -1353,6 +1354,11 @@ namespace mrs_uav_manager
 
     mavros_msgs::CommandBool srv_out;
     srv_out.request.value = req.data;
+
+    // if disarming, switch motors off
+    if (!req.data) {
+      switchMotors(false);
+    }
 
     service_client_arm.call(srv_out);
 
@@ -2336,6 +2342,40 @@ namespace mrs_uav_manager
     }
 
     return true;
+  }
+
+  //}
+
+  /* switchMotors() //{ */
+
+  void ControlManager::switchMotors(bool input) {
+
+    ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
+
+    // set 'enable motors' to the desired value
+    motors = input;
+
+    // if switching motors off, switch to NullTracker
+    if (!motors) {
+
+      // request
+      mrs_msgs::StringRequest request;
+      request.value = null_tracker_name_;
+
+      // response (not used)
+      mrs_msgs::StringResponse response;
+
+      ROS_INFO("[ControlManager]: switching to NullTracker after switching motors off");
+
+      callbackSwitchTracker(request, response);
+
+      // request
+      request.value = controller_names[0];
+
+      ROS_INFO("[ControlManager]: switching to %s after switching motors off", request.value.c_str());
+
+      callbackSwitchController(request, response);
+    }
   }
 
   //}
