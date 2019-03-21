@@ -281,7 +281,7 @@ namespace mrs_uav_manager
 
     param_loader.load_param("status_timer_rate", status_timer_rate_);
 
-    param_loader.load_param("safety/hover_tracker", failsafe_tracker_name_);
+    param_loader.load_param("safety/failsafe_tracker", failsafe_tracker_name_);
     param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
     param_loader.load_param("safety/max_tilt_angle", max_tilt_angle_);
