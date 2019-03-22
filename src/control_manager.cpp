@@ -128,6 +128,8 @@ namespace mrs_uav_manager
     ros::ServiceServer service_server_switch_controller;
     ros::ServiceServer service_server_hover;
     ros::ServiceServer service_server_ehover;
+    ros::ServiceServer service_server_failsafe;
+    ;
     ros::ServiceServer service_server_motors;
     ros::ServiceServer service_server_arm;
     ros::ServiceServer service_server_enable_callbacks;
@@ -211,9 +213,11 @@ namespace mrs_uav_manager
     bool ehover(std::string &message_out);
     bool eland(std::string &message_out);
     bool failsafe();
+    void arming(bool input);
 
     bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+    bool callbackFailsafe(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEland(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
     bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
@@ -240,6 +244,7 @@ namespace mrs_uav_manager
   private:
     ros::Timer elanding_timer;
     void       elandingTimer(const ros::TimerEvent &event);
+    bool       eland_triggered = false;
 
   private:
     ros::Timer safety_timer;
@@ -524,6 +529,7 @@ namespace mrs_uav_manager
     service_server_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
     service_server_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
     service_server_ehover            = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
+    service_server_failsafe          = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
     service_server_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
     service_server_arm               = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
     service_server_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
@@ -697,9 +703,9 @@ namespace mrs_uav_manager
     {
       std::scoped_lock lock(mutex_odometry);
 
-      if (!failsafe_triggered) {
+      if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > eland_control_error) {
 
-        if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > eland_control_error) {
+        if (!failsafe_triggered && !eland_triggered) {
 
           ROS_ERROR("[ControlManager]: Activating emergancy land: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
@@ -715,9 +721,12 @@ namespace mrs_uav_manager
 
     if (control_error > failsafe_control_error_ && !failsafe_triggered) {
 
-      ROS_ERROR("[ControlManager]: Activating failsafe: control_error=%f", control_error);
+      if (!failsafe_triggered) {
 
-      failsafe();
+        ROS_ERROR("[ControlManager]: Activating failsafe: control_error=%f", control_error);
+
+        failsafe();
+      }
     }
 
     // --------------------------------------------------------------
@@ -729,11 +738,14 @@ namespace mrs_uav_manager
     {
       std::scoped_lock lock(mutex_odometry);
 
-      if (!failsafe_triggered && (ros::Time::now() - odometry_last_time).toSec() > odometry_max_missing_time_) {
+      if ((ros::Time::now() - odometry_last_time).toSec() > odometry_max_missing_time_) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, engaging failsafe land");
+        if (!failsafe_triggered) {
 
-        failsafe();
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, engaging failsafe land");
+
+          failsafe();
+        }
       }
     }
   }
@@ -785,6 +797,8 @@ namespace mrs_uav_manager
         ROS_WARN("[ControlManager]: emergancy landing finished");
 
         elanding_timer.stop();
+
+        eland_triggered = false;
       }
     }
   }
@@ -805,6 +819,25 @@ namespace mrs_uav_manager
     updateControllers();
 
     publish();
+
+    double last_thrust;
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      last_thrust = last_attitude_cmd->thrust;
+    }
+
+    double thrust_mass_estimate = pow((last_thrust - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
+
+    // condition for automatic motor turn off
+    if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust < 0.01)) {
+
+      ROS_INFO("[ControlManager]: detecting zero thrust, disarming");
+
+      arming(false);
+    }
   }
 
   //}
@@ -1158,6 +1191,20 @@ namespace mrs_uav_manager
 
   //}
 
+  /* callbackFailsafe() //{ */
+
+  bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+    if (!is_initialized)
+      return false;
+
+    res.success = failsafe();
+
+    return true;
+  }
+
+  //}
+
   /* //{ callbackELand() */
 
   bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
@@ -1221,25 +1268,7 @@ namespace mrs_uav_manager
       return true;
     }
 
-    mavros_msgs::CommandBool srv_out;
-    srv_out.request.value = req.data;
-
-    // if disarming, switch motors off
-    if (!req.data) {
-      switchMotors(false);
-    }
-
-    ROS_INFO("[ControlManager]: calling for disarming");
-    service_client_arm.call(srv_out);
-
-    res.success = srv_out.response.success;
-    res.message = srv_out.response.result;
-
-    failsafe_timer.stop();
-    elanding_timer.stop();
-    failsafe_triggered = false;
-
-    return true;
+    return false;
   }
 
   //}
@@ -2272,6 +2301,7 @@ namespace mrs_uav_manager
       case LANDING_STATE: {
 
         elanding_timer.start();
+        eland_triggered = true;
 
         landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
       }
@@ -2380,6 +2410,10 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return false;
 
+    if (eland_triggered || failsafe_triggered) {
+      return false;
+    }
+
     std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_controller_list);
 
     char message[200];
@@ -2476,6 +2510,10 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return false;
 
+    if (failsafe_triggered) {
+      return false;
+    }
+
     if (failsafe_controller_idx != active_controller_idx) {
 
       try {
@@ -2487,8 +2525,11 @@ namespace mrs_uav_manager
           controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
 
           failsafe_triggered = true;
-
           elanding_timer.stop();
+
+          landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+
+          eland_triggered = false;
           failsafe_timer.start();
         }
 
@@ -2514,6 +2555,31 @@ namespace mrs_uav_manager
     }
 
     return true;
+  }
+
+  //}
+
+  /* arming() //{ */
+
+  void ControlManager::arming(bool input) {
+
+    mavros_msgs::CommandBool srv_out;
+    srv_out.request.value = input;
+
+    // if disarming, switch motors off
+    if (!input) {
+      switchMotors(false);
+    }
+
+    ROS_INFO("[ControlManager]: calling for disarming");
+
+    service_client_arm.call(srv_out);
+
+    failsafe_timer.stop();
+    elanding_timer.stop();
+
+    failsafe_triggered = false;
+    eland_triggered    = false;
   }
 
   //}
