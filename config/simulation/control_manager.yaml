@@ -25,17 +25,19 @@ status_timer_rate:  10 # [Hz]
 
 safety:
 
-  timer_rate: 100 # [Hz]
+  safety_timer_rate: 100 # [Hz]
+  failsafe_timer_rate: 100 # [Hz]
 
   max_tilt_angle: 1000 # [deg]
-  failsafe_hover_control_error: 100.5 # [m]
-  failsafe_land_control_error: 100.0 # [m]
+  eland_control_error: 1.5 # [m]
+  failsafe_control_error: 3.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
   failsafe_tracker: "mrs_trackers/LandoffTracker"
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"
+  odometry_max_missing_time: 0.1 # [s]
 
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0

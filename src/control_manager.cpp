@@ -93,6 +93,8 @@ namespace mrs_uav_manager
     double             odometry_pitch;
     std::mutex         mutex_odometry;
     bool               got_odometry = false;
+    ros::Time          odometry_last_time;
+    double             odometry_max_missing_time_;
 
     ros::Subscriber subscriber_max_height;
     double          max_height;
@@ -102,7 +104,7 @@ namespace mrs_uav_manager
 
     int active_tracker_idx      = 0;
     int active_controller_idx   = 0;
-    int failsafe_tracker_idx       = 0;
+    int failsafe_tracker_idx    = 0;
     int failsafe_controller_idx = 0;
 
     void switchMotors(bool in);
@@ -111,6 +113,7 @@ namespace mrs_uav_manager
     int status_timer_rate_   = 0;
     int safety_timer_rate_   = 0;
     int elanding_timer_rate_ = 0;
+    int failsafe_timer_rate_ = 0;
 
     ros::Publisher publisher_control_output;
     ros::Publisher publisher_position_cmd;
@@ -158,13 +161,18 @@ namespace mrs_uav_manager
     std::mutex                          mutex_last_attitude_cmd;
 
   private:
+    void updateTrackers(void);
+    void updateControllers(void);
+    void publish(void);
+
+  private:
     mrs_uav_manager::MotorParams motor_params_;
     double                       g_;
 
   private:
     double max_tilt_angle_;
-    double failsafe_hover_control_error_;
-    double failsafe_land_control_error_;
+    double eland_control_error;
+    double failsafe_control_error_;
 
   private:
     mrs_lib::ConvexPolygon *      safety_area_polygon;
@@ -202,6 +210,7 @@ namespace mrs_uav_manager
 
     bool ehover(std::string &message_out);
     bool eland(std::string &message_out);
+    bool failsafe();
 
     bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
@@ -222,6 +231,11 @@ namespace mrs_uav_manager
   private:
     ros::Timer status_timer;
     void       statusTimer(const ros::TimerEvent &event);
+
+  private:
+    ros::Timer failsafe_timer;
+    void       failsafeTimer(const ros::TimerEvent &event);
+    bool       failsafe_triggered = false;
 
   private:
     ros::Timer elanding_timer;
@@ -279,17 +293,17 @@ namespace mrs_uav_manager
 
     param_loader.load_param("enable_profiler", profiler_enabled_);
 
-    param_loader.load_param("status_timer_rate", status_timer_rate_);
-
     param_loader.load_param("safety/failsafe_tracker", failsafe_tracker_name_);
     param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
     param_loader.load_param("safety/max_tilt_angle", max_tilt_angle_);
-    param_loader.load_param("safety/failsafe_hover_control_error", failsafe_hover_control_error_);
-    param_loader.load_param("safety/failsafe_land_control_error", failsafe_land_control_error_);
+    param_loader.load_param("safety/eland_control_error", eland_control_error);
+    param_loader.load_param("safety/failsafe_control_error", failsafe_control_error_);
 
-    param_loader.load_param("safety/timer_rate", safety_timer_rate_);
+    param_loader.load_param("status_timer_rate", status_timer_rate_);
+    param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
     param_loader.load_param("safety/elanding_timer_rate", elanding_timer_rate_);
+    param_loader.load_param("safety/failsafe_timer_rate", failsafe_timer_rate_);
 
     param_loader.load_param("uav_mass", uav_mass_);
     param_loader.load_param("hover_thrust/a", motor_params_.hover_thrust_a);
@@ -298,6 +312,8 @@ namespace mrs_uav_manager
 
     param_loader.load_param("safety/elanding_cutoff_height", elanding_cutoff_height_);
     param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
+
+    param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
 
     // --------------------------------------------------------------
     // |                        load trackers                       |
@@ -399,8 +415,8 @@ namespace mrs_uav_manager
       std::string tracker_name = tracker_names[i];
 
       if (tracker_name.compare(failsafe_tracker_name_) == 0) {
-        hover_tracker_check = true;
-        failsafe_tracker_idx   = i;
+        hover_tracker_check  = true;
+        failsafe_tracker_idx = i;
         break;
       }
     }
@@ -498,6 +514,7 @@ namespace mrs_uav_manager
     // --------------------------------------------------------------
 
     subscriber_odometry   = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+    odometry_last_time    = ros::Time(0);
     subscriber_max_height = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
     subscriber_joystick   = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
 
@@ -548,6 +565,7 @@ namespace mrs_uav_manager
     status_timer   = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
     safety_timer   = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
     elanding_timer = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
+    failsafe_timer = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
 
     // | ----------------------- finish init ---------------------- |
 
@@ -646,7 +664,7 @@ namespace mrs_uav_manager
     }
 
     if (reseting_odometry) {
-      ROS_ERROR("[MpcTracker]: MPC tried to run while reseting odometry");
+      ROS_ERROR("[ControlManager]: safetyTimer tried to run while reseting odometry");
       return;
     }
 
@@ -657,8 +675,6 @@ namespace mrs_uav_manager
         return;
       }
     }
-
-    char message[200];
 
     double position_error_x;
     double position_error_y;
@@ -675,16 +691,15 @@ namespace mrs_uav_manager
     double control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
 
     // --------------------------------------------------------------
-    // |   activate failsafe hover for tilt_angle/controller error  |
+    // |   activate emergancy land in case of medium control error  |
     // --------------------------------------------------------------
 
     {
       std::scoped_lock lock(mutex_odometry);
 
-      if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > failsafe_hover_control_error_) {
+      if (!failsafe_triggered) {
 
-        // check if the controller is not active
-        if (failsafe_tracker_idx != active_tracker_idx) {
+        if (odometry_pitch > max_tilt_angle_ || odometry_roll > max_tilt_angle_ || control_error > eland_control_error) {
 
           ROS_ERROR("[ControlManager]: Activating emergancy land: pitch=%f, roll=%f, control_error=%f", odometry_pitch, odometry_roll, control_error);
 
@@ -698,40 +713,27 @@ namespace mrs_uav_manager
     // |   activate the failsafe controller in case of large error  |
     // --------------------------------------------------------------
 
-    if (control_error > failsafe_land_control_error_) {
+    if (control_error > failsafe_control_error_ && !failsafe_triggered) {
 
-      if (failsafe_controller_idx != active_controller_idx) {
+      ROS_ERROR("[ControlManager]: Activating failsafe: control_error=%f", control_error);
 
-        ROS_ERROR("[ControlManager]: Activating failsafe: control_error=%f", control_error);
+      failsafe();
+    }
 
-        try {
+    // --------------------------------------------------------------
+    // |      activate failsafe when odometry stops publishing      |
+    // --------------------------------------------------------------
+    // to do that, we need to fire up safetyTimer, which will regularly trigger the controllers
+    // in place of the odometryCallback()
 
-          ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
-          {
-            std::scoped_lock lock(mutex_last_attitude_cmd, mutex_controller_list);
+    {
+      std::scoped_lock lock(mutex_odometry);
 
-            controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
-          }
-          sprintf((char *)&message, "Controller %s has been activated", failsafe_controller_name_.c_str());
-          ROS_INFO("[ControlManager]: %s", message);
+      if (!failsafe_triggered && (ros::Time::now() - odometry_last_time).toSec() > odometry_max_missing_time_) {
 
-          // super important, switch the active controller idx
-          try {
-            {
-              std::scoped_lock lock(mutex_controller_list);
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, engaging failsafe land");
 
-              controller_list[active_controller_idx]->deactivate();
-            }
-            active_controller_idx = failsafe_controller_idx;
-          }
-          catch (std::runtime_error &exrun) {
-            ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_tracker_idx].c_str());
-          }
-        }
-        catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Error during activation of controller %s", failsafe_controller_name_.c_str());
-          ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-        }
+        failsafe();
       }
     }
   }
@@ -766,8 +768,7 @@ namespace mrs_uav_manager
       ROS_INFO("[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
       // condition for automatic motor turn off
-      if ((odometry_z < elanding_cutoff_height_) &&
-          ((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
+      if ((odometry_z < elanding_cutoff_height_) && ((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
 
         // enable callbacks?
 
@@ -786,6 +787,24 @@ namespace mrs_uav_manager
         elanding_timer.stop();
       }
     }
+  }
+
+  //}
+
+  /* //{ failsafeTimer() */
+
+  void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("failsafeTimer", failsafe_timer_rate_, 0.01, event);
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe timer spinning");
+
+    updateControllers();
+
+    publish();
   }
 
   //}
@@ -825,7 +844,7 @@ namespace mrs_uav_manager
         safety_timer.stop();
         // wait for the safety timer to stop if its running
         while (running_safety_timer) {
-          ROS_INFO("[MpcTracker]: waiting for safety timer to finish");
+          ROS_INFO("[ControlManager]: waiting for safety timer to finish");
           ros::Duration wait(0.001);
           wait.sleep();
         }
@@ -856,271 +875,15 @@ namespace mrs_uav_manager
 
     got_odometry = true;
 
-    // --------------------------------------------------------------
-    // |                     Update the trackers                    |
-    // --------------------------------------------------------------
+    odometry_last_time = ros::Time::now();
 
-    mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
+    if (!failsafe_triggered) {  // when failsafe is triggers, updateControllers() and publish() is called in failsafeTimer()
 
-    {
-      std::scoped_lock lock(mutex_last_position_cmd, mutex_tracker_list);
+      updateTrackers();
 
-      try {
+      updateControllers();
 
-        // for each tracker
-        for (unsigned int i = 0; i < tracker_list.size(); i++) {
-
-          if ((int)i == active_tracker_idx) {
-
-            // if it is the active one, update and retrieve the command
-            tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
-
-          } else {
-
-            // if it is not the active one, just update without retrieving the command
-            tracker_list[i]->update(odometry_const_ptr);
-          }
-        }
-
-        if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
-
-          last_position_cmd = tracker_output_cmd;
-
-        } else if (active_tracker_idx > 0) {
-
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
-          // TODO: switch to failsave tracker, or stop outputting commands
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
-
-        } else if (active_tracker_idx == 0) {
-
-          last_position_cmd = tracker_output_cmd;
-        }
-      }
-      catch (std::runtime_error &exrun) {
-        ROS_INFO("[ControlManager]: Exception while updateing trackers.");
-        ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-      }
-    }
-
-    tf::Quaternion desired_orientation;
-
-    {
-      std::scoped_lock lock(mutex_last_position_cmd);
-
-      if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-        // publish the odom topic (position command for debugging, e.g. rviz)
-        nav_msgs::Odometry cmd_odom;
-        cmd_odom.header.stamp         = ros::Time::now();
-        cmd_odom.header.frame_id      = "local_origin";
-        cmd_odom.pose.pose.position   = tracker_output_cmd->position;
-        cmd_odom.twist.twist.linear.x = tracker_output_cmd->velocity.x;
-        cmd_odom.twist.twist.linear.y = tracker_output_cmd->velocity.y;
-        cmd_odom.twist.twist.linear.z = tracker_output_cmd->velocity.z;
-        desired_orientation           = tf::createQuaternionFromRPY(0, 0, tracker_output_cmd->yaw);
-        desired_orientation.normalize();
-
-        if (tracker_output_cmd->use_quat_attitude) {
-          cmd_odom.pose.pose.orientation = tracker_output_cmd->attitude;
-        } else {
-          quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
-        }
-
-        try {
-          publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
-        }
-        catch (...) {
-          ROS_ERROR("Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
-        }
-
-        // publish the full command structure
-        try {
-          publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd));  // the last_position_cmd is already a ConstPtr
-        }
-        catch (...) {
-          ROS_ERROR("Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
-        }
-      }
-    }
-
-    // --------------------------------------------------------------
-    // |                   Update the controller                    |
-    // --------------------------------------------------------------
-
-    mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
-
-    {
-      std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
-
-      if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-        try {
-          controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
-        }
-        catch (std::runtime_error &exrun) {
-          ROS_INFO("[ControlManager]: Exception while updating the active controller.");
-          ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-        }
-      }
-    }
-
-    // | --------- publish the attitude_cmd for debugging --------- |
-
-    if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-      try {
-        publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(controller_output_cmd));  // the control command is already a ConstPtr
-      }
-      catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
-      }
-    }
-
-    // | ------------ publish the desired thrust force ------------ |
-
-    if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-
-      mrs_msgs::Float64Stamped thrust_out;
-      thrust_out.header.stamp = ros::Time::now();
-      thrust_out.value        = (pow((controller_output_cmd->thrust - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_) * 10.0;
-
-      try {
-        publisher_thrust_force.publish(thrust_out);
-      }
-      catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_thrust_force.getTopic().c_str());
-      }
-    }
-
-    // --------------------------------------------------------------
-    // |                 Publish the control command                |
-    // --------------------------------------------------------------
-
-    mavros_msgs::AttitudeTarget attitude_target;
-    attitude_target.header.stamp    = ros::Time::now();
-    attitude_target.header.frame_id = "base_link";
-
-    bool should_publish = false;
-
-    if (active_tracker_idx == 0 || !motors) {
-
-      if (!motors) {
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
-      } else {
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
-      }
-
-      desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
-      desired_orientation.normalize();
-      quaternionTFToMsg(desired_orientation, attitude_target.orientation);
-
-      attitude_target.thrust = 0.0;
-
-      should_publish = true;
-
-    } else if (active_tracker_idx > 0 && controller_output_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
-                        controller_names[active_controller_idx].c_str());
-
-      // convert the RPY to quaternion
-      desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
-      desired_orientation.normalize();
-      quaternionTFToMsg(desired_orientation, attitude_target.orientation);
-
-      attitude_target.thrust = 0.0;
-
-      should_publish = true;
-
-    } else if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-
-      {
-        std::scoped_lock lock(mutex_last_attitude_cmd);
-
-        last_attitude_cmd = controller_output_cmd;
-      }
-
-      attitude_target.thrust = controller_output_cmd->thrust;
-
-      if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {
-
-        // convert the RPY to quaternion
-        desired_orientation = tf::createQuaternionFromRPY(controller_output_cmd->euler_attitude.x, controller_output_cmd->euler_attitude.y,
-                                                          controller_output_cmd->euler_attitude.z);
-        desired_orientation.normalize();
-        quaternionTFToMsg(desired_orientation, attitude_target.orientation);
-
-        attitude_target.body_rate.x = 0.0;
-        attitude_target.body_rate.y = 0.0;
-        attitude_target.body_rate.z = 0.0;
-
-        attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
-
-      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE) {
-
-        attitude_target.orientation = last_attitude_cmd->quter_attitude;
-
-        attitude_target.body_rate.x = 0.0;
-        attitude_target.body_rate.y = 0.0;
-        attitude_target.body_rate.z = 0.0;
-
-        attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
-
-      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
-
-        attitude_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
-        attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
-        attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
-
-        attitude_target.orientation = last_attitude_cmd->quter_attitude;
-
-        attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
-
-        // when controlling with angular rates, PixHawk does not publish the
-        // target_attitude topic anymore, thus we need do it here
-        try {
-          publisher_target_attitude.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
-        }
-        catch (...) {
-          ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
-        }
-      }
-
-      should_publish = true;
-    } else {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
-    }
-
-    if (should_publish) {
-
-      // test the output
-      if (!std::isfinite(attitude_target.orientation.x)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.x\"!!!");
-        return;
-      }
-      if (!std::isfinite(attitude_target.orientation.y)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.y\"!!!");
-        return;
-      }
-      if (!std::isfinite(attitude_target.orientation.z)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.z\"!!!");
-        return;
-      }
-      if (!std::isfinite(attitude_target.orientation.w)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.w\"!!!");
-        return;
-      }
-      if (!std::isfinite(attitude_target.thrust)) {
-        ROS_ERROR("NaN detected in variable \"attitude_target.thrust\"!!!");
-        return;
-      }
-
-      try {
-        publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
-      }
-      catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
-      }
+      publish();
     }
 
     if (reseting_odometry) {
@@ -1395,6 +1158,20 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ callbackELand() */
+
+  bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+    if (!is_initialized)
+      return false;
+
+    res.success = eland(res.message);
+
+    return true;
+  }
+
+  //}
+
   /* //{ callbackMotors() */
 
   bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
@@ -1452,10 +1229,15 @@ namespace mrs_uav_manager
       switchMotors(false);
     }
 
+    ROS_INFO("[ControlManager]: calling for disarming");
     service_client_arm.call(srv_out);
 
     res.success = srv_out.response.success;
     res.message = srv_out.response.result;
+
+    failsafe_timer.stop();
+    elanding_timer.stop();
+    failsafe_triggered = false;
 
     return true;
   }
@@ -1527,20 +1309,6 @@ namespace mrs_uav_manager
 
     res.message = "Setting constraints";
     res.success = true;
-
-    return true;
-  }
-
-  //}
-
-  /* //{ callbackELand() */
-
-  bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
-
-    if (!is_initialized)
-      return false;
-
-    res.success = eland(res.message);
 
     return true;
   }
@@ -2322,7 +2090,7 @@ namespace mrs_uav_manager
       callbackSwitchTracker(tracker_srv, response);
 
       // switch back to safety controller
-      controller_srv.value = failsafe_controller_name_;
+      controller_srv.value = controller_names[0];
       callbackSwitchController(controller_srv, response);
 
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2697,6 +2465,348 @@ namespace mrs_uav_manager
     }
 
     return success;
+  }
+
+  //}
+
+  /* failsafe() //{ */
+
+  bool ControlManager::failsafe() {
+
+    if (!is_initialized)
+      return false;
+
+    if (failsafe_controller_idx != active_controller_idx) {
+
+      try {
+
+        ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
+        {
+          std::scoped_lock lock(mutex_last_attitude_cmd, mutex_controller_list);
+
+          controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
+
+          failsafe_triggered = true;
+
+          elanding_timer.stop();
+          failsafe_timer.start();
+        }
+
+        ROS_INFO("[ControlManager]: Controller %s has been activated", failsafe_controller_name_.c_str());
+
+        // super important, switch the active controller idx
+        try {
+          {
+            std::scoped_lock lock(mutex_controller_list);
+
+            controller_list[active_controller_idx]->deactivate();
+          }
+          active_controller_idx = failsafe_controller_idx;
+        }
+        catch (std::runtime_error &exrun) {
+          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names[active_tracker_idx].c_str());
+        }
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_ERROR("[ControlManager]: Error during activation of controller %s", failsafe_controller_name_.c_str());
+        ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+      }
+    }
+
+    return true;
+  }
+
+  //}
+
+  /* updateTrackers() //{ */
+
+  void ControlManager::updateTrackers(void) {
+
+    // --------------------------------------------------------------
+    // |                     Update the trackers                    |
+    // --------------------------------------------------------------
+
+    std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_tracker_list);
+
+    mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
+
+    nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+
+    try {
+
+      // for each tracker
+      for (unsigned int i = 0; i < tracker_list.size(); i++) {
+
+        if ((int)i == active_tracker_idx) {
+
+          // if it is the active one, update and retrieve the command
+          tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
+
+        } else {
+
+          // if it is not the active one, just update without retrieving the command
+          tracker_list[i]->update(odometry_const_ptr);
+        }
+      }
+
+      if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
+
+        last_position_cmd = tracker_output_cmd;
+
+      } else if (active_tracker_idx > 0) {
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
+        // TODO: switch to failsave tracker, or stop outputting commands
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO");
+
+      } else if (active_tracker_idx == 0) {
+
+        last_position_cmd = tracker_output_cmd;
+      }
+    }
+    catch (std::runtime_error &exrun) {
+      ROS_INFO("[ControlManager]: Exception while updateing trackers.");
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    }
+  }
+
+  //}
+
+  /* updateControllers() //{ */
+
+  void ControlManager::updateControllers(void) {
+
+    // --------------------------------------------------------------
+    // |                   Update the controller                    |
+    // --------------------------------------------------------------
+
+    std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_controller_list);
+
+    nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+
+    mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      try {
+        controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
+
+        if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+          std::scoped_lock lock(mutex_last_attitude_cmd);
+
+          last_attitude_cmd = controller_output_cmd;
+        }
+      }
+      catch (std::runtime_error &exrun) {
+        ROS_INFO("[ControlManager]: Exception while updating the active controller.");
+        ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+      }
+    }
+  }
+
+  //}
+
+  /* publish() //{ */
+
+  void ControlManager::publish(void) {
+
+    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_last_position_cmd);
+
+    tf::Quaternion desired_orientation;
+
+    // --------------------------------------------------------------
+    // |                  publish the position cmd                  |
+    // --------------------------------------------------------------
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      // publish the odom topic (position command for debugging, e.g. rviz)
+      nav_msgs::Odometry cmd_odom;
+      cmd_odom.header.stamp         = ros::Time::now();
+      cmd_odom.header.frame_id      = "local_origin";
+      cmd_odom.pose.pose.position   = last_position_cmd->position;
+      cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
+      cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
+      cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
+      desired_orientation           = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
+      desired_orientation.normalize();
+
+      if (last_position_cmd->use_quat_attitude) {
+        cmd_odom.pose.pose.orientation = last_position_cmd->attitude;
+      } else {
+        quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
+      }
+
+      try {
+        publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
+      }
+
+      // publish the full command structure
+      try {
+        publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd));  // the last_position_cmd is already a ConstPtr
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
+      }
+    }
+
+    // --------------------------------------------------------------
+    // |                 Publish the control command                |
+    // --------------------------------------------------------------
+
+    mavros_msgs::AttitudeTarget attitude_target;
+    attitude_target.header.stamp    = ros::Time::now();
+    attitude_target.header.frame_id = "base_link";
+
+    bool should_publish = false;
+
+    if (active_tracker_idx == 0 || !motors) {
+
+      if (!motors) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
+      } else {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
+      }
+
+      desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+      desired_orientation.normalize();
+      quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+      attitude_target.thrust = 0.0;
+
+      should_publish = true;
+
+    } else if (active_tracker_idx > 0 && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
+                        controller_names[active_controller_idx].c_str());
+
+      // convert the RPY to quaternion
+      desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+      desired_orientation.normalize();
+      quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+      attitude_target.thrust = 0.0;
+
+      should_publish = true;
+
+    } else if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+      attitude_target.thrust = last_attitude_cmd->thrust;
+
+      if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {
+
+        // convert the RPY to quaternion
+        desired_orientation =
+            tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+
+        desired_orientation.normalize();
+        quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
+        attitude_target.body_rate.x = 0.0;
+        attitude_target.body_rate.y = 0.0;
+        attitude_target.body_rate.z = 0.0;
+
+        attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
+
+      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE) {
+
+        attitude_target.orientation = last_attitude_cmd->quter_attitude;
+
+        attitude_target.body_rate.x = 0.0;
+        attitude_target.body_rate.y = 0.0;
+        attitude_target.body_rate.z = 0.0;
+
+        attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
+
+      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
+
+        attitude_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
+        attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
+        attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
+
+        attitude_target.orientation = last_attitude_cmd->quter_attitude;
+
+        attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+
+        // when controlling with angular rates, PixHawk does not publish the
+        // target_attitude topic anymore, thus we need do it here
+        try {
+          publisher_target_attitude.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+        }
+        catch (...) {
+          ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+        }
+      }
+
+      should_publish = true;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
+    }
+
+    if (should_publish) {
+
+      // test the output
+      if (!std::isfinite(attitude_target.orientation.x)) {
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.x\"!!!");
+        return;
+      }
+      if (!std::isfinite(attitude_target.orientation.y)) {
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.y\"!!!");
+        return;
+      }
+      if (!std::isfinite(attitude_target.orientation.z)) {
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.z\"!!!");
+        return;
+      }
+      if (!std::isfinite(attitude_target.orientation.w)) {
+        ROS_ERROR("NaN detected in variable \"attitude_target.orientation.w\"!!!");
+        return;
+      }
+      if (!std::isfinite(attitude_target.thrust)) {
+        ROS_ERROR("NaN detected in variable \"attitude_target.thrust\"!!!");
+        return;
+      }
+
+      try {
+
+        publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+      }
+    }
+
+    // | --------- publish the attitude_cmd for debugging --------- |
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+      try {
+        publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(last_attitude_cmd));  // the control command is already a ConstPtr
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
+      }
+    }
+
+    // | ------------ publish the desired thrust force ------------ |
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+      mrs_msgs::Float64Stamped thrust_out;
+      thrust_out.header.stamp = ros::Time::now();
+      thrust_out.value        = (pow((last_attitude_cmd->thrust - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_) * 10.0;
+
+      try {
+        publisher_thrust_force.publish(thrust_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_thrust_force.getTopic().c_str());
+      }
+    }
   }
 
   //}
