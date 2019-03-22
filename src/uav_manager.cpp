@@ -3,6 +3,7 @@
 
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
+#include <std_msgs/String.h>
 
 #include <nav_msgs/Odometry.h>
 #include <mrs_msgs/Vec1.h>
@@ -35,9 +36,9 @@ namespace mrs_uav_manager
 
   } LandingStates_t;
 
-  const char *state_names[3] = {
+  const char *state_names[4] = {
 
-      "IDLING", "FLYING HOME", "LANDING"};
+      "IDLING", "FLYING HOME", "LANDING", "EMERGANCY LANDING"};
 
   class UavManager : public nodelet::Nodelet {
 
@@ -57,6 +58,8 @@ namespace mrs_uav_manager
     void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
     void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
     void callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg);
+    void callbackGains(const std_msgs::StringConstPtr &msg);
+    void callbackConstraints(const std_msgs::StringConstPtr &msg);
 
     void changeLandingState(LandingStates_t new_state);
 
@@ -88,6 +91,18 @@ namespace mrs_uav_manager
     std::mutex      mutex_height;
     bool            got_height = false;
 
+    // checking whether the gains are being set by the gain manager
+  private:
+    ros::Subscriber subscriber_gains;
+    ros::Time       gains_last_time;
+    bool            gain_manager_required_;
+
+    // checking whether the constraints are being set by the constraint manager
+  private:
+    ros::Subscriber subscriber_constraints;
+    ros::Time       constraints_last_time;
+    bool            constraint_manager_required_;
+
   private:
     ros::Subscriber         subscriber_tracker_status;
     bool                    got_tracker_status = false;
@@ -117,6 +132,7 @@ namespace mrs_uav_manager
     ros::ServiceClient service_client_motors;
     ros::ServiceClient service_client_enabled_callbacks;
     ros::ServiceClient service_client_emergency_goto;
+    ros::ServiceClient service_client_arm;
 
     std::mutex mutex_services;
 
@@ -212,6 +228,12 @@ namespace mrs_uav_manager
     subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
     subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
 
+    subscriber_gains = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
+    gains_last_time  = ros::Time(0);
+
+    subscriber_constraints = nh_.subscribe("constraints_in", 1, &UavManager::callbackConstraints, this, ros::TransportHints().tcpNoDelay());
+    constraints_last_time  = ros::Time(0);
+
     service_server_takeoff   = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
     service_server_land      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
     service_server_land_home = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
@@ -222,6 +244,7 @@ namespace mrs_uav_manager
     service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
     service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
     service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
+    service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
 
     mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
@@ -249,6 +272,9 @@ namespace mrs_uav_manager
     param_loader.load_param("max_height_checking/rate", max_height_checking_rate_);
     param_loader.load_param("max_height_checking/safety_height_offset", max_height_offset_);
     param_loader.load_param("safety_area/max_height", max_height);
+
+    param_loader.load_param("require_gain_manager", gain_manager_required_);
+    param_loader.load_param("require_constraint_manager", constraint_manager_required_);
 
     // --------------------------------------------------------------
     // |                    landing state machine                   |
@@ -351,20 +377,38 @@ namespace mrs_uav_manager
           double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
           ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
+          // condition for automatic motor turn off
           if ((height < landing_cutoff_height_) &&
               ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
-            mrs_msgs::String switch_tracker_out;
-            switch_tracker_out.request.value = null_tracker_name_;
-            service_client_switch_tracker.call(switch_tracker_out);
+            if (current_state_landing == LANDING_STATE) {
 
-            std_srvs::SetBool enable_callbacks_out;
-            enable_callbacks_out.request.data = true;
-            service_client_enabled_callbacks.call(enable_callbacks_out);
+              mrs_msgs::String switch_tracker_out;
+              switch_tracker_out.request.value = null_tracker_name_;
+              service_client_switch_tracker.call(switch_tracker_out);
 
-            changeLandingState(IDLE_STATE);
+              std_srvs::SetBool enable_callbacks_out;
+              enable_callbacks_out.request.data = true;
+              service_client_enabled_callbacks.call(enable_callbacks_out);
 
-            ROS_INFO("[UavManager]: landing finished");
+              changeLandingState(IDLE_STATE);
+
+              ROS_INFO("[UavManager]: landing finished");
+
+            } else {  // emergancy landing
+
+              std_srvs::SetBool arm_out;
+              arm_out.request.data = false;
+              service_client_arm.call(arm_out);
+
+              std_srvs::SetBool enable_callbacks_out;
+              enable_callbacks_out.request.data = true;
+              service_client_enabled_callbacks.call(enable_callbacks_out);
+
+              changeLandingState(IDLE_STATE);
+
+              ROS_WARN("[UavManager]: emergancy landing finished");
+            }
 
             landing_timer.stop();
           }
@@ -373,7 +417,6 @@ namespace mrs_uav_manager
       } else {
 
         ROS_ERROR("[UavManager]: incorrect tracker detected during landing!");
-        /* changeLandingState(IDLE_STATE); */
       }
     }
   }
@@ -591,6 +634,34 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ callbackGains() */
+
+  void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackGains");
+
+    gains_last_time = ros::Time::now();
+  }
+
+  //}
+
+  /* //{ callbackConstraints() */
+
+  void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringConstPtr &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackConstraints");
+
+    constraints_last_time = ros::Time::now();
+  }
+
+  //}
+
   /* //{ callbackOdometry() */
 
   void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
@@ -676,7 +747,7 @@ namespace mrs_uav_manager
       sprintf((char *)&message, "Can't takeoff, already in the air!");
       res.message = message;
       res.success = false;
-      ROS_WARN("[UavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -684,7 +755,23 @@ namespace mrs_uav_manager
       sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
       res.message = message;
       res.success = false;
-      ROS_WARN("[UavManager]: %s", message);
+      ROS_ERROR("[UavManager]: %s", message);
+      return true;
+    }
+
+    if (gain_manager_required_ && (ros::Time::now() - gains_last_time).toSec() > 5.0) {
+      sprintf((char *)&message, "Can't takeoff, GainManager is not running!");
+      res.message = message;
+      res.success = false;
+      ROS_ERROR("[UavManager]: %s", message);
+      return true;
+    }
+
+    if (constraint_manager_required_ && (ros::Time::now() - constraints_last_time).toSec() > 5.0) {
+      sprintf((char *)&message, "Can't takeoff, ConstraintManager is not running!");
+      res.message = message;
+      res.success = false;
+      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
@@ -712,6 +799,7 @@ namespace mrs_uav_manager
         res.success = takeoff_out.response.success;
         res.message = takeoff_out.response.message;
 
+        // remember the take off point
         {
           std::scoped_lock lock(mutex_odometry);
 
@@ -726,6 +814,7 @@ namespace mrs_uav_manager
         takeoff_timer.start();
       }
 
+      // could not activate the landoff tracker!
     } else {
 
       res.success = switch_tracker_out.response.success;

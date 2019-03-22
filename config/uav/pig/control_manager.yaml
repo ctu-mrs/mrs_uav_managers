@@ -31,7 +31,11 @@ safety:
   failsafe_land_control_error: 3.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
-  hover_tracker: "mrs_trackers/LandoffTracker"
+  failsafe_tracker: "mrs_trackers/LandoffTracker"
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"
+
+  elanding_timer_rate: 10
+  elanding_cutoff_height:  1.0
+  elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
