@@ -43,3 +43,6 @@ safety:
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0
   elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+
+joystick:
+  joystick_timer_rate: 30 # [Hz]

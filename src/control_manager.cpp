@@ -258,11 +258,24 @@ namespace mrs_uav_manager
     bool               profiler_enabled_ = false;
 
   private:
+    std::mutex mutex_joystick;
+
     ros::Subscriber subscriber_joystick;
     void            callbackJoystic(const sensor_msgs::Joy &msg);
     bool            callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-    ros::Time       joy_last_start_time;
-    bool            joy_start_pressed = false;
+
+    ros::Timer joystick_timer;
+    void       joystickTimer(const ros::TimerEvent &event);
+    double     joystick_timer_rate_;
+
+    ros::Time joystick_tracker_press_time;
+    bool      joytracker_start_pressed = false;
+
+    bool      joystick_failsafe_pressed = false;
+    ros::Time joystick_failsafe_press_time;
+
+    bool      joystick_eland_pressed = false;
+    ros::Time joystick_eland_press_time;
 
   private:
     LandingStates_t current_state_landing  = IDLE_STATE;
@@ -283,6 +296,10 @@ namespace mrs_uav_manager
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
     ros::Time::waitForValid();
+
+    joystick_tracker_press_time  = ros::Time(0);
+    joystick_failsafe_press_time = ros::Time(0);
+    joystick_eland_press_time    = ros::Time(0);
 
     ROS_INFO("[ControlManager]: initializing");
 
@@ -324,6 +341,8 @@ namespace mrs_uav_manager
     param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
 
     param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
+
+    param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
 
     // --------------------------------------------------------------
     // |                        load trackers                       |
@@ -574,6 +593,7 @@ namespace mrs_uav_manager
     safety_timer   = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
     elanding_timer = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
     failsafe_timer = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
+    joystick_timer = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
 
     // | ----------------------- finish init ---------------------- |
 
@@ -600,7 +620,7 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return;
 
-    mrs_lib::Routine profiler_routine = profiler->createRoutine("stausTimer", status_timer_rate_, 0.01, event);
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("statusTimer", status_timer_rate_, 0.01, event);
 
     // --------------------------------------------------------------
     // |                publishing the tracker status               |
@@ -872,6 +892,60 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ joystickTimer() */
+
+  void ControlManager::joystickTimer(const ros::TimerEvent &event) {
+
+    if (!is_initialized)
+      return;
+
+    std::scoped_lock lock(mutex_joystick);
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("joystickTimer", status_timer_rate_, 0.01, event);
+
+    // if start was pressed and held for > 3.0 s
+    if (joytracker_start_pressed && (ros::Time::now() - joystick_tracker_press_time).toSec() > 3.0) {
+
+      ROS_INFO("[ControlManager]: activating JoyTracker and AttitudeController");
+
+      joytracker_start_pressed = false;
+
+      mrs_msgs::StringRequest controller_srv;
+      controller_srv.value = "mrs_controllers/AttitudeController";
+
+      mrs_msgs::StringRequest tracker_srv;
+      tracker_srv.value = "mrs_trackers/JoyTracker";
+
+      mrs_msgs::StringResponse response;
+
+      callbackSwitchTracker(tracker_srv, response);
+      callbackSwitchController(controller_srv, response);
+    }
+
+    // if RT+LT were pressed and held for > 1.0 s
+    if (joystick_failsafe_pressed && (ros::Time::now() - joystick_failsafe_press_time).toSec() > 1.0) {
+
+      ROS_INFO("[ControlManager]: activating failsafe by joystick");
+
+      joystick_failsafe_pressed = false;
+
+      failsafe();
+    }
+
+    // if joypads were pressed and held for > 1.0 s
+    if (joystick_eland_pressed && (ros::Time::now() - joystick_eland_press_time).toSec() > 1.0) {
+
+      ROS_INFO("[ControlManager]: activating eland by joystick");
+
+      joystick_failsafe_pressed = false;
+
+      std::string message_out;
+      eland(message_out);
+    }
+  }
+
+  //}
+
   // --------------------------------------------------------------
   // |                          callbacks                         |
   // --------------------------------------------------------------
@@ -886,7 +960,7 @@ namespace mrs_uav_manager
       return;
 
     if (!got_max_height) {
-      ROS_ERROR("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
+      ROS_INFO("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
       return;
     }
 
@@ -984,11 +1058,18 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return;
 
+    std::scoped_lock lock(mutex_joystick);
 
     mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
 
-    if ((msg.buttons[0] == 1 || msg.buttons[6] == 1) && tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
+    // | -------------- Switching back to So3 and Mpc ------------- |
+
+    // if any of the A, B, X, Y buttons are pressed when flying with JoyTracker, switch back to Mpc and SO(3)
+    if ((msg.buttons[0] == 1 || msg.buttons[1] == 1 || msg.buttons[2] == 1 || msg.buttons[3] == 1) &&
+        tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
         controller_names[active_controller_idx].compare("mrs_controllers/AttitudeController") == 0) {
+
+      ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
       mrs_msgs::StringRequest controller_srv;
       controller_srv.value = "mrs_controllers/So3Controller";
@@ -1002,25 +1083,65 @@ namespace mrs_uav_manager
       callbackSwitchController(controller_srv, response);
     }
 
+    // | ------- JoyTracker & AttitudeController activation ------- |
+
+    // if start button was pressed
     if (msg.buttons[7] == 1) {
 
-      joy_last_start_time = ros::Time::now();
-      joy_start_pressed   = true;
+      if (!joytracker_start_pressed) {
 
-    } else if (joy_start_pressed && (ros::Time::now() - joy_last_start_time).toSec() > 3.0) {
+        ROS_INFO("[ControlManager]: joystick start button pressed");
 
-      joy_start_pressed = false;
+        joytracker_start_pressed    = true;
+        joystick_tracker_press_time = ros::Time::now();
+      }
 
-      mrs_msgs::StringRequest controller_srv;
-      controller_srv.value = "mrs_controllers/AttitudeController";
+    } else if (joytracker_start_pressed) {
 
-      mrs_msgs::StringRequest tracker_srv;
-      tracker_srv.value = "mrs_trackers/JoyTracker";
+      ROS_INFO("[ControlManager]: joystick start button released");
 
-      mrs_msgs::StringResponse response;
+      joytracker_start_pressed    = false;
+      joystick_tracker_press_time = ros::Time(0);
+    }
 
-      callbackSwitchTracker(tracker_srv, response);
-      callbackSwitchController(controller_srv, response);
+    // | ------------------------ Failsafes ----------------------- |
+
+    // if LT and RT buttons are both pressed down
+    if (msg.axes[2] < -0.99 && msg.axes[5] < -0.99) {
+
+      if (!joystick_failsafe_pressed) {
+
+        ROS_INFO("[ControlManager]: joystick Failsafe pressed");
+
+        joystick_failsafe_pressed    = true;
+        joystick_failsafe_press_time = ros::Time::now();
+      }
+
+    } else if (joystick_failsafe_pressed) {
+
+      ROS_INFO("[ControlManager]: joystick Failsafe released");
+
+      joystick_failsafe_pressed    = false;
+      joystick_failsafe_press_time = ros::Time(0);
+    }
+
+    // if left and right joypads are both pressed down
+    if (msg.buttons[9] == 1 && msg.buttons[10] == 1) {
+
+      if (!joystick_eland_pressed) {
+
+        ROS_INFO("[ControlManager]: joystick eland pressed");
+
+        joystick_eland_pressed    = true;
+        joystick_eland_press_time = ros::Time::now();
+      }
+
+    } else if (joystick_eland_pressed) {
+
+      ROS_INFO("[ControlManager]: joystick eland released");
+
+      joystick_eland_pressed    = false;
+      joystick_eland_press_time = ros::Time(0);
     }
   }
 
