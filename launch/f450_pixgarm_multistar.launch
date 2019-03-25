@@ -43,6 +43,7 @@
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
       <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
+      <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gains_in" to="gain_manager/current_gains" />

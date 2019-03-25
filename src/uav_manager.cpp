@@ -1,3 +1,5 @@
+/* includes //{ */
+
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
 
@@ -14,12 +16,15 @@
 #include <mrs_msgs/Float64Stamped.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
+#include <mavros_msgs/State.h>
 
 #include <mrs_lib/Profiler.h>
 
 #include <tf/transform_datatypes.h>
 
 #include <mrs_lib/ParamLoader.h>
+
+//}
 
 namespace mrs_uav_manager
 {
@@ -55,6 +60,7 @@ namespace mrs_uav_manager
     void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
     void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
     void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
+    void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
     void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
     void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
     void callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg);
@@ -114,6 +120,12 @@ namespace mrs_uav_manager
     bool                        got_target_attitude = false;
     mavros_msgs::AttitudeTarget target_attitude;
     std::mutex                  mutex_target_attitude;
+
+  private:
+    ros::Subscriber    subscriber_mavros_state;
+    mavros_msgs::State mavros_state;
+    std::mutex         mutex_mavros_state;
+    bool               got_mavros_state = false;
 
   private:
     ros::Subscriber           subscriber_attitude_command;
@@ -224,6 +236,7 @@ namespace mrs_uav_manager
     subscriber_odometry         = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
     subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &UavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
     subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &UavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
+    subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
     subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
     subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
     subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
@@ -577,6 +590,25 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ callbackTargetAttitude() */
+
+  void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMavrosState");
+
+    {
+      std::scoped_lock lock(mutex_mavros_state);
+      mavros_state = *msg;
+    }
+
+    got_mavros_state = true;
+  }
+
+  //}
+
   /* //{ callbackAttitudeCommand() */
 
   void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg) {
@@ -709,6 +741,34 @@ namespace mrs_uav_manager
       res.success = false;
       ROS_ERROR("[UavManager]: %s", message);
       return true;
+    }
+
+    {
+      std::scoped_lock lock(mutex_mavros_state);
+
+      if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
+        sprintf((char *)&message, "Can't takeoff, missing mavros state!");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+        return true;
+      }
+
+      if (!mavros_state.armed) {
+        sprintf((char *)&message, "Can't takeoff, UAV not armed!");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+        return true;
+      }
+
+      if (mavros_state.mode.compare(std::string("OFFBOARD")) != 0) {
+        sprintf((char *)&message, "Can't takeoff, UAV not in offboard mode!");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+        return true;
+      }
     }
 
     if (!got_tracker_status) {
