@@ -106,7 +106,6 @@
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
-      <remap from="~failsafe_controller/arm_out" to="~/arm" />
 
       <!-- Trackers' configs -->
 
