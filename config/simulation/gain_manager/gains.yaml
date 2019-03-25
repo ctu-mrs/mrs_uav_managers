@@ -1,8 +1,8 @@
 optflow:
 
   horizontal:
-    kp: 2.8
-    kv: 1.5
+    kp: 2.0
+    kv: 1.0
     ka: 1.0
 
     attitude:
