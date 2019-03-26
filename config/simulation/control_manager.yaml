@@ -45,5 +45,25 @@ safety:
   elanding_cutoff_height:  1.0
   elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
 
+obstacle_bumper:
+
+  enabled: true
+  timer_rate: 20 # [Hz]
+
+  horizontal_distance: 0.7 # [m]
+  vertical_distance: 0.7 # [m]
+
+  obstacle_hugging:
+
+    enabled: true
+
+  # true: the drone will move away from obstacles that appear within the radius
+  repulsion:
+
+    enabled: true
+
+    horizontal_distance: 0.7 # [m]
+    vertical_distance: 0.7 # [m]
+
 joystick:
   joystick_timer_rate: 30 # [Hz]

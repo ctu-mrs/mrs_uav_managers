@@ -160,6 +160,7 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
+      <remap from="~bumper_in" to="bumper/obstacle_sectors" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
