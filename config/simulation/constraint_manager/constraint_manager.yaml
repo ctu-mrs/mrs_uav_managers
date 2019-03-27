@@ -16,6 +16,7 @@ constraints: [
   "slow",
   "medium",
   "fast",
+  "darpa",
 ]
 
 constraint_management:
@@ -26,10 +27,10 @@ constraint_management:
     OBJECT: ["slow"]
     VIO: ["slow"]
     ICP: ["slow"]
-    RTK: ["slow", "medium", "fast"]
-    OPTFLOWGPS: ["slow"]
-    GPS: ["slow", "medium", "fast"]
-    OPTFLOW: ["slow", "medium", "fast"]
+    RTK: ["slow", "medium", "fast", "darpa"]
+    OPTFLOWGPS: ["slow", "darpa"]
+    GPS: ["slow", "medium", "fast", "darpa"]
+    OPTFLOW: ["slow", "medium", "fast", "darpa"]
     OTHER: ["slow"]
 
   # those gains will be used automatically when a localization mode switches

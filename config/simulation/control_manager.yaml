@@ -50,8 +50,8 @@ obstacle_bumper:
   enabled: true
   timer_rate: 20 # [Hz]
 
-  horizontal_distance: 0.7 # [m]
-  vertical_distance: 0.7 # [m]
+  horizontal_distance: 1.0 # [m]
+  vertical_distance: 1.0 # [m] # not used yet
 
   obstacle_hugging:
 
@@ -62,8 +62,10 @@ obstacle_bumper:
 
     enabled: true
 
-    horizontal_distance: 0.7 # [m]
-    vertical_distance: 0.7 # [m]
+    horizontal_distance: 1.0 # [m]
+    horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
+
+    vertical_distance: 1.0 # [m] # not used yet
 
 joystick:
   joystick_timer_rate: 30 # [Hz]
