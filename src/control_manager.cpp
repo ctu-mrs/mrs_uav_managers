@@ -1029,7 +1029,7 @@ namespace mrs_uav_manager
 
         request.goal[0] = joystick_data.axes[1] * speed;
         request.goal[1] = joystick_data.axes[3] * speed;
-        request.goal[2] = joystick_data.axes[4] * 0;
+        request.goal[2] = joystick_data.axes[4] * 1;
         request.goal[3] = joystick_data.axes[0];
 
         mrs_msgs::Vec4::Response response;
@@ -1054,6 +1054,8 @@ namespace mrs_uav_manager
       std::scoped_lock lock(mutex_odometry);
 
       if (odometry_z < 1.0) {
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: not using bumper repulsion, height < 1.0 m");
         return;
       }
     }
