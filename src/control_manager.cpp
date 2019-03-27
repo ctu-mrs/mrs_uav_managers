@@ -1554,6 +1554,15 @@ namespace mrs_uav_manager
       }
     }
 
+    if (bumper_enabled_) {
+      if (!got_bumper) {
+        ROS_ERROR("[ControlManager]: Can't turn motors on, missing bumper data!");
+        res.message = "missing bumper data";
+        res.success = false;
+        return true;
+      }
+    }
+
     switchMotors(req.data);
 
     char message[200];
@@ -2704,6 +2713,10 @@ namespace mrs_uav_manager
       return true;
     }
 
+    if (!got_bumper) {
+      return true;
+    }
+
     double fcu_x, fcu_y, fcu_z;
     /* reference to FCU //{ */
 
@@ -2880,6 +2893,10 @@ namespace mrs_uav_manager
   bool ControlManager::bumperPushFromObstacle(void) {
 
     if (!bumper_repulsion_enabled_) {
+      return true;
+    }
+
+    if (!got_bumper) {
       return true;
     }
 
