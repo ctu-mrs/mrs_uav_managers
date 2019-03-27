@@ -2892,6 +2892,10 @@ namespace mrs_uav_manager
 
   bool ControlManager::bumperPushFromObstacle(void) {
 
+    if (!bumper_enabled_) {
+      return true;
+    }
+
     if (!bumper_repulsion_enabled_) {
       return true;
     }
