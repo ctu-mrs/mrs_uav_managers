@@ -14,6 +14,7 @@
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/BoolStamped.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
@@ -66,6 +67,7 @@ namespace mrs_uav_manager
     void callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg);
     void callbackGains(const std_msgs::StringConstPtr &msg);
     void callbackConstraints(const std_msgs::StringConstPtr &msg);
+    void callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg);
 
     void changeLandingState(LandingStates_t new_state);
 
@@ -96,6 +98,12 @@ namespace mrs_uav_manager
     double          height;
     std::mutex      mutex_height;
     bool            got_height = false;
+
+  private:
+    ros::Subscriber       subscriber_motors;
+    mrs_msgs::BoolStamped motors;
+    std::mutex            mutex_motors;
+    bool                  got_motors = false;
 
     // checking whether the gains are being set by the gain manager
   private:
@@ -240,6 +248,7 @@ namespace mrs_uav_manager
     subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
     subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
     subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
+    subscriber_motors           = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
 
     subscriber_gains = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
     gains_last_time  = ros::Time(0);
@@ -590,7 +599,7 @@ namespace mrs_uav_manager
 
   //}
 
-  /* //{ callbackTargetAttitude() */
+  /* //{ callbackMavrosState() */
 
   void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
 
@@ -724,6 +733,25 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ callbackMotors() */
+
+  void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMotors");
+
+    {
+      std::scoped_lock lock(mutex_motors);
+      motors = *msg;
+    }
+
+    got_motors = true;
+  }
+
+  //}
+
   // | -------------------- service callbacks ------------------- |
 
   /* //{ callbackTakeoff() */
@@ -733,7 +761,7 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return false;
 
-    char message[100];
+    char message[200];
 
     if (!got_odometry) {
       sprintf((char *)&message, "Can't takeoff, missing odometry!");
@@ -833,6 +861,18 @@ namespace mrs_uav_manager
       res.success = false;
       ROS_ERROR("[UavManager]: %s", message);
       return true;
+    }
+
+    {
+      std::scoped_lock lock(mutex_motors);
+    
+      if (!got_motors || (ros::Time::now() - motors.stamp).toSec() > 1.0 || motors.data == motors.FALSE) {
+        sprintf((char *)&message, "Can't takeoff, motors are off!");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+        return true;
+      }
     }
 
     ROS_INFO("[UavManager]: taking off");

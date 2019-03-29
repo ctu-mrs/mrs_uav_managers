@@ -11,6 +11,7 @@
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
+#include <mrs_msgs/BoolStamped.h>
 
 #include <mrs_lib/ConvexPolygon.h>
 #include <mrs_lib/Profiler.h>
@@ -24,6 +25,7 @@
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/State.h>
 #include <std_srvs/SetBool.h>
 
 #include <pluginlib/class_loader.h>
@@ -137,6 +139,7 @@ namespace mrs_uav_manager
     ros::Publisher publisher_target_attitude;
     ros::Publisher publisher_tracker_status;
     ros::Publisher publisher_controller_status;
+    ros::Publisher publisher_motors;
 
     ros::ServiceServer service_server_switch_tracker;
     ros::ServiceServer service_server_switch_controller;
@@ -175,6 +178,12 @@ namespace mrs_uav_manager
 
     mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
     std::mutex                          mutex_last_attitude_cmd;
+
+  private:
+    ros::Subscriber    subscriber_mavros_state;
+    mavros_msgs::State mavros_state;
+    std::mutex         mutex_mavros_state;
+    bool               got_mavros_state = false;
 
   private:
     void updateTrackers(void);
@@ -225,10 +234,12 @@ namespace mrs_uav_manager
 
     bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
+    void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
+
     bool ehover(std::string &message_out);
     bool eland(std::string &message_out);
     bool failsafe();
-    void arming(bool input);
+    bool arming(bool input);
 
     bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
@@ -599,16 +610,18 @@ namespace mrs_uav_manager
     publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
     publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
     publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
+    publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
 
     // --------------------------------------------------------------
     // |                         subscribers                        |
     // --------------------------------------------------------------
 
-    subscriber_odometry   = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-    odometry_last_time    = ros::Time(0);
-    subscriber_max_height = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-    subscriber_joystick   = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
-    subscriber_bumper     = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+    subscriber_odometry     = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+    odometry_last_time      = ros::Time(0);
+    subscriber_max_height   = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+    subscriber_joystick     = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
+    subscriber_bumper       = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+    subscriber_mavros_state = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
 
     // | -------------------- general services -------------------- |
 
@@ -737,6 +750,21 @@ namespace mrs_uav_manager
       catch (...) {
         ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
       }
+    }
+
+    // --------------------------------------------------------------
+    // |                 publishing the motors state                |
+    // --------------------------------------------------------------
+
+    mrs_msgs::BoolStamped motors_out;
+    motors_out.data  = motors ? motors_out.TRUE : motors_out.FALSE;
+    motors_out.stamp = ros::Time::now();
+
+    try {
+      publisher_motors.publish(motors_out);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_motors.getTopic().c_str());
     }
   }
 
@@ -897,7 +925,7 @@ namespace mrs_uav_manager
       // condition for automatic motor turn off
       if ((odometry_z < elanding_cutoff_height_) && ((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
 
-        // enable callbacks?
+        // enable callbacks? ... NO
 
         switchMotors(false);
 
@@ -913,7 +941,7 @@ namespace mrs_uav_manager
 
         elanding_timer.stop();
 
-        eland_triggered = false;
+        // we should NOT set eland_triggered=true
       }
     }
   }
@@ -1313,6 +1341,25 @@ namespace mrs_uav_manager
 
   //}
 
+  /* //{ callbackMavrosState() */
+
+  void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
+
+    if (!is_initialized)
+      return;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMavrosState");
+
+    {
+      std::scoped_lock lock(mutex_mavros_state);
+      mavros_state = *msg;
+    }
+
+    got_mavros_state = true;
+  }
+
+  //}
+
   // | -------------------- service callbacks ------------------- |
 
   /* //{ callbackSwitchTracker() */
@@ -1545,29 +1592,53 @@ namespace mrs_uav_manager
     if (!is_initialized)
       return false;
 
+    char message[200];
+
     {
       std::scoped_lock lock(mutex_odometry);
 
       if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
-        ROS_ERROR("[ControlManager]: Can't turn motors on, the UAV is outside of the safety area!");
-        res.message = "the UAV is outside of the safety area";
+
+        sprintf((char *)&message, "Can't turn motors on, the UAV is outside of the safety area!");
+        res.message = message;
         res.success = false;
+        ROS_ERROR("[ControlManager]: %s", message);
+        return true;
+      }
+    }
+
+    if (req.data && (failsafe_triggered || eland_triggered)) {
+      sprintf((char *)&message, "cannot switch motors ON, we landed in emergancy.");
+      res.message = message;
+      res.success = false;
+      ROS_ERROR("[ControlManager]: %s", message);
+      return true;
+    }
+
+    {
+      std::scoped_lock lock(mutex_mavros_state);
+
+      if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
+        sprintf((char *)&message, "Can't takeoff, missing mavros state!");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[ControlManager]: %s", message);
         return true;
       }
     }
 
     if (bumper_enabled_) {
       if (!got_bumper) {
-        ROS_ERROR("[ControlManager]: Can't turn motors on, missing bumper data!");
-        res.message = "missing bumper data";
+        sprintf((char *)&message, "Can't turn motors on, missing bumper data!");
+        res.message = message;
         res.success = false;
+        ROS_ERROR("[ControlManager]: %s", message);
         return true;
       }
     }
 
     switchMotors(req.data);
 
-    char message[200];
     sprintf((char *)&message, "Motors: %s", motors ? "ON" : "OFF");
     res.message = message;
     res.success = true;
@@ -1589,14 +1660,28 @@ namespace mrs_uav_manager
 
       sprintf((char *)&message, "Not allowed to arm the drone.");
       res.message = message;
-      res.success = true;
-
+      res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
 
-      return true;
+    } else {
+
+      if (arming(false)) {
+
+        sprintf((char *)&message, "Disarmed");
+        res.message = message;
+        res.success = true;
+        ROS_INFO("[ControlManager]: %s", message);
+
+      } else {
+
+        sprintf((char *)&message, "Could not disarm");
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[ControlManager]: %s", message);
+      }
     }
 
-    return false;
+    return true;
   }
 
   //}
@@ -3327,7 +3412,7 @@ namespace mrs_uav_manager
 
   /* arming() //{ */
 
-  void ControlManager::arming(bool input) {
+  bool ControlManager::arming(bool input) {
 
     mavros_msgs::CommandBool srv_out;
     srv_out.request.value = input;
@@ -3337,15 +3422,27 @@ namespace mrs_uav_manager
       switchMotors(false);
     }
 
-    ROS_INFO("[ControlManager]: calling for disarming");
-
-    service_client_arm.call(srv_out);
-
     failsafe_timer.stop();
     elanding_timer.stop();
 
-    failsafe_triggered = false;
-    eland_triggered    = false;
+    // we cannot disarm if the drone is not in offboard mode
+    {
+      std::scoped_lock lock(mutex_mavros_state);
+
+      if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 1.0 || mavros_state.mode.compare(std::string("OFFBOARD")) != 0) {
+
+        ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode.");
+        return false;
+
+      } else {
+
+        ROS_INFO("[ControlManager]: calling for disarming");
+
+        service_client_arm.call(srv_out);
+
+        return srv_out.response.success;
+      }
+    }
   }
 
   //}

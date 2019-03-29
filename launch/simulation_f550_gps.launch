@@ -26,7 +26,7 @@
 
   <group ns="$(arg uav_name)">
 
-    <!-- MAV Manager -->
+    <!-- UAV manager -->
     <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
@@ -48,6 +48,7 @@
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gains_in" to="gain_manager/current_gains" />
       <remap from="~constraints_in" to="constraint_manager/current_constraints" />
+      <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
@@ -161,6 +162,7 @@
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />
+      <remap from="~mavros_state_in" to="mavros/state" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
@@ -179,6 +181,7 @@
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
       <remap from="~thrust_force_out" to="~thrust_force" />
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~motors_out" to="~motors" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
