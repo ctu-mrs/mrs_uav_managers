@@ -865,8 +865,8 @@ namespace mrs_uav_manager
 
     {
       std::scoped_lock lock(mutex_motors);
-    
-      if (!got_motors || (ros::Time::now() - motors.stamp).toSec() > 1.0 || motors.data == motors.FALSE) {
+
+      if (!got_motors || (ros::Time::now() - motors.stamp).toSec() > 1.0 || !motors.data) {
         sprintf((char *)&message, "Can't takeoff, motors are off!");
         res.message = message;
         res.success = false;

@@ -757,7 +757,7 @@ namespace mrs_uav_manager
     // --------------------------------------------------------------
 
     mrs_msgs::BoolStamped motors_out;
-    motors_out.data  = motors ? motors_out.TRUE : motors_out.FALSE;
+    motors_out.data  = motors;
     motors_out.stamp = ros::Time::now();
 
     try {
@@ -786,7 +786,7 @@ namespace mrs_uav_manager
     }
 
     if (reseting_odometry) {
-      ROS_ERROR("[ControlManager]: safetyTimer tried to run while reseting odometry");
+      ROS_WARN("[ControlManager]: safetyTimer tried to run while reseting odometry");
       return;
     }
 
@@ -812,14 +812,41 @@ namespace mrs_uav_manager
       position_error_z_ = last_position_cmd->position.z - odometry_z;
 
       // tilt angle
-      tf::Quaternion quaternion_odometry;
-      quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
+      tf::Quaternion odometry_quaternion;
+      quaternionMsgToTF(odometry.pose.pose.orientation, odometry_quaternion);
 
       // rotate the drone's z axis
-      tf::Vector3 local_z = tf::Transform(quaternion_odometry) * tf::Vector3(0, 0, 1);
+      tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
 
       // calculate the angle between the drone's z axis and the world's z axis
-      tilt_angle_ = acos(local_z.dot(tf::Vector3(0, 0, 1)));
+      tilt_angle_ = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
+
+      // | ---------------- calculate the tilt error ---------------- |
+      // to do that, we need the tilt reference, which might not be available
+      {
+        std::scoped_lock lock(mutex_last_attitude_cmd);
+
+        // if the attitude_cmd exists (a controller is running)
+        if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+          tf::Quaternion attitude_cmd_quaternion;
+
+          // calculate the quaternion
+          if (last_attitude_cmd->MODE_QUATER_ATTITUDE) {
+
+            attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
+            attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
+            attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
+            attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+
+          } else if (last_attitude_cmd->MODE_EULER_ATTITUDE) {
+
+            // convert the RPY to quaternion
+            attitude_cmd_quaternion =
+                tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+          }
+        }
+      }
     }
 
     double control_error_ = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
