@@ -140,6 +140,7 @@ namespace mrs_uav_manager
     ros::Publisher publisher_tracker_status;
     ros::Publisher publisher_controller_status;
     ros::Publisher publisher_motors;
+    ros::Publisher publisher_tilt_error;
 
     ros::ServiceServer service_server_switch_tracker;
     ros::ServiceServer service_server_switch_controller;
@@ -199,6 +200,12 @@ namespace mrs_uav_manager
     double tilt_limit_disarm_;
     double control_error_eland_;
     double control_error_failsafe_;
+
+  private:
+    bool       tilt_error_failsafe_enabled_ = false;
+    double     tilt_error_threshold_;
+    double     tilt_error;
+    std::mutex mutex_tilt_error;
 
   private:
     mrs_lib::ConvexPolygon *      safety_area_polygon;
@@ -403,6 +410,10 @@ namespace mrs_uav_manager
     param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
 
     param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
+
+    param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
+    param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
+    tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * PI;
 
     param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
 
@@ -611,6 +622,7 @@ namespace mrs_uav_manager
     publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
     publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
     publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+    publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
 
     // --------------------------------------------------------------
     // |                         subscribers                        |
@@ -766,6 +778,23 @@ namespace mrs_uav_manager
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_motors.getTopic().c_str());
     }
+
+    // --------------------------------------------------------------
+    // |                   publish the tilt error                   |
+    // --------------------------------------------------------------
+    {
+      std::scoped_lock lock(mutex_tilt_error);
+
+      std_msgs::Float64 tilt_error_out;
+      tilt_error_out.data = (180.0 / PI) * tilt_error;
+
+      try {
+        publisher_tilt_error.publish(tilt_error_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_tilt_error.getTopic().c_str());
+      }
+    }
   }
 
   //}
@@ -801,10 +830,11 @@ namespace mrs_uav_manager
     // | -------- cacalculate control errors and tilt angle ------- |
 
     double position_error_x_, position_error_y_, position_error_z_;
-    double tilt_angle_;
+    double tilt_angle;
+    tilt_error = 0;
 
     {
-      std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+      std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error);
 
       // control errors
       position_error_x_ = last_position_cmd->position.x - odometry_x;
@@ -819,7 +849,7 @@ namespace mrs_uav_manager
       tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
 
       // calculate the angle between the drone's z axis and the world's z axis
-      tilt_angle_ = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
+      tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
 
       // | ---------------- calculate the tilt error ---------------- |
       // to do that, we need the tilt reference, which might not be available
@@ -832,18 +862,27 @@ namespace mrs_uav_manager
           tf::Quaternion attitude_cmd_quaternion;
 
           // calculate the quaternion
-          if (last_attitude_cmd->MODE_QUATER_ATTITUDE) {
+          if (last_attitude_cmd->quater_attitude_set) {
 
             attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
             attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
             attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
             attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
 
-          } else if (last_attitude_cmd->MODE_EULER_ATTITUDE) {
+          } else if (last_attitude_cmd->euler_attitude_set) {
 
             // convert the RPY to quaternion
             attitude_cmd_quaternion =
                 tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+          }
+
+          if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
+
+            // calculate the desired drone's z axis in the world frame
+            tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
+
+            // calculate the angle between the drone's z axis and the world's z axis
+            tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
           }
         }
       }
@@ -858,11 +897,11 @@ namespace mrs_uav_manager
     {
       std::scoped_lock lock(mutex_odometry);
 
-      if (tilt_angle_ > tilt_limit_eland_ || control_error_ > control_error_eland_) {
+      if (tilt_angle > tilt_limit_eland_ || control_error_ > control_error_eland_) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / PI) * tilt_angle_,
+          ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / PI) * tilt_angle,
                     (180.0 / PI) * tilt_limit_eland_, control_error_, control_error_eland_);
 
           std::string message_out;
@@ -912,11 +951,29 @@ namespace mrs_uav_manager
     // --------------------------------------------------------------
     // |      disarm the drone when the tilt exceeds the limit      |
     // --------------------------------------------------------------
-    if (tilt_angle_ > tilt_limit_disarm_) {
+    if (tilt_angle > tilt_limit_disarm_) {
 
-      ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%2.2f/%2.2f deg", (180.0 / PI) * tilt_angle_, (180.0 / PI) * tilt_limit_eland_);
+      ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%2.2f/%2.2f deg", (180.0 / PI) * tilt_angle, (180.0 / PI) * tilt_limit_eland_);
 
       arming(false);
+    }
+
+    // --------------------------------------------------------------
+    // |     disarm the drone when tilt error exceeds the limit     |
+    // --------------------------------------------------------------
+    {
+      std::scoped_lock lock(mutex_tilt_error);
+
+      if (tilt_error_failsafe_enabled_) {
+
+        if (fabs(tilt_error) > tilt_error_threshold_) {
+
+          ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / PI) * tilt_error,
+                    (180.0 / PI) * tilt_error_threshold_);
+
+          arming(false);
+        }
+      }
     }
   }
 

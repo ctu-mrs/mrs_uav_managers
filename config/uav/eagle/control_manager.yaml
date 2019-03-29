@@ -44,6 +44,11 @@ safety:
   elanding_cutoff_height:  1.0
   elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
 
+  tilt_error_failsafe:
+
+    enabled: true
+    tilt_error_threshold: 30 # [deg]
+
 obstacle_bumper:
 
   enabled: false
