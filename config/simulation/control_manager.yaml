@@ -52,7 +52,7 @@ safety:
 
 obstacle_bumper:
 
-  enabled: true
+  enabled: false
   timer_rate: 20 # [Hz]
 
   horizontal_distance: 1.0 # [m]
