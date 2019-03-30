@@ -2970,23 +2970,26 @@ namespace mrs_uav_manager
     }
 
     if (horizontal_point_distance <= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_) &&
-        (fabs(fcu_z) <= 1e-3 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_))) {
+        (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_))) {
 
       return true;
     }
 
-    ROS_INFO("[ControlManager]: bumper_data.sectors[horizontal_vector_idx] %f", bumper_data.sectors[horizontal_vector_idx]);
-    ROS_INFO("[ControlManager]: bumper_data.sectors[vertical_vector_idx] %f", bumper_data.sectors[vertical_vector_idx]);
-    ROS_INFO("[ControlManager]: vertical_point_distance %f", vertical_point_distance);
-    ROS_INFO("[ControlManager]: bumper_horizontal_distance_ %f", bumper_horizontal_distance_);
-    ROS_INFO("[ControlManager]: bumper_vertical_distance_ %f", bumper_vertical_distance_);
+    // if the obstacle is too close and hugging can't be done, we can't fly, return false
+    if (horizontal_point_distance > 0.1 &&
+        (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance_)) {
+
+      ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, obstacle is too close (horizontally)", fcu_x,
+               fcu_y, fcu_z, horizontal_vector_idx);
+      return false;
+    }
 
     // if the obstacle is too close and hugging can't be done, we can't fly, return false
-    if ((bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance_) ||
+    if (vertical_point_distance > 0.1 &&
         (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance_)) {
 
-      ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, obstacle is too close", fcu_x, fcu_y, fcu_z,
-               horizontal_vector_idx);
+      ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f is not valid, obstacle is too close (vertically)", fcu_x, fcu_y,
+               fcu_z);
       return false;
     }
 
@@ -3010,7 +3013,7 @@ namespace mrs_uav_manager
 
       if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_)) {
 
-        new_z = point_heading_vertical * bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_;
+        new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_);
       }
 
       ROS_WARN(
@@ -3169,9 +3172,9 @@ namespace mrs_uav_manager
       }
     }
 
-    bool collision_above      = false;
-    bool collision_below      = false;
-    bool wall_locked_vertical = false;
+    bool   collision_above             = false;
+    bool   collision_below             = false;
+    bool   wall_locked_vertical        = false;
     double vertical_repulsion_distance = 0;
 
     // check for vertical collision down
@@ -3191,7 +3194,7 @@ namespace mrs_uav_manager
       ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper: potential collision above");
       collision_below             = true;
       vertical_collision_detected = true;
-      vertical_repulsion_distance = -(bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors+1]);
+      vertical_repulsion_distance = -(bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]);
     }
 
     // check the up/down wall locking
@@ -3202,7 +3205,8 @@ namespace mrs_uav_manager
 
         wall_locked_vertical = true;
 
-        vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors+1])/2.0;
+        vertical_repulsion_distance =
+            (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) / 2.0;
 
         /* // should we repulse up or down? */
         /* if (bumper_data.sectors[bumper_data.n_horizontal_sectors] < bumper_data.sectors[bumper_data.n_horizontal_sectors+1]) { */
