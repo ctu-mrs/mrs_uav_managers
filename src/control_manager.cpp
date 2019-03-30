@@ -204,6 +204,7 @@ namespace mrs_uav_manager
   private:
     bool       tilt_error_failsafe_enabled_ = false;
     double     tilt_error_threshold_;
+    double     tilt_error_failsafe_min_height_;
     double     tilt_error;
     std::mutex mutex_tilt_error;
 
@@ -414,6 +415,7 @@ namespace mrs_uav_manager
 
     param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
     param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
+    param_loader.load_param("safety/tilt_error_failsafe/min_height", tilt_error_failsafe_min_height_);
     tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * PI;
 
     param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
@@ -964,9 +966,10 @@ namespace mrs_uav_manager
     // |     disarm the drone when tilt error exceeds the limit     |
     // --------------------------------------------------------------
     {
-      std::scoped_lock lock(mutex_tilt_error);
+      std::scoped_lock lock(mutex_tilt_error, mutex_odometry);
 
-      if (tilt_error_failsafe_enabled_) {
+      if (tilt_error_failsafe_enabled_ &&
+          odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
 
         if (fabs(tilt_error) > tilt_error_threshold_) {
 
@@ -974,6 +977,8 @@ namespace mrs_uav_manager
                     (180.0 / PI) * tilt_error_threshold_);
 
           arming(false);
+
+          failsafe_triggered = true;
         }
       }
     }
