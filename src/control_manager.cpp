@@ -309,6 +309,7 @@ namespace mrs_uav_manager
     double bumper_repulsion_horizontal_distance_;
     double bumper_repulsion_horizontal_offset_;
     double bumper_repulsion_vertical_distance_;
+    double bumper_repulsion_vertical_offset_;
 
     bool bumperValidatePoint(double &x, double &y, double &z, ReferenceFrameType_t frame);
     int  bumperGetSectorId(const double x, const double y, const double z);
@@ -429,6 +430,7 @@ namespace mrs_uav_manager
     param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", bumper_repulsion_horizontal_distance_);
     param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
     param_loader.load_param("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
+    param_loader.load_param("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
 
     // --------------------------------------------------------------
     // |                        load trackers                       |
@@ -1100,7 +1102,7 @@ namespace mrs_uav_manager
     }
 
     // if RT+LT were pressed and held for > 1.0 s
-    if (joystick_failsafe_pressed && (ros::Time::now() - joystick_failsafe_press_time).toSec() > 1.0) {
+    if (joystick_failsafe_pressed && (ros::Time::now() - joystick_failsafe_press_time).toSec() > 0.1) {
 
       ROS_INFO("[ControlManager]: activating failsafe by joystick");
 
@@ -1110,7 +1112,7 @@ namespace mrs_uav_manager
     }
 
     // if joypads were pressed and held for > 1.0 s
-    if (joystick_eland_pressed && (ros::Time::now() - joystick_eland_press_time).toSec() > 1.0) {
+    if (joystick_eland_pressed && (ros::Time::now() - joystick_eland_press_time).toSec() > 0.1) {
 
       ROS_INFO("[ControlManager]: activating eland by joystick");
 
@@ -1121,7 +1123,7 @@ namespace mrs_uav_manager
     }
 
     // if back was pressed and held for > 1.0 s
-    if (joystick_back_pressed && (ros::Time::now() - joystick_goto_press_time).toSec() > 1.0) {
+    if (joystick_back_pressed && (ros::Time::now() - joystick_goto_press_time).toSec() > 0.1) {
 
       // activate the joystick goto functionality
       joystick_goto_enabled = true;
@@ -1165,9 +1167,9 @@ namespace mrs_uav_manager
     {
       std::scoped_lock lock(mutex_odometry);
 
-      if (odometry_z < 1.0) {
+      if (odometry_z < 0.5) {
 
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: not using bumper repulsion, height < 1.0 m");
+        ROS_WARN_THROTTLE(0.5, "[ControlManager]: not using bumper repulsion, height < 0.5 m");
         return;
       }
     }
@@ -1175,6 +1177,8 @@ namespace mrs_uav_manager
     // --------------------------------------------------------------
     // |                      bumper repulsion                      |
     // --------------------------------------------------------------
+
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumperTimer spinning");
 
     bumperPushFromObstacle();
   }
@@ -2935,7 +2939,7 @@ namespace mrs_uav_manager
 
         fcu_x = temp[0];
         fcu_y = temp[1];
-        fcu_z = z;
+        fcu_z = z - odometry_z;
 
         break;
       }
@@ -2944,36 +2948,45 @@ namespace mrs_uav_manager
     //}
 
     // get the id of the sector, where the reference is
-    int sector_idx = bumperGetSectorId(fcu_x, fcu_y, fcu_z);
+    int horizontal_vector_idx = bumperGetSectorId(fcu_x, fcu_y, fcu_z);
+    int vertical_vector_idx   = fcu_z < 0 ? bumper_data.n_horizontal_sectors : bumper_data.n_horizontal_sectors + 1;
 
     // calculate the horizontal distance to the point
-    double point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
+    double horizontal_point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
+    double vertical_point_distance   = fabs(fcu_z);
 
     // check whether we measure in that direction
-    if (bumper_data.sectors[sector_idx] == bumper_data.OBSTACLE_NO_DATA) {
+    if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
 
       ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, we do not measure in that direction", fcu_x,
-               fcu_y, fcu_z, sector_idx);
+               fcu_y, fcu_z, horizontal_vector_idx);
       return false;
     }
 
-    // check whether no obstacle was detected, if no, return true
-    if (bumper_data.sectors[sector_idx] == bumper_data.OBSTACLE_NOT_DETECTED) {
+    if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NOT_DETECTED &&
+        bumper_data.sectors[vertical_vector_idx] == bumper_data.OBSTACLE_NOT_DETECTED) {
 
       return true;
     }
 
-    // if the reference is closer than the obstacle (minus the bumper distance), OK, return true
-    if (point_distance <= (bumper_data.sectors[sector_idx] - bumper_horizontal_distance_)) {
+    if (horizontal_point_distance <= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_) &&
+        (fabs(fcu_z) <= 1e-3 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_))) {
 
       return true;
     }
+
+    ROS_INFO("[ControlManager]: bumper_data.sectors[horizontal_vector_idx] %f", bumper_data.sectors[horizontal_vector_idx]);
+    ROS_INFO("[ControlManager]: bumper_data.sectors[vertical_vector_idx] %f", bumper_data.sectors[vertical_vector_idx]);
+    ROS_INFO("[ControlManager]: vertical_point_distance %f", vertical_point_distance);
+    ROS_INFO("[ControlManager]: bumper_horizontal_distance_ %f", bumper_horizontal_distance_);
+    ROS_INFO("[ControlManager]: bumper_vertical_distance_ %f", bumper_vertical_distance_);
 
     // if the obstacle is too close and hugging can't be done, we can't fly, return false
-    if (bumper_data.sectors[sector_idx] <= (bumper_horizontal_distance_)) {
+    if ((bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance_) ||
+        (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance_)) {
 
       ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, obstacle is too close", fcu_x, fcu_y, fcu_z,
-               sector_idx);
+               horizontal_vector_idx);
       return false;
     }
 
@@ -2981,17 +2994,31 @@ namespace mrs_uav_manager
     if (bumper_hugging_enabled_) {
 
       // heading of the point in drone frame
-      double point_heading = atan2(fcu_y, fcu_x);
+      double point_heading_horizontal = atan2(fcu_y, fcu_x);
+      double point_heading_vertical   = fcu_z > 0 ? 1.0 : -1.0;
 
-      double new_x = cos(point_heading) * (bumper_data.sectors[sector_idx] - (bumper_horizontal_distance_));
-      double new_y = sin(point_heading) * (bumper_data.sectors[sector_idx] - (bumper_horizontal_distance_));
-      double new_z = fcu_z;  // TODO
+      double new_x = fcu_x;
+      double new_y = fcu_y;
+      double new_z = fcu_z;
+
+      if (bumper_data.sectors[horizontal_vector_idx] > 0 &&
+          horizontal_point_distance >= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_)) {
+
+        new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
+        new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
+      }
+
+      if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_)) {
+
+        new_z = point_heading_vertical * bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_;
+      }
 
       ROS_WARN(
           "[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it "
           "to x: %2.2f, y: "
           "%2.2f, z: %2.2f",
-          fcu_x, fcu_y, fcu_z, sector_idx, point_distance, bumper_data.sectors[sector_idx], bumper_horizontal_distance_, new_x, new_y, new_z);
+          fcu_x, fcu_y, fcu_z, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
+          new_y, new_z);
 
       // express the point back in the original FRAME
       /* FCU to original frame conversion //{ */
@@ -3041,7 +3068,7 @@ namespace mrs_uav_manager
 
           x = temp[0];
           y = temp[1];
-          z = new_z;
+          z = new_z + odometry_z;
 
           break;
         }
@@ -3080,9 +3107,11 @@ namespace mrs_uav_manager
     double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
     double direction;
-    double repulsion_distance = 10e9;
+    double min_distance                  = 10e9;
+    double repulsion_distance            = 10e9;
+    double horizontal_collision_detected = false;
 
-    double collision_detected = false;
+    double vertical_collision_detected = false;
 
     for (uint i = 0; i < bumper_data.n_horizontal_sectors; i++) {
 
@@ -3090,30 +3119,109 @@ namespace mrs_uav_manager
         continue;
       }
 
+      double wall_locked_horizontal = false;
+
       // if the sector is under critical distance
       if (bumper_data.sectors[i] <= bumper_repulsion_horizontal_distance_ && bumper_data.sectors[i] < repulsion_distance) {
 
-        int oposite_sector_idx = (i + bumper_data.n_horizontal_sectors / 2) % bumper_data.n_horizontal_sectors;
+        // check for locking between the oposite walls
+        // get the desired direction of motion
+        double oposite_direction  = double(i) * sector_size + PI;
+        int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
+
+        if (bumper_data.sectors[oposite_sector_idx] > 0 && ((bumper_data.sectors[i] + bumper_data.sectors[oposite_sector_idx]) <=
+                                                            (2 * bumper_repulsion_horizontal_distance_ + 2 * bumper_repulsion_horizontal_offset_))) {
+
+          wall_locked_horizontal = true;
+
+          if (fabs(bumper_data.sectors[i] - bumper_data.sectors[oposite_sector_idx]) <= 2 * bumper_repulsion_horizontal_offset_) {
+
+            ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper locked between two walls");
+            continue;
+          }
+        }
+
+        // get the id of the oposite sector
+        direction = oposite_direction;
+
+        /* int oposite_sector_idx = (i + bumper_data.n_horizontal_sectors / 2) % bumper_data.n_horizontal_sectors; */
 
         ROS_WARN_THROTTLE(1.0, "[ControlManager]: found potential collision (sector %d vs. %d), obstacle distance: %2.2f, repulsing", i, oposite_sector_idx,
                           bumper_data.sectors[i]);
 
-        // get the desired direction of motion
-        direction = double(i) * sector_size + PI;
+        ROS_INFO_THROTTLE(1.0, "[ControlManager]: oposite direction: %2.2f", oposite_direction);
 
-        ROS_INFO_THROTTLE(1.0, "[ControlManager]: direction: %2.2f", direction);
+        if (wall_locked_horizontal) {
+          if (bumper_data.sectors[i] < bumper_data.sectors[oposite_sector_idx]) {
+            repulsion_distance = bumper_repulsion_horizontal_offset_;
+          } else {
+            repulsion_distance = -bumper_repulsion_horizontal_offset_;
+          }
+        } else {
+          repulsion_distance = bumper_repulsion_horizontal_distance_ + bumper_repulsion_horizontal_offset_ - bumper_data.sectors[i];
+        }
 
-        repulsion_distance = bumper_data.sectors[i];
-        repulsing_from     = i;
+        min_distance = bumper_data.sectors[i];
 
-        collision_detected = true;
+        repulsing_from = i;
+
+        horizontal_collision_detected = true;
       }
     }
 
-    repulsion_distance = bumper_repulsion_horizontal_distance_ + bumper_repulsion_horizontal_offset_ - repulsion_distance;
+    bool collision_above      = false;
+    bool collision_below      = false;
+    bool wall_locked_vertical = false;
+    double vertical_repulsion_distance = 0;
+
+    // check for vertical collision down
+    if (bumper_data.sectors[bumper_data.n_horizontal_sectors] > 0 &&
+        bumper_data.sectors[bumper_data.n_horizontal_sectors] <= bumper_repulsion_vertical_distance_) {
+
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper: potential collision below");
+      collision_above             = true;
+      vertical_collision_detected = true;
+      vertical_repulsion_distance = bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors];
+    }
+
+    // check for vertical collision up
+    if (bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] > 0 &&
+        bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] <= bumper_repulsion_vertical_distance_) {
+
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper: potential collision above");
+      collision_below             = true;
+      vertical_collision_detected = true;
+      vertical_repulsion_distance = -(bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors+1]);
+    }
+
+    // check the up/down wall locking
+    if (collision_above && collision_below) {
+
+      if (((bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
+           (2 * bumper_repulsion_vertical_distance_ + 2 * bumper_repulsion_vertical_offset_))) {
+
+        wall_locked_vertical = true;
+
+        vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors+1])/2.0;
+
+        /* // should we repulse up or down? */
+        /* if (bumper_data.sectors[bumper_data.n_horizontal_sectors] < bumper_data.sectors[bumper_data.n_horizontal_sectors+1]) { */
+        /*   vertical_repulsion_distance = bumper_repulsion_vertical_offset_; */
+        /* } else { */
+        /*   vertical_repulsion_distance = -bumper_repulsion_vertical_offset_; */
+        /* } */
+
+        if (fabs(bumper_data.sectors[bumper_data.n_horizontal_sectors] - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
+            2 * bumper_repulsion_vertical_offset_) {
+
+          ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper locked between the floor and ceiling");
+          vertical_collision_detected = false;
+        }
+      }
+    }
 
     // if potential collision was detected and we should start the repulsing
-    if (collision_detected) {
+    if (horizontal_collision_detected || vertical_collision_detected) {
 
       ROS_INFO("[ControlManager]: repulsing was initiated");
 
@@ -3134,9 +3242,15 @@ namespace mrs_uav_manager
         // rotate it from the frame of the drone
         des = rotateVector(des, odometry_yaw);
 
-        req_goto_out.goal[0] = des[0];
-        req_goto_out.goal[1] = des[1];
-        req_goto_out.goal[2] = 0;
+        if (horizontal_collision_detected) {
+          req_goto_out.goal[0] = des[0];
+          req_goto_out.goal[1] = des[1];
+        }
+
+        if (vertical_collision_detected) {
+          req_goto_out.goal[2] = vertical_repulsion_distance;
+        }
+
         req_goto_out.goal[3] = 0;
       }
 
@@ -3165,7 +3279,7 @@ namespace mrs_uav_manager
     }
 
     // if repulsing and the distance is safe once again
-    if (repulsing && (bumper_data.sectors[repulsing_from] >= bumper_repulsion_horizontal_distance_ || bumper_data.sectors[repulsing_from] < 0)) {
+    if ((repulsing && !horizontal_collision_detected && !vertical_collision_detected)) {
 
       ROS_INFO("[ControlManager]: repulsing was stopped");
 
@@ -3200,20 +3314,20 @@ namespace mrs_uav_manager
     std::scoped_lock lock(mutex_odometry);  // TODO check if it can be here
 
     // heading of the point in drone frame
-    double point_heading = atan2(y, x);
+    double point_heading_horizontal = atan2(y, x);
 
-    point_heading += TAU;
+    point_heading_horizontal += TAU;
 
-    // if point_heading is greater then 2*PI mod it
-    if (fabs(point_heading) >= TAU) {
-      point_heading = fmod(point_heading, TAU);
+    // if point_heading_horizontal is greater then 2*PI mod it
+    if (fabs(point_heading_horizontal) >= TAU) {
+      point_heading_horizontal = fmod(point_heading_horizontal, TAU);
     }
 
     // heading of the right edge of the first sector
     double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
     // calculate the idx
-    int idx = floor((point_heading + (sector_size / 2.0)) / sector_size);
+    int idx = floor((point_heading_horizontal + (sector_size / 2.0)) / sector_size);
 
     if (uint(idx) > bumper_data.n_horizontal_sectors - 1) {
       idx -= bumper_data.n_horizontal_sectors;
