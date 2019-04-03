@@ -980,7 +980,9 @@ namespace mrs_uav_manager
         {
           std::scoped_lock lock(mutex_flightime_timer);
 
-          flighttime_timer.start();
+          if (flighttime_timer_enabled_) {
+            flighttime_timer.start();
+          }
         }
 
         ROS_INFO("[UavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
