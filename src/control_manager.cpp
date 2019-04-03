@@ -244,6 +244,7 @@ namespace mrs_uav_manager
     bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
     void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
+    bool isOffboard(void);
 
     bool ehover(std::string &message_out);
     bool eland(std::string &message_out);
@@ -289,7 +290,7 @@ namespace mrs_uav_manager
     double     reseting_odometry    = false;
 
   private:
-    double escalating_failsafe_timeout_;
+    double    escalating_failsafe_timeout_;
     ros::Time escalating_failsafe_time;
 
   private:
@@ -2876,6 +2877,21 @@ namespace mrs_uav_manager
 
   //}
 
+  /* isOffboard() //{ */
+
+  bool ControlManager::isOffboard(void) {
+
+    if (got_mavros_state && (ros::Time::now() - mavros_state.header.stamp).toSec() < 1.0 &&
+        mavros_state.mode.compare(std::string("OFFBOARD")) == STRING_EQUAL) {
+
+      return true;
+    }
+
+    return false;
+  }
+
+  //}
+
   // | ----------------------- safety area ---------------------- |
 
   /* //{ isInSafetyArea3d() */
@@ -3690,7 +3706,7 @@ namespace mrs_uav_manager
     {
       std::scoped_lock lock(mutex_mavros_state);
 
-      if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 1.0 || mavros_state.mode.compare(std::string("OFFBOARD")) != 0) {
+      if (!isOffboard()) {
 
         ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode.");
         return false;
