@@ -147,7 +147,8 @@ namespace mrs_uav_manager
     ros::ServiceServer service_server_hover;
     ros::ServiceServer service_server_ehover;
     ros::ServiceServer service_server_failsafe;
-    ;
+    ros::ServiceServer service_server_failsafe_escalating;
+
     ros::ServiceServer service_server_motors;
     ros::ServiceServer service_server_arm;
     ros::ServiceServer service_server_enable_callbacks;
@@ -252,6 +253,7 @@ namespace mrs_uav_manager
     bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackFailsafe(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+    bool callbackFailsafeEscalating(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool callbackEland(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
     bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
@@ -285,6 +287,10 @@ namespace mrs_uav_manager
     void       safetyTimer(const ros::TimerEvent &event);
     bool       running_safety_timer = false;
     double     reseting_odometry    = false;
+
+  private:
+    double escalating_failsafe_timeout_;
+    ros::Time escalating_failsafe_time;
 
   private:
     ros::Timer bumper_timer;
@@ -371,6 +377,7 @@ namespace mrs_uav_manager
     joystick_tracker_press_time  = ros::Time(0);
     joystick_failsafe_press_time = ros::Time(0);
     joystick_eland_press_time    = ros::Time(0);
+    escalating_failsafe_time     = ros::Time(0);
 
     ROS_INFO("[ControlManager]: initializing");
 
@@ -417,6 +424,8 @@ namespace mrs_uav_manager
     param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
     param_loader.load_param("safety/tilt_error_failsafe/min_height", tilt_error_failsafe_min_height_);
     tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * PI;
+
+    param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
 
     param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
 
@@ -641,17 +650,18 @@ namespace mrs_uav_manager
 
     // | -------------------- general services -------------------- |
 
-    service_server_switch_tracker    = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-    service_server_switch_controller = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-    service_server_hover             = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
-    service_server_ehover            = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
-    service_server_failsafe          = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-    service_server_motors            = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
-    service_server_arm               = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-    service_server_enable_callbacks  = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-    service_server_set_constraints   = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-    service_server_use_joystick      = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-    service_server_eland             = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+    service_server_switch_tracker      = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+    service_server_switch_controller   = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+    service_server_hover               = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
+    service_server_ehover              = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
+    service_server_failsafe            = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
+    service_server_failsafe_escalating = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
+    service_server_motors              = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+    service_server_arm                 = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+    service_server_enable_callbacks    = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+    service_server_set_constraints     = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+    service_server_use_joystick        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+    service_server_eland               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
 
     service_client_arm   = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
     service_client_eland = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -1658,6 +1668,50 @@ namespace mrs_uav_manager
     std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
     res.success = failsafe();
+
+    return true;
+  }
+
+  //}
+
+  /* callbackFailsafeEscalating() //{ */
+
+  bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+    if (!is_initialized)
+      return false;
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackFailsafeEscalating");
+
+    if ((ros::Time::now() - escalating_failsafe_time).toSec() < escalating_failsafe_timeout_) {
+
+      res.message = "too soon for escalating failsafe";
+      res.success = false;
+      return true;
+    }
+
+    ROS_WARN("[ControlManager]: escalating failsafe triggered");
+
+    if (!eland_triggered && !failsafe_triggered && motors) {
+
+      res.success              = eland(res.message);
+      res.message              = "triggering eland";
+      escalating_failsafe_time = ros::Time::now();
+
+    } else if (eland_triggered) {
+
+      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+      res.success              = failsafe();
+      res.message              = "triggering failsafe";
+      escalating_failsafe_time = ros::Time::now();
+
+    } else if (failsafe_triggered) {
+
+      escalating_failsafe_time = ros::Time::now();
+      res.message              = "disarming";
+      res.success              = arming(false);
+    }
 
     return true;
   }

@@ -199,6 +199,7 @@
       <remap from="~arm_in" to="~arm" />
       <remap from="~eland_in" to="~eland" />
       <remap from="~failsafe_in" to="~failsafe" />
+      <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
 
     </node>
