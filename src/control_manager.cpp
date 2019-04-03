@@ -1180,6 +1180,10 @@ namespace mrs_uav_manager
 
     mrs_lib::Routine profiler_routine = profiler->createRoutine("bumperTimer", bumper_timer_rate_, 0.01, event);
 
+    if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+      return;
+    }
+
     {
       std::scoped_lock lock(mutex_odometry);
 
@@ -2965,6 +2969,10 @@ namespace mrs_uav_manager
 
     if (!got_bumper) {
       return true;
+    }
+
+    if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+      return true; 
     }
 
     double fcu_x, fcu_y, fcu_z;
