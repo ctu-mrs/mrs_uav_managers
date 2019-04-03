@@ -31,6 +31,6 @@ landing:
 
 flight_timer:
 
-  enabled: true
+  enabled: false
   rate: 1 # [Hz]
   max_time: 10 # [s]
