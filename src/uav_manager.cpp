@@ -184,6 +184,7 @@ namespace mrs_uav_manager
     double      uav_mass_;
     double      g_;
     double      landing_uav_mass_;
+    bool        landing_disarm_;
     double      hover_thrust_a_;
     double      hover_thrust_b_;
 
@@ -193,6 +194,15 @@ namespace mrs_uav_manager
     void landingTimer(const ros::TimerEvent &event);
     void takeoffTimer(const ros::TimerEvent &event);
     void maxHeightTimer(const ros::TimerEvent &event);
+    void flighttimeTimer(const ros::TimerEvent &event);
+
+  private:
+    ros::Timer flighttime_timer;
+    double     flighttime_timer_rate_;
+    double     flighttime_max_time;
+    bool       flighttime_timer_enabled_;
+    double     flighttime = 0;
+    std::mutex mutex_flightime_timer;
 
     // | ------------------------ profiler ------------------------ |
   private:
@@ -284,6 +294,7 @@ namespace mrs_uav_manager
     param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
     param_loader.load_param("landing/landing_cutoff_height", landing_cutoff_height_);
     param_loader.load_param("landing/landing_cutoff_mass_factor", landing_cutoff_mass_factor_);
+    param_loader.load_param("landing/disarm", landing_disarm_);
 
     param_loader.load_param("uav_mass", uav_mass_);
     param_loader.load_param("g", g_);
@@ -297,6 +308,10 @@ namespace mrs_uav_manager
 
     param_loader.load_param("require_gain_manager", gain_manager_required_);
     param_loader.load_param("require_constraint_manager", constraint_manager_required_);
+
+    param_loader.load_param("flight_timer/enabled", flighttime_timer_enabled_);
+    param_loader.load_param("flight_timer/rate", flighttime_timer_rate_);
+    param_loader.load_param("flight_timer/max_time", flighttime_max_time);
 
     // --------------------------------------------------------------
     // |                    landing state machine                   |
@@ -317,6 +332,7 @@ namespace mrs_uav_manager
     landing_timer    = nh_.createTimer(ros::Rate(landing_timer_rate_), &UavManager::landingTimer, this, false, false);
     takeoff_timer    = nh_.createTimer(ros::Rate(takeoff_timer_rate_), &UavManager::takeoffTimer, this, false, false);
     max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &UavManager::maxHeightTimer, this);
+    flighttime_timer = nh_.createTimer(ros::Rate(flighttime_timer_rate_), &UavManager::flighttimeTimer, this, false, false);
 
     // | ----------------------- finish init ---------------------- |
 
@@ -412,6 +428,15 @@ namespace mrs_uav_manager
               std_srvs::SetBool enable_callbacks_out;
               enable_callbacks_out.request.data = true;
               service_client_enabled_callbacks.call(enable_callbacks_out);
+
+              if (landing_disarm_) {
+
+                ROS_INFO("[UavManager]: disarming after landing");
+
+                std_srvs::SetBool arm_out;
+                arm_out.request.data = false;
+                service_client_arm.call(arm_out);
+              }
 
               changeLandingState(IDLE_STATE);
 
@@ -549,6 +574,51 @@ namespace mrs_uav_manager
 
           fixing_max_height = false;
         }
+      }
+    }
+  }
+
+  //}
+
+  /* //{ flighttimeTimer() */
+
+  void UavManager::flighttimeTimer(const ros::TimerEvent &event) {
+
+    if (!is_initialized)
+      return;
+
+    std::scoped_lock lock(mutex_flightime_timer);
+
+    mrs_lib::Routine profiler_routine = profiler->createRoutine("flighttimeTimer", flighttime_timer_rate_, 0.1, event);
+
+    flighttime += 1.0/flighttime_timer_rate_;
+
+    if (flighttime > flighttime_max_time) {
+
+      flighttime = 0;
+      flighttime_timer.stop();
+
+      ROS_INFO("[UavManager]: max flight time achieved, landing");
+
+      mrs_msgs::String switch_tracker_out;
+      switch_tracker_out.request.value = landing_tracker_name_;
+      service_client_switch_tracker.call(switch_tracker_out);
+
+      std_srvs::Trigger land_out;
+      if (switch_tracker_out.response.success == true) {
+
+        service_client_land.call(land_out);
+
+        ros::Duration wait(1.0);
+        wait.sleep();
+
+        changeLandingState(LANDING_STATE);
+
+        landing_timer.start();
+
+      } else {
+
+        changeLandingState(IDLE_STATE);
       }
     }
   }
@@ -907,6 +977,12 @@ namespace mrs_uav_manager
           takeoff_y = odometry_y;
         }
 
+        {
+          std::scoped_lock lock(mutex_flightime_timer);
+
+          flighttime_timer.start();
+        }
+
         ROS_INFO("[UavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
 
         takingoff = true;
@@ -960,6 +1036,8 @@ namespace mrs_uav_manager
     }
 
     ROS_INFO("[UavManager]: landing");
+
+    flighttime_timer.stop();
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = landing_tracker_name_;

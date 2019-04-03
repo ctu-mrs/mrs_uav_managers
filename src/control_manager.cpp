@@ -3084,19 +3084,21 @@ namespace mrs_uav_manager
 
         new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
         new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
+
+        ROS_WARN(
+            "[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f (sector %d) is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it "
+            "to x: %2.2f, y: %2.2f",
+            fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
+            new_y);
       }
 
       if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_)) {
 
         new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_);
-      }
 
-      ROS_WARN(
-          "[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it "
-          "to x: %2.2f, y: "
-          "%2.2f, z: %2.2f",
-          fcu_x, fcu_y, fcu_z, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
-          new_y, new_z);
+        ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %2.2f is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it z: %2.2f", fcu_z,
+                 vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
+      }
 
       // express the point back in the original FRAME
       /* FCU to original frame conversion //{ */

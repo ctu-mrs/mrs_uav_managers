@@ -26,3 +26,11 @@ landing:
   # those two must apply simultaneously
   landing_cutoff_height:  0.5
   landing_cutoff_mass_factor:  0.3 # how much light does the drone appear to be?
+
+  disarm: true
+
+flight_timer:
+
+  enabled: true
+  rate: 1 # [Hz]
+  max_time: 30 # [s]
