@@ -2,7 +2,6 @@
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LandoffTracker",
-  "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
   "mrs_trackers/JoyTracker",
 ]
@@ -11,7 +10,6 @@ trackers : [
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/So3Controller",
-  "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
   "mrs_controllers/AttitudeController",
 ]
