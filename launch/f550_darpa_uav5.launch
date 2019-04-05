@@ -4,7 +4,7 @@
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
-  <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml" />
+  <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
   <arg name="g" default="9.8" />
   <arg name="debug" default="false" />
 
