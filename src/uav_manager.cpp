@@ -173,7 +173,8 @@ private:
 private:
   ros::Timer  takeoff_timer;
   double      takeoff_timer_rate_;
-  bool        takingoff = false;
+  bool        takingoff          = false;
+  int         number_of_takeoffs = 0;
   std::string after_takeoff_tracker_name_;
   std::string takeoff_tracker_name_;
 
@@ -947,6 +948,29 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     }
   }
 
+  if (number_of_takeoffs > 0) {
+
+    if (!got_attitude_command) {
+
+      sprintf((char *)&message, "Can't takeoff, missing attitude command!");
+      res.message = message;
+      res.success = false;
+      ROS_ERROR("[UavManager]: %s", message);
+      return true;
+    }
+
+    std::scoped_lock lock(mutex_attitude_command);
+
+    if (fabs(attitude_command.mass_difference) > 0.5) {
+
+      sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large!");
+      res.message = message;
+      res.success = false;
+      ROS_ERROR("[UavManager]: %s", message);
+      return true;
+    }
+  }
+
   ROS_INFO("[UavManager]: taking off");
 
   mrs_msgs::String switch_tracker_out;
@@ -990,6 +1014,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
       ROS_INFO("[UavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
 
       takingoff = true;
+      number_of_takeoffs++;
 
       takeoff_timer.start();
     }
