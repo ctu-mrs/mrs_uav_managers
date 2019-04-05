@@ -1182,6 +1182,10 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("bumperTimer", bumper_timer_rate_, 0.01, event);
 
+  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
+    return;
+  }
+
   if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
     return;
   }
