@@ -14,6 +14,7 @@ estimator_types: [
 
 gains: [
   "optflow",
+  "optflow_dark",
 ]
 
 gain_management:
@@ -27,7 +28,7 @@ gain_management:
     RTK: ["optflow"]
     OPTFLOWGPS: ["optflow"]
     GPS: ["optflow"]
-    OPTFLOW: ["optflow"]
+    OPTFLOW: ["optflow", "optflow_dark"]
     OTHER: ["optflow"]
 
   # those gains will be used automatically when a localization mode switches
@@ -40,5 +41,5 @@ gain_management:
     RTK: "optflow"
     OPTFLOWGPS: "optflow"
     GPS: "optflow"
-    OPTFLOW: "optflow"
+    OPTFLOW: "optflow_dark"
     OTHER: "optflow"
