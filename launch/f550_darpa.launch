@@ -31,7 +31,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/uav_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550_darpa/motor_params.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/uav/f550_darpa/motor_params_new_esc.yaml" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
@@ -57,7 +57,7 @@
       <!-- Services -->
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
-      <remap from="~land_home_in" to="~land_home" />
+      aremap from="~land_home_in" to="~land_home" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
@@ -73,7 +73,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/control_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550_darpa/motor_params.yaml" />
+      <rosparam file="$(find mrs_controllers)/config/uav/f550_darpa/motor_params_new_esc.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
       <param name="g" value="$(arg g)" />
