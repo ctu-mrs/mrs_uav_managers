@@ -199,6 +199,7 @@ private:
   void takeoffTimer(const ros::TimerEvent &event);
   void maxHeightTimer(const ros::TimerEvent &event);
   void flighttimeTimer(const ros::TimerEvent &event);
+  void maxthrustTimer(const ros::TimerEvent &event);
 
 private:
   ros::Timer flighttime_timer;
@@ -207,6 +208,12 @@ private:
   bool       flighttime_timer_enabled_;
   double     flighttime = 0;
   std::mutex mutex_flightime_timer;
+
+private:
+  ros::Timer maxthrust_timer;
+  bool       maxthrust_timer_enabled_;
+  double     maxthrust_timer_rate_;
+  double     maxthrust_max_thrust_;
 
   // | ------------------------ profiler ------------------------ |
 private:
@@ -317,6 +324,10 @@ void UavManager::onInit() {
   param_loader.load_param("flight_timer/rate", flighttime_timer_rate_);
   param_loader.load_param("flight_timer/max_time", flighttime_max_time);
 
+  param_loader.load_param("max_thrust/enabled", maxthrust_timer_enabled_);
+  param_loader.load_param("max_thrust/rate", maxthrust_timer_rate_);
+  param_loader.load_param("max_thrust/max_thrust", maxthrust_max_thrust_);
+
   // --------------------------------------------------------------
   // |                    landing state machine                   |
   // --------------------------------------------------------------
@@ -337,6 +348,7 @@ void UavManager::onInit() {
   takeoff_timer    = nh_.createTimer(ros::Rate(takeoff_timer_rate_), &UavManager::takeoffTimer, this, false, false);
   max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &UavManager::maxHeightTimer, this);
   flighttime_timer = nh_.createTimer(ros::Rate(flighttime_timer_rate_), &UavManager::flighttimeTimer, this, false, false);
+  maxthrust_timer  = nh_.createTimer(ros::Rate(maxthrust_timer_rate_), &UavManager::maxthrustTimer, this, false, false);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -487,7 +499,13 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
       std::scoped_lock lock(mutex_odometry);
 
       if (fabs(takeoff_height_ - odometry_z) < 0.2) {
+
         ROS_INFO("[UavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
+
+        // if enabled, start the timer for landing after reaching max thrust
+        if (maxthrust_timer_enabled_) {
+          maxthrust_timer.start();
+        }
 
         mrs_msgs::String switch_tracker_out;
         switch_tracker_out.request.value = after_takeoff_tracker_name_;
@@ -602,6 +620,46 @@ void UavManager::flighttimeTimer(const ros::TimerEvent &event) {
     flighttime_timer.stop();
 
     ROS_INFO("[UavManager]: max flight time achieved, landing");
+
+    mrs_msgs::String switch_tracker_out;
+    switch_tracker_out.request.value = landing_tracker_name_;
+    service_client_switch_tracker.call(switch_tracker_out);
+
+    std_srvs::Trigger land_out;
+    if (switch_tracker_out.response.success == true) {
+
+      service_client_land.call(land_out);
+
+      ros::Duration wait(1.0);
+      wait.sleep();
+
+      changeLandingState(LANDING_STATE);
+
+      landing_timer.start();
+
+    } else {
+
+      changeLandingState(IDLE_STATE);
+    }
+  }
+}
+
+//}
+
+/* //{ maxthrustTimer() */
+
+void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("maxthrustTimer", maxthrust_timer_rate_, 0.002, event);
+
+  if (attitude_command.thrust >= maxthrust_max_thrust_) {
+
+    maxthrust_timer.stop();
+
+    ROS_INFO("[UavManager]: detecting maximum allowed thrust in attitude_cmd, landing");
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = landing_tracker_name_;
@@ -1004,9 +1062,11 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
       }
 
       {
-        std::scoped_lock lock(mutex_flightime_timer);
-
+        // if enabled, start the timer for measuring the flight time
         if (flighttime_timer_enabled_) {
+
+          std::scoped_lock lock(mutex_flightime_timer);
+
           flighttime_timer.start();
         }
       }
