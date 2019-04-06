@@ -41,5 +41,5 @@ gain_management:
     RTK: "optflow"
     OPTFLOWGPS: "optflow"
     GPS: "optflow"
-    OPTFLOW: "optflow_dark"
+    OPTFLOW: "optflow"
     OTHER: "optflow"
