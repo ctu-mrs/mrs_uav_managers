@@ -688,7 +688,7 @@ void ControlManager::onInit() {
 
   service_client_arm      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_shutdown = nh_.serviceClient<mrs_msgs::Float64Stamped>("shutdown_out");
+  service_client_shutdown = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -1057,8 +1057,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
       mavros_msgs::CommandBool srv_out;
       service_client_arm.call(srv_out);
 
-      mrs_msgs::Float64Stamped shutdown_out;
-      shutdown_out.value = 60.0;
+      std_srvs::Trigger shutdown_out;
       service_client_shutdown.call(shutdown_out);
 
       // TODO: check the result?
@@ -3806,6 +3805,9 @@ bool ControlManager::arming(bool input) {
       ROS_INFO("[ControlManager]: calling for disarming");
 
       service_client_arm.call(srv_out);
+
+      std_srvs::Trigger shutdown_out;
+      service_client_shutdown.call(shutdown_out);
 
       return srv_out.response.success;
     }

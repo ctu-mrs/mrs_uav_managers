@@ -196,6 +196,7 @@
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
       <remap from="~rc_in" to="mavros/rc/in" />
+      <remap from="~shutdown_out" to="automatic_start_darpa/shutdown" />
 
     </node>
 
