@@ -26,7 +26,7 @@
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/State.h>
-#include <mavros_msgs/RCOut.h>
+#include <mavros_msgs/RCIn.h>
 #include <std_srvs/SetBool.h>
 
 #include <pluginlib/class_loader.h>
@@ -193,7 +193,7 @@ private:
 
 private:
   ros::Subscriber    subscriber_rc;
-  mavros_msgs::RCOut rc_channels;
+  mavros_msgs::RCIn rc_channels;
   std::mutex         mutex_rc_channels;
   bool               got_rc_channels = false;
 
@@ -254,7 +254,7 @@ private:
   bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
-  void callbackRC(const mavros_msgs::RCOutConstPtr &msg);
+  void callbackRC(const mavros_msgs::RCInConstPtr &msg);
   bool isOffboard(void);
 
   bool ehover(std::string &message_out);
@@ -1494,12 +1494,14 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(const mavros_msgs::RCOutConstPtr &msg) {
+void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
   if (!is_initialized)
     return;
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackRC");
+
+  ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
   {
     std::scoped_lock lock(mutex_rc_channels);
@@ -1510,14 +1512,14 @@ void ControlManager::callbackRC(const mavros_msgs::RCOutConstPtr &msg) {
 
   if (rc_eland_enabled_) {
 
-    if ((msg->channels.size() - 1) > uint(rc_eland_channel_)) {
+    if (uint(rc_eland_channel_) > (msg->channels.size() - 1)) {
 
-      ROS_ERROR("[ControlManager]: RC eland channel number is out of range");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
       return;
 
     } else {
 
-      if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered) {
+      if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered && !failsafe_triggered) {
 
         ROS_INFO("[ControlManager]: triggering eland by RC");
 
@@ -3504,7 +3506,11 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       elanding_timer.start();
       eland_triggered = true;
 
-      landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        landing_uav_mass_ = uav_mass_;
+      } else {
+        landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+      }
     }
 
     break;
@@ -3690,13 +3696,18 @@ bool ControlManager::eland(std::string &message_out) {
   std_srvs::Trigger eland_out;
   service_client_eland.call(eland_out);
 
-  // TODO: check result of the service call
-
-  changeLandingState(LANDING_STATE);
-
-  if (success) {
+  if (!eland_out.response.success) {
+    
+    changeLandingState(LANDING_STATE);
     sprintf((char *)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
+  } else{
+
+    sprintf((char *)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+
+    message_out = std::string(message);
+    success     = false;
   }
 
   return success;
@@ -3728,7 +3739,11 @@ bool ControlManager::failsafe() {
       failsafe_triggered = true;
       elanding_timer.stop();
 
-      landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        landing_uav_mass_ = uav_mass_;
+      } else {
+        landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+      }
 
       eland_triggered = false;
       failsafe_timer.start();
@@ -3975,13 +3990,15 @@ void ControlManager::publish(void) {
 
   bool should_publish = false;
 
-  if (active_tracker_idx == 0 || !motors) {
+  if (!motors) {
 
-    if (!motors) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
-    } else {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
-    }
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
+
+    should_publish = false;
+
+  } else if (active_tracker_idx == 0) {
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
     desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
     desired_orientation.normalize();

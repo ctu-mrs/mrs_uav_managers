@@ -52,7 +52,7 @@ safety:
   rc_eland:
 
     enabled: true
-    channel_number: 8 # [-]
+    channel_number: 7 # [-]
     threshold: 1500 # [us]
 
 obstacle_bumper:
