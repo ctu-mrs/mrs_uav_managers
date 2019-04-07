@@ -171,6 +171,7 @@ private:
 
   ros::ServiceClient service_client_arm;
   ros::ServiceClient service_client_eland;
+  ros::ServiceClient service_client_shutdown;
 
   ros::Subscriber subscriber_goto;
   ros::Subscriber subscriber_goto_fcu;
@@ -192,10 +193,10 @@ private:
   bool               got_mavros_state = false;
 
 private:
-  ros::Subscriber    subscriber_rc;
+  ros::Subscriber   subscriber_rc;
   mavros_msgs::RCIn rc_channels;
-  std::mutex         mutex_rc_channels;
-  bool               got_rc_channels = false;
+  std::mutex        mutex_rc_channels;
+  bool              got_rc_channels = false;
 
 private:
   void updateTrackers(void);
@@ -339,8 +340,8 @@ private:
 
 private:
   bool rc_eland_enabled_ = false;
-  int rc_eland_channel_;
-  int rc_eland_threshold_;
+  int  rc_eland_channel_;
+  int  rc_eland_threshold_;
 
 private:
   std::mutex mutex_joystick;
@@ -685,8 +686,9 @@ void ControlManager::onInit() {
   service_server_use_joystick        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
   service_server_eland               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
 
-  service_client_arm   = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
-  service_client_eland = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_arm      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
+  service_client_eland    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_shutdown = nh_.serviceClient<mrs_msgs::Float64Stamped>("shutdown_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -1054,6 +1056,10 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
       // disarm the drone
       mavros_msgs::CommandBool srv_out;
       service_client_arm.call(srv_out);
+
+      mrs_msgs::Float64Stamped shutdown_out;
+      shutdown_out.value = 60.0;
+      service_client_shutdown.call(shutdown_out);
 
       // TODO: check the result?
 
@@ -3697,11 +3703,11 @@ bool ControlManager::eland(std::string &message_out) {
   service_client_eland.call(eland_out);
 
   if (!eland_out.response.success) {
-    
+
     changeLandingState(LANDING_STATE);
     sprintf((char *)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
-  } else{
+  } else {
 
     sprintf((char *)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
