@@ -26,6 +26,7 @@
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/State.h>
+#include <mavros_msgs/RCOut.h>
 #include <std_srvs/SetBool.h>
 
 #include <pluginlib/class_loader.h>
@@ -191,6 +192,12 @@ private:
   bool               got_mavros_state = false;
 
 private:
+  ros::Subscriber    subscriber_rc;
+  mavros_msgs::RCOut rc_channels;
+  std::mutex         mutex_rc_channels;
+  bool               got_rc_channels = false;
+
+private:
   void updateTrackers(void);
   void updateControllers(void);
   void publish(void);
@@ -247,6 +254,7 @@ private:
   bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
 
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
+  void callbackRC(const mavros_msgs::RCOutConstPtr &msg);
   bool isOffboard(void);
 
   bool ehover(std::string &message_out);
@@ -328,6 +336,11 @@ private:
 
   Eigen::Vector3d local2fcu(const Eigen::Vector3d in);
   Eigen::Vector3d fcu2local(const Eigen::Vector3d in);
+
+private:
+  bool rc_eland_enabled_ = false;
+  int rc_eland_channel_;
+  int rc_eland_threshold_;
 
 private:
   std::mutex mutex_joystick;
@@ -446,6 +459,10 @@ void ControlManager::onInit() {
   param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
   param_loader.load_param("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
   param_loader.load_param("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
+
+  param_loader.load_param("safety/rc_eland/enabled", rc_eland_enabled_);
+  param_loader.load_param("safety/rc_eland/channel_number", rc_eland_channel_);
+  param_loader.load_param("safety/rc_eland/threshold", rc_eland_threshold_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -651,6 +668,7 @@ void ControlManager::onInit() {
   subscriber_joystick     = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
   subscriber_bumper       = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_rc           = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -1470,6 +1488,44 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
   }
 
   got_mavros_state = true;
+}
+
+//}
+
+/* //{ callbackRC() */
+
+void ControlManager::callbackRC(const mavros_msgs::RCOutConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackRC");
+
+  {
+    std::scoped_lock lock(mutex_rc_channels);
+    rc_channels = *msg;
+  }
+
+  got_rc_channels = true;
+
+  if (rc_eland_enabled_) {
+
+    if ((msg->channels.size() - 1) > uint(rc_eland_channel_)) {
+
+      ROS_ERROR("[ControlManager]: RC eland channel number is out of range");
+      return;
+
+    } else {
+
+      if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered) {
+
+        ROS_INFO("[ControlManager]: triggering eland by RC");
+
+        std::string message_out;
+        eland(message_out);
+      }
+    }
+  }
 }
 
 //}

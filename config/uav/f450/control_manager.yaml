@@ -51,6 +51,12 @@ safety:
     tilt_error_threshold: 30 # [deg]
     min_height: 0.5 # [m]
 
+  rc_eland:
+
+    enabled: true
+    channel_number: 8 # [-]
+    threshold: 1500 # [us]
+
 obstacle_bumper:
 
   enabled: false
