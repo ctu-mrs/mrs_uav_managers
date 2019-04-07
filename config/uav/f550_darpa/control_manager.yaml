@@ -46,7 +46,7 @@ safety:
   tilt_error_failsafe:
 
     enabled: true
-    tilt_error_threshold: 30 # [deg]
+    tilt_error_threshold: 40 # [deg]
     min_height: 0.5 # [m]
 
 obstacle_bumper:
