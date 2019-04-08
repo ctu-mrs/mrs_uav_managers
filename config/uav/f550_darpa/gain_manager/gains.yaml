@@ -16,8 +16,8 @@ optflow:
     kiw_lim: 10.0
 
   vertical:
-    kp: 8.6
-    kv: 4.3
+    kp: 17.0
+    kv: 8.0
     ka: 1.0
 
     attitude:

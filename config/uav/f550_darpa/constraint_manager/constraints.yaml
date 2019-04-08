@@ -1,8 +1,8 @@
 darpa:
 
   horizontal:
-    speed: 0.5
-    acceleration: 0.5
+    speed: 1.0
+    acceleration: 1.0
     jerk: 1.0
     snap: 1.0
 

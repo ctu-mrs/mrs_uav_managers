@@ -342,6 +342,7 @@ private:
   bool rc_eland_enabled_ = false;
   int  rc_eland_channel_;
   int  rc_eland_threshold_;
+  bool rc_eland_triggered = false;
 
 private:
   std::mutex mutex_joystick;
@@ -1054,8 +1055,16 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
       switchMotors(false);
 
       // disarm the drone
-      mavros_msgs::CommandBool srv_out;
-      service_client_arm.call(srv_out);
+      if (isOffboard()) {
+
+        ROS_INFO("[ControlManager]: reached cutoff thrust, calling for disarm");
+        mavros_msgs::CommandBool srv_out;
+        service_client_arm.call(srv_out);
+
+      } else {
+
+        ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode");
+      }
 
       std_srvs::Trigger shutdown_out;
       service_client_shutdown.call(shutdown_out);
@@ -1504,6 +1513,10 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  if (rc_eland_triggered) {
+    return; 
+  }
+
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackRC");
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
@@ -1527,6 +1540,8 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
       if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered && !failsafe_triggered) {
 
         ROS_INFO("[ControlManager]: triggering eland by RC");
+
+        rc_eland_triggered = true;
 
         std::string message_out;
         eland(message_out);
@@ -1828,7 +1843,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
     }
   }
 
-  if (req.data && (failsafe_triggered || eland_triggered)) {
+  if (req.data && (failsafe_triggered || eland_triggered || rc_eland_triggered)) {
     sprintf((char *)&message, "cannot switch motors ON, we landed in emergancy.");
     res.message = message;
     res.success = false;
@@ -3701,11 +3716,12 @@ bool ControlManager::eland(std::string &message_out) {
   std_srvs::Trigger eland_out;
   service_client_eland.call(eland_out);
 
-  if (!eland_out.response.success) {
+  if (eland_out.response.success) {
 
     changeLandingState(LANDING_STATE);
     sprintf((char *)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
+
   } else {
 
     sprintf((char *)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
@@ -3795,12 +3811,7 @@ bool ControlManager::arming(bool input) {
   {
     std::scoped_lock lock(mutex_mavros_state);
 
-    if (!isOffboard()) {
-
-      ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode.");
-      return false;
-
-    } else {
+    if (isOffboard()) {
 
       ROS_INFO("[ControlManager]: calling for disarming");
 
@@ -3810,6 +3821,11 @@ bool ControlManager::arming(bool input) {
       service_client_shutdown.call(shutdown_out);
 
       return srv_out.response.success;
+
+    } else {
+
+      ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode.");
+      return false;
     }
   }
 }
