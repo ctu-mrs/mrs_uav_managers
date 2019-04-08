@@ -1225,9 +1225,9 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_odometry);
 
-    if (odometry_z < 0.5) {
+    if (odometry_z < 0.75) {
 
-      ROS_WARN_THROTTLE(0.5, "[ControlManager]: not using bumper repulsion, height < 0.5 m");
+      ROS_WARN_THROTTLE(0.5, "[ControlManager]: not using bumper repulsion, height < 0.75 m");
       return;
     }
   }
