@@ -1,9 +1,9 @@
 darpa:
 
   horizontal:
-    speed: 1.0
-    acceleration: 1.0
-    jerk: 1.0
+    speed: 0.5
+    acceleration: 0.5
+    jerk: 0.5
     snap: 1.0
 
   vertical:
@@ -21,7 +21,7 @@ darpa:
       snap: 1.0
 
   yaw:
-    speed: 0.5
+    speed: 0.3
     acceleration: 0.5
-    jerk: 2.0
-    snap: 2.0
+    jerk: 0.5
+    snap: 1.0
