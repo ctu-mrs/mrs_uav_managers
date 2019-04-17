@@ -13,34 +13,32 @@ estimator_types: [
 ]
 
 constraints: [
-  "slow",
-  "medium",
-  "fast",
+  "darpa",
 ]
 
 constraint_management:
 
   # list of allowed gains per odometry mode
   allowed_constraints:
-    T265: ["slow", "medium", "fast"]
-    OBJECT: ["slow"]
-    VIO: ["slow"]
-    ICP: ["slow"]
-    RTK: ["slow"]
-    OPTFLOWGPS: ["slow"]
-    GPS: ["slow", "medium", "fast"]
-    OPTFLOW: ["slow"]
-    OTHER: ["slow"]
+    T265: ["darpa"]
+    OBJECT: ["darpa"]
+    VIO: ["darpa"]
+    ICP: ["darpa"]
+    RTK: ["darpa"]
+    OPTFLOWGPS: ["darpa"]
+    GPS: ["darpa"]
+    OPTFLOW: ["darpa"]
+    OTHER: ["darpa"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_constraints:
-    T265: "slow"
-    OBJECT: "slow"
-    VIO: "slow"
-    ICP: "slow"
-    RTK: "slow"
-    OPTFLOWGPS: "slow"
-    GPS: "medium"
-    OPTFLOW: "slow"
-    OTHER: "slow"
+    T265: "darpa"
+    OBJECT: "darpa"
+    VIO: "darpa"
+    ICP: "darpa"
+    RTK: "darpa"
+    OPTFLOWGPS: "darpa"
+    GPS: "darpa"
+    OPTFLOW: "darpa"
+    OTHER: "darpa"

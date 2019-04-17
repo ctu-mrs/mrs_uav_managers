@@ -1,23 +1,23 @@
 <library path="lib/libUavManager">
-  <class name="mrs_uav_manager/UavManager" type="mrs_uav_manager::UavManager" base_class_type="nodelet::Nodelet">
+  <class name="mrs_uav_manager/UavManager" type="mrs_uav_manager::uav_manager::UavManager" base_class_type="nodelet::Nodelet">
     <description>UavManager nodelet</description>
   </class>
 </library>
 
 <library path="lib/libControlManager">
-  <class name="mrs_uav_manager/ControlManager" type="mrs_uav_manager::ControlManager" base_class_type="nodelet::Nodelet">
+  <class name="mrs_uav_manager/ControlManager" type="mrs_uav_manager::control_manager::ControlManager" base_class_type="nodelet::Nodelet">
     <description>ControlManager nodelet</description>
   </class>
 </library>
 
 <library path="lib/libConstraintManager">
-  <class name="mrs_uav_manager/ConstraintManager" type="mrs_uav_manager::ConstraintManager" base_class_type="nodelet::Nodelet">
+  <class name="mrs_uav_manager/ConstraintManager" type="mrs_uav_manager::constraint_manager::ConstraintManager" base_class_type="nodelet::Nodelet">
     <description>ConstraintManager nodelet</description>
   </class>
 </library>
 
 <library path="lib/libGainManager">
-  <class name="mrs_uav_manager/GainManager" type="mrs_uav_manager::GainManager" base_class_type="nodelet::Nodelet">
+  <class name="mrs_uav_manager/GainManager" type="mrs_uav_manager::gain_manager::GainManager" base_class_type="nodelet::Nodelet">
     <description>GainManager nodelet</description>
   </class>
 </library>

@@ -2,17 +2,14 @@
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LandoffTracker",
-  "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
   "mrs_trackers/JoyTracker",
-  "mrs_trackers/MatlabTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/So3Controller",
-  "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
   "mrs_controllers/AttitudeController",
 ]
@@ -32,8 +29,8 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  control_error_eland: 2.0 # [m]
-  control_error_failsafe: 4.0 # [m]
+  control_error_eland: 1.0 # [m]
+  control_error_failsafe: 2.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
   ehover_tracker: "mrs_trackers/LandoffTracker"
@@ -60,11 +57,11 @@ safety:
 
 obstacle_bumper:
 
-  enabled: false
+  enabled: true
   timer_rate: 20 # [Hz]
 
-  horizontal_distance: 1.0 # [m]
-  vertical_distance: 1.0 # [m]
+  horizontal_distance: 0.9 # [m]
+  vertical_distance: 0.3 # [m]
 
   obstacle_hugging:
 
@@ -73,12 +70,12 @@ obstacle_bumper:
   # true: the drone will move away from obstacles that appear within the radius
   repulsion:
 
-    enabled: true
+    enabled: false
 
-    horizontal_distance: 1.0 # [m]
-    horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
+    horizontal_distance: 0.8 # [m]
+    horizontal_offset: 0.3 # [m] by how much to repulse from the horizontal_distance limit
 
-    vertical_distance: 1.0 # [m]
+    vertical_distance: 0.5 # [m]
     vertical_offset: 0.1 # [m]
 
 joystick:
