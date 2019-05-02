@@ -83,6 +83,6 @@ obstacle_bumper:
 joystick:
   joystick_timer_rate: 30 # [Hz]
 
-rc_joystic:
-  enable: false
-  channel_numer: 8
+rc_joystick:
+  enabled: false
+  channel_number: 8

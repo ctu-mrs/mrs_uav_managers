@@ -470,8 +470,8 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/rc_eland/channel_number", rc_eland_channel_);
   param_loader.load_param("safety/rc_eland/threshold", rc_eland_threshold_);
 
-  param_loader.load_param("rc_joystic/enabled", rc_goto_enabled_);
-  param_loader.load_param("rc_joystic/channel_number", rc_joystic_channel_);
+  param_loader.load_param("rc_joystick/enabled", rc_goto_enabled_);
+  param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1254,7 +1254,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
   }
 
-  if (rc_goto_enabled_) {
+  if (rc_goto_enabled_ && got_rc_channels) {
 
     std::scoped_lock lock(mutex_rc_channels);
 
