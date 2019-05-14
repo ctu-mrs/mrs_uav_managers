@@ -330,7 +330,7 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
   mrs_lib::Routine profiler_routine = profiler->createRoutine("constraintsManagementTimer", rate_, 0.01, event);
 
   if (!got_odometry_diagnostics) {
-    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constrint management, missing odometry diagnostics!");
+    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constraint management, missing odometry diagnostics!");
     return;
   }
 
