@@ -12,9 +12,9 @@ max_height_checking:
 takeoff:
   rate: 10 # [Hz]
   takeoff_tracker: "mrs_trackers/LandoffTracker"
-  after_takeoff_tracker: "mrs_trackers/MpcTracker"
+  after_takeoff_tracker: "mrs_trackers/LineTracker"
 
-  takeoff_height: 1.0
+  takeoff_height: 2.0
 
   ground_limit_height: 0.5 # under which height the takeoff can happen
 
@@ -40,4 +40,4 @@ max_thrust:
 
   enabled: false
   rate: 30 # [Hz]
-  max_thrust: 0.85 # [-]
+  max_thrust: 0.90 # [-]

@@ -3,17 +3,17 @@
 trackers : [
   "mrs_trackers/LandoffTracker",
   "mrs_trackers/LineTracker",
-  "mrs_trackers/MpcTracker",
-  "mrs_trackers/JoyTracker",
+  # "mrs_trackers/MpcTracker",
+  # "mrs_trackers/JoyTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
   "mrs_controllers/So3Controller",
-  "mrs_controllers/NsfController",
+  # "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
-  "mrs_controllers/AttitudeController",
+  # "mrs_controllers/AttitudeController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -39,7 +39,7 @@ safety:
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"
-  odometry_max_missing_time: 0.1 # [s]
+  odometry_max_missing_time: 0.5 # [s]
 
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0
