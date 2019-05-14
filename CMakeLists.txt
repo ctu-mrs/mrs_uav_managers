@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   nav_msgs
   mrs_msgs
+  mavros_msgs
   mrs_lib
   tf
   cmake_modules
@@ -24,7 +25,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib mavros_msgs
   LIBRARIES GainManager ConstraintManager ControlManager UavManager
   )
 

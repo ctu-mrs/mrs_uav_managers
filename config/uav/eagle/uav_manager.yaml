@@ -27,7 +27,7 @@ landing:
   landing_cutoff_height:  0.8
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
-  disarm: true
+  disarm: false
 
 flight_timer:
 

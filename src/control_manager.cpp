@@ -363,6 +363,10 @@ private:
   bool      joystick_back_pressed = false;
   bool      joystick_goto_enabled = false;
 
+  bool rc_goto_enabled_ = false;
+  bool rc_goto_active_  = false;
+  int  rc_joystic_channel_;
+
   bool      joystick_failsafe_pressed = false;
   ros::Time joystick_failsafe_press_time;
 
@@ -465,6 +469,9 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/rc_eland/enabled", rc_eland_enabled_);
   param_loader.load_param("safety/rc_eland/channel_number", rc_eland_channel_);
   param_loader.load_param("safety/rc_eland/threshold", rc_eland_threshold_);
+
+  param_loader.load_param("rc_joystick/enabled", rc_goto_enabled_);
+  param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1201,6 +1208,109 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       callbackGoToFcuService(request, response);
     }
   }
+
+  if (rc_goto_active_) {
+
+    std::scoped_lock lock(mutex_tracker_list, mutex_rc_channels);
+
+    // create the reference
+
+    mrs_msgs::Vec4::Request request;
+
+    double speed = 1.0;
+
+    if (abs(rc_channels.channels[0] - 1500) > 100) {
+      request.goal[1] = (-(rc_channels.channels[0] - 1500.0) / 500.0) * speed;
+    }
+
+    if (abs(rc_channels.channels[1] - 1500) > 100) {
+      request.goal[2] = ((rc_channels.channels[1] - 1500.0) / 500.0) * 1.0;
+    }
+
+    if (abs(rc_channels.channels[2] - 1500) > 100) {
+      request.goal[0] = ((rc_channels.channels[2] - 1500.0) / 500.0) * 1.0;
+    }
+
+    if (abs(rc_channels.channels[3] - 1500) > 100) {
+      request.goal[3] = (-(rc_channels.channels[3] - 1500.0) / 500.0);
+    }
+
+    ROS_INFO("[ControlManager]: goto by rc by x=%2.2f, y=%2.2f, z=%2.2f, yaw=%2.f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
+
+    mrs_msgs::Vec4::Response response;
+
+    // disable callbacks of all trackers
+    std_srvs::SetBoolRequest req_enable_callbacks;
+
+    // enable the callbacks for the active tracker
+    req_enable_callbacks.data = true;
+    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+
+    // call the goto
+    callbackGoToFcuService(request, response);
+
+    // disable the callbacks back again
+    req_enable_callbacks.data = false;
+    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+  }
+
+  if (rc_goto_enabled_ && got_rc_channels) {
+
+    std::scoped_lock lock(mutex_rc_channels);
+
+    if (rc_channels.channels[rc_joystic_channel_] > 1500) {
+
+      if (rc_goto_active_ == false) {
+
+        ROS_INFO("[ControlManager]: activating rc joystiv");
+
+        callbacks_enabled = false;
+
+        std_srvs::SetBoolRequest req_goto_out;
+        req_goto_out.data = false;
+
+        std_srvs::SetBoolRequest req_enable_callbacks;
+        req_enable_callbacks.data = callbacks_enabled;
+
+        {
+          std::scoped_lock lock(mutex_tracker_list);
+
+          // disable callbacks of all trackers
+          for (unsigned int i = 0; i < tracker_list.size(); i++) {
+            tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+          }
+        }
+      }
+
+      rc_goto_active_ = true;
+
+    } else {
+
+      if (rc_goto_active_ == true) {
+
+        ROS_INFO("[ControlManager]: de-activating rc joystiv");
+
+        callbacks_enabled = true;
+
+        std_srvs::SetBoolRequest req_goto_out;
+        req_goto_out.data = true;
+
+        std_srvs::SetBoolRequest req_enable_callbacks;
+        req_enable_callbacks.data = callbacks_enabled;
+
+        {
+          std::scoped_lock lock(mutex_tracker_list);
+
+          // enable callbacks of all trackers
+          for (unsigned int i = 0; i < tracker_list.size(); i++) {
+            tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+          }
+        }
+      }
+
+      rc_goto_active_ = false;
+    }
+  }
 }
 
 //}
@@ -1514,7 +1624,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
     return;
 
   if (rc_eland_triggered) {
-    return; 
+    return;
   }
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackRC");
