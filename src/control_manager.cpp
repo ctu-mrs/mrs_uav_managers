@@ -191,6 +191,7 @@ private:
   mavros_msgs::State mavros_state;
   std::mutex         mutex_mavros_state;
   bool               got_mavros_state = false;
+  bool               offboard_mode    = false;
 
 private:
   ros::Subscriber   subscriber_rc;
@@ -1606,12 +1607,27 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackMavrosState");
 
-  {
-    std::scoped_lock lock(mutex_mavros_state);
-    mavros_state = *msg;
-  }
+  std::scoped_lock lock(mutex_mavros_state);
 
+  // | --------------------- save the state --------------------- |
+  mavros_state     = *msg;
   got_mavros_state = true;
+
+  // | ------ detect and print the changes in offboard mode ----- |
+  if (mavros_state.mode.compare(std::string("OFFBOARD")) == STRING_EQUAL) {
+
+    if (!offboard_mode) {
+      offboard_mode = true;
+      ROS_INFO("[ControlManager]: OFFBOARD mode ON");
+    }
+
+  } else {
+
+    if (offboard_mode) {
+      offboard_mode = false;
+      ROS_INFO("[ControlManager]: OFFBOARD mode OFF");
+    }
+  }
 }
 
 //}
