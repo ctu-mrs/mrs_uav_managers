@@ -40,8 +40,7 @@
 //}
 
 #define STRING_EQUAL 0
-#define PI 3.141592653
-#define TAU 6.283185
+#define TAU 2 * M_PI
 
 namespace mrs_uav_manager
 {
@@ -422,9 +421,9 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
-  tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * PI;
+  tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
   param_loader.load_param("safety/tilt_limit_disarm", tilt_limit_disarm_);
-  tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * PI;
+  tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * M_PI;
 
   param_loader.load_param("safety/control_error_eland", control_error_eland_);
   param_loader.load_param("safety/control_error_failsafe", control_error_failsafe_);
@@ -447,7 +446,7 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
   param_loader.load_param("safety/tilt_error_failsafe/min_height", tilt_error_failsafe_min_height_);
-  tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * PI;
+  tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
 
@@ -832,7 +831,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
     std::scoped_lock lock(mutex_tilt_error);
 
     std_msgs::Float64 tilt_error_out;
-    tilt_error_out.data = (180.0 / PI) * tilt_error;
+    tilt_error_out.data = (180.0 / M_PI) * tilt_error;
 
     try {
       publisher_tilt_error.publish(tilt_error_out);
@@ -947,8 +946,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered && !eland_triggered) {
 
-        ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / PI) * tilt_angle,
-                  (180.0 / PI) * tilt_limit_eland_, control_error_, control_error_eland_);
+        ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
+                  (180.0 / M_PI) * tilt_limit_eland_, control_error_, control_error_eland_);
 
         std::string message_out;
         eland(message_out);
@@ -999,7 +998,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
   if (tilt_angle > tilt_limit_disarm_) {
 
-    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%2.2f/%2.2f deg", (180.0 / PI) * tilt_angle, (180.0 / PI) * tilt_limit_eland_);
+    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * tilt_limit_eland_);
 
     arming(false);
   }
@@ -1015,8 +1014,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
-        ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / PI) * tilt_error,
-                  (180.0 / PI) * tilt_error_threshold_);
+        ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
+                  (180.0 / M_PI) * tilt_error_threshold_);
 
         arming(false);
 
@@ -3422,7 +3421,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // check for locking between the oposite walls
       // get the desired direction of motion
-      double oposite_direction  = double(i) * sector_size + PI;
+      double oposite_direction  = double(i) * sector_size + M_PI;
       int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
 
       if (bumper_data.sectors[oposite_sector_idx] > 0 && ((bumper_data.sectors[i] + bumper_data.sectors[oposite_sector_idx]) <=
@@ -3614,7 +3613,7 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
 
   point_heading_horizontal += TAU;
 
-  // if point_heading_horizontal is greater then 2*PI mod it
+  // if point_heading_horizontal is greater then 2*M_PI mod it
   if (fabs(point_heading_horizontal) >= TAU) {
     point_heading_horizontal = fmod(point_heading_horizontal, TAU);
   }
