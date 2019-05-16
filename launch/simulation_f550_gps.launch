@@ -26,7 +26,7 @@
 
   <group ns="$(arg uav_name)">
 
-    <!-- MAV Manager -->
+    <!-- UAV manager -->
     <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
@@ -43,8 +43,12 @@
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
       <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
+      <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
+      <remap from="~gains_in" to="gain_manager/current_gains" />
+      <remap from="~constraints_in" to="constraint_manager/current_constraints" />
+      <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
       <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
@@ -60,6 +64,7 @@
       <remap from="~motors_out" to="control_manager/motors" />
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
+      <remap from="~arm_out" to="control_manager/arm" />
 
     </node>
 
@@ -71,6 +76,8 @@
       <rosparam file="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
+      <param name="g" value="$(arg g)" />
+      <param name="uav_mass" value="$(arg uav_mass)" />
 
       <!-- Controller's configs -->
 
@@ -101,6 +108,7 @@
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
+      <remap from="~failsafe_controller/arm_out" to="~/arm" />
 
       <!-- Trackers' configs -->
 
@@ -115,11 +123,20 @@
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
+      <!-- MatlabTracker -->
+      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/simulation/matlab_tracker.yaml" />
+      <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
+      <remap from="~matlab_tracker/profiler" to="profiler" />
+      <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
+
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/simulation/landoff_tracker.yaml" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
+      <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
+      <remap from="~landoff_tracker/eland_in" to="~landoff_tracker/eland" />
+      <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/simulation/mpc_tracker.yaml" />
@@ -128,13 +145,11 @@
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
-      <remap from="~mpc_tracker/rc_in" to="mavros/rc/in" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
       <remap from="~mpc_tracker/start_trajectory_following_in" to="~mpc_tracker/start_trajectory_following" />
       <remap from="~mpc_tracker/stop_trajectory_following_in" to="~mpc_tracker/stop_trajectory_following" />
       <remap from="~mpc_tracker/resume_trajectory_following_in" to="~mpc_tracker/resume_trajectory_following" />
       <remap from="~mpc_tracker/fly_to_trajectory_start_in" to="~mpc_tracker/fly_to_trajectory_start" />
-      <remap from="~mpc_tracker/failsafe_in" to="~mpc_tracker/failsafe" />
       <remap from="~mpc_tracker/set_mpc_matrix_in" to="~mpc_tracker/set_Q" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
@@ -146,6 +161,8 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
+      <remap from="~bumper_in" to="bumper/obstacle_sectors" />
+      <remap from="~mavros_state_in" to="mavros/state" />
 
       <!-- Subscribers and Services -->
       <remap from="~goto_in" to="~goto" />
@@ -162,7 +179,9 @@
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
+      <remap from="~thrust_force_out" to="~thrust_force" />
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~motors_out" to="~motors" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
@@ -176,6 +195,14 @@
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
       <remap from="~set_constraints_in" to="control_manager/set_constraints" />
       <remap from="~use_joystick_in" to="control_manager/use_joystick" />
+      <remap from="~arm_out" to="mavros/cmd/arming" />
+      <remap from="~arm_in" to="~arm" />
+      <remap from="~eland_in" to="~eland" />
+      <remap from="~failsafe_in" to="~failsafe" />
+      <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
+      <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
+      <remap from="~rc_in" to="mavros/rc/in" />
+      <remap from="~shutdown_out" to="~shutdown_out" />
 
     </node>
 

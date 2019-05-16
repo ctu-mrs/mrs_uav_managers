@@ -18,20 +18,71 @@ controllers : [
 
 # - this is the "do nothing tracker", which is active when no other is
 # - NullTracker is defined in the mrs_uav_manager package
-null_tracker: "mrs_mav_manager/NullTracker"
+null_tracker: "mrs_uav_manager/NullTracker"
 
 status_timer_rate:  10 # [Hz]
 
 safety:
 
-  timer_rate: 100 # [Hz]
+  safety_timer_rate: 100 # [Hz]
+  failsafe_timer_rate: 100 # [Hz]
+  escalating_failsafe_timeout: 1.0 # [s]
 
-  max_tilt_angle: 60 # [deg]
-  failsafe_hover_control_error: 1.5 # [m]
-  failsafe_land_control_error: 3.0 # [m]
+  tilt_limit_eland: 60 # [deg]
+  tilt_limit_disarm: 90 # [deg]
+
+  control_error_eland: 1.5 # [m]
+  control_error_failsafe: 2.5 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
-  hover_tracker: "mrs_trackers/LandoffTracker"
+  ehover_tracker: "mrs_trackers/LandoffTracker"
 
   # - this controller will be used for emergancy landing
   failsafe_controller: "mrs_controllers/FailsafeController"
+  odometry_max_missing_time: 0.1 # [s]
+
+  elanding_timer_rate: 10
+  elanding_cutoff_height:  1.0
+  elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+
+  tilt_error_failsafe:
+
+    enabled: true
+    tilt_error_threshold: 45 # [deg]
+    min_height: 0.5 # [m]
+
+  rc_eland:
+
+    enabled: true
+    channel_number: 7 # [-]
+    threshold: 1500 # [us]
+
+obstacle_bumper:
+
+  enabled: false
+  timer_rate: 20 # [Hz]
+
+  horizontal_distance: 1.0 # [m]
+  vertical_distance: 1.0 # [m]
+
+  obstacle_hugging:
+
+    enabled: true
+
+  # true: the drone will move away from obstacles that appear within the radius
+  repulsion:
+
+    enabled: true
+
+    horizontal_distance: 1.0 # [m]
+    horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
+
+    vertical_distance: 1.0 # [m]
+    vertical_offset: 0.1 # [m]
+
+joystick:
+  joystick_timer_rate: 30 # [Hz]
+
+rc_joystick:
+  enabled: false
+  channel_number: 8

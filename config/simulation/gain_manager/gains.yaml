@@ -1,3 +1,33 @@
+optflow:
+
+  horizontal:
+    kp: 2.0
+    kv: 1.0
+    ka: 1.0
+
+    attitude:
+      kq: 10.0
+      kw: 0.0
+
+    kib: 0.1
+    kib_lim: 10.0
+
+    kiw: 0.1
+    kiw_lim: 10.0
+
+  vertical:
+    kp: 33.333333
+    kv: 16.666667
+    ka: 1.0
+
+    attitude:
+      kq: 20.0
+      kw: 5.0
+
+  weight_estimator:
+    km: 1.0
+    km_lim: 3.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+
 supersoft:
 
   horizontal:
@@ -31,8 +61,8 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 3.333333
-    kv: 2.0
+    kp: 2.8
+    kv: 1.5
     ka: 1.0
 
     attitude:

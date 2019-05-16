@@ -12,11 +12,11 @@ max_height_checking:
 takeoff:
   rate: 10 # [Hz]
   takeoff_tracker: "mrs_trackers/LandoffTracker"
-  after_takeoff_tracker: "mrs_trackers/MpcTracker"
+  after_takeoff_tracker: "mrs_trackers/LineTracker"
 
-  takeoff_height: 3.0
+  takeoff_height: 2.0
 
-  ground_limit_height: 1.0 # under which height the takeoff can happen
+  ground_limit_height: 0.5 # under which height the takeoff can happen
 
 landing:
 
@@ -24,10 +24,10 @@ landing:
   landing_tracker: "mrs_trackers/LandoffTracker"
 
   # those two must apply simultaneously
-  landing_cutoff_height:  0.8
-  landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
+  landing_cutoff_height:  0.5
+  landing_cutoff_mass_factor:  0.3 # how much light does the drone appear to be?
 
-  disarm: false
+  disarm: true
 
 flight_timer:
 
@@ -40,4 +40,4 @@ max_thrust:
 
   enabled: false
   rate: 30 # [Hz]
-  max_thrust: 0.85 # [-]
+  max_thrust: 0.90 # [-]

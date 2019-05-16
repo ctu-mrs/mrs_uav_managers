@@ -1,3 +1,5 @@
+/* includes //{ */
+
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
 
@@ -16,372 +18,379 @@
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
 
+//}
+
 #define STRING_EQUAL 0
 
 namespace mrs_uav_manager
 {
 
-  /* //{ class ConstraintManager */
+namespace constraint_manager
+{
 
-  class ConstraintManager : public nodelet::Nodelet {
+/* //{ class ConstraintManager */
 
-  private:
-    ros::NodeHandle nh_;
-    bool            is_initialized = false;
+class ConstraintManager : public nodelet::Nodelet {
 
-  private:
-    std::vector<std::string> estimator_type_names_;
+private:
+  ros::NodeHandle nh_;
+  bool            is_initialized = false;
 
-    std::vector<std::string>                                   constraint_names_;
-    std::map<std::string, mrs_msgs::TrackerConstraintsRequest> constraints;
+private:
+  std::vector<std::string> estimator_type_names_;
 
-  private:
-    std::map<std::string, std::vector<std::string>> map_type_allowed_constraints;
-    std::map<std::string, std::string>              map_type_fallback_constraints;
+  std::vector<std::string>                                   constraint_names_;
+  std::map<std::string, mrs_msgs::TrackerConstraintsRequest> constraints;
 
-  public:
-    virtual void onInit();
-    bool         callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
-    void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
+private:
+  std::map<std::string, std::vector<std::string>> map_type_allowed_constraints;
+  std::map<std::string, std::string>              map_type_fallback_constraints;
 
-    bool setConstraints(std::string constraints_names);
+public:
+  virtual void onInit();
+  bool         callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
 
-    bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
+  bool setConstraints(std::string constraints_names);
 
-  private:
-    ros::ServiceServer service_server_set_constraints;
+  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 
-    ros::ServiceClient service_client_set_constraints;
+private:
+  ros::ServiceServer service_server_set_constraints;
 
-    ros::Publisher publisher_current_constraints;
+  ros::ServiceClient service_client_set_constraints;
 
-  private:
-    ros::Subscriber        subscriber_odometry_diagnostics;
-    bool                   got_odometry_diagnostics = false;
-    mrs_msgs::OdometryDiag odometry_diagnostics;
-    std::mutex             mutex_odometry_diagnostics;
+  ros::Publisher publisher_current_constraints;
 
-    // | ------------- constraint management ------------- |
+private:
+  ros::Subscriber        subscriber_odometry_diagnostics;
+  bool                   got_odometry_diagnostics = false;
+  mrs_msgs::OdometryDiag odometry_diagnostics;
+  std::mutex             mutex_odometry_diagnostics;
 
-  private:
-    mrs_msgs::EstimatorType::_type_type last_estimator_type;
+  // | ------------- constraint management ------------- |
 
-    void       constraintsManagementTimer(const ros::TimerEvent &event);
-    ros::Timer constraints_management_timer;
+private:
+  mrs_msgs::EstimatorType::_type_type last_estimator_type;
 
-    int rate_;
+  void       constraintsManagementTimer(const ros::TimerEvent &event);
+  ros::Timer constraints_management_timer;
 
-    // | ------------------ constraint management ----------------- |
+  int rate_;
 
-    std::string current_constraints;
+  // | ------------------ constraint management ----------------- |
 
-    // | ------------------------ profiler ------------------------ |
-  private:
-    mrs_lib::Profiler *profiler;
-    bool               profiler_enabled_ = false;
-    ;
-  };
+  std::string current_constraints;
 
-  //}
+  // | ------------------------ profiler ------------------------ |
+private:
+  mrs_lib::Profiler *profiler;
+  bool               profiler_enabled_ = false;
+  ;
+};
 
-  /* //{ onInit() */
+//}
 
-  void ConstraintManager::onInit() {
+/* //{ onInit() */
 
-    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+void ConstraintManager::onInit() {
 
-    ros::Time::waitForValid();
+  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-    ROS_INFO("[ConstraintManager]: initializing");
+  ros::Time::waitForValid();
 
-    // | ------------------------- params ------------------------- |
+  ROS_INFO("[ConstraintManager]: initializing");
 
-    mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
+  // | ------------------------- params ------------------------- |
 
-    param_loader.load_param("enable_profiler", profiler_enabled_);
+  mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
 
-    param_loader.load_param("constraints", constraint_names_);
+  param_loader.load_param("enable_profiler", profiler_enabled_);
 
-    param_loader.load_param("estimator_types", estimator_type_names_);
-    param_loader.load_param("rate", rate_);
+  param_loader.load_param("constraints", constraint_names_);
 
-    std::vector<std::string>::iterator it;
+  param_loader.load_param("estimator_types", estimator_type_names_);
+  param_loader.load_param("rate", rate_);
 
-    // loading constraint names
-    for (it = constraint_names_.begin(); it != constraint_names_.end(); ++it) {
-      ROS_INFO_STREAM("[ConstraintManager]: loading constraints \"" << *it << "\"");
+  std::vector<std::string>::iterator it;
 
-      mrs_msgs::TrackerConstraintsRequest new_constraints;
+  // loading constraint names
+  for (it = constraint_names_.begin(); it != constraint_names_.end(); ++it) {
+    ROS_INFO_STREAM("[ConstraintManager]: loading constraints \"" << *it << "\"");
 
-      param_loader.load_param(*it + "/horizontal/speed", new_constraints.horizontal_speed);
-      param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.horizontal_acceleration);
-      param_loader.load_param(*it + "/horizontal/jerk", new_constraints.horizontal_jerk);
-      param_loader.load_param(*it + "/horizontal/snap", new_constraints.horizontal_snap);
+    mrs_msgs::TrackerConstraintsRequest new_constraints;
 
-      param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.vertical_ascending_speed);
-      param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.vertical_ascending_acceleration);
-      param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.vertical_ascending_jerk);
-      param_loader.load_param(*it + "/vertical/ascending/snap", new_constraints.vertical_ascending_snap);
+    param_loader.load_param(*it + "/horizontal/speed", new_constraints.horizontal_speed);
+    param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.horizontal_acceleration);
+    param_loader.load_param(*it + "/horizontal/jerk", new_constraints.horizontal_jerk);
+    param_loader.load_param(*it + "/horizontal/snap", new_constraints.horizontal_snap);
 
-      param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.vertical_descending_speed);
-      param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.vertical_descending_acceleration);
-      param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.vertical_descending_jerk);
-      param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.vertical_descending_snap);
+    param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.vertical_ascending_speed);
+    param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.vertical_ascending_acceleration);
+    param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.vertical_ascending_jerk);
+    param_loader.load_param(*it + "/vertical/ascending/snap", new_constraints.vertical_ascending_snap);
 
-      param_loader.load_param(*it + "/yaw/speed", new_constraints.yaw_speed);
-      param_loader.load_param(*it + "/yaw/acceleration", new_constraints.yaw_acceleration);
-      param_loader.load_param(*it + "/yaw/jerk", new_constraints.yaw_jerk);
-      param_loader.load_param(*it + "/yaw/snap", new_constraints.yaw_snap);
+    param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.vertical_descending_speed);
+    param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.vertical_descending_acceleration);
+    param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.vertical_descending_jerk);
+    param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.vertical_descending_snap);
 
-      constraints.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsRequest>(*it, new_constraints));
-    }
+    param_loader.load_param(*it + "/yaw/speed", new_constraints.yaw_speed);
+    param_loader.load_param(*it + "/yaw/acceleration", new_constraints.yaw_acceleration);
+    param_loader.load_param(*it + "/yaw/jerk", new_constraints.yaw_jerk);
+    param_loader.load_param(*it + "/yaw/snap", new_constraints.yaw_snap);
 
-    // loading the allowed constraints lists
-    for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
+    constraints.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsRequest>(*it, new_constraints));
+  }
 
-      std::vector<std::string> temp_vector;
-      param_loader.load_param("constraint_management/allowed_constraints/" + *it, temp_vector);
+  // loading the allowed constraints lists
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
-      std::vector<std::string>::iterator it2;
-      for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
-        if (!stringInVector(*it2, constraint_names_)) {
-          ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
-          ros::shutdown();
-        }
-      }
+    std::vector<std::string> temp_vector;
+    param_loader.load_param("constraint_management/allowed_constraints/" + *it, temp_vector);
 
-      map_type_allowed_constraints.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
-    }
-
-    // loading the fallback constraints
-    for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
-
-      std::string temp_str;
-      param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
-
-      if (!stringInVector(temp_str, map_type_allowed_constraints.at(*it))) {
-        ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
+    std::vector<std::string>::iterator it2;
+    for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
+      if (!stringInVector(*it2, constraint_names_)) {
+        ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
         ros::shutdown();
       }
-
-      map_type_fallback_constraints.insert(std::pair<std::string, std::string>(*it, temp_str));
     }
 
-    ROS_INFO("[ConstraintManager]: done loading dynamical params");
+    map_type_allowed_constraints.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
+  }
 
-    current_constraints = "";
-    last_estimator_type = -1;
+  // loading the fallback constraints
+  for (it = estimator_type_names_.begin(); it != estimator_type_names_.end(); ++it) {
 
-    // | ------------------------ services ------------------------ |
+    std::string temp_str;
+    param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
 
-    service_server_set_constraints = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
-
-    service_client_set_constraints = nh_.serviceClient<mrs_msgs::TrackerConstraints>("set_constraints_out");
-
-    // | ----------------------- subscribers ---------------------- |
-    subscriber_odometry_diagnostics =
-        nh_.subscribe("odometry_diagnostics_in", 1, &ConstraintManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
-
-    // | ----------------------- publishers ----------------------- |
-
-    publisher_current_constraints = nh_.advertise<std_msgs::String>("current_constraints_out", 1);
-
-    // | ------------------------- timers ------------------------- |
-
-    constraints_management_timer = nh_.createTimer(ros::Rate(rate_), &ConstraintManager::constraintsManagementTimer, this);
-
-    // --------------------------------------------------------------
-    // |                          profiler                          |
-    // --------------------------------------------------------------
-
-    profiler = new mrs_lib::Profiler(nh_, "ConstraintManager", profiler_enabled_);
-
-    // | ----------------------- finish init ---------------------- |
-
-    if (!param_loader.loaded_successfully()) {
-      ROS_ERROR("[ConstraintManager]: Could not load all parameters!");
+    if (!stringInVector(temp_str, map_type_allowed_constraints.at(*it))) {
+      ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
-    is_initialized = true;
-
-    ROS_INFO("[ConstraintManager]: initilized");
+    map_type_fallback_constraints.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  //}
+  ROS_INFO("[ConstraintManager]: done loading dynamical params");
+
+  current_constraints = "";
+  last_estimator_type = -1;
+
+  // | ------------------------ services ------------------------ |
+
+  service_server_set_constraints = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
+
+  service_client_set_constraints = nh_.serviceClient<mrs_msgs::TrackerConstraints>("set_constraints_out");
+
+  // | ----------------------- subscribers ---------------------- |
+  subscriber_odometry_diagnostics =
+      nh_.subscribe("odometry_diagnostics_in", 1, &ConstraintManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
+
+  // | ----------------------- publishers ----------------------- |
+
+  publisher_current_constraints = nh_.advertise<std_msgs::String>("current_constraints_out", 1);
+
+  // | ------------------------- timers ------------------------- |
+
+  constraints_management_timer = nh_.createTimer(ros::Rate(rate_), &ConstraintManager::constraintsManagementTimer, this);
 
   // --------------------------------------------------------------
-  // |                           methods                          |
+  // |                          profiler                          |
   // --------------------------------------------------------------
 
-  /* setConstraints() //{ */
+  profiler = new mrs_lib::Profiler(nh_, "ConstraintManager", profiler_enabled_);
 
-  bool ConstraintManager::setConstraints(std::string constraints_names) {
+  // | ----------------------- finish init ---------------------- |
 
-    std::map<std::string, mrs_msgs::TrackerConstraintsRequest>::iterator it;
-    it = constraints.find(constraints_names);
-
-    if (it == constraints.end()) {
-      return false;
-    }
-
-    mrs_msgs::TrackerConstraints new_constraints;
-
-    new_constraints.request = it->second;
-
-    service_client_set_constraints.call(new_constraints);
-
-    current_constraints = constraints_names;
-
-    return new_constraints.response.success;
+  if (!param_loader.loaded_successfully()) {
+    ROS_ERROR("[ConstraintManager]: Could not load all parameters!");
+    ros::shutdown();
   }
 
-  //}
+  is_initialized = true;
 
-  // --------------------------------------------------------------
-  // |                          callbacks                         |
-  // --------------------------------------------------------------
+  ROS_INFO("[ConstraintManager]: initilized");
+}
 
-  // | --------------------- topic callbacks -------------------- |
+//}
 
-  /* //{ callbackOdometryDiagnostics() */
+// --------------------------------------------------------------
+// |                           methods                          |
+// --------------------------------------------------------------
 
-  void ConstraintManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
+/* setConstraints() //{ */
 
-    if (!is_initialized)
-      return;
+bool ConstraintManager::setConstraints(std::string constraints_name) {
 
-    mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryDiagnostics");
+  std::map<std::string, mrs_msgs::TrackerConstraintsRequest>::iterator it;
+  it = constraints.find(constraints_name);
 
-    {
-      std::scoped_lock lock(mutex_odometry_diagnostics);
-
-      odometry_diagnostics = *msg;
-    }
-
-    got_odometry_diagnostics = true;
+  if (it == constraints.end()) {
+    ROS_ERROR("[ConstraintManager]: could not setConstraints(), the constraint name \"%s\" is not on the list", constraints_name.c_str());
+    return false;
   }
 
-  //}
+  mrs_msgs::TrackerConstraints new_constraints;
 
-  // | -------------------- service callbacks ------------------- |
+  new_constraints.request = it->second;
 
-  /* //{ callbackSetConstraints() */
+  service_client_set_constraints.call(new_constraints);
 
-  bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+  current_constraints = constraints_name;
 
-    if (!is_initialized)
-      return false;
+  return new_constraints.response.success;
+}
 
-    char message[200];
+//}
 
-    if (!stringInVector(req.value, constraint_names_)) {
+// --------------------------------------------------------------
+// |                          callbacks                         |
+// --------------------------------------------------------------
 
-      sprintf((char *)&message, "The constraints '%s' do not exist (in the ConstraintManager's config).", req.value.c_str());
-      res.message = message;
-      res.success = false;
-      ROS_ERROR("[ConstraintManager]: %s", message);
-      return true;
-    }
+// | --------------------- topic callbacks -------------------- |
 
-    if (!stringInVector(req.value, map_type_allowed_constraints.at(odometry_diagnostics.estimator_type.name))) {
+/* //{ callbackOdometryDiagnostics() */
 
-      sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
-      res.message = message;
-      res.success = false;
-      ROS_ERROR("[ConstraintManager]: %s", message);
-      return true;
-    }
+void ConstraintManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
 
-    // try to set the constraints
-    if (!setConstraints(req.value)) {
+  if (!is_initialized)
+    return;
 
-      res.message = "the control_manager can't set the constraints";
-      res.success = false;
-      return true;
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryDiagnostics");
 
+  {
+    std::scoped_lock lock(mutex_odometry_diagnostics);
+
+    odometry_diagnostics = *msg;
+  }
+
+  got_odometry_diagnostics = true;
+}
+
+//}
+
+// | -------------------- service callbacks ------------------- |
+
+/* //{ callbackSetConstraints() */
+
+bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  char message[200];
+
+  if (!stringInVector(req.value, constraint_names_)) {
+
+    sprintf((char *)&message, "The constraints '%s' do not exist (in the ConstraintManager's config).", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[ConstraintManager]: %s", message);
+    return true;
+  }
+
+  if (!stringInVector(req.value, map_type_allowed_constraints.at(odometry_diagnostics.estimator_type.name))) {
+
+    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[ConstraintManager]: %s", message);
+    return true;
+  }
+
+  // try to set the constraints
+  if (!setConstraints(req.value)) {
+
+    res.message = "the control_manager can't set the constraints";
+    res.success = false;
+    return true;
+
+  } else {
+
+    sprintf((char *)&message, "The constraints '%s' are set.", req.value.c_str());
+    res.message = message;
+    res.success = true;
+    ROS_INFO("[ConstraintManager]: %s", message);
+    return true;
+  }
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                           timers                           |
+// --------------------------------------------------------------
+
+/* constraintsManagementTimer() //{ */
+
+void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("constraintsManagementTimer", rate_, 0.01, event);
+
+  if (!got_odometry_diagnostics) {
+    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constraint management, missing odometry diagnostics!");
+    return;
+  }
+
+  // | --- automatically set constraints when odometry.type schanges -- |
+  if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
+
+    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+
+    std::map<std::string, std::string>::iterator it;
+    it = map_type_fallback_constraints.find(odometry_diagnostics.estimator_type.name);
+
+    if (it == map_type_fallback_constraints.end()) {
+      ROS_ERROR("[ConstraintManager]: the odometry.type %s was not specified in the constraint_manager's config!",
+                odometry_diagnostics.estimator_type.name.c_str());
     } else {
-
-      sprintf((char *)&message, "The constraints '%s' are set.", req.value.c_str());
-      res.message = message;
-      res.success = true;
-      ROS_INFO("[ConstraintManager]: %s", message);
-      return true;
-    }
-  }
-
-  //}
-
-  // --------------------------------------------------------------
-  // |                           timers                           |
-  // --------------------------------------------------------------
-
-  /* constraintsManagementTimer() //{ */
-
-  void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event) {
-
-    if (!is_initialized)
-      return;
-
-    mrs_lib::Routine profiler_routine = profiler->createRoutine("constraintsManagementTimer", rate_, 0.01, event);
-
-    if (!got_odometry_diagnostics) {
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constrint management, missing odometry diagnostics!");
-      return;
-    }
-
-    // | --- automatically set constraints when odometry.type schanges -- |
-    if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
-
-      ROS_WARN("[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
-
-      std::map<std::string, std::string>::iterator it;
-
-      it = map_type_fallback_constraints.find(odometry_diagnostics.estimator_type.name);
-
-      if (it == map_type_fallback_constraints.end()) {
-
-        ROS_ERROR("[ConstraintManager]: the odometry.type %s was not specified in the constraint_manager's config!",
-                  odometry_diagnostics.estimator_type.name.c_str());
-
+      if (setConstraints(it->second)) {
+        last_estimator_type = odometry_diagnostics.estimator_type.type;
       } else {
-        if (setConstraints(it->second)) {
-          last_estimator_type = odometry_diagnostics.estimator_type.type;
-        }
+        ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
       }
     }
-
-    std_msgs::String str_out;
-    str_out.data = current_constraints;
-
-    try {
-      publisher_current_constraints.publish(str_out);
-    }
-    catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
-    }
   }
 
-  //}
+  std_msgs::String str_out;
+  str_out.data = current_constraints;
 
-  // --------------------------------------------------------------
-  // |                          routines                          |
-  // --------------------------------------------------------------
-
-  /* stringInVector() //{ */
-
-  bool ConstraintManager::stringInVector(const std::string &value, const std::vector<std::string> &vector) {
-
-    if (std::find(vector.begin(), vector.end(), value) == vector.end()) {
-      return false;
-    } else {
-      return true;
-    }
+  try {
+    publisher_current_constraints.publish(str_out);
   }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
+  }
+}
 
-  //}
+//}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
+
+/* stringInVector() //{ */
+
+bool ConstraintManager::stringInVector(const std::string &value, const std::vector<std::string> &vector) {
+
+  if (std::find(vector.begin(), vector.end(), value) == vector.end()) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+//}
+
+}  // namespace constraint_manager
 
 }  // namespace mrs_uav_manager
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::ConstraintManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::constraint_manager::ConstraintManager, nodelet::Nodelet)

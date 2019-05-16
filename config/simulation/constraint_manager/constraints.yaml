@@ -81,3 +81,31 @@ fast:
     acceleration: 2.0
     jerk: 3.0
     snap: 5.0
+
+darpa:
+
+  horizontal:
+    speed: 1.0
+    acceleration: 0.5
+    jerk: 1.0
+    snap: 1.0
+
+  vertical:
+
+    ascending:
+      speed: 0.5
+      acceleration: 0.5
+      jerk: 1.0
+      snap: 1.0
+
+    descending:
+      speed: 0.5
+      acceleration: 0.5
+      jerk: 1.0
+      snap: 1.0
+
+  yaw:
+    speed: 0.5
+    acceleration: 0.5
+    jerk: 3.0
+    snap: 5.0
