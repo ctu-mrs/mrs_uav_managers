@@ -2,7 +2,7 @@
 <package format="2">
 
   <name>mrs_uav_manager</name>
-  <version>1.0.0</version>
+  <version>0.0.1</version>
   <description>The mrs_uav_manager package</description>
 
   <author email="tomas.baca@fel.cvut.cz">Tomas Baca</author>
@@ -20,7 +20,7 @@
   <depend>mrs_msgs</depend>
   <depend>nodelet</depend>
   <depend>mrs_lib</depend>
-  <depend>mavros_msgs</depend>
+  <depend version_eq="0.26.3">mavros_msgs</depend>
 
   <export>
     <nodelet plugin="${prefix}/plugins.xml" />

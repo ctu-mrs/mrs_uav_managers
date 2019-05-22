@@ -4098,20 +4098,46 @@ void ControlManager::publish(void) {
 
     // publish the odom topic (position command for debugging, e.g. rviz)
     nav_msgs::Odometry cmd_odom;
+
     cmd_odom.header.stamp         = ros::Time::now();
     cmd_odom.header.frame_id      = "local_origin";
     cmd_odom.pose.pose.position   = last_position_cmd->position;
     cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
     cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
     cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
-    desired_orientation           = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
+
+    // | -------------- prepared desired orientation -------------- |
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+      // when controlling with quaternion or attitude rates, the quaternion should be filled in
+      if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE || last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
+
+        desired_orientation.setX(last_attitude_cmd->quter_attitude.x);
+        desired_orientation.setY(last_attitude_cmd->quter_attitude.y);
+        desired_orientation.setZ(last_attitude_cmd->quter_attitude.z);
+        desired_orientation.setW(last_attitude_cmd->quter_attitude.w);
+
+      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {  // when controlling with euler attitude, convert it to quaternion
+
+        desired_orientation =
+            tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+      } else {
+
+        // else use just the yaw from position command
+        desired_orientation = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
+      }
+
+    } else {
+
+      // else use just the yaw from position command
+      desired_orientation = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
+    }
+
     desired_orientation.normalize();
 
-    if (last_position_cmd->use_quat_attitude) {
-      cmd_odom.pose.pose.orientation = last_position_cmd->attitude;
-    } else {
-      quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
-    }
+    // fill in the desired orientation
+    quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
 
     try {
       publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
