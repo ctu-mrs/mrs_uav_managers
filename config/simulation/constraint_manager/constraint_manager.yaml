@@ -26,7 +26,7 @@ constraint_management:
     T265: ["slow", "medium", "fast"]
     OBJECT: ["slow"]
     VIO: ["slow"]
-    ICP: ["slow"]
+    ICP: ["slow", "darpa"]
     RTK: ["slow", "medium", "fast", "darpa"]
     OPTFLOWGPS: ["slow", "darpa"]
     GPS: ["slow", "medium", "fast", "darpa"]
@@ -39,7 +39,7 @@ constraint_management:
     T265: "slow"
     OBJECT: "slow"
     VIO: "slow"
-    ICP: "slow"
+    ICP: "darpa"
     RTK: "medium"
     OPTFLOWGPS: "slow"
     GPS: "medium"
