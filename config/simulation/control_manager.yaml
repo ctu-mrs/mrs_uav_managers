@@ -15,6 +15,7 @@ controllers : [
   "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
   "mrs_controllers/AttitudeController",
+  "mrs_controllers/MpcController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -32,8 +33,8 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  control_error_eland: 2.0 # [m]
-  control_error_failsafe: 4.0 # [m]
+  control_error_eland: 10.0 # [m]
+  control_error_failsafe: 10.0 # [m]
 
   # - this tracker will be used for calling the emergancy hover routine
   ehover_tracker: "mrs_trackers/LandoffTracker"
