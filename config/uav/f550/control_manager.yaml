@@ -13,6 +13,7 @@ controllers : [
   "mrs_controllers/So3Controller",
   "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
+  "mrs_controllers/MpcController",
   "mrs_controllers/AttitudeController",
 ]
 
