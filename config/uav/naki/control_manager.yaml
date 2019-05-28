@@ -14,6 +14,7 @@ controllers : [
   "mrs_controllers/NsfController",
   "mrs_controllers/FailsafeController",
   "mrs_controllers/AttitudeController",
+  "mrs_controllers/MpcController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
