@@ -4066,11 +4066,21 @@ void ControlManager::updateControllers(void) {
     try {
       controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
 
+      // in normal sitation, the controller returns a valid command
       if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
         std::scoped_lock lock(mutex_last_attitude_cmd);
 
         last_attitude_cmd = controller_output_cmd;
+
+        // but it can return an empty command
+        // which means we shoudl trigger the failsafe landing
+      } else {
+
+        ROS_WARN("[ControlManager]: triggering failsafe, the controller returned null");
+
+        std::scoped_lock lock(mutex_last_attitude_cmd);
+        failsafe();
       }
     }
     catch (std::runtime_error &exrun) {
@@ -4078,9 +4088,9 @@ void ControlManager::updateControllers(void) {
       ROS_INFO("[ControlManager]: Exception while updating the active controller.");
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
-      ROS_WARN("[ControlManager]: triggering failsafe due to error in a controller");
+      ROS_WARN("[ControlManager]: triggering failsafe due to an exception in the controller");
 
-      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+      std::scoped_lock lock(mutex_last_attitude_cmd);
       failsafe();
     }
   }
