@@ -95,6 +95,13 @@
       <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
+      <!-- MPC -->
+      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/simulation/f550/mpc.yaml" />
+      <param name="mpc_controller/g" value="$(arg g)" />
+      <param name="mpc_controller/enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="mpc_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~mpc_controller/profiler" to="profiler" />
+
       <!-- Attitude controller -->
       <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/attitude.yaml" />
       <param name="attitude_controller/g" value="$(arg g)" />
