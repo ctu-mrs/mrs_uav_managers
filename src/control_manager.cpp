@@ -4074,8 +4074,14 @@ void ControlManager::updateControllers(void) {
       }
     }
     catch (std::runtime_error &exrun) {
+
       ROS_INFO("[ControlManager]: Exception while updating the active controller.");
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+
+      ROS_WARN("[ControlManager]: triggering failsafe due to error in a controller");
+
+      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+      failsafe();
     }
   }
 }
