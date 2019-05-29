@@ -10,12 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   nav_msgs
   mrs_msgs
-  mavros_msgs
   mrs_lib
   tf
   cmake_modules
   nodelet
   )
+
+find_package(mavros_msgs 0.30.0 EXACT REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 
@@ -25,8 +26,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib mavros_msgs
   LIBRARIES GainManager ConstraintManager ControlManager UavManager
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib 
+  DEPENDS mavros_msgs
   )
 
 ###########
@@ -39,6 +41,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${mavros_msgs_INCLUDE_DIRS}
   )
 
 # ControlManager
@@ -52,6 +55,7 @@ add_dependencies(ControlManager
 
 target_link_libraries(ControlManager
   ${catkin_LIBRARIES}
+  ${mavros_msgs_LIBRARIES}
   )
 
 # NullTracker
@@ -63,7 +67,10 @@ add_dependencies(NullTracker
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
 
-target_link_libraries(NullTracker ${catkin_LIBRARIES})
+target_link_libraries(NullTracker 
+  ${catkin_LIBRARIES}
+  ${mavros_msgs_LIBRARIES}
+  )
 
 # UavManager
 
@@ -76,6 +83,7 @@ add_dependencies(UavManager
 
 target_link_libraries(UavManager
   ${catkin_LIBRARIES}
+  ${mavros_msgs_LIBRARIES}
   )
 
 # GainManager
@@ -89,6 +97,7 @@ add_dependencies(GainManager
 
 target_link_libraries(GainManager
   ${catkin_LIBRARIES}
+  ${mavros_msgs_LIBRARIES}
   )
 
 # ConstraintManager
@@ -102,4 +111,5 @@ add_dependencies(ConstraintManager
 
 target_link_libraries(ConstraintManager
   ${catkin_LIBRARIES}
+  ${mavros_msgs_LIBRARIES}
   )

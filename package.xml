@@ -20,7 +20,7 @@
   <depend>mrs_msgs</depend>
   <depend>nodelet</depend>
   <depend>mrs_lib</depend>
-  <depend version_eq="0.30.0">mavros_msgs</depend>
+  <depend>mavros_msgs</depend>
 
   <export>
     <nodelet plugin="${prefix}/plugins.xml" />
