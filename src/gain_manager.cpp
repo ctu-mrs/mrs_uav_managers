@@ -454,7 +454,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     }
   }
 
-  // | --- automatically set gains when odometry.type schanges -- |
+  // | --- automatically set gains when odometry.type changes -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
     ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
