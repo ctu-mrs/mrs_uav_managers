@@ -984,7 +984,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, engaging failsafe land");
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, initiating failsafe land");
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -3766,7 +3766,7 @@ bool ControlManager::eland(std::string &message_out) {
     return false;
   }
 
-  std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_controller_list);
+  std::scoped_lock lock(mutex_tracker_list, mutex_controller_list, mutex_last_attitude_cmd, mutex_last_position_cmd);
 
   char message[200];
   bool success = false;
@@ -3808,7 +3808,7 @@ bool ControlManager::eland(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[0].c_str());
-    { controller_list[0]->activate(last_attitude_cmd); }
+    controller_list[0]->activate(last_attitude_cmd);
     sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
