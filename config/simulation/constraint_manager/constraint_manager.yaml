@@ -1,6 +1,7 @@
 rate: 25
 
 estimator_types: [
+  "HECTOR",
   "T265",
   "OBJECT",
   "VIO",
@@ -23,6 +24,7 @@ constraint_management:
 
   # list of allowed gains per odometry mode
   allowed_constraints:
+    HECTOR: ["slow", "medium", "fast", "darpa"]
     T265: ["slow", "medium", "fast"]
     OBJECT: ["slow"]
     VIO: ["slow"]
@@ -36,6 +38,7 @@ constraint_management:
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_constraints:
+    HECTOR: "darpa"
     T265: "slow"
     OBJECT: "slow"
     VIO: "slow"
