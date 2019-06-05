@@ -184,6 +184,7 @@ private:
 
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
   std::mutex                          mutex_last_attitude_cmd;
+  ros::Time                           controller_switch_time;
 
 private:
   ros::Subscriber    subscriber_mavros_state;
@@ -401,6 +402,7 @@ void ControlManager::onInit() {
   joystick_failsafe_press_time = ros::Time(0);
   joystick_eland_press_time    = ros::Time(0);
   escalating_failsafe_time     = ros::Time(0);
+  controller_switch_time       = ros::Time(0);
 
   ROS_INFO("[ControlManager]: initializing");
 
@@ -605,6 +607,9 @@ void ControlManager::onInit() {
   ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
 
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
+
+  // update the time (used in failsafe)
+  controller_switch_time = ros::Time::now();
 
   motors = false;
 
@@ -1007,19 +1012,27 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
   {
-    std::scoped_lock lock(mutex_tilt_error, mutex_odometry);
+    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list);
 
     if (tilt_error_failsafe_enabled_ &&
         odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
-        ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
-                  (180.0 / M_PI) * tilt_error_threshold_);
+        if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
 
-        arming(false);
+          ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
+                    (180.0 / M_PI) * tilt_error_threshold_);
 
-        failsafe_triggered = true;
+          arming(false);
+
+          failsafe_triggered = true;
+
+        } else {
+
+          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controllers just switched so its ok.",
+                    (180.0 / M_PI) * tilt_error, (180.0 / M_PI) * tilt_error_threshold_);
+        }
       }
     }
   }
@@ -1834,6 +1847,9 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         sprintf((char *)&message, "Controller %s has been activated", req.value.c_str());
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
+
+        // update the time (used in failsafe)
+        controller_switch_time = ros::Time::now();
 
         // super important, switch which the active controller idx
         try {
@@ -3715,9 +3731,12 @@ bool ControlManager::ehover(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[0].c_str());
-    { controller_list[0]->activate(last_attitude_cmd); }
+    controller_list[0]->activate(last_attitude_cmd);
     sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
     ROS_INFO("[ControlManager]: %s", message);
+
+    // update the time (used in failsafe)
+    controller_switch_time = ros::Time::now();
 
     try {
 
@@ -3812,6 +3831,9 @@ bool ControlManager::eland(std::string &message_out) {
     sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
+    // update the time (used in failsafe)
+    controller_switch_time = ros::Time::now();
+
     try {
 
       controller_list[active_controller_idx]->deactivate();
@@ -3881,6 +3903,9 @@ bool ControlManager::failsafe() {
 
       ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
       controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
+
+      // update the time (used in failsafe)
+      controller_switch_time = ros::Time::now();
 
       failsafe_triggered = true;
       elanding_timer.stop();

@@ -22,7 +22,7 @@ supersoft:
 
     attitude:
       kq: 5.0
-      kw: 2.0
+      kw: 1.0
 
   weight_estimator:
     km: 1.0
@@ -51,8 +51,8 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 10.4
-      kw: 2.0
+      kq: 10.0
+      kw: 1.0
 
   weight_estimator:
     km: 1.0
