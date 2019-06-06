@@ -10,9 +10,15 @@ max_height_checking:
   safety_height_offset: 0.5 # how much lower to descend bellow the max height
 
 takeoff:
+
   rate: 10 # [Hz]
+
   takeoff_tracker: "mrs_trackers/LandoffTracker"
-  after_takeoff_tracker: "mrs_trackers/MpcTracker"
+  takeoff_controller: "mrs_controllers/MpcController"
+
+  after_takeoff:
+    tracker: "mrs_trackers/MpcTracker"
+    controller: "mrs_controllers/MpcController"
 
   takeoff_height: 1.2
 

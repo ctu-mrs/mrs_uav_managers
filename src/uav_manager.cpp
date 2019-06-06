@@ -151,6 +151,7 @@ private:
 
   ros::ServiceClient service_client_takeoff;
   ros::ServiceClient service_client_switch_tracker;
+  ros::ServiceClient service_client_switch_controller;
   ros::ServiceClient service_client_land;
   ros::ServiceClient service_client_motors;
   ros::ServiceClient service_client_enabled_callbacks;
@@ -176,7 +177,9 @@ private:
   bool        takingoff          = false;
   int         number_of_takeoffs = 0;
   std::string after_takeoff_tracker_name_;
+  std::string after_takeoff_controller_name_;
   std::string takeoff_tracker_name_;
+  std::string takeoff_controller_name_;
 
 private:
   ros::Timer  landing_timer;
@@ -284,6 +287,7 @@ void UavManager::onInit() {
   service_client_takeoff           = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
   service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
+  service_client_switch_controller = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
   service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
   service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
@@ -296,8 +300,10 @@ void UavManager::onInit() {
   param_loader.load_param("null_tracker", null_tracker_name_);
 
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
-  param_loader.load_param("takeoff/after_takeoff_tracker", after_takeoff_tracker_name_);
+  param_loader.load_param("takeoff/after_takeoff/tracker", after_takeoff_tracker_name_);
+  param_loader.load_param("takeoff/after_takeoff/controller", after_takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_tracker", takeoff_tracker_name_);
+  param_loader.load_param("takeoff/takeoff_controller", takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
   param_loader.load_param("takeoff/ground_limit_height", ground_limit_height_);
 
@@ -518,6 +524,19 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
         } else {
 
           ROS_ERROR("[UavManager]: could not switch to %s: %s", after_takeoff_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
+        }
+
+        mrs_msgs::String switch_controller_out;
+        switch_controller_out.request.value = after_takeoff_controller_name_;
+        service_client_switch_controller.call(switch_controller_out);
+
+        if (switch_controller_out.response.success == true) {
+
+          ROS_INFO("[UavManager]: switched to %s", after_takeoff_controller_name_.c_str());
+
+        } else {
+
+          ROS_ERROR("[UavManager]: could not switch to %s: %s", after_takeoff_controller_name_.c_str(), switch_controller_out.response.message.c_str());
         }
 
         takeoff_timer.stop();
@@ -1035,10 +1054,14 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   switch_tracker_out.request.value = takeoff_tracker_name_;
   service_client_switch_tracker.call(switch_tracker_out);
 
+  mrs_msgs::String switch_controller_out;
+  switch_controller_out.request.value = takeoff_controller_name_;
+  service_client_switch_controller.call(switch_controller_out);
+
   mrs_msgs::Vec1 takeoff_out;
   takeoff_out.request.goal = takeoff_height_;
 
-  if (switch_tracker_out.response.success == true) {
+  if (switch_tracker_out.response.success == true && switch_controller_out.response.success == true) {
 
     service_client_takeoff.call(takeoff_out);
 
@@ -1080,10 +1103,25 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     }
 
     // could not activate the landoff tracker!
-  } else {
+  } else if (!switch_tracker_out.response.success) {
 
     res.success = switch_tracker_out.response.success;
     res.message = switch_tracker_out.response.message;
+    ROS_ERROR("[UavManager]: could not activate %s for takeoff", takeoff_tracker_name_.c_str());
+
+    mrs_msgs::String switch_tracker_out;
+    switch_tracker_out.request.value = null_tracker_name_;
+    service_client_switch_tracker.call(switch_tracker_out);
+
+  } else if (!switch_controller_out.response.success) {
+
+    res.success = switch_controller_out.response.success;
+    res.message = switch_controller_out.response.message;
+    ROS_ERROR("[UavManager]: could not activate %s for takeoff", takeoff_controller_name_.c_str());
+
+    mrs_msgs::String switch_tracker_out;
+    switch_tracker_out.request.value = null_tracker_name_;
+    service_client_switch_tracker.call(switch_tracker_out);
   }
 
   return true;

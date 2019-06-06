@@ -260,6 +260,7 @@ private:
   bool isOffboard(void);
 
   bool ehover(std::string &message_out);
+  bool hover(std::string &message_out);
   bool eland(std::string &message_out);
   bool failsafe();
   bool arming(bool input);
@@ -1848,6 +1849,11 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
+        // TODO is this the right place?
+        std::string response;
+        ROS_INFO("[ControlManager]: triggering hover after switching to a new controller.");
+        hover(response);
+
         // update the time (used in failsafe)
         controller_switch_time = ros::Time::now();
 
@@ -2975,22 +2981,7 @@ bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Re
   if (!is_initialized)
     return false;
 
-  std::scoped_lock lock(mutex_tracker_list);
-
-  std_srvs::TriggerResponse::ConstPtr tracker_response;
-  char                                message[200];
-
-  std_srvs::TriggerRequest hover_out;
-
-  tracker_response = tracker_list[active_tracker_idx]->hover(std_srvs::TriggerRequest::ConstPtr(new std_srvs::TriggerRequest(hover_out)));
-
-  if (tracker_response != std_srvs::TriggerResponse::Ptr()) {
-    res = *tracker_response;
-  } else {
-    sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
-    res.message = message;
-    res.success = false;
-  }
+  res.success = hover(res.message);
 
   return true;
 }
@@ -3678,6 +3669,40 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
   }
 
   ROS_INFO("[ControlManager]: Switching emergancy landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+}
+
+//}
+
+/* hover() //{ */
+
+bool ControlManager::hover(std::string &message_out) {
+
+  if (!is_initialized) {
+
+    message_out = std::string("ControlManager is not initialized");
+    return false;
+  }
+
+  std::scoped_lock lock(mutex_tracker_list);
+
+  std_srvs::TriggerResponse::ConstPtr tracker_response;
+  char                                message[200];
+
+  std_srvs::TriggerRequest hover_out;
+
+  tracker_response = tracker_list[active_tracker_idx]->hover(std_srvs::TriggerRequest::ConstPtr(new std_srvs::TriggerRequest(hover_out)));
+
+  if (tracker_response != std_srvs::TriggerResponse::Ptr()) {
+
+    message_out = tracker_response->message;
+    return tracker_response->success;
+
+  } else {
+
+    sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
+    message_out = std::string(message);
+    return false;
+  }
 }
 
 //}
