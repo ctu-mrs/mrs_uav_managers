@@ -97,6 +97,7 @@ private:
   std::string ehover_tracker_name_;
 
   std::string failsafe_controller_name_;
+  std::string eland_controller_name_;
 
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
@@ -124,6 +125,7 @@ private:
   int active_controller_idx   = 0;
   int ehover_tracker_idx      = 0;
   int failsafe_controller_idx = 0;
+  int eland_controller_idx = 0;
 
   void switchMotors(bool in);
   bool motors = false;
@@ -422,6 +424,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety/ehover_tracker", ehover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
+  param_loader.load_param("safety/eland_controller", eland_controller_name_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
@@ -584,7 +587,7 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
-  // check if the safety_controller is within the loaded controllers
+  // check if the failsafe controller is within the loaded controllers
   bool failsafe_controller_check = false;
   for (unsigned long i = 0; i < controller_names.size(); i++) {
 
@@ -597,7 +600,24 @@ void ControlManager::onInit() {
     }
   }
   if (!failsafe_controller_check) {
-    ROS_ERROR("[ControlManager]: the safety/failsafe_controller is not within the loaded controllers");
+    ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", failsafe_controller_name_.c_str());
+    ros::shutdown();
+  }
+
+  // check if the eland controller is within the loaded controllers
+  bool eland_controller_check = false;
+  for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+    std::string controller_name = controller_names[i];
+
+    if (controller_name.compare(eland_controller_name_) == 0) {
+      eland_controller_check = true;
+      eland_controller_idx   = i;
+      break;
+    }
+  }
+  if (!eland_controller_check) {
+    ROS_ERROR("[ControlManager]: the eland controller (%s) is not within the loaded controllers", eland_controller_name_.c_str());
     ros::shutdown();
   }
 
@@ -605,7 +625,7 @@ void ControlManager::onInit() {
   // |           active the first controller on the list          |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[0].c_str());
+  ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[eland_controller_idx].c_str());
 
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
@@ -942,6 +962,22 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   double control_error_ = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
 
   // --------------------------------------------------------------
+  // |   activate the failsafe controller in case of large error  |
+  // --------------------------------------------------------------
+
+  if (control_error_ > control_error_failsafe_ && !failsafe_triggered) {
+
+    if (!failsafe_triggered) {
+
+      ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, control_error_failsafe_);
+
+      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+      failsafe();
+    }
+  }
+
+  // --------------------------------------------------------------
   // |   activate emergancy land in case of medium control error  |
   // --------------------------------------------------------------
 
@@ -958,22 +994,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
         std::string message_out;
         eland(message_out);
       }
-    }
-  }
-
-  // --------------------------------------------------------------
-  // |   activate the failsafe controller in case of large error  |
-  // --------------------------------------------------------------
-
-  if (control_error_ > control_error_failsafe_ && !failsafe_triggered) {
-
-    if (!failsafe_triggered) {
-
-      ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, control_error_failsafe_);
-
-      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
-
-      failsafe();
     }
   }
 
@@ -1436,6 +1456,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   odometry_last_time = ros::Time::now();
 
   if (!failsafe_triggered) {  // when failsafe is triggers, updateControllers() and publish() is called in failsafeTimer()
+
+    // run the safety timer
+    // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
+    ros::TimerEvent safety_timer_event;
+    safetyTimer(safety_timer_event);
 
     updateTrackers();
 
@@ -3755,9 +3780,9 @@ bool ControlManager::ehover(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[0].c_str());
-    controller_list[0]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
+    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
+    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
     // update the time (used in failsafe)
@@ -3851,9 +3876,9 @@ bool ControlManager::eland(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[0].c_str());
-    controller_list[0]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[0].c_str());
+    ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
+    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
     // update the time (used in failsafe)
@@ -4031,7 +4056,7 @@ void ControlManager::switchMotors(bool input) {
     callbackSwitchTracker(request, response);
 
     // request
-    request.value = controller_names[0];
+    request.value = controller_names[eland_controller_idx];
 
     ROS_INFO("[ControlManager]: switching to %s after switching motors off", request.value.c_str());
 

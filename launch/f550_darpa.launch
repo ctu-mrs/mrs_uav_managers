@@ -57,10 +57,11 @@
       <!-- Services -->
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
-      aremap from="~land_home_in" to="~land_home" />
+      <remap from="~land_home_in" to="~land_home" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
+      <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
@@ -129,6 +130,12 @@
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
+
+      <!-- MatlabTracker -->
+      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/matlab_tracker.yaml" />
+      <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
+      <remap from="~matlab_tracker/profiler" to="profiler" />
+      <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
 
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/landoff_tracker.yaml" />

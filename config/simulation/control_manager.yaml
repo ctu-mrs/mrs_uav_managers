@@ -2,8 +2,8 @@
 # - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
   "mrs_trackers/LandoffTracker",
-  "mrs_trackers/LineTracker",
   "mrs_trackers/MpcTracker",
+  "mrs_trackers/LineTracker",
   "mrs_trackers/JoyTracker",
   "mrs_trackers/MatlabTracker",
 ]
@@ -11,8 +11,8 @@ trackers : [
 # - list of names of dynamically loaded controllers
 # - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
-  "mrs_controllers/So3Controller",
   "mrs_controllers/MpcController",
+  "mrs_controllers/So3Controller",
   "mrs_controllers/FailsafeController",
   "mrs_controllers/AttitudeController",
   "mrs_controllers/NsfController",
@@ -33,14 +33,19 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  control_error_eland: 100.0 # [m]
-  control_error_failsafe: 100.0 # [m]
+  control_error_eland: 5.0 # [m]
+  control_error_failsafe: 8.0 # [m]
 
-  # - this tracker will be used for calling the emergancy hover routine
+  # tracker used for emergancy hover routine
   ehover_tracker: "mrs_trackers/LandoffTracker"
 
-  # - this controller will be used for emergancy landing
+  # controller used for safety landing (feed forward)
   failsafe_controller: "mrs_controllers/FailsafeController"
+
+  # controller used for emergancy (controller) landing
+  eland_controller: "mrs_controllers/MpcController"
+
+  # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 0.1 # [s]
 
   elanding_timer_rate: 10
