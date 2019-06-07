@@ -1877,7 +1877,10 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         // TODO is this the right place?
         std::string response;
         ROS_INFO("[ControlManager]: triggering hover after switching to a new controller.");
-        hover(response);
+
+        // reactivate the current tracker
+        tracker_list[active_tracker_idx]->deactivate();
+        tracker_list[active_tracker_idx]->activate(mrs_msgs::PositionCommand::Ptr());
 
         // update the time (used in failsafe)
         controller_switch_time = ros::Time::now();
