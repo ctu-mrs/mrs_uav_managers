@@ -20,7 +20,7 @@ takeoff:
     tracker: "mrs_trackers/MpcTracker"
     controller: "mrs_controllers/MpcController"
 
-  takeoff_height: 1.2
+  takeoff_height: 2.0
 
   ground_limit_height: 0.5 # under which height the takeoff can happen
 

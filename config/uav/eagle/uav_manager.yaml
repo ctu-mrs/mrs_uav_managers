@@ -1,7 +1,7 @@
 null_tracker: "mrs_uav_manager/NullTracker"
 
 # require gain or constraint manager runnign to takeoff?
-require_gain_manager: true
+require_gain_manager: false
 require_constraint_manager: true
 
 max_height_checking:
@@ -10,9 +10,15 @@ max_height_checking:
   safety_height_offset: 0.5 # how much lower to descend bellow the max height
 
 takeoff:
+
   rate: 10 # [Hz]
+
   takeoff_tracker: "mrs_trackers/LandoffTracker"
-  after_takeoff_tracker: "mrs_trackers/MpcTracker"
+  takeoff_controller: "mrs_controllers/MpcController"
+
+  after_takeoff:
+    tracker: "mrs_trackers/MpcTracker"
+    controller: "mrs_controllers/MpcController"
 
   takeoff_height: 3.0
 
@@ -27,7 +33,7 @@ landing:
   landing_cutoff_height:  0.8
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
-  disarm: false
+  disarm: true
 
 flight_timer:
 
@@ -38,6 +44,6 @@ flight_timer:
 # detecting if desired thrust cross max threshold, triggers landing after that
 max_thrust:
 
-  enabled: false
+  enabled: true
   rate: 30 # [Hz]
   max_thrust: 0.85 # [-]
