@@ -41,6 +41,7 @@
 
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
+#define PWM_MIDDLE 1500.0
 
 namespace mrs_uav_manager
 {
@@ -125,7 +126,7 @@ private:
   int active_controller_idx   = 0;
   int ehover_tracker_idx      = 0;
   int failsafe_controller_idx = 0;
-  int eland_controller_idx = 0;
+  int eland_controller_idx    = 0;
 
   void switchMotors(bool in);
   bool motors = false;
@@ -196,10 +197,12 @@ private:
   bool               offboard_mode    = false;
 
 private:
-  ros::Subscriber   subscriber_rc;
-  mavros_msgs::RCIn rc_channels;
-  std::mutex        mutex_rc_channels;
-  bool              got_rc_channels = false;
+  ros::Subscriber      subscriber_rc;
+  mavros_msgs::RCIn    rc_channels;
+  std::mutex           mutex_rc_channels;
+  bool                 got_rc_channels = false;
+  std::list<ros::Time> rc_channel_switch_time;
+  std::mutex           mutex_rc_channel_switch_time;
 
 private:
   void updateTrackers(void);
@@ -367,9 +370,12 @@ private:
   bool      joystick_back_pressed = false;
   bool      joystick_goto_enabled = false;
 
-  bool rc_goto_enabled_ = false;
-  bool rc_goto_active_  = false;
+  bool rc_goto_enabled_              = false;
+  bool rc_goto_active_               = false;
+  int  rc_joystic_channel_last_value = 0;
   int  rc_joystic_channel_;
+  int  rc_joystic_n_switches_;
+  int  rc_joystic_timeout_;
 
   bool      joystick_failsafe_pressed = false;
   ros::Time joystick_failsafe_press_time;
@@ -478,6 +484,8 @@ void ControlManager::onInit() {
 
   param_loader.load_param("rc_joystick/enabled", rc_goto_enabled_);
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
+  param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
+  param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1253,20 +1261,20 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     double speed = 1.0;
 
-    if (abs(rc_channels.channels[0] - 1500) > 100) {
-      request.goal[1] = (-(rc_channels.channels[0] - 1500.0) / 500.0) * speed;
+    if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
+      request.goal[1] = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
     }
 
-    if (abs(rc_channels.channels[1] - 1500) > 100) {
-      request.goal[2] = ((rc_channels.channels[1] - 1500.0) / 500.0) * 1.0;
+    if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
+      request.goal[2] = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * 1.0;
     }
 
-    if (abs(rc_channels.channels[2] - 1500) > 100) {
-      request.goal[0] = ((rc_channels.channels[2] - 1500.0) / 500.0) * 1.0;
+    if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 100) {
+      request.goal[0] = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * 1.0;
     }
 
-    if (abs(rc_channels.channels[3] - 1500) > 100) {
-      request.goal[3] = (-(rc_channels.channels[3] - 1500.0) / 500.0);
+    if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
+      request.goal[3] = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0);
     }
 
     ROS_INFO("[ControlManager]: goto by rc by x=%2.2f, y=%2.2f, z=%2.2f, yaw=%2.f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
@@ -1292,11 +1300,21 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     std::scoped_lock lock(mutex_rc_channels);
 
-    if (rc_channels.channels[rc_joystic_channel_] > 1500) {
+    // prune the list of rc_channel_switches
+    std::list<ros::Time>::iterator it;
+    for (it = rc_channel_switch_time.begin(); it != rc_channel_switch_time.end();) {
+      if ((ros::Time::now() - *it).toSec() > rc_joystic_timeout_) {
+        it = rc_channel_switch_time.erase(it);
+      } else {
+        it++;
+      }
+    }
+
+    if (int(rc_channel_switch_time.size()) > rc_joystic_n_switches_) {
 
       if (rc_goto_active_ == false) {
 
-        ROS_INFO("[ControlManager]: activating rc joystiv");
+        ROS_INFO("[ControlManager]: activating rc joystick");
 
         callbacks_enabled = false;
 
@@ -1314,13 +1332,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
             tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
           }
         }
-      }
-
-      rc_goto_active_ = true;
-
-    } else {
-
-      if (rc_goto_active_ == true) {
+      } else if (rc_goto_active_ == true) {
 
         ROS_INFO("[ControlManager]: de-activating rc joystiv");
 
@@ -1342,7 +1354,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
         }
       }
 
-      rc_goto_active_ = false;
+      rc_goto_active_ = !rc_goto_active_;
     }
   }
 }
@@ -1692,6 +1704,25 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
   got_rc_channels = true;
 
+  // | ------------------- rc joystic control ------------------- |
+
+  // when the switch change its position
+  if (rc_goto_enabled_) {
+
+    if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
+        (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+
+      // enter an event to the std vector
+      std::scoped_lock lock(mutex_rc_channel_switch_time);
+
+      rc_channel_switch_time.insert(rc_channel_switch_time.begin(), ros::Time::now());
+    }
+  }
+
+  // do not forget to update the last... variable
+  rc_joystic_channel_last_value = rc_channels.channels[rc_joystic_channel_];
+
+  // | ------------------------ rc eland ------------------------ |
   if (rc_eland_enabled_) {
 
     if (uint(rc_eland_channel_) > (msg->channels.size() - 1)) {
