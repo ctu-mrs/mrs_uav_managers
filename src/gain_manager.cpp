@@ -445,6 +445,16 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     return;
   }
 
+  std_msgs::String str_out;
+  str_out.data = current_gains;
+
+  try {
+    publisher_current_gains.publish(str_out);
+  }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_gains.getTopic().c_str());
+  }
+
   {
     std::scoped_lock lock(mutex_controller_status);
 
@@ -471,16 +481,6 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
         ROS_ERROR_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
       }
     }
-  }
-
-  std_msgs::String str_out;
-  str_out.data = current_gains;
-
-  try {
-    publisher_current_gains.publish(str_out);
-  }
-  catch (...) {
-    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_gains.getTopic().c_str());
   }
 }
 
