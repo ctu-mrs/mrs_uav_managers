@@ -9,10 +9,6 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <nav_msgs/Odometry.h>
 
-#include <mrs_msgs/TrackerConstraints.h>
-#include <mrs_msgs/TrackerConstraintsRequest.h>
-#include <mrs_msgs/TrackerConstraintsResponse.h>
-
 namespace mrs_uav_manager
 {
 
@@ -34,8 +30,6 @@ public:
   virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &       odometry,
                                                            const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
   virtual const mrs_msgs::ControllerStatus::Ptr     getStatus()                                                  = 0;
-
-  virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &constraints) = 0;
 };
 }  // namespace mrs_uav_manager
 
