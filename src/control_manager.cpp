@@ -147,6 +147,7 @@ private:
   ros::Publisher publisher_controller_status;
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
+  ros::Publisher publisher_mass_estimate;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -700,6 +701,7 @@ void ControlManager::onInit() {
   publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
   publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -872,6 +874,26 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
     }
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_tilt_error.getTopic().c_str());
+    }
+  }
+
+  // --------------------------------------------------------------
+  // |                  publish the mass estimate                 |
+  // --------------------------------------------------------------
+  {
+    std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+
+      std_msgs::Float64 mass_estimate_out;
+      mass_estimate_out.data = uav_mass_ + last_attitude_cmd->mass_difference;
+
+      try {
+        publisher_mass_estimate.publish(mass_estimate_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_mass_estimate.getTopic().c_str());
+      }
     }
   }
 }
