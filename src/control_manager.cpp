@@ -2174,7 +2174,7 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
     return true;
   }
 
-  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+  mrs_msgs::TrackerConstraintsResponse::ConstPtr response;
 
   mrs_msgs::TrackerConstraintsRequest req_constraints;
   req_constraints = req;
@@ -2185,9 +2185,17 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
     // for each tracker
     for (unsigned int i = 0; i < tracker_list.size(); i++) {
 
-      // if it is the active one, update and retrieve the command
-      tracker_response =
-          tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
+      response = tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
+    }
+  }
+
+  {
+    std::scoped_lock lock(mutex_controller_list);
+
+    // for each controller
+    for (unsigned int i = 0; i < controller_list.size(); i++) {
+
+      response = controller_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
     }
   }
 
