@@ -39,7 +39,7 @@ safety:
   failsafe_controller: "mrs_controllers/FailsafeController"
 
   # controller used for emergancy (controller) landing
-  eland_controller: "mrs_controllers/MpcController"
+  eland_controller: "mrs_controllers/So3Controller"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 0.1 # [s]

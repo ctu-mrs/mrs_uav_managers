@@ -33,8 +33,8 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  control_error_eland: 5.0 # [m]
-  control_error_failsafe: 8.0 # [m]
+  control_error_eland: 2.5 # [m]
+  control_error_failsafe: 5.0 # [m]
 
   # tracker used for emergancy hover routine
   ehover_tracker: "mrs_trackers/LandoffTracker"
@@ -43,7 +43,7 @@ safety:
   failsafe_controller: "mrs_controllers/FailsafeController"
 
   # controller used for emergancy (controller) landing
-  eland_controller: "mrs_controllers/MpcController"
+  eland_controller: "mrs_controllers/So3Controller"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 1.0 # [s]
