@@ -217,8 +217,17 @@ private:
 private:
   double tilt_limit_eland_;
   double tilt_limit_disarm_;
-  double control_error_eland_;
-  double control_error_failsafe_;
+
+  double eland_so3_threshold_;
+  double eland_mpc_threshold_;
+  double eland_other_threshold_;
+
+  double failsafe_so3_threshold_;
+  double failsafe_mpc_threshold_;
+  double failsafe_other_threshold_;
+
+  double failsafe_threshold_;
+  double eland_threshold_;
 
 private:
   bool       tilt_error_failsafe_enabled_ = false;
@@ -438,8 +447,13 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/tilt_limit_disarm", tilt_limit_disarm_);
   tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * M_PI;
 
-  param_loader.load_param("safety/control_error_eland", control_error_eland_);
-  param_loader.load_param("safety/control_error_failsafe", control_error_failsafe_);
+  param_loader.load_param("safety/eland/so3", eland_so3_threshold_);
+  param_loader.load_param("safety/eland/mpc", eland_mpc_threshold_);
+  param_loader.load_param("safety/eland/other", eland_other_threshold_);
+
+  param_loader.load_param("safety/failsafe/so3", failsafe_so3_threshold_);
+  param_loader.load_param("safety/failsafe/mpc", failsafe_mpc_threshold_);
+  param_loader.load_param("safety/failsafe/other", failsafe_other_threshold_);
 
   param_loader.load_param("status_timer_rate", status_timer_rate_);
   param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
@@ -928,6 +942,34 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     }
   }
 
+  // | -------------- eland and failsafe thresholds ------------- |
+
+  {
+    std::scoped_lock lock(mutex_controller_list);
+
+    if (controller_names[active_controller_idx].compare("mrs_controllers/So3Controller") == 0) {
+
+      eland_threshold_    = eland_so3_threshold_;
+      failsafe_threshold_ = failsafe_so3_threshold_;
+
+      ROS_INFO_THROTTLE(5.0, "[ControlManager]: using safety threshold for So3 controller");
+
+    } else if (controller_names[active_controller_idx].compare("mrs_controllers/MpcController") == 0) {
+
+      eland_threshold_    = eland_mpc_threshold_;
+      failsafe_threshold_ = failsafe_mpc_threshold_;
+
+      ROS_INFO_THROTTLE(5.0, "[ControlManager]: using safety threshold for Mpc controller");
+
+    } else {
+
+      eland_threshold_    = eland_other_threshold_;
+      failsafe_threshold_ = failsafe_other_threshold_;
+
+      ROS_WARN_THROTTLE(5.0, "[ControlManager]: using safety threshold for other controller");
+    }
+  }
+
   // | -------- cacalculate control errors and tilt angle ------- |
 
   double position_error_x_, position_error_y_, position_error_z_;
@@ -995,15 +1037,18 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
-  if (control_error_ > control_error_failsafe_ && !failsafe_triggered) {
+  if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
 
-    if (!failsafe_triggered) {
+    if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
 
-      ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, control_error_failsafe_);
+      if (!failsafe_triggered) {
 
-      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
 
-      failsafe();
+        std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+        failsafe();
+      }
     }
   }
 
@@ -1014,15 +1059,18 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_odometry);
 
-    if (tilt_angle > tilt_limit_eland_ || control_error_ > control_error_eland_) {
+    if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
 
-      if (!failsafe_triggered && !eland_triggered) {
+      if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
 
-        ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
-                  (180.0 / M_PI) * tilt_limit_eland_, control_error_, control_error_eland_);
+        if (!failsafe_triggered && !eland_triggered) {
 
-        std::string message_out;
-        eland(message_out);
+          ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
+                    (180.0 / M_PI) * tilt_limit_eland_, control_error_, eland_threshold_);
+
+          std::string message_out;
+          eland(message_out);
+        }
       }
     }
   }
