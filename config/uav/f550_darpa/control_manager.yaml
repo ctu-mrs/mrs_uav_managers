@@ -31,8 +31,11 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  control_error_eland: 1.0 # [m]
-  control_error_failsafe: 2.0 # [m]
+  # This needs to be set correctly depending on the controller being used.
+  # Beware, MPC can have huge control errors when velocity constraints are too fast.
+  # When flying with MPC controller, max 2 m/s velocity is recommanded.
+  control_error_eland: 1.0 # [m] cca 1.5 for SO3 and 2.5 for MPC
+  control_error_failsafe: 2.0 # [m] cca 2.5 for SO3 and 4.0 for MPC
 
   # tracker used for emergancy hover routine
   ehover_tracker: "mrs_trackers/LandoffTracker"
