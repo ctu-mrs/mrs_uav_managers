@@ -14,11 +14,11 @@ takeoff:
   rate: 10 # [Hz]
 
   takeoff_tracker: "mrs_trackers/LandoffTracker"
-  takeoff_controller: "mrs_controllers/MpcController"
+  takeoff_controller: "mrs_controllers/So3Controller"
 
   after_takeoff:
     tracker: "mrs_trackers/MpcTracker"
-    controller: "mrs_controllers/MpcController"
+    controller: "mrs_controllers/So3Controller"
 
   takeoff_height: 1.2
 
