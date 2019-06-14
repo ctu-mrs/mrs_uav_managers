@@ -170,6 +170,7 @@ private:
   int active_controller_idx   = 0;
   int ehover_tracker_idx      = 0;
   int failsafe_controller_idx = 0;
+  int null_tracker_idx        = 0;
   int eland_controller_idx    = 0;
 
   void switchMotors(bool in);
@@ -713,6 +714,36 @@ void ControlManager::onInit() {
   }
 
   // --------------------------------------------------------------
+  // |         check for the existance of the NullTracker         |
+  // --------------------------------------------------------------
+
+  // check if the hover_tracker is within the loaded trackers
+  bool null_tracker_check = false;
+  for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+    std::string tracker_name = tracker_names[i];
+
+    if (tracker_name.compare(null_tracker_name_) == 0) {
+      null_tracker_check = true;
+      null_tracker_idx   = i;
+      break;
+    }
+  }
+  if (!null_tracker_check) {
+    ROS_ERROR("[ControlManager]: the null tracker is not within the loaded trackers");
+    ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
+  // |                  activate the NullTracker                  |
+  // --------------------------------------------------------------
+
+  ROS_INFO("[ControlManager]: Activating the null tracker");
+
+  tracker_list[null_tracker_idx]->activate(last_position_cmd);
+  active_tracker_idx = null_tracker_idx;
+
+  // --------------------------------------------------------------
   // |           active the first controller on the list          |
   // --------------------------------------------------------------
 
@@ -720,7 +751,7 @@ void ControlManager::onInit() {
 
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
-  // update the time (used in failsafe)
+  // update the time
   controller_switch_time = ros::Time::now();
 
   motors = false;
@@ -1648,8 +1679,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
 
   // if any of the A, B, X, Y buttons are pressed when flying with JoyTracker, switch back to Mpc and SO(3)
   if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) &&
-      tracker_names[active_tracker_idx].compare("JoyTracker") == 0 &&
-      controller_names[active_controller_idx].compare("AttitudeController") == 0) {
+      tracker_names[active_tracker_idx].compare("JoyTracker") == 0 && controller_names[active_controller_idx].compare("AttitudeController") == 0) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
@@ -3946,8 +3976,9 @@ bool ControlManager::ehover(std::string &message_out) {
 
     try {
 
+      // deactivate the old controller
       controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = 0;  // super important
+      active_controller_idx = eland_controller_idx;  // super important
 
       success = true;
     }
@@ -4043,7 +4074,7 @@ bool ControlManager::eland(std::string &message_out) {
     try {
 
       controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = 0;  // super important
+      active_controller_idx = eland_controller_idx;  // super important
 
       success = true;
     }
@@ -4257,7 +4288,7 @@ void ControlManager::updateTrackers(void) {
 
       last_position_cmd = tracker_output_cmd;
 
-    } else if (active_tracker_idx > 0) {
+    } else if (active_tracker_idx != null_tracker_idx) {
 
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
 
@@ -4265,7 +4296,7 @@ void ControlManager::updateTrackers(void) {
 
       failsafe();
 
-    } else if (active_tracker_idx == 0) {
+    } else if (active_tracker_idx == null_tracker_idx) {
 
       last_position_cmd = tracker_output_cmd;
     }
@@ -4418,7 +4449,7 @@ void ControlManager::publish(void) {
 
     should_publish = false;
 
-  } else if (active_tracker_idx == 0) {
+  } else if (active_tracker_idx == null_tracker_idx) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
