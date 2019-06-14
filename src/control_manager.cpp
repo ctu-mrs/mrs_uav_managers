@@ -74,6 +74,46 @@ typedef enum
 
 } ReferenceFrameType_t;
 
+/* class ControllerParams() //{ */
+
+class ControllerParams {
+
+public:
+  ControllerParams(std::string address, double eland_threshold, double failsafe_threshold);
+
+public:
+  double      failsafe_threshold;
+  double      eland_threshold;
+  std::string address;
+};
+
+ControllerParams::ControllerParams(std::string address, double eland_threshold, double failsafe_threshold) {
+
+  this->eland_threshold    = eland_threshold;
+  this->failsafe_threshold = failsafe_threshold;
+  this->address            = address;
+}
+
+//}
+
+/* class TrackerParams() //{ */
+
+class TrackerParams {
+
+public:
+  TrackerParams(std::string address);
+
+public:
+  std::string address;
+};
+
+TrackerParams::TrackerParams(std::string address) {
+
+  this->address = address;
+}
+
+//}
+
 class ControlManager : public nodelet::Nodelet {
 
 public:
@@ -85,11 +125,15 @@ private:
   std::string     uav_name_;
 
 private:
+private:
   pluginlib::ClassLoader<mrs_uav_manager::Tracker> *   tracker_loader;
   pluginlib::ClassLoader<mrs_uav_manager::Controller> *controller_loader;
 
-  std::vector<std::string> tracker_names;
-  std::vector<std::string> controller_names;
+  std::vector<std::string>             tracker_names;
+  std::map<std::string, TrackerParams> trackers_;
+
+  std::vector<std::string>                controller_names;
+  std::map<std::string, ControllerParams> controllers_;
 
   std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>>    tracker_list;
   std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list;
@@ -447,14 +491,6 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/tilt_limit_disarm", tilt_limit_disarm_);
   tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * M_PI;
 
-  param_loader.load_param("safety/eland/so3", eland_so3_threshold_);
-  param_loader.load_param("safety/eland/mpc", eland_mpc_threshold_);
-  param_loader.load_param("safety/eland/other", eland_other_threshold_);
-
-  param_loader.load_param("safety/failsafe/so3", failsafe_so3_threshold_);
-  param_loader.load_param("safety/failsafe/mpc", failsafe_mpc_threshold_);
-  param_loader.load_param("safety/failsafe/other", failsafe_other_threshold_);
-
   param_loader.load_param("status_timer_rate", status_timer_rate_);
   param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
   param_loader.load_param("safety/elanding_timer_rate", elanding_timer_rate_);
@@ -508,7 +544,6 @@ void ControlManager::onInit() {
 
   param_loader.load_param("trackers", tracker_names);
   param_loader.load_param("null_tracker", null_tracker_name_);
-  tracker_names.insert(tracker_names.begin(), null_tracker_name_);
 
   tracker_loader = new pluginlib::ClassLoader<mrs_uav_manager::Tracker>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
@@ -516,19 +551,26 @@ void ControlManager::onInit() {
 
     std::string tracker_name = tracker_names[i];
 
+    // load the controller parameters
+    std::string address;
+    param_loader.load_param(tracker_name + "/address", address);
+
+    TrackerParams new_tracker(address);
+    trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
+
     try {
-      ROS_INFO("[ControlManager]: Trying to load tracker %s", tracker_name.c_str());
-      { tracker_list.push_back(tracker_loader->createInstance(tracker_name.c_str())); }
+      ROS_INFO("[ControlManager]: Trying to load tracker %s", new_tracker.address.c_str());
+      tracker_list.push_back(tracker_loader->createInstance(new_tracker.address.c_str()));
     }
     catch (pluginlib::CreateClassException &ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for tracker %s", tracker_name.c_str());
+      ROS_ERROR("[ControlManager]: CreateClassException for tracker %s", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      return;
+      ros::shutdown();
     }
     catch (pluginlib::PluginlibException &ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for tracker %s", tracker_name.c_str());
+      ROS_ERROR("[ControlManager]: PluginlibException for tracker %s", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      return;
+      ros::shutdown();
     }
   }
 
@@ -536,8 +578,11 @@ void ControlManager::onInit() {
 
   for (unsigned long i = 0; i < tracker_list.size(); i++) {
 
+    std::map<std::string, TrackerParams>::iterator it;
+    it = trackers_.find(tracker_names[i]);
+
     try {
-      ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, tracker_names[i].c_str());
+      ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, it->second.address.c_str());
       tracker_list[i]->initialize(nh_, &safety_area);
     }
     catch (std::runtime_error &ex) {
@@ -555,23 +600,42 @@ void ControlManager::onInit() {
 
   controller_loader = new pluginlib::ClassLoader<mrs_uav_manager::Controller>("mrs_uav_manager", "mrs_uav_manager::Controller");
 
+  // for each controller in the list
   for (unsigned long i = 0; i < controller_names.size(); i++) {
 
     std::string controller_name = controller_names[i];
 
+    // load the controller parameters
+    std::string address;
+    double      eland_threshold, failsafe_threshold;
+    param_loader.load_param(controller_name + "/address", address);
+    param_loader.load_param(controller_name + "/eland_threshold", eland_threshold);
+    param_loader.load_param(controller_name + "/failsafe_threshold", failsafe_threshold);
+
+    if (eland_threshold == 0) {
+      eland_threshold = 1e6;
+    }
+
+    if (failsafe_threshold == 0) {
+      failsafe_threshold = 1e6;
+    }
+
+    ControllerParams new_controller(address, eland_threshold, failsafe_threshold);
+    controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
+
     try {
-      ROS_INFO("[ControlManager]: Loading controller %s", controller_name.c_str());
-      controller_list.push_back(controller_loader->createInstance(controller_name.c_str()));
+      ROS_INFO("[ControlManager]: Loading controller %s", new_controller.address.c_str());
+      controller_list.push_back(controller_loader->createInstance(new_controller.address.c_str()));
     }
     catch (pluginlib::CreateClassException &ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for controller %s", controller_name.c_str());
+      ROS_ERROR("[ControlManager]: CreateClassException for controller %s", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      return;
+      ros::shutdown();
     }
     catch (pluginlib::PluginlibException &ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for controller %s", controller_name.c_str());
+      ROS_ERROR("[ControlManager]: PluginlibException for controller %s", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      return;
+      ros::shutdown();
     }
   }
 
@@ -579,7 +643,11 @@ void ControlManager::onInit() {
 
   for (unsigned long i = 0; i < controller_list.size(); i++) {
     try {
-      ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, controller_names[i].c_str());
+
+      std::map<std::string, ControllerParams>::iterator it;
+      it = controllers_.find(controller_names[i]);
+
+      ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
       controller_list[i]->initialize(nh_, motor_params_);
     }
     catch (std::runtime_error &ex) {
@@ -947,27 +1015,11 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_controller_list);
 
-    if (controller_names[active_controller_idx].compare("mrs_controllers/So3Controller") == 0) {
+    std::map<std::string, ControllerParams>::iterator it;
+    it = controllers_.find(controller_names[active_controller_idx]);
 
-      eland_threshold_    = eland_so3_threshold_;
-      failsafe_threshold_ = failsafe_so3_threshold_;
-
-      ROS_INFO_THROTTLE(5.0, "[ControlManager]: using safety threshold for So3 controller");
-
-    } else if (controller_names[active_controller_idx].compare("mrs_controllers/MpcController") == 0) {
-
-      eland_threshold_    = eland_mpc_threshold_;
-      failsafe_threshold_ = failsafe_mpc_threshold_;
-
-      ROS_INFO_THROTTLE(5.0, "[ControlManager]: using safety threshold for Mpc controller");
-
-    } else {
-
-      eland_threshold_    = eland_other_threshold_;
-      failsafe_threshold_ = failsafe_other_threshold_;
-
-      ROS_WARN_THROTTLE(5.0, "[ControlManager]: using safety threshold for other controller");
-    }
+    eland_threshold_    = it->second.eland_threshold;
+    failsafe_threshold_ = it->second.failsafe_threshold;
   }
 
   // | -------- cacalculate control errors and tilt angle ------- |
@@ -1259,10 +1311,10 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     joytracker_start_pressed = false;
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "mrs_controllers/AttitudeController";
+    controller_srv.value = "AttitudeController";
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "mrs_trackers/JoyTracker";
+    tracker_srv.value = "JoyTracker";
 
     mrs_msgs::StringResponse response;
 
@@ -1596,16 +1648,16 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
 
   // if any of the A, B, X, Y buttons are pressed when flying with JoyTracker, switch back to Mpc and SO(3)
   if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) &&
-      tracker_names[active_tracker_idx].compare("mrs_trackers/JoyTracker") == 0 &&
-      controller_names[active_controller_idx].compare("mrs_controllers/AttitudeController") == 0) {
+      tracker_names[active_tracker_idx].compare("JoyTracker") == 0 &&
+      controller_names[active_controller_idx].compare("AttitudeController") == 0) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "mrs_controllers/So3Controller";
+    controller_srv.value = "So3Controller";
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "mrs_trackers/MpcTracker";
+    tracker_srv.value = "MpcTracker";
 
     mrs_msgs::StringResponse response;
 
@@ -3124,10 +3176,10 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
   char message[400];
 
   mrs_msgs::StringRequest controller_srv;
-  controller_srv.value = "mrs_controllers/AttitudeController";
+  controller_srv.value = "AttitudeController";
 
   mrs_msgs::StringRequest tracker_srv;
-  tracker_srv.value = "mrs_trackers/JoyTracker";
+  tracker_srv.value = "JoyTracker";
 
   mrs_msgs::StringResponse response;
 

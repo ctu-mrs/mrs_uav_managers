@@ -1,24 +1,21 @@
 # - list of names of dynamically loaded trackers
-# - trackers follow the mrs_uav_manager/Tracker.h interface
 trackers : [
-  "mrs_trackers/LandoffTracker",
-  "mrs_trackers/MpcTracker",
-  "mrs_trackers/LineTracker",
+  "MpcTracker",
+  "LineTracker",
+  "LandoffTracker",
+  "NullTracker",
 ]
 
 # - list of names of dynamically loaded controllers
-# - controllers follow the mrs_uav_manager/Controller.h interface
 controllers : [
-  "mrs_controllers/MpcController",
-  "mrs_controllers/So3Controller",
-  "mrs_controllers/FailsafeController",
-  "mrs_controllers/AttitudeController",
-  "mrs_controllers/MpcController",
+  "So3Controller",
+  "MpcController",
+  "FailsafeController",
+  "AttitudeController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
-# - NullTracker is defined in the mrs_uav_manager package
-null_tracker: "mrs_uav_manager/NullTracker"
+null_tracker: "NullTracker"
 
 status_timer_rate:  10 # [Hz]
 
@@ -31,26 +28,14 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  # control error thresholds for triggering the emergancy land
-  eland:
-    so3: 1.5 # [m]
-    mpc: 3.0 # [m]
-    other: 1.5 # [m] # applies to anything else than so3 and mpc
-
-  # control error thresholds for triggering the failsafe land
-  failsafe:
-    so3: 2.5 # [m]
-    mpc: 3.0 # [m]
-    other: 2.5 # [m] # applies to anything else than so3 and mpc
-
   # tracker used for emergancy hover routine
-  ehover_tracker: "mrs_trackers/LandoffTracker"
+  ehover_tracker: "LandoffTracker"
 
   # controller used for safety landing (feed forward)
-  failsafe_controller: "mrs_controllers/FailsafeController"
+  failsafe_controller: "FailsafeController"
 
   # controller used for emergancy (controller) landing
-  eland_controller: "mrs_controllers/So3Controller"
+  eland_controller: "So3Controller"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 0.1 # [s]

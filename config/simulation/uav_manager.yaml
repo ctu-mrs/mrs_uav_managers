@@ -1,4 +1,4 @@
-null_tracker: "mrs_uav_manager/NullTracker"
+null_tracker: "NullTracker"
 
 # require gain or constraint manager runnign to takeoff?
 require_gain_manager: true
@@ -13,12 +13,12 @@ takeoff:
 
   rate: 10 # [Hz]
 
-  takeoff_tracker: "mrs_trackers/LandoffTracker"
-  takeoff_controller: "mrs_controllers/So3Controller"
+  takeoff_tracker: "LandoffTracker"
+  takeoff_controller: "So3Controller"
 
   after_takeoff:
-    tracker: "mrs_trackers/MpcTracker"
-    controller: "mrs_controllers/So3Controller"
+    tracker: "MpcTracker"
+    controller: "So3Controller"
 
   takeoff_height: 2.0
 
@@ -27,7 +27,7 @@ takeoff:
 landing:
 
   rate: 10 # [Hz]
-  landing_tracker: "mrs_trackers/LandoffTracker"
+  landing_tracker: "LandoffTracker"
 
   # those two must apply simultaneously
   landing_cutoff_height:  0.75

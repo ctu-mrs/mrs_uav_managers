@@ -1,0 +1,17 @@
+MpcTracker:
+  address: "mrs_trackers/MpcTracker"
+
+LandoffTracker:
+  address: "mrs_trackers/LandoffTracker"
+
+LineTracker:
+  address: "mrs_trackers/LineTracker"
+
+JoyTracker:
+  address: "mrs_trackers/JoyTracker"
+
+MatlabTracker:
+  address: "mrs_trackers/MatlabTracker"
+
+NullTracker:
+  address: "mrs_uav_manager/NullTracker"

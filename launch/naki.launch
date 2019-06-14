@@ -75,6 +75,8 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/naki/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/controllers.yaml" />
       <rosparam file="$(find mrs_controllers)/config/uav/naki/motor_params.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />

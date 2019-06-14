@@ -75,6 +75,8 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f450/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/f450/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/f450/controllers.yaml" />
       <rosparam file="$(find mrs_controllers)/config/uav/f450/motor_params_dji.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />

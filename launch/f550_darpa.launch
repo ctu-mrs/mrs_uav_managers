@@ -75,6 +75,8 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/controllers.yaml" />
       <rosparam file="$(find mrs_controllers)/config/uav/f550_darpa/motor_params_new_esc.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
