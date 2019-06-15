@@ -10,6 +10,7 @@ estimator_types: [
   "GPS",
   "OPTFLOW",
   "OTHER",
+  "HECTOR",
 ]
 
 gains: [
@@ -30,6 +31,7 @@ gain_management:
     GPS: ["supersoft", "soft"]
     OPTFLOW: ["supersoft"]
     OTHER: ["supersoft"]
+    HECTOR: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -43,3 +45,4 @@ gain_management:
     GPS: "soft"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
+    HECTOR: "supersoft"
