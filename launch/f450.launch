@@ -157,6 +157,7 @@
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
+      <remap from="~mpc_tracker/odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~mpc_tracker/start_trajectory_following_in" to="~mpc_tracker/start_trajectory_following" />
       <remap from="~mpc_tracker/stop_trajectory_following_in" to="~mpc_tracker/stop_trajectory_following" />
       <remap from="~mpc_tracker/resume_trajectory_following_in" to="~mpc_tracker/resume_trajectory_following" />
