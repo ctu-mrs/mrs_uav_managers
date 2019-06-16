@@ -10,6 +10,7 @@ estimator_types: [
   "GPS",
   "OPTFLOW",
   "OTHER",
+  "HECTOR",
 ]
 
 constraints: [
@@ -30,6 +31,7 @@ constraint_management:
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow", "medium", "fast"]
+    HECTOR: ["slow"]
     OTHER: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
@@ -43,4 +45,5 @@ constraint_management:
     OPTFLOWGPS: "slow"
     GPS: "medium"
     OPTFLOW: "slow"
+    HECTOR: "slow"
     OTHER: "slow"
