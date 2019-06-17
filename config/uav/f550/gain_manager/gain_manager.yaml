@@ -30,7 +30,7 @@ gain_management:
     ICP: ["supersoft"]
     RTK: ["supersoft", "soft", "tight"]
     OPTFLOWGPS: ["supersoft"]
-    GPS: ["supersoft", "soft"]
+    GPS: ["supersoft", "soft", "tight"]
     OPTFLOW: ["supersoft", "soft", "optflow"]
     OTHER: ["supersoft"]
     HECTOR: ["supersoft"]
@@ -44,7 +44,7 @@ gain_management:
     ICP: "supersoft"
     RTK: "tight"
     OPTFLOWGPS: "supersoft"
-    GPS: "soft"
+    GPS: "tight"
     OPTFLOW: "optflow"
     HECTOR: "supersoft"
     OTHER: "supersoft"

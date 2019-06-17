@@ -1404,49 +1404,80 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     }
   }
 
-  if (rc_goto_active_) {
+  if (rc_goto_active_ && last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
-    std::scoped_lock lock(mutex_tracker_list, mutex_rc_channels);
+    std::scoped_lock lock(mutex_rc_channels);
 
     // create the reference
 
     mrs_msgs::Vec4::Request request;
 
-    double speed = 1.0;
+    double des_x   = 0;
+    double des_y   = 0;
+    double des_z   = 0;
+    double des_yaw = 0;
+
+    double speed = 2.0;
+
+    bool nothing_to_do = true;
 
     if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
-      request.goal[1] = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
+      des_y         = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
+      nothing_to_do = false;
     }
 
     if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
-      request.goal[2] = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * 1.0;
+      des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
+      nothing_to_do = false;
     }
 
-    if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 100) {
-      request.goal[0] = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * 1.0;
+    if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
+      des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
+      nothing_to_do = false;
     }
 
     if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
-      request.goal[3] = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0);
+      des_yaw       = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0) * 1.0;
+      nothing_to_do = false;
     }
 
-    ROS_INFO("[ControlManager]: goto by rc by x=%2.2f, y=%2.2f, z=%2.2f, yaw=%2.f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
+    if (!nothing_to_do) {
 
-    mrs_msgs::Vec4::Response response;
+      request.goal[0] = des_x;
+      request.goal[1] = des_y;
+      request.goal[2] = des_z;
+      request.goal[3] = des_yaw;
 
-    // disable callbacks of all trackers
-    std_srvs::SetBoolRequest req_enable_callbacks;
+      mrs_msgs::Vec4Response response;
 
-    // enable the callbacks for the active tracker
-    req_enable_callbacks.data = true;
-    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+      // disable callbacks of all trackers
+      std_srvs::SetBoolRequest req_enable_callbacks;
 
-    // call the goto
-    callbackGoToFcuService(request, response);
+      // enable the callbacks for the active tracker
+      req_enable_callbacks.data = true;
+      {
+        std::scoped_lock lock(mutex_tracker_list);
 
-    // disable the callbacks back again
-    req_enable_callbacks.data = false;
-    tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+        tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+      }
+
+      callbacks_enabled = true;
+
+      // call the goto
+      callbackGoToFcuService(request, response);
+
+      callbacks_enabled = false;
+
+      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
+
+      // disable the callbacks back again
+      req_enable_callbacks.data = false;
+      {
+        std::scoped_lock lock(mutex_tracker_list);
+
+        tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+      }
+    }
   }
 
   if (rc_goto_enabled_ && got_rc_channels) {
@@ -1508,6 +1539,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       }
 
       rc_goto_active_ = !rc_goto_active_;
+      rc_channel_switch_time.clear();
     }
   }
 }
