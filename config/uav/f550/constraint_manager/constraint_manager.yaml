@@ -43,7 +43,7 @@ constraint_management:
     ICP: "slow"
     RTK: "slow"
     OPTFLOWGPS: "slow"
-    GPS: "medium"
+    GPS: "slow"
     OPTFLOW: "slow"
     HECTOR: "slow"
     OTHER: "slow"
