@@ -1525,7 +1525,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
         }
       } else if (rc_goto_active_ == true) {
 
-        ROS_INFO("[ControlManager]: de-activating rc joystiv");
+        ROS_INFO("[ControlManager]: deactivating rc joystic");
 
         callbacks_enabled = true;
 
