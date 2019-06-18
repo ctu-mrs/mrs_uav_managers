@@ -1421,24 +1421,31 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     bool nothing_to_do = true;
 
-    if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
-      des_y         = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+    if (uint(3) >= rc_channels.channels.size()) {
 
-    if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
-      des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
 
-    if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
-      des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+    } else {
 
-    if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
-      des_yaw       = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0) * 1.0;
-      nothing_to_do = false;
+      if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
+        des_y         = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
+        des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
+        des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
+        des_yaw       = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0) * 1.0;
+        nothing_to_do = false;
+      }
     }
 
     if (!nothing_to_do) {
@@ -1893,13 +1900,21 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   // when the switch change its position
   if (rc_goto_enabled_) {
 
-    if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
-        (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+    if (uint(rc_joystic_channel_) >= msg->channels.size()) {
 
-      // enter an event to the std vector
-      std::scoped_lock lock(mutex_rc_channel_switch_time);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
+      return;
 
-      rc_channel_switch_time.insert(rc_channel_switch_time.begin(), ros::Time::now());
+    } else {
+
+      if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
+          (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+
+        // enter an event to the std vector
+        std::scoped_lock lock(mutex_rc_channel_switch_time);
+
+        rc_channel_switch_time.insert(rc_channel_switch_time.begin(), ros::Time::now());
+      }
     }
   }
 
@@ -1909,7 +1924,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   // | ------------------------ rc eland ------------------------ |
   if (rc_eland_enabled_) {
 
-    if (uint(rc_eland_channel_) > (msg->channels.size() - 1)) {
+    if (uint(rc_eland_channel_) >= msg->channels.size()) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
       return;
@@ -2008,13 +2023,21 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
           if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
 
             ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", controller_names[active_controller_idx].c_str());
-            controller_list[active_controller_idx]->activate(last_attitude_cmd);
+            {
+              std::scoped_lock lock(mutex_controller_list);
+
+              controller_list[active_controller_idx]->activate(last_attitude_cmd);
+            }
 
             // if switching to null tracker, deactivate the active controller
           } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
 
             ROS_INFO("[ControlManager]: deactivating %s due to switching to NullTracker", controller_names[active_controller_idx].c_str());
-            controller_list[active_controller_idx]->deactivate();
+            {
+              std::scoped_lock lock(mutex_controller_list);
+
+              controller_list[active_controller_idx]->deactivate();
+            }
           }
 
           active_tracker_idx = new_tracker_idx;
@@ -2096,7 +2119,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         // reactivate the current tracker
         {
           std::scoped_lock lock(mutex_tracker_list);
-        
+
           tracker_list[active_tracker_idx]->deactivate();
           tracker_list[active_tracker_idx]->activate(mrs_msgs::PositionCommand::Ptr());
         }
