@@ -1038,7 +1038,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
     std::scoped_lock lock(mutex_attitude_command);
 
-    if (fabs(attitude_command.mass_difference) > 0.5) {
+    if (attitude_command.mass_difference > 0.5) {
 
       sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large!");
       res.message = message;
