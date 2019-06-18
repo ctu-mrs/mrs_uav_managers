@@ -1433,12 +1433,12 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       }
 
       if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
+        des_z         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
+        des_x         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
         nothing_to_do = false;
       }
 
@@ -1723,7 +1723,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "So3Controller";
+    controller_srv.value = "MpcController";
 
     mrs_msgs::StringRequest tracker_srv;
     tracker_srv.value = "MpcTracker";
