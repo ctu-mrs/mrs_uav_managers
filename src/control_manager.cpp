@@ -1716,7 +1716,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "So3Controller";
+    controller_srv.value = "MpcController";
 
     mrs_msgs::StringRequest tracker_srv;
     tracker_srv.value = "MpcTracker";
