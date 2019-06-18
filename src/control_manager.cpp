@@ -233,7 +233,8 @@ private:
 
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
   std::mutex                          mutex_last_attitude_cmd;
-  ros::Time                           controller_switch_time;
+  ros::Time                           controller_tracker_switch_time;
+  std::mutex                          mutex_controller_tracker_switch_time;
 
 private:
   ros::Subscriber    subscriber_mavros_state;
@@ -462,11 +463,11 @@ void ControlManager::onInit() {
 
   ros::Time::waitForValid();
 
-  joystick_tracker_press_time  = ros::Time(0);
-  joystick_failsafe_press_time = ros::Time(0);
-  joystick_eland_press_time    = ros::Time(0);
-  escalating_failsafe_time     = ros::Time(0);
-  controller_switch_time       = ros::Time(0);
+  joystick_tracker_press_time    = ros::Time(0);
+  joystick_failsafe_press_time   = ros::Time(0);
+  joystick_eland_press_time      = ros::Time(0);
+  escalating_failsafe_time       = ros::Time(0);
+  controller_tracker_switch_time = ros::Time(0);
 
   ROS_INFO("[ControlManager]: initializing");
 
@@ -752,7 +753,11 @@ void ControlManager::onInit() {
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
   // update the time
-  controller_switch_time = ros::Time::now();
+  {
+    std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+    controller_tracker_switch_time = ros::Time::now();
+  }
 
   motors = false;
 
@@ -1120,17 +1125,21 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
-  if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
+  {
+    std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-    if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+    if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
 
-      if (!failsafe_triggered) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
+        if (!failsafe_triggered) {
 
-        std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+          ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
 
-        failsafe();
+          std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+          failsafe();
+        }
       }
     }
   }
@@ -1140,11 +1149,11 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_odometry, mutex_controller_tracker_switch_time);
 
     if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
 
-      if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
@@ -1194,14 +1203,14 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
   {
-    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list);
+    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list, mutex_controller_tracker_switch_time);
 
     if (tilt_error_failsafe_enabled_ &&
         odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
-        if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+        if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
           ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
                     (180.0 / M_PI) * tilt_error_threshold_);
@@ -1212,7 +1221,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
         } else {
 
-          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controllers just switched so its ok.",
+          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controller/tracker just switched so its ok.",
                     (180.0 / M_PI) * tilt_error, (180.0 / M_PI) * tilt_error_threshold_);
         }
       }
@@ -2013,6 +2022,13 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time = ros::Time::now();
+        }
+
         // super important, switch which the active tracker idx
         try {
 
@@ -2027,6 +2043,13 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
               std::scoped_lock lock(mutex_controller_list);
 
               controller_list[active_controller_idx]->activate(last_attitude_cmd);
+
+              {
+                std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+                // update the time (used in failsafe)
+                controller_tracker_switch_time = ros::Time::now();
+              }
             }
 
             // if switching to null tracker, deactivate the active controller
@@ -2124,8 +2147,12 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
           tracker_list[active_tracker_idx]->activate(mrs_msgs::PositionCommand::Ptr());
         }
 
-        // update the time (used in failsafe)
-        controller_switch_time = ros::Time::now();
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time = ros::Time::now();
+        }
 
         // super important, switch which the active controller idx
         try {
@@ -3996,6 +4023,13 @@ bool ControlManager::ehover(std::string &message_out) {
     sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
+    {
+      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+      // update the time (used in failsafe)
+      controller_tracker_switch_time = ros::Time::now();
+    }
+
     // super important, switch the active tracker idx
     try {
 
@@ -4030,8 +4064,12 @@ bool ControlManager::ehover(std::string &message_out) {
     sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
-    // update the time (used in failsafe)
-    controller_switch_time = ros::Time::now();
+    {
+      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+      // update the time (used in failsafe)
+      controller_tracker_switch_time = ros::Time::now();
+    }
 
     try {
 
@@ -4093,6 +4131,13 @@ bool ControlManager::eland(std::string &message_out) {
     sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
+    {
+      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+      // update the time (used in failsafe)
+      controller_tracker_switch_time = ros::Time::now();
+    }
+
     // super important, switch the active tracker idx
     try {
 
@@ -4127,8 +4172,12 @@ bool ControlManager::eland(std::string &message_out) {
     sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
     ROS_INFO("[ControlManager]: %s", message);
 
-    // update the time (used in failsafe)
-    controller_switch_time = ros::Time::now();
+    {
+      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+      // update the time (used in failsafe)
+      controller_tracker_switch_time = ros::Time::now();
+    }
 
     try {
 
@@ -4200,8 +4249,12 @@ bool ControlManager::failsafe() {
       ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
       controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
 
-      // update the time (used in failsafe)
-      controller_switch_time = ros::Time::now();
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
       failsafe_triggered = true;
       elanding_timer.stop();
