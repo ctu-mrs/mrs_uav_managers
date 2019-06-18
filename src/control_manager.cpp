@@ -1024,7 +1024,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || active_tracker_idx <= 0) {
+  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
@@ -4497,7 +4497,7 @@ void ControlManager::publish(void) {
 
     should_publish = true;
 
-  } else if (active_tracker_idx > 0 && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+  } else if (active_tracker_idx != null_tracker_idx && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
                       controller_names[active_controller_idx].c_str());
