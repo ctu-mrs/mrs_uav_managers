@@ -1,0 +1,50 @@
+rate: 25
+
+estimator_types: [
+  "T265",
+  "OBJECT",
+  "VIO",
+  "ICP",
+  "RTK",
+  "OPTFLOWGPS",
+  "GPS",
+  "OPTFLOW",
+  "HECTOR",
+  "OTHER",
+]
+
+gains: [
+  "supersoft",
+  "soft",
+  "tight",
+  "optflow",
+]
+
+gain_management:
+
+  # list of allowed gains per odometry mode
+  allowed_gains:
+    T265: ["supersoft", "soft", "tight"]
+    OBJECT: ["supersoft"]
+    VIO: ["supersoft"]
+    ICP: ["supersoft"]
+    RTK: ["supersoft", "soft", "tight"]
+    OPTFLOWGPS: ["supersoft"]
+    GPS: ["supersoft", "soft", "tight"]
+    OPTFLOW: ["supersoft", "soft", "optflow"]
+    OTHER: ["supersoft"]
+    HECTOR: ["supersoft"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_gains:
+    T265: "supersoft"
+    OBJECT: "supersoft"
+    VIO: "supersoft"
+    ICP: "supersoft"
+    RTK: "tight"
+    OPTFLOWGPS: "supersoft"
+    GPS: "soft"
+    OPTFLOW: "optflow"
+    HECTOR: "supersoft"
+    OTHER: "supersoft"

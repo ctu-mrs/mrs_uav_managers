@@ -1,0 +1,19 @@
+So3Controller:
+  address: "mrs_controllers/So3Controller"
+  eland_threshold: 1.5
+  failsafe_threshold: 2.5
+
+MpcController:
+  address: "mrs_controllers/MpcController"
+  eland_threshold: 2.5
+  failsafe_threshold: 4.0
+
+FailsafeController:
+  address: "mrs_controllers/FailsafeController"
+  eland_threshold: 0.0
+  failsafe_threshold: 0.0
+
+AttitudeController:
+  address: "mrs_controllers/AttitudeController"
+  eland_threshold: 0.0
+  failsafe_threshold: 0.0

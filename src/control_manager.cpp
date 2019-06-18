@@ -2096,7 +2096,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         // reactivate the current tracker
         {
           std::scoped_lock lock(mutex_tracker_list);
-        
+
           tracker_list[active_tracker_idx]->deactivate();
           tracker_list[active_tracker_idx]->activate(mrs_msgs::PositionCommand::Ptr());
         }
