@@ -4402,7 +4402,7 @@ void ControlManager::updateTrackers(void) {
 
     } else if (active_tracker_idx != null_tracker_idx) {
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", tracker_names[active_tracker_idx].c_str());
 
       std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
