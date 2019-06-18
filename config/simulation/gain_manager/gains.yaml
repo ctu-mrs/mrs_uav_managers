@@ -117,3 +117,34 @@ tight:
   weight_estimator:
     km: 1.0
     km_lim: 3.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+
+wall:
+
+  horizontal:
+    kp: 2.5
+    kv: 1.5
+    ka: 1.0
+
+    attitude:
+      kq: 10.0
+      kw: 0.0
+
+    kib: 0.0
+    kib_lim: 0.0
+
+    kiw: 0.0
+    kiw_lim: 0.0
+
+  vertical:
+    kp: 33.333333
+    kv: 16.666667
+    ka: 1.0
+
+    attitude:
+      kq: 20.0
+      kw: 5.0
+
+  weight_estimator:
+    km: 0.0
+    km_lim: 4.4 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+

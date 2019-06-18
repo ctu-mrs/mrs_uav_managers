@@ -134,6 +134,12 @@
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
+      <!-- WallTracker -->
+      <rosparam ns="wall_tracker" file="$(find mrs_trackers)/config/simulation/wall_tracker.yaml" />
+      <param name="wall_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
+      <remap from="~wall_tracker/set_gains_out" to="gain_manager/set_gains" />
+      <remap from="~wall_tracker/profiler" to="profiler" />
+
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/simulation/matlab_tracker.yaml" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />

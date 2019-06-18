@@ -18,6 +18,7 @@ gains: [
   "soft",
   "tight",
   "optflow",
+  "wall",
 ]
 
 gain_management:
@@ -29,7 +30,7 @@ gain_management:
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     ICP: ["supersoft"]
-    RTK: ["soft", "supersoft", "tight"]
+    RTK: ["soft", "supersoft", "tight","wall"]
     OPTFLOWGPS: ["soft", "supersoft"]
     GPS: ["soft", 'supersoft', 'tight']
     OPTFLOW: ["optflow"]
@@ -43,7 +44,7 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
-    RTK: "tight"
+    RTK: "soft"
     OPTFLOWGPS: "soft"
     GPS: "soft"
     OPTFLOW: "optflow"
