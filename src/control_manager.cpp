@@ -251,6 +251,8 @@ private:
   std::list<ros::Time> rc_channel_switch_time;
   std::mutex           mutex_rc_channel_switch_time;
 
+  double rc_channel_pitch_, rc_channel_roll_, rc_channel_yaw_, rc_channel_thrust_;
+
 private:
   void updateTrackers(void);
   void updateControllers(void);
@@ -539,6 +541,11 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
   param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
   param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
+
+  param_loader.load_param("rc_joystick/channels/pitch", rc_channel_pitch_);
+  param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
+  param_loader.load_param("rc_joystick/channels/yaw", rc_channel_yaw_);
+  param_loader.load_param("rc_joystick/channels/thrust", rc_channel_thrust_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1436,23 +1443,23 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     } else {
 
-      if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
+      if (abs(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) > 100) {
+        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * speed;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
+      if (abs(rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) > 100) {
+        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * speed;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
+      if (abs(rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) > 200) {
+        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * speed;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
-        des_yaw       = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0) * 1.0;
+      if (abs(rc_channels.channels[rc_channel_yaw_] - PWM_MIDDLE) > 100) {
+        des_yaw       = (-(rc_channels.channels[rc_channel_yaw_] - PWM_MIDDLE) / 500.0) * 1.0;
         nothing_to_do = false;
       }
     }
