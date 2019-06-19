@@ -49,7 +49,7 @@ safety:
 
   tilt_error_failsafe:
 
-    enabled: true
+    enabled: false
     tilt_error_threshold: 30 # [deg]
     min_height: 0.5 # [m]
 
@@ -94,3 +94,9 @@ rc_joystick:
   # n_switches need to occur within a time timeout
   timeout: 2.0 # [s]
   n_switches: 5 # [-]
+
+  channels:
+    pitch: 2
+    roll: 0
+    yaw: 3
+    thrust: 1
