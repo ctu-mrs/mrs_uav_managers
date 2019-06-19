@@ -83,10 +83,16 @@ joystick:
 
 rc_joystick:
 
-  enabled: false
+  enabled: true
   channel_number: 6 # indexed from 0
 
   # switch the chanel repeatedly to enable the joystic control
   # n_switches need to occur within a time timeout
   timeout: 2.0 # [s]
   n_switches: 5 # [-]
+
+  channels:
+    pitch: 2
+    roll: 0
+    yaw: 3
+    thrust: 1
