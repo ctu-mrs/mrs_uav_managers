@@ -2099,7 +2099,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
   int new_controller_idx = -1;
 
   for (unsigned int i = 0; i < controller_names.size(); i++) {
-    if (req.value.compare(controller_names[i]) == 0) {
+    if (req.value.compare(controller_names[i]) == STRING_EQUAL) {
       new_controller_idx = i;
     }
   }
@@ -4025,33 +4025,42 @@ bool ControlManager::ehover(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
-    tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    // check if the tracker is not active
+    if (ehover_tracker_idx == active_tracker_idx) {
 
-    {
-      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+      sprintf((char *)&message, "Not switching, the tracker %s is already active!", ehover_tracker_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      // update the time (used in failsafe)
-      controller_tracker_switch_time = ros::Time::now();
-    }
+    } else {
 
-    // super important, switch the active tracker idx
-    try {
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
+      tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = ehover_tracker_idx;
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      // super important, switch the active tracker idx
+      try {
 
-      message_out = std::string(message);
-      success     = false;
+        tracker_list[active_tracker_idx]->deactivate();
+        active_tracker_idx = ehover_tracker_idx;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4067,32 +4076,42 @@ bool ControlManager::ehover(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
-    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
-    ROS_INFO("[ControlManager]: %s", message);
 
-    {
-      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+    // check if the controller is not active
+    if (eland_controller_idx == active_controller_idx) {
 
-      // update the time (used in failsafe)
-      controller_tracker_switch_time = ros::Time::now();
-    }
+      sprintf((char *)&message, "Not switching, the controller %s is already active!", eland_controller_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-    try {
+    } else {
 
-      // deactivate the old controller
-      controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = eland_controller_idx;  // super important
+      controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+      sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
-      message_out = std::string(message);
-      success     = false;
+      try {
+
+        // deactivate the old controller
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = eland_controller_idx;  // super important
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4133,33 +4152,42 @@ bool ControlManager::eland(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
-    tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    // check if the tracker is not active
+    if (ehover_tracker_idx == active_tracker_idx) {
 
-    {
-      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+      sprintf((char *)&message, "Not switching, the tracker %s is already active!", ehover_tracker_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      // update the time (used in failsafe)
-      controller_tracker_switch_time = ros::Time::now();
-    }
+    } else {
 
-    // super important, switch the active tracker idx
-    try {
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
+      tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = ehover_tracker_idx;
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      // super important, switch the active tracker idx
+      try {
 
-      message_out = std::string(message);
-      success     = false;
+        tracker_list[active_tracker_idx]->deactivate();
+        active_tracker_idx = ehover_tracker_idx;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4175,31 +4203,41 @@ bool ControlManager::eland(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
-    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
-    ROS_INFO("[ControlManager]: %s", message);
 
-    {
-      std::scoped_lock lock(mutex_controller_tracker_switch_time);
+    // check if the controller is not active
+    if (eland_controller_idx == active_controller_idx) {
 
-      // update the time (used in failsafe)
-      controller_tracker_switch_time = ros::Time::now();
-    }
+      sprintf((char *)&message, "Not switching, the controller %s is already active!", eland_controller_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-    try {
+    } else {
 
-      controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = eland_controller_idx;  // super important
+      controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+      sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
-      message_out = std::string(message);
-      success     = false;
+      try {
+
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = eland_controller_idx;  // super important
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
