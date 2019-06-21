@@ -160,6 +160,17 @@ private:
   ros::Time          odometry_last_time;
   double             odometry_max_missing_time_;
 
+  ros::Subscriber    subscriber_pixhawk_odometry;
+  nav_msgs::Odometry pixhawk_odometry;
+  double             pixhawk_odometry_x;
+  double             pixhawk_odometry_y;
+  double             pixhawk_odometry_z;
+  double             pixhawk_odometry_yaw;
+  double             pixhawk_odometry_roll;
+  double             pixhawk_odometry_pitch;
+  std::mutex         mutex_pixhawk_odometry;
+  bool               got_pixhawk_odometry = false;
+
   ros::Subscriber subscriber_max_height;
   double          max_height;
   bool            got_max_height = false;
@@ -193,6 +204,7 @@ private:
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
+  ros::Publisher publisher_desired_acceleration;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -255,7 +267,7 @@ private:
 
 private:
   void updateTrackers(void);
-  void updateControllers(void);
+  void updateControllers(nav_msgs::Odometry odom_for_control);
   void publish(void);
 
 private:
@@ -297,6 +309,7 @@ private:
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
@@ -816,29 +829,31 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force      = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
-  publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
-  publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_output       = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd         = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd         = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force         = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom             = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude      = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_tracker_status       = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
+  publisher_controller_status    = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
+  publisher_motors               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error           = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_desired_acceleration = nh_.advertise<std_msgs::Float64>("desired_acceleration", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry     = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  odometry_last_time      = ros::Time(0);
-  subscriber_max_height   = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_joystick     = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper       = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_state = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
-  subscriber_rc           = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry         = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
+  odometry_last_time          = ros::Time(0);
+  subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -1036,7 +1051,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!got_odometry || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
@@ -1132,21 +1147,28 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
+  // | ------ copy the last tracker/controller switch time ------ |
+
+  ros::Time tmp_controller_tracker_switch_time;
   {
     std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-    if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
+    tmp_controller_tracker_switch_time = controller_tracker_switch_time;
+  }
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+  // | --------------------------------------------------------- |
 
-        if (!failsafe_triggered) {
+  if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
+    if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
-          std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+      if (!failsafe_triggered) {
 
-          failsafe();
-        }
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
+
+        std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+        failsafe();
       }
     }
   }
@@ -1156,11 +1178,11 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_odometry, mutex_controller_tracker_switch_time);
+    std::scoped_lock lock(mutex_odometry);
 
     if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
@@ -1313,7 +1335,11 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe timer spinning");
 
-  updateControllers();
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
+
+    updateControllers(pixhawk_odometry);
+  }
 
   publish();
 
@@ -1621,7 +1647,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     return;
 
   if (!got_max_height) {
-    ROS_INFO("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
+    ROS_INFO("[ControlerManager]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
   }
 
@@ -1684,7 +1710,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     updateTrackers();
 
-    updateControllers();
+    {
+      std::scoped_lock lock(mutex_odometry);
+
+      updateControllers(odometry);
+    }
 
     publish();
   }
@@ -1694,6 +1724,38 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     safety_timer.start();
     reseting_odometry = false;
   }
+}
+
+//}
+
+/* //{ callbackPixhawkOdometry() */
+
+void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  // --------------------------------------------------------------
+  // |                      copy the odometry                     |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
+
+    pixhawk_odometry = *msg;
+
+    pixhawk_odometry_x = pixhawk_odometry.pose.pose.position.x;
+    pixhawk_odometry_y = pixhawk_odometry.pose.pose.position.y;
+    pixhawk_odometry_z = pixhawk_odometry.pose.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion quaternion_odometry;
+    quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, quaternion_odometry);
+    tf::Matrix3x3 m(quaternion_odometry);
+    m.getRPY(pixhawk_odometry_roll, pixhawk_odometry_pitch, pixhawk_odometry_yaw);
+  }
+
+  got_pixhawk_odometry = true;
 }
 
 //}
@@ -1976,6 +2038,15 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   if (!got_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  if (!got_pixhawk_odometry) {
+
+    sprintf((char *)&message, "Can't switch tracker, missing PixHawk odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -4468,15 +4539,15 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(void) {
+void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_controller_list);
+  std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odom_for_control));
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
