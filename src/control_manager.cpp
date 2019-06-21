@@ -13,7 +13,9 @@
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 
-#include <mrs_lib/ConvexPolygon.h>
+#include <mrs_lib/Polygon.h>
+#include <mrs_lib/PointObstacle.h>
+#include <mrs_lib/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
@@ -285,7 +287,7 @@ private:
   std::mutex mutex_tilt_error;
 
 private:
-  mrs_lib::ConvexPolygon *      safety_area_polygon;
+  mrs_lib::SafetyZone *         safety_zone;
   bool                          use_safety_area_;
   double                        min_height;
   mrs_uav_manager::SafetyArea_t safety_area;
@@ -782,7 +784,8 @@ void ControlManager::onInit() {
 
     try {
 
-      safety_area_polygon = new mrs_lib::ConvexPolygon(safety_area_points);
+      mrs_lib::Polygon safety_area_polygon(safety_area_points);
+      safety_zone = new mrs_lib::SafetyZone(safety_area_polygon, std::vector<mrs_lib::Polygon>{}, std::vector<mrs_lib::PointObstacle>{});
     }
     catch (mrs_lib::ConvexPolygon::WrongNumberOfVertices) {
 
@@ -3427,7 +3430,7 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
 
   std::scoped_lock lock(mutex_max_height, mutex_min_height);
 
-  if (safety_area_polygon->isPointIn(x, y) && z >= min_height && z <= max_height) {
+  if (safety_zone->isPointValid(x, y) && z >= min_height && z <= max_height) {
     return true;
   }
 
@@ -3439,16 +3442,7 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
 /* //{ isInSafetyArea2d() */
 
 bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
-
-  if (!use_safety_area_) {
-    return true;
-  }
-
-  if (safety_area_polygon->isPointIn(x, y)) {
-    return true;
-  }
-
-  return false;
+  return !use_safety_area_ || safety_zone->isPointValid(x, y);
 }
 
 //}
