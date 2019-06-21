@@ -38,7 +38,7 @@ safety:
   eland_controller: "MpcController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 0.1 # [s]
+  odometry_max_missing_time: 0.5 # [s]
 
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0

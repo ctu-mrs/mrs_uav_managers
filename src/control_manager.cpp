@@ -1209,7 +1209,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, initiating failsafe land");
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land.",
+                           (ros::Time::now() - odometry_last_time).toSec());
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1646,6 +1647,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
+
   if (!got_max_height) {
     ROS_INFO("[ControlerManager]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
@@ -1734,6 +1737,8 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &m
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackPixhawkOdometry");
 
   // --------------------------------------------------------------
   // |                      copy the odometry                     |
