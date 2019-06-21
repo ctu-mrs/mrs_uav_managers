@@ -785,9 +785,13 @@ void ControlManager::onInit() {
     try {
 
       mrs_lib::Polygon safety_area_polygon(safety_area_points);
+
       std::vector<mrs_lib::Polygon> EMPTY_POLYGON_LIST;
       std::vector<mrs_lib::PointObstacle> EMPTY_POINT_LIST;
+      ROS_INFO("Trying to create safety zone");
       safety_zone = new mrs_lib::SafetyZone(safety_area_polygon, EMPTY_POLYGON_LIST, EMPTY_POINT_LIST);
+      ROS_INFO("Created safety zone");
+
     }
     catch (mrs_lib::Polygon::WrongNumberOfVertices) {
 
