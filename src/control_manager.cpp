@@ -13,9 +13,9 @@
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 
-#include <mrs_lib/Polygon.h>
-#include <mrs_lib/PointObstacle.h>
-#include <mrs_lib/SafetyZone.h>
+#include <mrs_lib/SafetyZone/Polygon.h>
+#include <mrs_lib/SafetyZone/PointObstacle.h>
+#include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
@@ -785,19 +785,16 @@ void ControlManager::onInit() {
     try {
 
       mrs_lib::Polygon safety_area_polygon(safety_area_points);
-      safety_zone = new mrs_lib::SafetyZone(safety_area_polygon, std::vector<mrs_lib::Polygon>{}, std::vector<mrs_lib::PointObstacle>{});
+      std::vector<mrs_lib::Polygon> EMPTY_POLYGON_LIST;
+      std::vector<mrs_lib::PointObstacle> EMPTY_POINT_LIST;
+      safety_zone = new mrs_lib::SafetyZone(safety_area_polygon, EMPTY_POLYGON_LIST, EMPTY_POINT_LIST);
     }
-    catch (mrs_lib::ConvexPolygon::WrongNumberOfVertices) {
+    catch (mrs_lib::Polygon::WrongNumberOfVertices) {
 
       ROS_ERROR("[ControlManager]: Exception caught. Wrong number of vertices was supplied to create the safety area.");
       ros::shutdown();
     }
-    catch (mrs_lib::ConvexPolygon::PolygonNotConvexException) {
-
-      ROS_ERROR("[ControlManager]: Exception caught. Polygon supplied to create the safety area is not convex.");
-      ros::shutdown();
-    }
-    catch (mrs_lib::ConvexPolygon::WrongNumberOfColumns) {
+    catch (mrs_lib::Polygon::WrongNumberOfColumns) {
       ROS_ERROR("[ControlManager]: Exception caught. Wrong number of columns was supplied to the safety area.");
       ros::shutdown();
     }
