@@ -12,6 +12,8 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
+#include <geometry_msgs/PolygonStamped.h>
+#include <geometry_msgs/Point32.h>
 
 #include <mrs_lib/SafetyZone/Polygon.h>
 #include <mrs_lib/SafetyZone/PointObstacle.h>
@@ -195,6 +197,7 @@ private:
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
+  ros::Publisher publisher_safe_zone_border;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -783,15 +786,11 @@ void ControlManager::onInit() {
     Eigen::MatrixXd safety_area_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
 
     try {
-
       mrs_lib::Polygon safety_area_polygon(safety_area_points);
 
       std::vector<mrs_lib::Polygon> EMPTY_POLYGON_LIST;
       std::vector<mrs_lib::PointObstacle> EMPTY_POINT_LIST;
-      ROS_INFO("Trying to create safety zone");
       safety_zone = new mrs_lib::SafetyZone(safety_area_polygon, EMPTY_POLYGON_LIST, EMPTY_POINT_LIST);
-      ROS_INFO("Created safety zone");
-
     }
     catch (mrs_lib::Polygon::WrongNumberOfVertices) {
 
@@ -807,8 +806,8 @@ void ControlManager::onInit() {
   safety_area.use_safety_area       = use_safety_area_;
   safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1, _2);
   safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1, _2, _3);
-  safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
-  safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
+  safety_area.getMinHeight = boost::bind(&ControlManager::getMinHeight, this);
+  safety_area.getMaxHeight = boost::bind(&ControlManager::getMaxHeight, this);
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -831,6 +830,7 @@ void ControlManager::onInit() {
   publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_safe_zone_border  = nh_.advertise<geometry_msgs::PolygonStamped>("safe_zone_border_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1023,6 +1023,24 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
       catch (...) {
         ROS_ERROR("Exception caught during publishing topic %s.", publisher_mass_estimate.getTopic().c_str());
       }
+    }
+  }
+
+  // --------------------------------------------------------------
+  // |                  publish the safe zone border              |
+  // --------------------------------------------------------------
+  if (use_safety_area_) {
+    geometry_msgs::PolygonStamped polygon;
+    polygon.header.stamp = ros::Time::now();
+    polygon.header.frame_id = "local_origin";
+
+    polygon.polygon = safety_zone->getBorder().get_ros_message();
+
+    try {
+      publisher_safe_zone_border.publish(geometry_msgs::PolygonStampedConstPtr(new geometry_msgs::PolygonStamped(polygon)));
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_safe_zone_border.getTopic().c_str());
     }
   }
 }
