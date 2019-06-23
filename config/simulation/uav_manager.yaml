@@ -18,7 +18,7 @@ takeoff:
 
   after_takeoff:
     tracker: "MpcTracker"
-    controller: "MpcController"
+    controller: "So3Controller"
 
   takeoff_height: 2.0
 
