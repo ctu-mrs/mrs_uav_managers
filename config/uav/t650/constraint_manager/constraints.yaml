@@ -1,10 +1,10 @@
 slow:
 
   horizontal:
-    speed: 1.0
+    speed: 2.0
     acceleration: 1.0
     jerk: 1.0
-    snap: 1.0
+    snap: 5.0
 
   vertical:
 
@@ -12,13 +12,13 @@ slow:
       speed: 1.0
       acceleration: 1.0
       jerk: 2.0
-      snap: 2.0
+      snap: 5.0
 
     descending:
       speed: 1.0
       acceleration: 1.0
       jerk: 2.0
-      snap: 2.0
+      snap: 5.0
 
   yaw:
     speed: 0.5
