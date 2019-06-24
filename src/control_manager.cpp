@@ -204,7 +204,6 @@ private:
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
-  ros::Publisher publisher_desired_acceleration;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -840,7 +839,6 @@ void ControlManager::onInit() {
   publisher_motors               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error           = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_desired_acceleration = nh_.advertise<std_msgs::Float64>("desired_acceleration", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
