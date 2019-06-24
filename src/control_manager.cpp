@@ -12,7 +12,7 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
-#include <geometry_msgs/PolygonStamped.h>
+#include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
 
 #include <mrs_lib/SafetyZone/Polygon.h>
@@ -830,7 +830,7 @@ void ControlManager::onInit() {
   publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_safe_zone_border  = nh_.advertise<geometry_msgs::PolygonStamped>("safe_zone_border_out", 1);
+  publisher_safe_zone_border  = nh_.advertise<visualization_msgs::Marker>("safe_zone_border_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1030,14 +1030,13 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   // |                  publish the safe zone border              |
   // --------------------------------------------------------------
   if (use_safety_area_) {
-    geometry_msgs::PolygonStamped polygon;
-    polygon.header.stamp = ros::Time::now();
-    polygon.header.frame_id = "local_origin";
+    auto safety_zone_marker = safety_zone->getMarkerMessage();
 
-    polygon.polygon = safety_zone->getBorder().get_ros_message();
-
+    safety_zone_marker.header.stamp = ros::Time::now();
+    safety_zone_marker.header.frame_id = "local_origin";
+  
     try {
-      publisher_safe_zone_border.publish(geometry_msgs::PolygonStampedConstPtr(new geometry_msgs::PolygonStamped(polygon)));
+      publisher_safe_zone_border.publish(safety_zone_marker);
     }
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_safe_zone_border.getTopic().c_str());
