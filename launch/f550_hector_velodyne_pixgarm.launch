@@ -7,6 +7,7 @@
   <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
   <arg name="g" default="9.8" />
   <arg name="debug" default="false" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/f550/motor_params_velodyne.yaml" />
 
   <arg unless="$(arg debug)" name="launch_prefix" value=""/>
   <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
@@ -31,7 +32,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550/uav_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params.yaml" />
+      <rosparam file="$(arg motor_params_file)" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
@@ -77,7 +78,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550/control_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550/trackers.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/f550/controllers.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/f550/motor_params.yaml" />
+      <rosparam file="$(arg motor_params_file)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
       <param name="g" value="$(arg g)" />
