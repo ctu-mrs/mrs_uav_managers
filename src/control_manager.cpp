@@ -784,9 +784,14 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    std::vector<Eigen::MatrixXd> point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+      Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+      std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+      std::vector<Eigen::MatrixXd> point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+
+      // TODO: remove this when param loader supports proper loading
+      for (auto& matrix: polygon_obstacle_points) {
+        matrix.transposeInPlace();
+      }
 
       try { 
         safety_zone = new mrs_lib::SafetyZone(border_points, polygon_obstacle_points, point_obstacle_points);
