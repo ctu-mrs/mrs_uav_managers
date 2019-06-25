@@ -90,7 +90,7 @@ rc_joystick:
   # switch the chanel repeatedly to enable the joystic control
   # n_switches need to occur within a time timeout
   timeout: 2.0 # [s]
-  n_switches: 5 # [-]
+  n_switches: 4 # [-]
 
   channels:
     pitch: 2
