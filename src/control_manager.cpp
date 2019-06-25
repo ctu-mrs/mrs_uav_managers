@@ -253,6 +253,7 @@ private:
   std::mutex         mutex_mavros_state;
   bool               got_mavros_state = false;
   bool               offboard_mode    = false;
+  bool               armed            = false;
 
 private:
   ros::Subscriber      subscriber_rc;
@@ -828,17 +829,17 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output       = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd         = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd         = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force         = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom             = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude      = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_tracker_status       = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
-  publisher_controller_status    = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
-  publisher_motors               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error           = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force      = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
+  publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
+  publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1542,7 +1543,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       }
     }
 
-    if (int(rc_channel_switch_time.size()) > rc_joystic_n_switches_) {
+    if (int(rc_channel_switch_time.size()) >= rc_joystic_n_switches_) {
 
       if (rc_goto_active_ == false) {
 
@@ -1948,6 +1949,22 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
     if (offboard_mode) {
       offboard_mode = false;
       ROS_INFO("[ControlManager]: OFFBOARD mode OFF");
+    }
+  }
+
+  // | --------- detect and print the changes in arming --------- |
+  if (mavros_state.armed == true) {
+
+    if (!armed) {
+      armed = true;
+      ROS_INFO("[ControlManager]: vehicle ARMED");
+    }
+
+  } else {
+
+    if (armed) {
+      armed = false;
+      ROS_INFO("[ControlManager]: vehicle DISARMED");
     }
   }
 }
