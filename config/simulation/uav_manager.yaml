@@ -13,8 +13,9 @@ takeoff:
 
   rate: 10 # [Hz]
 
-  takeoff_tracker: "LandoffTracker"
-  takeoff_controller: "So3Controller"
+  during_takeoff:
+    tracker: "LandoffTracker"
+    controller: "MpcController"
 
   after_takeoff:
     tracker: "MpcTracker"

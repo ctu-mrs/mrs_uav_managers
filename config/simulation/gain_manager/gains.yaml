@@ -16,8 +16,8 @@ optflow:
     kiw_lim: 10.0
 
   vertical:
-    kp: 33.3
-    kv: 16.6
+    kp: 8.0
+    kv: 5.0
     ka: 1.0
 
     attitude:
@@ -46,8 +46,8 @@ supersoft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 33.3
-    kv: 16.6
+    kp: 8.0
+    kv: 5.0
     ka: 1.0
 
     attitude:
@@ -76,8 +76,8 @@ soft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 33.3
-    kv: 16.6
+    kp: 8.0
+    kv: 5.0
     ka: 1.0
 
     attitude:
@@ -106,8 +106,8 @@ tight:
     kiw_lim: 10.0
 
   vertical:
-    kp: 33.3
-    kv: 16.6
+    kp: 8.0
+    kv: 5.0
     ka: 1.0
 
     attitude:

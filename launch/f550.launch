@@ -9,7 +9,7 @@
   <arg name="debug" default="false" />
 
   <arg unless="$(arg debug)" name="launch_prefix" value=""/>
-  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch"/>
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
@@ -171,6 +171,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />

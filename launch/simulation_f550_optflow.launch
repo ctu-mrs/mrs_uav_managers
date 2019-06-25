@@ -170,6 +170,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />

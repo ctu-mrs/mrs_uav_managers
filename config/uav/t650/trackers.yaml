@@ -11,4 +11,4 @@ NullTracker:
   address: "mrs_uav_manager/NullTracker"
 
 JoyTracker:
-  address: "mrs_uav_manager/JoyTracker"
+  address: "mrs_trackers/JoyTracker"

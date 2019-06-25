@@ -302,8 +302,8 @@ void UavManager::onInit() {
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
   param_loader.load_param("takeoff/after_takeoff/tracker", after_takeoff_tracker_name_);
   param_loader.load_param("takeoff/after_takeoff/controller", after_takeoff_controller_name_);
-  param_loader.load_param("takeoff/takeoff_tracker", takeoff_tracker_name_);
-  param_loader.load_param("takeoff/takeoff_controller", takeoff_controller_name_);
+  param_loader.load_param("takeoff/during_takeoff/tracker", takeoff_tracker_name_);
+  param_loader.load_param("takeoff/during_takeoff/controller", takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
   param_loader.load_param("takeoff/ground_limit_height", ground_limit_height_);
 
@@ -1038,7 +1038,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
     std::scoped_lock lock(mutex_attitude_command);
 
-    if (fabs(attitude_command.mass_difference) > 0.5) {
+    if (attitude_command.mass_difference > 0.5) {
 
       sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large!");
       res.message = message;

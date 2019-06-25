@@ -6,7 +6,7 @@
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml" />
   <arg name="g" default="9.8" />
-  <arg name="debug" default="false" />
+  <arg name="debug" default="true" />
 
   <arg unless="$(arg debug)" name="launch_prefix" value=""/>
   <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
@@ -20,7 +20,7 @@
   <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/naki.launch" >
+  <include file="$(find mrs_odometry)/launch/naki_optflow.launch" >
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
@@ -171,6 +171,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />
