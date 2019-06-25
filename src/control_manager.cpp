@@ -15,8 +15,6 @@
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
 
-#include <mrs_lib/SafetyZone/Polygon.h>
-#include <mrs_lib/SafetyZone/PointObstacle.h>
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
@@ -784,9 +782,12 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
-      Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-      std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-      std::vector<Eigen::MatrixXd> point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+      Eigen::MatrixXd border_points =
+              param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+      std::vector<Eigen::MatrixXd> polygon_obstacle_points =
+              param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+      std::vector<Eigen::MatrixXd> point_obstacle_points =
+              param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
 
       // TODO: remove this when param loader supports proper loading
       for (auto& matrix: polygon_obstacle_points) {
