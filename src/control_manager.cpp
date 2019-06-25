@@ -784,23 +784,53 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
-
     Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
     std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
     std::vector<Eigen::MatrixXd> point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
-    
-    try {
-      safety_zone = new mrs_lib::SafetyZone(border_points, polygon_obstacle_points, point_obstacle_points);
-    }
-    catch (mrs_lib::Polygon::WrongNumberOfVertices) {
 
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of rows was supplied for safety_area.");
-      ros::shutdown();
+//    try {
+      mrs_lib::Polygon border{border_points};
+//    }
+//    catch (mrs_lib::Polygon::WrongNumberOfVertices) {
+//      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of rows was supplied for safety_area border.");
+//      ros::shutdown();
+//    }
+//    catch (mrs_lib::Polygon::WrongNumberOfColumns) {
+//      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of vertices was supplied for safety area border.");
+//      ros::shutdown();
+//    }
+
+    std::vector<mrs_lib::Polygon> polygon_obstacles;
+
+    for (auto &matrix: polygon_obstacle_points) {
+      try {
+        polygon_obstacles.emplace_back(matrix);
+      }
+      catch (mrs_lib::Polygon::WrongNumberOfVertices) {
+        ROS_ERROR("[ControlManager]: Exception caught. Wrong number of rows was supplied for safety_area polygon obstacle.");
+        ros::shutdown();
+      }
+      catch (mrs_lib::Polygon::WrongNumberOfColumns) {
+        ROS_ERROR("[ControlManager]: Exception caught. Wrong number of vertices was supplied for safety area polygon obstacle.");
+        ros::shutdown();
+      }
     }
-    catch (mrs_lib::Polygon::WrongNumberOfColumns) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong number of columns was supplied for safety area.");
-      ros::shutdown();
+
+    std::vector<mrs_lib::PointObstacle> point_obstacles;
+    for (auto &matrix: point_obstacle_points) {
+      if (matrix.cols() != 3) {
+        ROS_ERROR("[ControlManager]: Exception caught. Wrong number of columns was supplied for safety area point obstacle.");
+        ros::shutdown();
+      }
+      if (matrix.rows() != 1) {
+        ROS_ERROR("[ControlManager]: Exception caught. Number of rows should be 1 for safety area point obstacle.");
+        ros::shutdown();
+      }
+
+      point_obstacles.emplace_back(Eigen::RowVector2d{matrix(0, 0), matrix(0, 1)}, matrix(0, 2));
     }
+
+    safety_zone = new mrs_lib::SafetyZone(border, polygon_obstacles, point_obstacles);
   }
 
   safety_area.use_safety_area       = use_safety_area_;
