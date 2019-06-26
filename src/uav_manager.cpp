@@ -153,6 +153,7 @@ private:
   ros::ServiceClient service_client_switch_tracker;
   ros::ServiceClient service_client_switch_controller;
   ros::ServiceClient service_client_land;
+  ros::ServiceClient service_client_eland;
   ros::ServiceClient service_client_motors;
   ros::ServiceClient service_client_enabled_callbacks;
   ros::ServiceClient service_client_emergency_goto;
@@ -286,6 +287,7 @@ void UavManager::onInit() {
 
   service_client_takeoff           = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
   service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_eland             = nh_.serviceClient<std_srvs::Trigger>("eland_out");
   service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
   service_client_switch_controller = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
   service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
@@ -1068,8 +1070,10 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     // if the takeoff was not successful, switch to NullTracker
     if (!takeoff_out.response.success) {
 
-      switch_tracker_out.request.value = null_tracker_name_;
-      service_client_switch_tracker.call(switch_tracker_out);
+      ROS_ERROR("[UavManager]: takeoff was not successful, calling eland");
+
+      std_srvs::Trigger eland_out;
+      service_client_eland.call(eland_out);
 
     } else {
 
