@@ -1272,6 +1272,11 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_last_attitude_cmd);
 
+    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      ROS_WARN("[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
+      return;
+    }
+
     last_thrust_cmd = last_attitude_cmd->thrust;
   }
 
@@ -1333,8 +1338,6 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("failsafeTimer", failsafe_timer_rate_, 0.01, event);
 
-  ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe timer spinning");
-
   {
     std::scoped_lock lock(mutex_pixhawk_odometry);
 
@@ -1347,6 +1350,11 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   {
     std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      ROS_WARN("[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+      return;
+    }
 
     last_thrust = last_attitude_cmd->thrust;
   }
@@ -4584,7 +4592,7 @@ void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
         last_attitude_cmd = controller_output_cmd;
 
         // but it can return an empty command
-        // which means we shoudl trigger the failsafe landing
+        // which means we should trigger the failsafe landing
       } else {
 
         ROS_WARN("[ControlManager]: triggering failsafe, the controller returned null");
