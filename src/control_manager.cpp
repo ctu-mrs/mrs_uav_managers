@@ -1267,19 +1267,6 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  double last_thrust_cmd;
-
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd);
-
-    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-      ROS_WARN("[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
-      return;
-    }
-
-    last_thrust_cmd = last_attitude_cmd->thrust;
-  }
-
   mrs_lib::Routine profiler_routine = profiler->createRoutine("elandingTimer", elanding_timer_rate_, 0.01, event);
 
   if (current_state_landing == IDLE_STATE) {
@@ -1287,6 +1274,20 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
     return;
 
   } else if (current_state_landing == LANDING_STATE) {
+
+    double last_thrust_cmd;
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+        return;
+      }
+
+      last_thrust_cmd = last_attitude_cmd->thrust;
+    }
 
     // recalculate the mass based on the thrust
     double thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
@@ -1352,7 +1353,8 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
     std::scoped_lock lock(mutex_last_attitude_cmd);
 
     if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-      ROS_WARN("[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
       return;
     }
 
