@@ -1673,6 +1673,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      {
+        std::scoped_lock lock(mutex_odometry);
+
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+      }
 
       reseting_odometry = true;
 
@@ -1735,6 +1740,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     safety_timer.start();
     reseting_odometry = false;
+
+    std::scoped_lock lock(mutex_odometry);
+
+    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
   }
 }
 
