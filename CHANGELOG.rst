@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.2 (2019-07-01)
+------------------
 * added more prints for odometry switch
 * tweaks in rc eland trigger before takeoff
 * fixed control manager crash during startup while RC eland is triggered
