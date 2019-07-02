@@ -19,7 +19,7 @@ takeoff:
 
   after_takeoff:
     tracker: "MpcTracker"
-    controller: "So3Controller"
+    controller: "MpcController"
 
   takeoff_height: 2.0
 
@@ -34,7 +34,7 @@ landing:
   landing_cutoff_height:  0.5
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
-  disarm: false
+  disarm: true
 
 flight_timer:
 

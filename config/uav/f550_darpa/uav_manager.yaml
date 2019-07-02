@@ -19,7 +19,7 @@ takeoff:
 
   after_takeoff:
     tracker: "MpcTracker"
-    controller: "So3Controller"
+    controller: "MpcController"
 
   takeoff_height: 1.2
 
@@ -40,7 +40,7 @@ flight_timer:
 
   enabled: false
   rate: 1 # [Hz]
-  max_time: 300.0 # [s]
+  max_time: 300 # [s]
 
 # detecting if desired thrust cross max threshold, triggers landing after that
 max_thrust:
