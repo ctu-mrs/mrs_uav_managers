@@ -5,11 +5,9 @@
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/t650/motor_params.yaml" />
   <arg name="g" default="9.8" />
   <arg name="debug" default="false" />
-
-  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
-  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
@@ -31,7 +29,7 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/t650/uav_manager.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/t650/motor_params.yaml" />
+      <rosparam file="$(arg motor_params_file)" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
@@ -60,10 +58,10 @@
       <remap from="~land_home_in" to="~land_home" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
+      <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />
-      <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
@@ -77,7 +75,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/uav/t650/control_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/t650/trackers.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/uav/t650/controllers.yaml" />
-      <rosparam file="$(find mrs_controllers)/config/uav/t650/motor_params.yaml" />
+      <rosparam file="$(arg motor_params_file)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
       <param name="g" value="$(arg g)" />
@@ -171,6 +169,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />

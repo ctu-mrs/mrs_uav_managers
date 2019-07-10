@@ -160,6 +160,17 @@ private:
   ros::Time          odometry_last_time;
   double             odometry_max_missing_time_;
 
+  ros::Subscriber    subscriber_pixhawk_odometry;
+  nav_msgs::Odometry pixhawk_odometry;
+  double             pixhawk_odometry_x;
+  double             pixhawk_odometry_y;
+  double             pixhawk_odometry_z;
+  double             pixhawk_odometry_yaw;
+  double             pixhawk_odometry_roll;
+  double             pixhawk_odometry_pitch;
+  std::mutex         mutex_pixhawk_odometry;
+  bool               got_pixhawk_odometry = false;
+
   ros::Subscriber subscriber_max_height;
   double          max_height;
   bool            got_max_height = false;
@@ -233,7 +244,8 @@ private:
 
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd;
   std::mutex                          mutex_last_attitude_cmd;
-  ros::Time                           controller_switch_time;
+  ros::Time                           controller_tracker_switch_time;
+  std::mutex                          mutex_controller_tracker_switch_time;
 
 private:
   ros::Subscriber    subscriber_mavros_state;
@@ -241,6 +253,7 @@ private:
   std::mutex         mutex_mavros_state;
   bool               got_mavros_state = false;
   bool               offboard_mode    = false;
+  bool               armed            = false;
 
 private:
   ros::Subscriber      subscriber_rc;
@@ -250,9 +263,11 @@ private:
   std::list<ros::Time> rc_channel_switch_time;
   std::mutex           mutex_rc_channel_switch_time;
 
+  double rc_channel_pitch_, rc_channel_roll_, rc_channel_yaw_, rc_channel_thrust_;
+
 private:
   void updateTrackers(void);
-  void updateControllers(void);
+  void updateControllers(nav_msgs::Odometry odom_for_control);
   void publish(void);
 
 private:
@@ -294,6 +309,7 @@ private:
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
@@ -462,11 +478,11 @@ void ControlManager::onInit() {
 
   ros::Time::waitForValid();
 
-  joystick_tracker_press_time  = ros::Time(0);
-  joystick_failsafe_press_time = ros::Time(0);
-  joystick_eland_press_time    = ros::Time(0);
-  escalating_failsafe_time     = ros::Time(0);
-  controller_switch_time       = ros::Time(0);
+  joystick_tracker_press_time    = ros::Time(0);
+  joystick_failsafe_press_time   = ros::Time(0);
+  joystick_eland_press_time      = ros::Time(0);
+  escalating_failsafe_time       = ros::Time(0);
+  controller_tracker_switch_time = ros::Time(0);
 
   ROS_INFO("[ControlManager]: initializing");
 
@@ -538,6 +554,11 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
   param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
   param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
+
+  param_loader.load_param("rc_joystick/channels/pitch", rc_channel_pitch_);
+  param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
+  param_loader.load_param("rc_joystick/channels/yaw", rc_channel_yaw_);
+  param_loader.load_param("rc_joystick/channels/thrust", rc_channel_thrust_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -752,7 +773,11 @@ void ControlManager::onInit() {
   controller_list[active_controller_idx]->activate(last_attitude_cmd);
 
   // update the time
-  controller_switch_time = ros::Time::now();
+  {
+    std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+    controller_tracker_switch_time = ros::Time::now();
+  }
 
   motors = false;
 
@@ -820,13 +845,14 @@ void ControlManager::onInit() {
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry     = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  odometry_last_time      = ros::Time(0);
-  subscriber_max_height   = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_joystick     = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper       = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_state = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
-  subscriber_rc           = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry         = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
+  odometry_last_time          = ros::Time(0);
+  subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -1024,7 +1050,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!got_odometry || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
@@ -1120,9 +1146,20 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
+  // | ------ copy the last tracker/controller switch time ------ |
+
+  ros::Time tmp_controller_tracker_switch_time;
+  {
+    std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+    tmp_controller_tracker_switch_time = controller_tracker_switch_time;
+  }
+
+  // | --------------------------------------------------------- |
+
   if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
 
-    if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+    if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered) {
 
@@ -1144,7 +1181,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
     if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
 
-      if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
@@ -1171,7 +1208,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, initiating failsafe land");
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land.",
+                           (ros::Time::now() - odometry_last_time).toSec());
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1194,14 +1232,14 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
   {
-    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list);
+    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list, mutex_controller_tracker_switch_time);
 
     if (tilt_error_failsafe_enabled_ &&
         odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
-        if ((ros::Time::now() - controller_switch_time).toSec() > 0.5) {
+        if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
           ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
                     (180.0 / M_PI) * tilt_error_threshold_);
@@ -1212,7 +1250,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
         } else {
 
-          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controllers just switched so its ok.",
+          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controller/tracker just switched so its ok.",
                     (180.0 / M_PI) * tilt_error, (180.0 / M_PI) * tilt_error_threshold_);
         }
       }
@@ -1229,14 +1267,6 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  double last_thrust_cmd;
-
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd);
-
-    last_thrust_cmd = last_attitude_cmd->thrust;
-  }
-
   mrs_lib::Routine profiler_routine = profiler->createRoutine("elandingTimer", elanding_timer_rate_, 0.01, event);
 
   if (current_state_landing == IDLE_STATE) {
@@ -1244,6 +1274,20 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
     return;
 
   } else if (current_state_landing == LANDING_STATE) {
+
+    double last_thrust_cmd;
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+        return;
+      }
+
+      last_thrust_cmd = last_attitude_cmd->thrust;
+    }
 
     // recalculate the mass based on the thrust
     double thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
@@ -1295,9 +1339,11 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("failsafeTimer", failsafe_timer_rate_, 0.01, event);
 
-  ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe timer spinning");
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
 
-  updateControllers();
+    updateControllers(pixhawk_odometry);
+  }
 
   publish();
 
@@ -1305,6 +1351,12 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   {
     std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+      return;
+    }
 
     last_thrust = last_attitude_cmd->thrust;
   }
@@ -1421,24 +1473,31 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     bool nothing_to_do = true;
 
-    if (abs(rc_channels.channels[0] - PWM_MIDDLE) > 100) {
-      des_y         = (-(rc_channels.channels[0] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+    if (uint(3) >= rc_channels.channels.size()) {
 
-    if (abs(rc_channels.channels[1] - PWM_MIDDLE) > 100) {
-      des_z         = ((rc_channels.channels[1] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
 
-    if (abs(rc_channels.channels[2] - PWM_MIDDLE) > 200) {
-      des_x         = ((rc_channels.channels[2] - PWM_MIDDLE) / 500.0) * speed;
-      nothing_to_do = false;
-    }
+    } else {
 
-    if (abs(rc_channels.channels[3] - PWM_MIDDLE) > 100) {
-      des_yaw       = (-(rc_channels.channels[3] - PWM_MIDDLE) / 500.0) * 1.0;
-      nothing_to_do = false;
+      if (abs(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) > 100) {
+        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) > 100) {
+        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) > 200) {
+        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * speed;
+        nothing_to_do = false;
+      }
+
+      if (abs(rc_channels.channels[rc_channel_yaw_] - PWM_MIDDLE) > 100) {
+        des_yaw       = (-(rc_channels.channels[rc_channel_yaw_] - PWM_MIDDLE) / 500.0) * 1.0;
+        nothing_to_do = false;
+      }
     }
 
     if (!nothing_to_do) {
@@ -1494,7 +1553,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       }
     }
 
-    if (int(rc_channel_switch_time.size()) > rc_joystic_n_switches_) {
+    if (int(rc_channel_switch_time.size()) >= rc_joystic_n_switches_) {
 
       if (rc_goto_active_ == false) {
 
@@ -1518,7 +1577,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
         }
       } else if (rc_goto_active_ == true) {
 
-        ROS_INFO("[ControlManager]: de-activating rc joystiv");
+        ROS_INFO("[ControlManager]: deactivating rc joystic");
 
         callbacks_enabled = true;
 
@@ -1597,8 +1656,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
+
   if (!got_max_height) {
-    ROS_INFO("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
+    ROS_INFO("[ControlerManager]: the safety timer is in the middle of an iteration, waiting for it to finish");
     return;
   }
 
@@ -1612,6 +1673,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      {
+        std::scoped_lock lock(mutex_odometry);
+
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+      }
 
       reseting_odometry = true;
 
@@ -1661,7 +1727,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     updateTrackers();
 
-    updateControllers();
+    {
+      std::scoped_lock lock(mutex_odometry);
+
+      updateControllers(odometry);
+    }
 
     publish();
   }
@@ -1670,7 +1740,45 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
     safety_timer.start();
     reseting_odometry = false;
+
+    std::scoped_lock lock(mutex_odometry);
+
+    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
   }
+}
+
+//}
+
+/* //{ callbackPixhawkOdometry() */
+
+void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackPixhawkOdometry");
+
+  // --------------------------------------------------------------
+  // |                      copy the odometry                     |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
+
+    pixhawk_odometry = *msg;
+
+    pixhawk_odometry_x = pixhawk_odometry.pose.pose.position.x;
+    pixhawk_odometry_y = pixhawk_odometry.pose.pose.position.y;
+    pixhawk_odometry_z = pixhawk_odometry.pose.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion quaternion_odometry;
+    quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, quaternion_odometry);
+    tf::Matrix3x3 m(quaternion_odometry);
+    m.getRPY(pixhawk_odometry_roll, pixhawk_odometry_pitch, pixhawk_odometry_yaw);
+  }
+
+  got_pixhawk_odometry = true;
 }
 
 //}
@@ -1862,6 +1970,22 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
       ROS_INFO("[ControlManager]: OFFBOARD mode OFF");
     }
   }
+
+  // | --------- detect and print the changes in arming --------- |
+  if (mavros_state.armed == true) {
+
+    if (!armed) {
+      armed = true;
+      ROS_INFO("[ControlManager]: vehicle ARMED");
+    }
+
+  } else {
+
+    if (armed) {
+      armed = false;
+      ROS_INFO("[ControlManager]: vehicle DISARMED");
+    }
+  }
 }
 
 //}
@@ -1893,13 +2017,21 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   // when the switch change its position
   if (rc_goto_enabled_) {
 
-    if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
-        (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+    if (uint(rc_joystic_channel_) >= msg->channels.size()) {
 
-      // enter an event to the std vector
-      std::scoped_lock lock(mutex_rc_channel_switch_time);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
+      return;
 
-      rc_channel_switch_time.insert(rc_channel_switch_time.begin(), ros::Time::now());
+    } else {
+
+      if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
+          (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+
+        // enter an event to the std vector
+        std::scoped_lock lock(mutex_rc_channel_switch_time);
+
+        rc_channel_switch_time.insert(rc_channel_switch_time.begin(), ros::Time::now());
+      }
     }
   }
 
@@ -1909,7 +2041,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   // | ------------------------ rc eland ------------------------ |
   if (rc_eland_enabled_) {
 
-    if (uint(rc_eland_channel_) > (msg->channels.size() - 1)) {
+    if (uint(rc_eland_channel_) >= msg->channels.size()) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
       return;
@@ -1945,6 +2077,15 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   if (!got_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  if (!got_pixhawk_odometry) {
+
+    sprintf((char *)&message, "Can't switch tracker, missing PixHawk odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -1998,6 +2139,13 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time = ros::Time::now();
+        }
+
         // super important, switch which the active tracker idx
         try {
 
@@ -2008,13 +2156,28 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
           if (tracker_names[active_tracker_idx].compare(null_tracker_name_) == 0) {
 
             ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", controller_names[active_controller_idx].c_str());
-            controller_list[active_controller_idx]->activate(last_attitude_cmd);
+            {
+              std::scoped_lock lock(mutex_controller_list);
+
+              controller_list[active_controller_idx]->activate(last_attitude_cmd);
+
+              {
+                std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+                // update the time (used in failsafe)
+                controller_tracker_switch_time = ros::Time::now();
+              }
+            }
 
             // if switching to null tracker, deactivate the active controller
           } else if (tracker_names[new_tracker_idx].compare(null_tracker_name_) == 0) {
 
             ROS_INFO("[ControlManager]: deactivating %s due to switching to NullTracker", controller_names[active_controller_idx].c_str());
-            controller_list[active_controller_idx]->deactivate();
+            {
+              std::scoped_lock lock(mutex_controller_list);
+
+              controller_list[active_controller_idx]->deactivate();
+            }
           }
 
           active_tracker_idx = new_tracker_idx;
@@ -2046,7 +2209,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
   int new_controller_idx = -1;
 
   for (unsigned int i = 0; i < controller_names.size(); i++) {
-    if (req.value.compare(controller_names[i]) == 0) {
+    if (req.value.compare(controller_names[i]) == STRING_EQUAL) {
       new_controller_idx = i;
     }
   }
@@ -2101,8 +2264,12 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
           tracker_list[active_tracker_idx]->activate(mrs_msgs::PositionCommand::Ptr());
         }
 
-        // update the time (used in failsafe)
-        controller_switch_time = ros::Time::now();
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time = ros::Time::now();
+        }
 
         // super important, switch which the active controller idx
         try {
@@ -3968,26 +4135,42 @@ bool ControlManager::ehover(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
-    tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    // check if the tracker is not active
+    if (ehover_tracker_idx == active_tracker_idx) {
 
-    // super important, switch the active tracker idx
-    try {
+      sprintf((char *)&message, "Not switching, the tracker %s is already active!", ehover_tracker_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = ehover_tracker_idx;
+    } else {
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
+      tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      message_out = std::string(message);
-      success     = false;
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
+
+      // super important, switch the active tracker idx
+      try {
+
+        tracker_list[active_tracker_idx]->deactivate();
+        active_tracker_idx = ehover_tracker_idx;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4003,28 +4186,42 @@ bool ControlManager::ehover(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
-    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
-    ROS_INFO("[ControlManager]: %s", message);
 
-    // update the time (used in failsafe)
-    controller_switch_time = ros::Time::now();
+    // check if the controller is not active
+    if (eland_controller_idx == active_controller_idx) {
 
-    try {
+      sprintf((char *)&message, "Not switching, the controller %s is already active!", eland_controller_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      // deactivate the old controller
-      controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = eland_controller_idx;  // super important
+    } else {
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+      sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      message_out = std::string(message);
-      success     = false;
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
+
+      try {
+
+        // deactivate the old controller
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = eland_controller_idx;  // super important
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4065,26 +4262,42 @@ bool ControlManager::eland(std::string &message_out) {
 
   try {
 
-    ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
-    tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
-    sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    // check if the tracker is not active
+    if (ehover_tracker_idx == active_tracker_idx) {
 
-    // super important, switch the active tracker idx
-    try {
+      sprintf((char *)&message, "Not switching, the tracker %s is already active!", ehover_tracker_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      tracker_list[active_tracker_idx]->deactivate();
-      active_tracker_idx = ehover_tracker_idx;
+    } else {
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
+      tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      message_out = std::string(message);
-      success     = false;
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
+
+      // super important, switch the active tracker idx
+      try {
+
+        tracker_list[active_tracker_idx]->deactivate();
+        active_tracker_idx = ehover_tracker_idx;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4100,27 +4313,41 @@ bool ControlManager::eland(std::string &message_out) {
   try {
 
     ROS_INFO("[ControlManager]: Activating controller %s", controller_names[eland_controller_idx].c_str());
-    controller_list[eland_controller_idx]->activate(last_attitude_cmd);
-    sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
-    ROS_INFO("[ControlManager]: %s", message);
 
-    // update the time (used in failsafe)
-    controller_switch_time = ros::Time::now();
+    // check if the controller is not active
+    if (eland_controller_idx == active_controller_idx) {
 
-    try {
+      sprintf((char *)&message, "Not switching, the controller %s is already active!", eland_controller_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
 
-      controller_list[active_controller_idx]->deactivate();
-      active_controller_idx = eland_controller_idx;  // super important
+    } else {
 
-      success = true;
-    }
-    catch (std::runtime_error &exrun) {
+      controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+      sprintf((char *)&message, "Controller %s has been activated", controller_names[eland_controller_idx].c_str());
+      ROS_INFO("[ControlManager]: %s", message);
 
-      sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
-      ROS_ERROR("[ControlManager]: %s", message);
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-      message_out = std::string(message);
-      success     = false;
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
+
+      try {
+
+        controller_list[active_controller_idx]->deactivate();
+        active_controller_idx = eland_controller_idx;  // super important
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
     }
   }
   catch (std::runtime_error &exrun) {
@@ -4177,8 +4404,12 @@ bool ControlManager::failsafe() {
       ROS_INFO("[ControlManager]: Activating controller %s", failsafe_controller_name_.c_str());
       controller_list[failsafe_controller_idx]->activate(last_attitude_cmd);
 
-      // update the time (used in failsafe)
-      controller_switch_time = ros::Time::now();
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
 
       failsafe_triggered = true;
       elanding_timer.stop();
@@ -4326,7 +4557,7 @@ void ControlManager::updateTrackers(void) {
 
     } else if (active_tracker_idx != null_tracker_idx) {
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s return empty command!", tracker_names[active_tracker_idx].c_str());
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", tracker_names[active_tracker_idx].c_str());
 
       std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -4347,15 +4578,15 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(void) {
+void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_controller_list);
+  std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odom_for_control));
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
@@ -4372,7 +4603,7 @@ void ControlManager::updateControllers(void) {
         last_attitude_cmd = controller_output_cmd;
 
         // but it can return an empty command
-        // which means we shoudl trigger the failsafe landing
+        // which means we should trigger the failsafe landing
       } else {
 
         ROS_WARN("[ControlManager]: triggering failsafe, the controller returned null");

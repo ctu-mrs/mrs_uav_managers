@@ -4,10 +4,10 @@
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
-  <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/f550_darpa/motor_params_new_esc.yaml" />
+  <arg name="world_file" default="$(find mrs_general)/config/world_current.yaml" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/naki/motor_params.yaml" />
   <arg name="g" default="9.8" />
-  <arg name="debug" default="false" />
+  <arg name="debug" default="true" />
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
@@ -18,7 +18,7 @@
   <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f550_darpa.launch" >
+  <include file="$(find mrs_odometry)/launch/naki_optflow.launch" >
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
@@ -28,7 +28,7 @@
     <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/uav_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/uav_manager.yaml" />
       <rosparam file="$(arg motor_params_file)" />
 
       <param name="uav_mass" value="$(arg uav_mass)" />
@@ -72,9 +72,9 @@
     <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_uav_manager/ControlManager $(arg nodelet_manager)" output="screen">
 
       <rosparam file="$(arg world_file)" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/trackers.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/controllers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/controllers.yaml" />
       <rosparam file="$(arg motor_params_file)" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="uav_name" type="string" value="$(arg uav_name)" />
@@ -84,35 +84,35 @@
       <!-- Controller's configs -->
 
       <!-- NSF -->
-      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/nsf.yaml" />
+      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/uav/naki/nsf.yaml" />
       <param name="nsf_controller/g" value="$(arg g)" />
       <param name="nsf_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="nsf_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- SO3 -->
-      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/so3.yaml" />
+      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/uav/naki/so3.yaml" />
       <param name="so3_controller/g" value="$(arg g)" />
       <param name="so3_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
       <!-- MPC -->
-      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/mpc.yaml" />
+      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/uav/naki/mpc.yaml" />
       <param name="mpc_controller/g" value="$(arg g)" />
       <param name="mpc_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~mpc_controller/profiler" to="profiler" />
 
       <!-- Attitude controller -->
-      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/attitude.yaml" />
+      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/uav/naki/attitude.yaml" />
       <param name="attitude_controller/g" value="$(arg g)" />
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="attitude_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
 
       <!-- FailSafe -->
-      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/uav/f550_darpa/failsafe.yaml" />
+      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/uav/naki/failsafe.yaml" />
       <param name="failsafe_controller/g" value="$(arg g)" />
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="failsafe_controller/uav_mass" value="$(arg uav_mass)" />
@@ -122,24 +122,24 @@
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/uav/naki/line_tracker.yaml" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- JoyTracker -->
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/uav/naki/joy_tracker.yaml" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- MatlabTracker -->
-      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/matlab_tracker.yaml" />
+      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/uav/naki/matlab_tracker.yaml" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
 
       <!-- LandoffTracker -->
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/uav/naki/landoff_tracker.yaml" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
@@ -148,7 +148,7 @@
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
 
       <!-- MpcTracker -->
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/f550_darpa/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/naki/mpc_tracker.yaml" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
@@ -214,15 +214,15 @@
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
       <remap from="~rc_in" to="mavros/rc/in" />
-      <remap from="~shutdown_out" to="automatic_start_darpa/shutdown" />
+      <remap from="~shutdown_out" to="~shutdown_out" />
 
     </node>
 
     <!-- Gain Manager -->
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_manager/GainManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/gain_manager/gains.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
@@ -242,8 +242,8 @@
     <!-- Constraint Manager -->
     <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
 
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/uav/f550_darpa/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/uav/naki/constraint_manager/constraints.yaml" />
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->

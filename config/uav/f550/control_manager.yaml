@@ -35,10 +35,10 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # controller used for emergancy (controller) landing
-  eland_controller: "So3Controller"
+  eland_controller: "MpcController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 0.1 # [s]
+  odometry_max_missing_time: 0.5 # [s]
 
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0
@@ -46,7 +46,7 @@ safety:
 
   tilt_error_failsafe:
 
-    enabled: true
+    enabled: false
     tilt_error_threshold: 40 # [deg]
     min_height: 0.5 # [m]
 
@@ -90,4 +90,10 @@ rc_joystick:
   # switch the chanel repeatedly to enable the joystic control
   # n_switches need to occur within a time timeout
   timeout: 2.0 # [s]
-  n_switches: 5 # [-]
+  n_switches: 4 # [-]
+
+  channels:
+    pitch: 2
+    roll: 0
+    yaw: 3
+    thrust: 1
