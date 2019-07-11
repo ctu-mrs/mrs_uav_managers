@@ -30,6 +30,8 @@ public:
   virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &       odometry,
                                                            const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
   virtual const mrs_msgs::ControllerStatus::Ptr     getStatus()                                                  = 0;
+
+  virtual void switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg) = 0;
 };
 }  // namespace mrs_uav_manager
 

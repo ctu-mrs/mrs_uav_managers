@@ -1027,7 +1027,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
   {
     std::scoped_lock lock(mutex_control_error);
-  
+
     nav_msgs::Odometry odom_out;
 
     odom_out.pose.pose.position.x = position_error_x_;
@@ -1040,7 +1040,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
     try {
       publisher_control_error.publish(odom_out);
-    } catch (...) {
+    }
+    catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_error.getTopic().c_str());
     }
   }
@@ -1722,7 +1723,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
         wait.sleep();
       }
 
-      tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
+      {
+        std::scoped_lock lock(mutex_controller_list, mutex_tracker_list);
+
+        tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
+        controller_list[active_controller_idx]->switchOdometrySource(odometry_const_ptr);
+      }
     }
   }
 
