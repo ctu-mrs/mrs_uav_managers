@@ -204,6 +204,7 @@ private:
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
+  ros::Publisher publisher_control_error;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -294,7 +295,10 @@ private:
   double     tilt_error_threshold_;
   double     tilt_error_failsafe_min_height_;
   double     tilt_error;
+  double     position_error_x_, position_error_y_, position_error_z_;
+  double     velocity_error_x_, velocity_error_y_, velocity_error_z_;
   std::mutex mutex_tilt_error;
+  std::mutex mutex_control_error;
 
 private:
   mrs_lib::ConvexPolygon *      safety_area_polygon;
@@ -840,6 +844,7 @@ void ControlManager::onInit() {
   publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error     = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1017,6 +1022,30 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   }
 
   // --------------------------------------------------------------
+  // |                  publish the control error                 |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_control_error);
+  
+    nav_msgs::Odometry odom_out;
+
+    odom_out.pose.pose.position.x = position_error_x_;
+    odom_out.pose.pose.position.y = position_error_y_;
+    odom_out.pose.pose.position.z = position_error_z_;
+
+    odom_out.twist.twist.linear.x = velocity_error_x_;
+    odom_out.twist.twist.linear.y = velocity_error_y_;
+    odom_out.twist.twist.linear.z = velocity_error_z_;
+
+    try {
+      publisher_control_error.publish(odom_out);
+    } catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_error.getTopic().c_str());
+    }
+  }
+
+  // --------------------------------------------------------------
   // |                  publish the mass estimate                 |
   // --------------------------------------------------------------
   {
@@ -1081,17 +1110,20 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   // | -------- cacalculate control errors and tilt angle ------- |
 
-  double position_error_x_, position_error_y_, position_error_z_;
   double tilt_angle;
-  tilt_error = 0;
-
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
+
+    tilt_error = 0;
 
     // control errors
     position_error_x_ = last_position_cmd->position.x - odometry_x;
     position_error_y_ = last_position_cmd->position.y - odometry_y;
     position_error_z_ = last_position_cmd->position.z - odometry_z;
+
+    velocity_error_x_ = last_position_cmd->velocity.x - odometry.twist.twist.linear.x;
+    velocity_error_y_ = last_position_cmd->velocity.y - odometry.twist.twist.linear.y;
+    velocity_error_z_ = last_position_cmd->velocity.z - odometry.twist.twist.linear.z;
 
     // tilt angle
     tf::Quaternion odometry_quaternion;
