@@ -1872,7 +1872,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ------- JoyTracker & AttitudeController activation ------- |
 
   // if start button was pressed
-  if (msg->buttons[7] == 1) {
+  if (msg->buttons[9] == 1) {
 
     if (!joytracker_start_pressed) {
 
@@ -1893,7 +1893,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ---------------- Joystick goto activation ---------------- |
 
   // if back button was pressed
-  if (msg->buttons[6] == 1) {
+  if (msg->buttons[8] == 1) {
 
     if (!joystick_back_pressed) {
 
@@ -1914,7 +1914,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ------------------------ Failsafes ----------------------- |
 
   // if LT and RT buttons are both pressed down
-  if (msg->axes[2] < -0.99 && msg->axes[5] < -0.99) {
+  if (msg->axes[6] < -0.99 && msg->axes[7] < -0.99) {
 
     if (!joystick_failsafe_pressed) {
 
@@ -1933,7 +1933,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   }
 
   // if left and right joypads are both pressed down
-  if (msg->buttons[9] == 1 && msg->buttons[10] == 1) {
+  if (msg->buttons[10] == 1 && msg->buttons[11] == 1) {
 
     if (!joystick_eland_pressed) {
 
@@ -3452,7 +3452,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to JoyTracker was unsuccssfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to JoyTracker was unsuccessfull: %s", response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3465,7 +3465,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to AttitudeController was unsuccssfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to AttitudeController was unsuccessfull: %s", response.message.c_str());
     res.success = false;
     res.message = message;
 
