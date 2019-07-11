@@ -4631,6 +4631,7 @@ void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     try {
+      // TODO we should update the inactive controllers aswell
       controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
 
       // in normal sitation, the controller returns a valid command
