@@ -104,6 +104,13 @@
       <param name="mpc_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~mpc_controller/profiler" to="profiler" />
 
+      <!-- Acceleration Controller -->
+      <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/simulation/f550/acceleration.yaml" />
+      <param name="acceleration_controller/g" value="$(arg g)" />
+      <param name="acceleration_controller/enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="acceleration_controller/uav_mass" value="$(arg uav_mass)" />
+      <remap from="~acceleration_controller/profiler" to="profiler" />
+
       <!-- Attitude controller -->
       <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/simulation/f550/attitude.yaml" />
       <param name="attitude_controller/g" value="$(arg g)" />
