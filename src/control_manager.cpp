@@ -183,14 +183,16 @@ private:
   std::mutex      mutex_max_height;
   std::mutex      mutex_min_height;
 
-  int active_tracker_idx      = 0;
-  int active_controller_idx   = 0;
-  int ehover_tracker_idx      = 0;
-  int joystick_tracker_idx    = 0;
-  int joystick_controller_idx = 0;
-  int failsafe_controller_idx = 0;
-  int null_tracker_idx        = 0;
-  int eland_controller_idx    = 0;
+  int active_tracker_idx               = 0;
+  int active_controller_idx            = 0;
+  int ehover_tracker_idx               = 0;
+  int joystick_tracker_idx             = 0;
+  int joystick_controller_idx          = 0;
+  int failsafe_controller_idx          = 0;
+  int joystick_fallback_controller_idx = 0;
+  int joystick_fallback_tracker_idx    = 0;
+  int null_tracker_idx                 = 0;
+  int eland_controller_idx             = 0;
 
   void switchMotors(bool in);
   bool motors = false;
@@ -286,14 +288,6 @@ private:
 private:
   double tilt_limit_eland_;
   double tilt_limit_disarm_;
-
-  double eland_so3_threshold_;
-  double eland_mpc_threshold_;
-  double eland_other_threshold_;
-
-  double failsafe_so3_threshold_;
-  double failsafe_mpc_threshold_;
-  double failsafe_other_threshold_;
 
   double failsafe_threshold_;
   double eland_threshold_;
@@ -773,7 +767,7 @@ void ControlManager::onInit() {
   }
 
   // --------------------------------------------------------------
-  // |  check existance of controllers and trackers for joysticl  |
+  // |  check existance of controllers and trackers for joystick  |
   // --------------------------------------------------------------
 
   if (joystick_enabled_) {
@@ -812,7 +806,7 @@ void ControlManager::onInit() {
       ros::shutdown();
     }
 
-    // check if the fallbac ktracker for joystick control exists
+    // check if the fallback tracker for joystick control exists
     bool joystick_fallback_tracker_check = false;
     for (unsigned long i = 0; i < tracker_names.size(); i++) {
 
@@ -820,12 +814,29 @@ void ControlManager::onInit() {
 
       if (tracker_name.compare(joystick_fallback_tracker_name_) == 0) {
         joystick_fallback_tracker_check = true;
-        joystick_tracker_idx   = i;
+        joystick_fallback_tracker_idx   = i;
         break;
       }
     }
     if (!joystick_fallback_tracker_check) {
-      ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", joystick_tracker_name_.c_str());
+      ROS_ERROR("[ControlManager]: the joystick fallback tracker (%s) is not within the loaded trackers", joystick_fallback_tracker_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the fallback controller for joystick control exists
+    bool joystic_fallback_controller_check = false;
+    for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+      std::string controller_name = controller_names[i];
+
+      if (controller_name.compare(joystick_fallback_controller_name_) == 0) {
+        joystic_fallback_controller_check = true;
+        joystick_fallback_controller_idx  = i;
+        break;
+      }
+    }
+    if (!joystic_fallback_controller_check) {
+      ROS_ERROR("[ControlManager]: the failsafe fallback controller (%s) is not within the loaded controllers", joystick_fallback_controller_name_.c_str());
       ros::shutdown();
     }
   }
@@ -1924,19 +1935,19 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
 
-  // | -------------- Switching back to So3 and Mpc ------------- |
+  // | ---- switching back to fallback tracker and controller --- |
 
-  // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to Mpc and SO(3)
+  // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
   if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) && active_tracker_idx == joystick_tracker_idx &&
       active_controller_idx == joystick_controller_idx) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "MpcController";
+    controller_srv.value = joystick_fallback_controller_name_;
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "MpcTracker";
+    tracker_srv.value = joystick_fallback_tracker_name_;
 
     mrs_msgs::StringResponse response;
 
