@@ -6,6 +6,7 @@ trackers : [
   "JoyTracker",
   "MatlabTracker",
   "NullTracker",
+  "JoyBumperTracker",
 ]
 
 # - list of names of dynamically loaded controllers
@@ -90,8 +91,8 @@ joystick:
   joystick_timer_rate: 30 # [Hz]
 
   # tracker and controller used to control the drone using a joystick
-  tracker: "JoyTracker"
-  controller: "AttitudeController"
+  tracker: "JoyBumperTracker"
+  controller: "AccelerationController"
 
   # what tracker and controller should be activate when
   # switching back from joystic control?
