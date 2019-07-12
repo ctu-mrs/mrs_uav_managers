@@ -81,7 +81,21 @@ obstacle_bumper:
     vertical_offset: 0.1 # [m]
 
 joystick:
+
+  enabled: true
+
   joystick_timer_rate: 30 # [Hz]
+
+  # tracker and controller used to control the drone using a joystick
+  tracker: "JoyTracker"
+  controller: "AttitudeController"
+
+  # what tracker and controller should be activate when
+  # switching back from joystic control?
+  fallback:
+
+    tracker: "MpcTracker"
+    controller: "MpcController"
 
 rc_joystick:
 

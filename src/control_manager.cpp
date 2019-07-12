@@ -141,6 +141,12 @@ private:
   std::string null_tracker_name_;
   std::string ehover_tracker_name_;
 
+  bool        joystick_enabled_ = false;
+  std::string joystick_tracker_name_;
+  std::string joystick_controller_name_;
+  std::string joystick_fallback_tracker_name_;
+  std::string joystick_fallback_controller_name_;
+
   std::string failsafe_controller_name_;
   std::string eland_controller_name_;
 
@@ -180,6 +186,8 @@ private:
   int active_tracker_idx      = 0;
   int active_controller_idx   = 0;
   int ehover_tracker_idx      = 0;
+  int joystick_tracker_idx    = 0;
+  int joystick_controller_idx = 0;
   int failsafe_controller_idx = 0;
   int null_tracker_idx        = 0;
   int eland_controller_idx    = 0;
@@ -530,7 +538,12 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
 
+  param_loader.load_param("joystick/enabled", joystick_enabled_);
   param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
+  param_loader.load_param("joystick/tracker", joystick_tracker_name_);
+  param_loader.load_param("joystick/controller", joystick_controller_name_);
+  param_loader.load_param("joystick/fallback/tracker", joystick_fallback_tracker_name_);
+  param_loader.load_param("joystick/fallback/controller", joystick_fallback_controller_name_);
 
   param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", bumper_timer_rate_);
@@ -696,7 +709,7 @@ void ControlManager::onInit() {
     }
   }
   if (!hover_tracker_check) {
-    ROS_ERROR("[ControlManager]: the safety/hover_tracker is not within the loaded trackers");
+    ROS_ERROR("[ControlManager]: the safety/hover_tracker (%s) is not within the loaded trackers", ehover_tracker_name_.c_str());
     ros::shutdown();
   }
 
@@ -751,8 +764,66 @@ void ControlManager::onInit() {
     }
   }
   if (!null_tracker_check) {
-    ROS_ERROR("[ControlManager]: the null tracker is not within the loaded trackers");
+    ROS_ERROR("[ControlManager]: the null tracker (%s) is not within the loaded trackers", null_tracker_name_.c_str());
     ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
+  // |  check existance of controllers and trackers for joysticl  |
+  // --------------------------------------------------------------
+
+  if (joystick_enabled_) {
+
+    // check if the tracker for joystick control exists
+    bool joystick_tracker_check = false;
+    for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+      std::string tracker_name = tracker_names[i];
+
+      if (tracker_name.compare(joystick_tracker_name_) == 0) {
+        joystick_tracker_check = true;
+        joystick_tracker_idx   = i;
+        break;
+      }
+    }
+    if (!joystick_tracker_check) {
+      ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", joystick_tracker_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the controller for joystick control exists
+    bool joystic_controller_check = false;
+    for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+      std::string controller_name = controller_names[i];
+
+      if (controller_name.compare(joystick_controller_name_) == 0) {
+        joystic_controller_check = true;
+        joystick_controller_idx  = i;
+        break;
+      }
+    }
+    if (!joystic_controller_check) {
+      ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", joystick_controller_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the fallbac ktracker for joystick control exists
+    bool joystick_fallback_tracker_check = false;
+    for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+      std::string tracker_name = tracker_names[i];
+
+      if (tracker_name.compare(joystick_fallback_tracker_name_) == 0) {
+        joystick_fallback_tracker_check = true;
+        joystick_tracker_idx   = i;
+        break;
+      }
+    }
+    if (!joystick_fallback_tracker_check) {
+      ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", joystick_tracker_name_.c_str());
+      ros::shutdown();
+    }
   }
 
   // --------------------------------------------------------------
@@ -1389,7 +1460,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   // if start was pressed and held for > 3.0 s
   if (joytracker_start_pressed && (ros::Time::now() - joystick_tracker_press_time).toSec() > 3.0) {
 
-    ROS_INFO("[ControlManager]: activating JoyTracker and AttitudeController");
+    ROS_INFO("[ControlManager]: transitioning to joystick control: activating %s and %s", joystick_tracker_name_.c_str(), joystick_controller_name_.c_str());
 
     joytracker_start_pressed = false;
 
@@ -1397,7 +1468,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     controller_srv.value = "AttitudeController";
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "JoyTracker";
+    tracker_srv.value = joystick_tracker_name_;
 
     mrs_msgs::StringResponse response;
 
@@ -1817,9 +1888,9 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
 
   // | -------------- Switching back to So3 and Mpc ------------- |
 
-  // if any of the A, B, X, Y buttons are pressed when flying with JoyTracker, switch back to Mpc and SO(3)
-  if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) &&
-      tracker_names[active_tracker_idx].compare("JoyTracker") == 0 && controller_names[active_controller_idx].compare("AttitudeController") == 0) {
+  // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to Mpc and SO(3)
+  if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) && active_tracker_idx == joystick_tracker_idx &&
+      active_controller_idx == joystick_controller_idx) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
@@ -3412,7 +3483,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
   controller_srv.value = "AttitudeController";
 
   mrs_msgs::StringRequest tracker_srv;
-  tracker_srv.value = "JoyTracker";
+  tracker_srv.value = joystick_tracker_name_;
 
   mrs_msgs::StringResponse response;
 
@@ -3420,7 +3491,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to JoyTracker was unsuccessfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_tracker_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3433,7 +3504,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to AttitudeController was unsuccessfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_controller_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3450,7 +3521,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
     return true;
   }
 
-  sprintf((char *)&message, "Switched to JoyTracker");
+  sprintf((char *)&message, "Switched to joystick control");
   res.success = true;
   res.message = message;
 
