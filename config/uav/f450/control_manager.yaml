@@ -81,20 +81,64 @@ obstacle_bumper:
 
 joystick:
 
-  enabled: true
+  enabled: false
 
   joystick_timer_rate: 30 # [Hz]
 
   # tracker and controller used to control the drone using a joystick
-  tracker: "JoyTracker"
-  controller: "AttitudeController"
+  tracker: "JoyBumperTracker"
+  controller: "AccelerationController"
 
   # what tracker and controller should be activate when
-  # switching back from joystic control?
+  # switching back from joystick control?
   fallback:
 
     tracker: "MpcTracker"
     controller: "MpcController"
+
+  # channel numbers, indeces in array
+  channels:
+
+    # The main front buttons
+    # if any of those are pressend in the "joystic control mode",
+    # the control returns back to autonomy using the "fallback"
+    # controller and tracker
+    A: 0 # []
+    B: 1 # []
+    X: 2 # []
+    Y: 3 # []
+
+    # if the "start" button is pressed and held down for > 3 sec, the UAV switches
+    # to a tracker and controller specified above. Autonomy in this mode is not
+    # guaranteed, it depends on the specified tracker and controller.
+    start: 9 # []
+
+    # If "back" button is pressed, the UAV switches to a GOTO mode, where
+    # references are set using the joystick. This is fully autonomous mode,
+    # or more specifically, it uses the tracker and controller which were
+    # already active.
+    back: 8 # []
+
+    # if LT and RT are pressed together, the failsafe is triggered
+    LT: 6 # [] left trigger
+    RT: 7 # [] right trigger
+
+    # if L_joy and R_joy are pressed together, emergancy landing is triggered
+    L_joy: 10 # [] pressing left joypad
+    R_joy: 11 # [] pressing right joypad
+
+    pitch: 1 # []
+    roll: 2 # []
+    yaw: 0 # []
+    thrust: 1 # []
+
+  # multipliers for scaling and reversing the channels
+  channel_multipliers:
+
+    pitch: 1.0 # []
+    roll: 1.0 # []
+    yaw: 1.0 # []
+    thrust: 1.0 # []
 
 rc_joystick:
 

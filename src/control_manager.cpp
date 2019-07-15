@@ -42,6 +42,10 @@
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
+#define REF_X 0
+#define REF_Y 1
+#define REF_Z 2
+#define REF_YAW 3
 
 namespace mrs_uav_manager
 {
@@ -432,9 +436,16 @@ private:
   std::mutex mutex_joystick;
 
   ros::Subscriber  subscriber_joystick;
-  void             callbackJoystic(const sensor_msgs::JoyConstPtr &msg);
+  void             callbackJoystick(const sensor_msgs::JoyConstPtr &msg);
   sensor_msgs::Joy joystick_data;
   bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+  // joystick buttons
+  int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
+
+  // channel numbers and channel multipliers
+  int _channel_pitch_, _channel_roll_, _channel_yaw_, _channel_thrust_;
+  int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_yaw_, _channel_mult_thrust_;
 
   ros::Timer joystick_timer;
   void       joystickTimer(const ros::TimerEvent &event);
@@ -542,6 +553,29 @@ void ControlManager::onInit() {
   param_loader.load_param("joystick/controller", joystick_controller_name_);
   param_loader.load_param("joystick/fallback/tracker", joystick_fallback_tracker_name_);
   param_loader.load_param("joystick/fallback/controller", joystick_fallback_controller_name_);
+
+  param_loader.load_param("joystick/channels/A", _channel_A_);
+  param_loader.load_param("joystick/channels/B", _channel_B_);
+  param_loader.load_param("joystick/channels/X", _channel_X_);
+  param_loader.load_param("joystick/channels/Y", _channel_Y_);
+  param_loader.load_param("joystick/channels/start", _channel_start_);
+  param_loader.load_param("joystick/channels/back", _channel_back_);
+  param_loader.load_param("joystick/channels/LT", _channel_LT_);
+  param_loader.load_param("joystick/channels/RT", _channel_RT_);
+  param_loader.load_param("joystick/channels/L_joy", _channel_L_joy_);
+  param_loader.load_param("joystick/channels/R_joy", _channel_R_joy_);
+
+  // load channels
+  param_loader.load_param("joystick/channels/pitch", _channel_pitch_);
+  param_loader.load_param("joystick/channels/roll", _channel_roll_);
+  param_loader.load_param("joystick/channels/yaw", _channel_yaw_);
+  param_loader.load_param("joystick/channels/thrust", _channel_thrust_);
+
+  // load channel multipliers
+  param_loader.load_param("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
+  param_loader.load_param("joystick/channel_multipliers/roll", _channel_mult_roll_);
+  param_loader.load_param("joystick/channel_multipliers/yaw", _channel_mult_yaw_);
+  param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
   param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", bumper_timer_rate_);
@@ -936,7 +970,7 @@ void ControlManager::onInit() {
   subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
   odometry_last_time          = ros::Time(0);
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
   subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
@@ -1555,15 +1589,15 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     mrs_msgs::Vec4::Request request;
 
-    if (fabs(joystick_data.axes[0]) >= 0.05 || fabs(joystick_data.axes[1]) >= 0.05 || fabs(joystick_data.axes[3]) >= 0.05 ||
-        fabs(joystick_data.axes[4]) >= 0.05) {
+    if (fabs(joystick_data.axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data.axes[_channel_roll_]) >= 0.05 ||
+        fabs(joystick_data.axes[_channel_yaw_]) >= 0.05 || fabs(joystick_data.axes[_channel_thrust_]) >= 0.05) {
 
       double speed = 1.0;
 
-      request.goal[0] = joystick_data.axes[1] * speed;
-      request.goal[1] = joystick_data.axes[3] * speed;
-      request.goal[2] = joystick_data.axes[4] * 1;
-      request.goal[3] = joystick_data.axes[0];
+      request.goal[REF_X]   = _channel_mult_pitch_ * joystick_data.axes[_channel_pitch_] * speed;
+      request.goal[REF_Y]   = _channel_mult_roll_ * joystick_data.axes[_channel_roll_] * speed;
+      request.goal[REF_Z]   = _channel_mult_thrust_ * joystick_data.axes[_channel_thrust_];
+      request.goal[REF_YAW] = _channel_mult_yaw_ * joystick_data.axes[_channel_yaw_];
 
       mrs_msgs::Vec4::Response response;
 
@@ -1617,10 +1651,10 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     if (!nothing_to_do) {
 
-      request.goal[0] = des_x;
-      request.goal[1] = des_y;
-      request.goal[2] = des_z;
-      request.goal[3] = des_yaw;
+      request.goal[REF_X]   = des_x;
+      request.goal[REF_Y]   = des_y;
+      request.goal[REF_Z]   = des_z;
+      request.goal[REF_YAW] = des_yaw;
 
       mrs_msgs::Vec4Response response;
 
@@ -1642,7 +1676,8 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
       callbacks_enabled = false;
 
-      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
+      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z],
+               request.goal[REF_YAW]);
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
@@ -1924,7 +1959,7 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
+void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
 
   if (!is_initialized)
     return;
@@ -1933,13 +1968,13 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
 
   joystick_data = *msg;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
 
   // | ---- switching back to fallback tracker and controller --- |
 
   // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
-  if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) && active_tracker_idx == joystick_tracker_idx &&
-      active_controller_idx == joystick_controller_idx) {
+  if ((msg->buttons[_channel_A_] == 1 || msg->buttons[_channel_B_] == 1 || msg->buttons[_channel_X_] == 1 || msg->buttons[_channel_Y_] == 1) &&
+      active_tracker_idx == joystick_tracker_idx && active_controller_idx == joystick_controller_idx) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
@@ -1960,7 +1995,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ------- JoyTracker & AttitudeController activation ------- |
 
   // if start button was pressed
-  if (msg->buttons[9] == 1) {
+  if (msg->buttons[_channel_start_] == 1) {
 
     if (!joytracker_start_pressed) {
 
@@ -1981,7 +2016,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ---------------- Joystick goto activation ---------------- |
 
   // if back button was pressed
-  if (msg->buttons[8] == 1) {
+  if (msg->buttons[_channel_back_] == 1) {
 
     if (!joystick_back_pressed) {
 
@@ -2002,7 +2037,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ------------------------ Failsafes ----------------------- |
 
   // if LT and RT buttons are both pressed down
-  if (msg->axes[6] < -0.99 && msg->axes[7] < -0.99) {
+  if (msg->axes[_channel_LT_] < -0.99 && msg->axes[_channel_RT_] < -0.99) {
 
     if (!joystick_failsafe_pressed) {
 
@@ -2021,7 +2056,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   }
 
   // if left and right joypads are both pressed down
-  if (msg->buttons[10] == 1 && msg->buttons[11] == 1) {
+  if (msg->buttons[_channel_L_joy_] == 1 && msg->buttons[_channel_R_joy_] == 1) {
 
     if (!joystick_eland_pressed) {
 
@@ -2757,14 +2792,14 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], ABSOLUTE_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], ABSOLUTE_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
-  if (!isPointInSafetyArea3d(request_in.goal[0], request_in.goal[1], request_in.goal[2])) {
+  if (!isPointInSafetyArea3d(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z])) {
     ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -2928,7 +2963,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], FCU_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], FCU_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
@@ -2937,7 +2972,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
 
   // prepare the message for current tracker
   mrs_msgs::Vec4Request request;
-  Eigen::Vector2d       des(request_in.goal[0], request_in.goal[1]);
+  Eigen::Vector2d       des(request_in.goal[REF_X], request_in.goal[REF_Y]);
 
   {
     std::scoped_lock lock(mutex_odometry);
@@ -2945,14 +2980,14 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     // rotate it from the frame of the drone
     des = rotateVector(des, odometry_yaw);
 
-    request.goal[0] = des[0] + odometry_x;
-    request.goal[1] = des[1] + odometry_y;
-    request.goal[2] = request_in.goal[2] + odometry_z;
-    request.goal[3] = request_in.goal[3] + odometry_yaw;
+    request.goal[REF_X]   = des[REF_X] + odometry_x;
+    request.goal[REF_Y]   = des[REF_Y] + odometry_y;
+    request.goal[REF_Z]   = request_in.goal[REF_Z] + odometry_z;
+    request.goal[REF_YAW] = request_in.goal[REF_YAW] + odometry_yaw;
   }
 
   // check the safety area
-  if (!isPointInSafetyArea3d(request.goal[0], request.goal[1], request.goal[2])) {
+  if (!isPointInSafetyArea3d(request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z])) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -3092,7 +3127,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], RELATIVE_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], RELATIVE_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
@@ -3102,8 +3137,8 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[0], last_position_cmd->position.y + request_in.goal[1],
-                               last_position_cmd->position.z + request_in.goal[2])) {
+    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[REF_X], last_position_cmd->position.y + request_in.goal[REF_Y],
+                               last_position_cmd->position.z + request_in.goal[REF_Z])) {
       ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
       res.message = "the point is outside of the safety area";
       res.success = false;
@@ -4079,15 +4114,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
       des = rotateVector(des, odometry_yaw);
 
       if (horizontal_collision_detected) {
-        req_goto_out.goal[0] = des[0];
-        req_goto_out.goal[1] = des[1];
+        req_goto_out.goal[REF_X] = des[0];
+        req_goto_out.goal[REF_Y] = des[1];
       }
 
       if (vertical_collision_detected) {
-        req_goto_out.goal[2] = vertical_repulsion_distance;
+        req_goto_out.goal[REF_Z] = vertical_repulsion_distance;
       }
 
-      req_goto_out.goal[3] = 0;
+      req_goto_out.goal[REF_YAW] = 0;
     }
 
     {
