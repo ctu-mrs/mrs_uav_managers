@@ -116,26 +116,26 @@ joystick:
     # if the "start" button is pressed and held down for > 3 sec, the UAV switches
     # to a tracker and controller specified above. Autonomy in this mode is not
     # guaranteed, it depends on the specified tracker and controller.
-    start: 9 # []
+    start: 7 # []
 
     # If "back" button is pressed, the UAV switches to a GOTO mode, where
     # references are set using the joystick. This is fully autonomous mode,
     # or more specifically, it uses the tracker and controller which were
     # already active.
-    back: 8 # []
+    back: 6 # []
 
     # if LT and RT are pressed together, the failsafe is triggered
-    LT: 6 # [] left trigger
-    RT: 7 # [] right trigger
+    LT: 2 # [] left trigger
+    RT: 5 # [] right trigger
 
     # if L_joy and R_joy are pressed together, emergancy landing is triggered
-    L_joy: 10 # [] pressing left joypad
-    R_joy: 11 # [] pressing right joypad
+    L_joy: 9 # [] pressing left joypad
+    R_joy: 10 # [] pressing right joypad
 
     pitch: 1 # []
-    roll: 2 # []
+    roll: 3 # []
     yaw: 0 # []
-    thrust: 1 # []
+    thrust: 4 # []
 
   # multipliers for scaling and reversing the channels
   channel_multipliers:

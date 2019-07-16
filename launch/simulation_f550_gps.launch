@@ -144,6 +144,7 @@
       <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_bumper_tracker/profiler" to="profiler" />
       <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
+      <remap from="~joy_bumper_tracker/bumper_in" to="bumper/obstacle_sectors" />
 
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/simulation/matlab_tracker.yaml" />
