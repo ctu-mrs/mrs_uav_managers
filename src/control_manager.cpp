@@ -3564,7 +3564,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
   char message[400];
 
   mrs_msgs::StringRequest controller_srv;
-  controller_srv.value = "AttitudeController";
+  controller_srv.value = joystick_controller_name_;
 
   mrs_msgs::StringRequest tracker_srv;
   tracker_srv.value = joystick_tracker_name_;
