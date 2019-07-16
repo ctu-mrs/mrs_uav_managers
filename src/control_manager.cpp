@@ -1543,7 +1543,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     joytracker_start_pressed = false;
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "AttitudeController";
+    controller_srv.value = joystick_controller_name_;
 
     mrs_msgs::StringRequest tracker_srv;
     tracker_srv.value = joystick_tracker_name_;
@@ -1992,7 +1992,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
     joystick_goto_enabled = false;
   }
 
-  // | ------- JoyTracker & AttitudeController activation ------- |
+  // | ------- joystick control activation ------- |
 
   // if start button was pressed
   if (msg->buttons[_channel_start_] == 1) {
