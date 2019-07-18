@@ -26,6 +26,8 @@ status_timer_rate:  10 # [Hz]
 
 safety:
 
+  min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
+
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
   escalating_failsafe_timeout: 1.0 # [s]

@@ -201,6 +201,8 @@ private:
   void switchMotors(bool in);
   bool motors = false;
 
+  double min_thrust_null_tracker_ = 0.0;
+
   int status_timer_rate_   = 0;
   int safety_timer_rate_   = 0;
   int elanding_timer_rate_ = 0;
@@ -516,6 +518,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
+  param_loader.load_param("safety/min_thrust_null_tracker", min_thrust_null_tracker_);
   param_loader.load_param("safety/ehover_tracker", ehover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
   param_loader.load_param("safety/eland_controller", eland_controller_name_);
@@ -4893,7 +4896,7 @@ void ControlManager::publish(void) {
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust = 0.0;
+    attitude_target.thrust = min_thrust_null_tracker_;
 
     should_publish = true;
 
