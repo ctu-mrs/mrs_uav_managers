@@ -18,7 +18,7 @@
   <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f550_hector.launch" >
+  <include file="$(find mrs_odometry)/launch/uav/hector.launch" >
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
