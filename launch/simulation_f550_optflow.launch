@@ -97,7 +97,7 @@
       <param name="so3_controller/uav_mass" value="$(arg uav_mass)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
-      <!-- MPC -->
+      <!-- MPC controller -->
       <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/simulation/f550/mpc.yaml" />
       <param name="mpc_controller/g" value="$(arg g)" />
       <param name="mpc_controller/enable_profiler" type="bool" value="$(arg profiler)" />
@@ -138,6 +138,13 @@
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
+
+      <!-- JoyBumperTracker -->
+      <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/simulation/joy_bumper_tracker.yaml" />
+      <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
+      <remap from="~joy_bumper_tracker/profiler" to="profiler" />
+      <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
+      <remap from="~joy_bumper_tracker/bumper_in" to="bumper/obstacle_sectors" />
 
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/simulation/matlab_tracker.yaml" />
