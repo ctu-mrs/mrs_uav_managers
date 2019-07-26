@@ -1052,13 +1052,13 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
   ROS_INFO("[UavManager]: taking off");
 
-  mrs_msgs::String switch_tracker_out;
-  switch_tracker_out.request.value = takeoff_tracker_name_;
-  service_client_switch_tracker.call(switch_tracker_out);
-
   mrs_msgs::String switch_controller_out;
   switch_controller_out.request.value = takeoff_controller_name_;
   service_client_switch_controller.call(switch_controller_out);
+
+  mrs_msgs::String switch_tracker_out;
+  switch_tracker_out.request.value = takeoff_tracker_name_;
+  service_client_switch_tracker.call(switch_tracker_out);
 
   mrs_msgs::Vec1 takeoff_out;
   takeoff_out.request.goal = takeoff_height_;
