@@ -2411,10 +2411,10 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         res.success = true;
 
         // TODO is this the right place?
-        std::string response;
-        ROS_INFO("[ControlManager]: triggering hover after switching to a new controller.");
+        ROS_INFO("[ControlManager]: triggering hover after switching to a new controller, re-activating %s.", tracker_names[active_tracker_idx].c_str());
 
         // reactivate the current tracker
+        // TODO this is not the most elegant way
         {
           std::scoped_lock lock(mutex_tracker_list);
 
