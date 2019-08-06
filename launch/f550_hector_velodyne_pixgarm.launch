@@ -5,10 +5,9 @@
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/f550/motor_params.yaml" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/f550/motor_params_velodyne.yaml" />
   <arg name="g" default="9.8" />
   <arg name="debug" default="false" />
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/uav/f550/motor_params_velodyne.yaml" />
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
