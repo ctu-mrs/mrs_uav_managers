@@ -1,7 +1,7 @@
 null_tracker: "NullTracker"
 
 # require gain or constraint manager running to takeoff?
-require_gain_manager: true
+require_gain_manager: false
 require_constraint_manager: true
 
 # periodically checks if max height was exceeded
@@ -23,7 +23,7 @@ takeoff:
     tracker: "MpcTracker"
     controller: "MpcController"
 
-  takeoff_height: 1.2
+  takeoff_height: 2.0
 
   ground_limit_height: 0.5 # under which height the takeoff can happen
 
@@ -49,4 +49,4 @@ max_thrust:
 
   enabled: true
   rate: 30 # [Hz]
-  max_thrust: 0.83 # [-]
+  max_thrust: 0.85 # [-]
