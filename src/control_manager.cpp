@@ -264,6 +264,8 @@ private:
   ros::Time                           controller_tracker_switch_time;
   std::mutex                          mutex_controller_tracker_switch_time;
 
+  void shutdown();
+
 private:
   ros::Subscriber    subscriber_mavros_state;
   mavros_msgs::State mavros_state;
@@ -1464,10 +1466,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
         ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode");
       }
 
-      std_srvs::Trigger shutdown_out;
-      service_client_shutdown.call(shutdown_out);
-
-      // TODO: check the result?
+      shutdown();
 
       changeLandingState(IDLE_STATE);
 
@@ -3683,6 +3682,25 @@ bool ControlManager::isOffboard(void) {
 
 //}
 
+/* shutdown() //{ */
+
+void ControlManager::shutdown() {
+
+  std::scoped_lock lock(mutex_odometry);
+
+  double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
+
+  if (distance_to_origin > 1.0) {
+
+    ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
+
+    std_srvs::Trigger shutdown_out;
+    service_client_shutdown.call(shutdown_out);
+  }
+}
+
+//}
+
 // | ----------------------- safety area ---------------------- |
 
 /* //{ isInSafetyArea3d() */
@@ -4629,8 +4647,7 @@ bool ControlManager::arming(bool input) {
 
       service_client_arm.call(srv_out);
 
-      std_srvs::Trigger shutdown_out;
-      service_client_shutdown.call(shutdown_out);
+      shutdown();
 
       return srv_out.response.success;
 
