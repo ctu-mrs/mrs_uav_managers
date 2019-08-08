@@ -3690,7 +3690,7 @@ void ControlManager::shutdown() {
 
   double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
 
-  if (distance_to_origin > 1.0) {
+  if (distance_to_origin > 5.0) {
 
     ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
 
