@@ -86,6 +86,11 @@ obstacle_bumper:
     vertical_distance: 1.0 # [m]
     vertical_offset: 0.1 # [m]
 
+automatic_pc_shutdown:
+
+  enabled: false
+  distance_threshold: 5 # [m]
+
 joystick:
 
   enabled: true

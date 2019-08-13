@@ -487,6 +487,10 @@ private:
 private:
   mrs_lib::Profiler *profiler;
   bool               profiler_enabled_ = false;
+
+private:
+  bool   automatic_pc_shutdown_enabled = false;
+  double automatic_pc_shutdown_threshold;
 };
 
 //}
@@ -609,6 +613,9 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
   param_loader.load_param("rc_joystick/channels/yaw", rc_channel_yaw_);
   param_loader.load_param("rc_joystick/channels/thrust", rc_channel_thrust_);
+
+  param_loader.load_param("automatic_pc_shutdown/enabled", automatic_pc_shutdown_enabled);
+  param_loader.load_param("automatic_pc_shutdown/distance_threshold", automatic_pc_shutdown_threshold);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -3686,16 +3693,19 @@ bool ControlManager::isOffboard(void) {
 
 void ControlManager::shutdown() {
 
-  std::scoped_lock lock(mutex_odometry);
+  if (automatic_pc_shutdown_enabled) {
 
-  double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
+    std::scoped_lock lock(mutex_odometry);
 
-  if (distance_to_origin > 5.0) {
+    double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
 
-    ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
+    if (distance_to_origin > automatic_pc_shutdown_threshold) {
 
-    std_srvs::Trigger shutdown_out;
-    service_client_shutdown.call(shutdown_out);
+      ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
+
+      std_srvs::Trigger shutdown_out;
+      service_client_shutdown.call(shutdown_out);
+    }
   }
 }
 
