@@ -2832,6 +2832,8 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
     return true;
   }
 
+  pirouette_enabled_ = true;
+
   std::scoped_lock lock(mutex_odometry);
 
   setCallbacks(false);
