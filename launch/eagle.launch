@@ -65,6 +65,7 @@
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
+      <remap from="~pirouette_out" to="control_manager/pirouette" />
 
     </node>
 
@@ -215,6 +216,7 @@
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
       <remap from="~rc_in" to="mavros/rc/in" />
       <remap from="~shutdown_out" to="~shutdown_out" />
+      <remap from="~pirouette_in" to="~pirouette" />
 
     </node>
 

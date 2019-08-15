@@ -158,6 +158,7 @@ private:
   ros::ServiceClient service_client_enabled_callbacks;
   ros::ServiceClient service_client_emergency_goto;
   ros::ServiceClient service_client_arm;
+  ros::ServiceClient service_client_pirouette;
 
   std::mutex mutex_services;
 
@@ -181,6 +182,7 @@ private:
   std::string after_takeoff_controller_name_;
   std::string takeoff_tracker_name_;
   std::string takeoff_controller_name_;
+  bool        after_takeoff_pirouette_ = false;
 
 private:
   ros::Timer  landing_timer;
@@ -294,6 +296,7 @@ void UavManager::onInit() {
   service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
   service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
+  service_client_pirouette         = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
@@ -304,6 +307,7 @@ void UavManager::onInit() {
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
   param_loader.load_param("takeoff/after_takeoff/tracker", after_takeoff_tracker_name_);
   param_loader.load_param("takeoff/after_takeoff/controller", after_takeoff_controller_name_);
+  param_loader.load_param("takeoff/after_takeoff/pirouette", after_takeoff_pirouette_);
   param_loader.load_param("takeoff/during_takeoff/tracker", takeoff_tracker_name_);
   param_loader.load_param("takeoff/during_takeoff/controller", takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
@@ -539,6 +543,21 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
         } else {
 
           ROS_ERROR("[UavManager]: could not switch to %s: %s", after_takeoff_controller_name_.c_str(), switch_controller_out.response.message.c_str());
+        }
+
+        if (after_takeoff_pirouette_) {
+
+          std_srvs::Trigger pirouette_out;
+          service_client_pirouette.call(pirouette_out);
+
+          if (pirouette_out.response.success == true) {
+
+            ROS_INFO("[UavManager]: initiated after takeoff pirouette");
+
+          } else {
+
+            ROS_INFO("[UavManager]: pirouette not successfull: %s", pirouette_out.response.message.c_str());
+          }
         }
 
         takeoff_timer.stop();

@@ -159,3 +159,7 @@ rc_joystick:
     roll: 0
     yaw: 3
     thrust: 1
+
+pirouette:
+  speed: 0.25 # [rad/s]
+  timer_rate: 10 # [Hz]

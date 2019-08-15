@@ -243,6 +243,7 @@ private:
   ros::ServiceServer service_server_set_yaw_relative;
 
   ros::ServiceServer service_server_emergency_goto;
+  ros::ServiceServer service_server_pirouette;
   ros::ServiceServer service_server_eland;
 
   ros::ServiceClient service_client_arm;
@@ -265,6 +266,7 @@ private:
   std::mutex                          mutex_controller_tracker_switch_time;
 
   void shutdown();
+  void setCallbacks(bool in);
 
 private:
   ros::Subscriber    subscriber_mavros_state;
@@ -394,6 +396,10 @@ private:
   double     reseting_odometry    = false;
 
 private:
+  ros::Timer pirouette_timer;
+  void       pirouetteTimer(const ros::TimerEvent &event);
+
+private:
   double    escalating_failsafe_timeout_;
   ros::Time escalating_failsafe_time;
 
@@ -491,6 +497,15 @@ private:
 private:
   bool   automatic_pc_shutdown_enabled = false;
   double automatic_pc_shutdown_threshold;
+
+private:
+  bool       pirouette_enabled_ = false;
+  double     pirouette_speed_;
+  double     pirouette_timer_rate_;
+  std::mutex mutex_pirouette_;
+  double     pirouette_inital_yaw;
+  double     pirouette_iterator;
+  bool       callbackPirouette(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 };
 
 //}
@@ -616,6 +631,9 @@ void ControlManager::onInit() {
 
   param_loader.load_param("automatic_pc_shutdown/enabled", automatic_pc_shutdown_enabled);
   param_loader.load_param("automatic_pc_shutdown/distance_threshold", automatic_pc_shutdown_threshold);
+
+  param_loader.load_param("pirouette/speed", pirouette_speed_);
+  param_loader.load_param("pirouette/timer_rate", pirouette_timer_rate_);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1027,17 +1045,19 @@ void ControlManager::onInit() {
   // | --------------------- other services --------------------- |
 
   service_server_emergency_goto = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
+  service_server_pirouette      = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
   // --------------------------------------------------------------
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  status_timer   = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
-  safety_timer   = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
-  bumper_timer   = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
-  elanding_timer = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
-  failsafe_timer = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
-  joystick_timer = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
+  status_timer    = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
+  safety_timer    = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
+  bumper_timer    = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
+  elanding_timer  = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
+  failsafe_timer  = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
+  pirouette_timer = nh_.createTimer(ros::Rate(pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
+  joystick_timer  = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -1798,6 +1818,51 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumperTimer spinning");
 
   bumperPushFromObstacle();
+}
+
+//}
+
+/* //{ pirouetteTimer() */
+
+void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("pirouetteTimer", pirouette_timer_rate_, 0.01, event);
+
+  pirouette_iterator++;
+
+  double pirouette_duration  = (2 * M_PI) / pirouette_speed_;
+  double pirouette_n_steps   = pirouette_duration * pirouette_timer_rate_;
+  double pirouette_step_size = (2 * M_PI) / pirouette_n_steps;
+
+  if (pirouette_iterator > pirouette_duration * pirouette_timer_rate_) {
+
+    pirouette_enabled_ = false;
+    pirouette_timer.stop();
+
+    setCallbacks(true);
+
+    return;
+  }
+
+  // enable the callbacks for the active tracker
+  std_srvs::SetBoolRequest req_enable_callbacks;
+  req_enable_callbacks.data = true;
+  tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+
+  // call the goto
+  mrs_msgs::Vec1Request req_goto_out;
+
+  req_goto_out.goal = pirouette_inital_yaw + pirouette_iterator * pirouette_step_size;
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+
+  // disable the callbacks for the active tracker
+  req_enable_callbacks.data = false;
+  tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 }
 
 //}
@@ -2654,22 +2719,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   if (!is_initialized)
     return false;
 
-  callbacks_enabled = req.data;
-
-  std_srvs::SetBoolRequest req_goto_out;
-  req_goto_out = req;
-
-  std_srvs::SetBoolRequest req_enable_callbacks;
-  req_enable_callbacks.data = callbacks_enabled;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    // disable callbacks of all trackers
-    for (unsigned int i = 0; i < tracker_list.size(); i++) {
-      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
-    }
-  }
+  setCallbacks(req.data);
 
   char message[200];
   sprintf((char *)&message, "Callbacks: %s", motors ? "enabled" : "disabled");
@@ -2763,6 +2813,33 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
       res.success = false;
     }
   }
+
+  return true;
+}
+
+//}
+
+/* callbackPirouette() //{ */
+
+bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  if (pirouette_enabled_) {
+    res.success = false;
+    res.message = "already active";
+    return true;
+  }
+
+  std::scoped_lock lock(mutex_odometry);
+
+  pirouette_inital_yaw = odometry_yaw;
+  pirouette_iterator   = 0;
+  pirouette_timer.start();
+
+  res.success = true;
+  res.message = "activated";
 
   return true;
 }
@@ -3705,6 +3782,27 @@ void ControlManager::shutdown() {
 
       std_srvs::Trigger shutdown_out;
       service_client_shutdown.call(shutdown_out);
+    }
+  }
+}
+
+//}
+
+/* setCallbacks() //{ */
+
+void ControlManager::setCallbacks(bool in) {
+
+  callbacks_enabled = in;
+
+  std_srvs::SetBoolRequest req_enable_callbacks;
+  req_enable_callbacks.data = callbacks_enabled;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    // set callbacks to all trackers
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
     }
   }
 }

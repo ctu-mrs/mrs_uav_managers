@@ -23,6 +23,8 @@ takeoff:
     tracker: "MpcTracker"
     controller: "MpcController"
 
+    pirouette: false
+
   takeoff_height: 1.5
 
   ground_limit_height: 0.5 # under which height the takeoff can happen
