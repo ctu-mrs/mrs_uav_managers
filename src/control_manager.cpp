@@ -2834,6 +2834,8 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
   std::scoped_lock lock(mutex_odometry);
 
+  setCallbacks(false);
+
   pirouette_inital_yaw = odometry_yaw;
   pirouette_iterator   = 0;
   pirouette_timer.start();
