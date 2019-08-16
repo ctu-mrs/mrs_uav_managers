@@ -495,6 +495,9 @@ private:
   double          elanding_cutoff_mass_factor_;
   double          landing_uav_mass_ = 0;
 
+  double initial_body_disturbance_x_;
+  double initial_body_disturbance_y_;
+
 private:
   mrs_lib::Profiler *profiler;
   bool               profiler_enabled_ = false;
@@ -639,6 +642,26 @@ void ControlManager::onInit() {
 
   param_loader.load_param("pirouette/speed", pirouette_speed_);
   param_loader.load_param("pirouette/timer_rate", pirouette_timer_rate_);
+
+  // | ------------- load the body integrator values ------------ |
+
+  param_loader.load_param("body_disturbance_x", initial_body_disturbance_x_);
+  param_loader.load_param("body_disturbance_y", initial_body_disturbance_y_);
+
+  mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
+  last_attitude_cmd = output_command;
+
+  output_command->total_mass = uav_mass_;
+  output_command->mass_difference = 0.0;
+
+  output_command->disturbance_bx_b = initial_body_disturbance_x_;
+  output_command->disturbance_by_b = initial_body_disturbance_y_;
+  output_command->disturbance_wx_w = 0.0;
+  output_command->disturbance_wy_w = 0.0;
+  output_command->disturbance_bx_w = 0.0;
+  output_command->disturbance_by_w = 0.0;
+
+  output_command->thrust = min_thrust_null_tracker_;
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -920,7 +943,7 @@ void ControlManager::onInit() {
   active_tracker_idx = null_tracker_idx;
 
   // --------------------------------------------------------------
-  // |           active the first controller on the list          |
+  // |          activate the first controller on the list         |
   // --------------------------------------------------------------
 
   ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[eland_controller_idx].c_str());
@@ -2138,7 +2161,7 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
   double pirouette_n_steps   = pirouette_duration * pirouette_timer_rate_;
   double pirouette_step_size = (2 * M_PI) / pirouette_n_steps;
 
-  if (pirouette_iterator > pirouette_duration * pirouette_timer_rate_) {
+  if (rc_eland_triggered || failsafe_triggered || eland_triggered || (pirouette_iterator > pirouette_duration * pirouette_timer_rate_)) {
 
     pirouette_enabled_ = false;
     pirouette_timer.stop();
@@ -5340,7 +5363,7 @@ void ControlManager::publish(void) {
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust = 0.0;
+    attitude_target.thrust = min_thrust_null_tracker_;
 
     should_publish = true;
 

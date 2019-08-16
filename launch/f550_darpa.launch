@@ -2,6 +2,8 @@
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
+  <arg name="body_disturbance_x" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
+  <arg name="body_disturbance_y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
@@ -81,6 +83,8 @@
       <param name="uav_name" type="string" value="$(arg uav_name)" />
       <param name="g" value="$(arg g)" />
       <param name="uav_mass" value="$(arg uav_mass)" />
+      <param name="body_disturbance_x" value="$(arg body_disturbance_x)" />
+      <param name="body_disturbance_y" value="$(arg body_disturbance_y)" />
 
       <!-- Controller's configs -->
 
