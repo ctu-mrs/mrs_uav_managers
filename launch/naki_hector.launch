@@ -64,6 +64,7 @@
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
@@ -197,6 +198,7 @@
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->

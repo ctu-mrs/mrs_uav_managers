@@ -209,6 +209,7 @@
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
