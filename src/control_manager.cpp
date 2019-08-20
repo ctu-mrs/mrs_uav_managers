@@ -651,7 +651,7 @@ void ControlManager::onInit() {
   mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
   last_attitude_cmd = output_command;
 
-  output_command->total_mass = uav_mass_;
+  output_command->total_mass      = uav_mass_;
   output_command->mass_difference = 0.0;
 
   output_command->disturbance_bx_b = initial_body_disturbance_x_;
@@ -1971,7 +1971,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     double des_z   = 0;
     double des_yaw = 0;
 
-    double speed = 2.0;
+    double speed = 0.1;
 
     bool nothing_to_do = true;
 
@@ -2009,6 +2009,16 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       request.goal[REF_Z]   = des_z;
       request.goal[REF_YAW] = des_yaw;
 
+      Eigen::Vector2d des(request.goal[REF_X], request.goal[REF_Y]);
+      {
+        std::scoped_lock lock(mutex_odometry);
+
+        des = rotateVector(des, odometry_yaw);
+      }
+
+      request.goal[REF_X] = des[0];
+      request.goal[REF_Y] = des[1];
+
       mrs_msgs::Vec4Response response;
 
       // disable callbacks of all trackers
@@ -2025,7 +2035,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       callbacks_enabled = true;
 
       // call the goto
-      callbackGoToFcuService(request, response);
+      callbackGoToRelativeService(request, response);
 
       callbacks_enabled = false;
 
@@ -5345,6 +5355,11 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
+    // set the quaternion to the current odometry.. better than setting it to something unrelated
+    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+
     attitude_target.body_rate.x = 0.0;
     attitude_target.body_rate.y = 0.0;
     attitude_target.body_rate.z = 0.0;
@@ -5359,6 +5374,11 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
                       controller_names[active_controller_idx].c_str());
+
+    // set the quaternion to the current odometry.. better than setting it to something unrelated
+    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+    desired_orientation.normalize();
+    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
     attitude_target.body_rate.x = 0.0;
     attitude_target.body_rate.y = 0.0;
