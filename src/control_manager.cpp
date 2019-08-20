@@ -5345,9 +5345,11 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
-    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
-    desired_orientation.normalize();
-    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
+
+    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
 
     attitude_target.thrust = min_thrust_null_tracker_;
 
@@ -5358,10 +5360,11 @@ void ControlManager::publish(void) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
                       controller_names[active_controller_idx].c_str());
 
-    // convert the RPY to quaternion
-    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
-    desired_orientation.normalize();
-    quaternionTFToMsg(desired_orientation, attitude_target.orientation);
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
+
+    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
 
     attitude_target.thrust = min_thrust_null_tracker_;
 
