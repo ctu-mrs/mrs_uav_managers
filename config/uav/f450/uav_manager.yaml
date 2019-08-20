@@ -25,7 +25,7 @@ takeoff:
 
     pirouette: false
 
-  takeoff_height: 1.5
+  takeoff_height: 1.2
 
   ground_limit_height: 0.5 # under which height the takeoff can happen
 
