@@ -187,7 +187,6 @@ private:
 private:
   ros::Timer  landing_timer;
   std::string landing_tracker_name_;
-  double      landing_cutoff_height_;
   double      landing_cutoff_mass_factor_;
   double      landing_timer_rate_;
   bool        landing = false;
@@ -315,7 +314,6 @@ void UavManager::onInit() {
 
   param_loader.load_param("landing/rate", landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
-  param_loader.load_param("landing/landing_cutoff_height", landing_cutoff_height_);
   param_loader.load_param("landing/landing_cutoff_mass_factor", landing_cutoff_mass_factor_);
   param_loader.load_param("landing/disarm", landing_disarm_);
 
@@ -444,7 +442,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
         ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
         // condition for automatic motor turn off
-        if ((height < landing_cutoff_height_) && ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
+        if (((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
           if (current_state_landing == LANDING_STATE) {
 
