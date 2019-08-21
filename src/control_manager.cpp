@@ -1680,7 +1680,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   }
 
   // --------------------------------------------------------------
-  // |   activate emergancy land in case of medium control error  |
+  // |   activate emergency land in case of medium control error  |
   // --------------------------------------------------------------
 
   {
@@ -1692,7 +1692,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
+          ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
                     (180.0 / M_PI) * tilt_limit_eland_, control_error_, eland_threshold_);
 
           std::string message_out;
@@ -1823,7 +1823,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
 
       changeLandingState(IDLE_STATE);
 
-      ROS_WARN("[ControlManager]: emergancy landing finished");
+      ROS_WARN("[ControlManager]: emergency landing finished");
 
       elanding_timer.stop();
 
@@ -2968,7 +2968,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   }
 
   if (req.data && (failsafe_triggered || eland_triggered || rc_eland_triggered)) {
-    sprintf((char *)&message, "cannot switch motors ON, we landed in emergancy.");
+    sprintf((char *)&message, "cannot switch motors ON, we landed in emergency.");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -4704,7 +4704,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
     break;
   }
 
-  ROS_INFO("[ControlManager]: Switching emergancy landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+  ROS_INFO("[ControlManager]: Switching emergency landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
 }
 
 //}

@@ -47,7 +47,7 @@ typedef enum
 
 const char *state_names[4] = {
 
-    "IDLING", "FLYING HOME", "LANDING", "EMERGANCY LANDING"};
+    "IDLING", "FLYING HOME", "LANDING", "emergency LANDING"};
 
 class UavManager : public nodelet::Nodelet {
 
@@ -484,7 +484,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
             ROS_INFO("[UavManager]: landing finished");
 
-          } else {  // emergancy landing
+          } else {  // emergency landing
 
             std_srvs::SetBool arm_out;
             arm_out.request.data = false;
@@ -496,7 +496,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
             changeLandingState(IDLE_STATE);
 
-            ROS_WARN("[UavManager]: emergancy landing finished");
+            ROS_WARN("[UavManager]: emergency landing finished");
           }
 
           landing_timer.stop();
