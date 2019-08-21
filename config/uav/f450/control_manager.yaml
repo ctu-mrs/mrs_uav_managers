@@ -37,7 +37,7 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # controller used for emergency (controller) landing
-  eland_controller: "So3Controller"
+  eland_controller: "MpcController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 0.5 # [s]
@@ -159,7 +159,7 @@ rc_joystick:
   timeout: 2.0 # [s]
   n_switches: 4 # [-]
 
-  carrot_distance: 1.0 # [m]
+  carrot_distance: 0.25 # [m]
 
   channels:
     pitch: 2
