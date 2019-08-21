@@ -402,8 +402,10 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
       temp_odom_y = odometry_y;
     }
 
+    // TODO: paremetrize the radius
     if (sqrt(pow(temp_odom_x - takeoff_x, 2) + pow(temp_odom_y - takeoff_y, 2)) < 0.5) {
 
+      // TODO: parametrize the timeout
       ros::Duration wait(5.0);
       wait.sleep();
 
@@ -411,20 +413,35 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
       mrs_msgs::String switch_tracker_out;
       switch_tracker_out.request.value = landing_tracker_name_;
-      service_client_switch_tracker.call(switch_tracker_out);
+      if (!service_client_switch_tracker.call(switch_tracker_out)) {
+        ROS_ERROR("[UavManager]: service call for switching to tracker %s failed", landing_tracker_name_.c_str());
+        changeLandingState(LANDING_STATE);
+      }
 
-      std_srvs::Trigger land_out;
       if (switch_tracker_out.response.success == true) {
 
-        service_client_land.call(land_out);
+        std_srvs::Trigger land_out;
+        if (service_client_land.call(land_out)) {
 
-        ros::Duration wait(1.0);
-        wait.sleep();
+          if (land_out.response.success) {
 
-        changeLandingState(LANDING_STATE);
+            changeLandingState(LANDING_STATE);
+
+          } else {
+
+            ROS_ERROR("[UavManager]: service call for landing was unsuccessful: %s", land_out.response.message.c_str());
+            changeLandingState(IDLE_STATE);
+          }
+
+        } else {
+
+          ROS_ERROR("[UavManager]: service call for landing failed");
+          changeLandingState(IDLE_STATE);
+        }
 
       } else {
 
+        ROS_ERROR("[UavManager]: could not switch to tracker %s: %s", landing_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
         changeLandingState(IDLE_STATE);
       }
     }
@@ -1000,14 +1017,6 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     return true;
   }
 
-  if (odometry_z > ground_limit_height_) {
-    sprintf((char *)&message, "Can't takeoff, already in the air!");
-    res.message = message;
-    res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
-    return true;
-  }
-
   if (null_tracker_name_.compare(tracker_status.tracker) != 0) {
     sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
     res.message = message;
@@ -1189,28 +1198,58 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
 
   mrs_msgs::String switch_tracker_out;
   switch_tracker_out.request.value = landing_tracker_name_;
-  service_client_switch_tracker.call(switch_tracker_out);
+  if (!service_client_switch_tracker.call(switch_tracker_out)) {
+    sprintf((char *)&message, "Service call for switching to tracker %s failed.", landing_tracker_name_.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
 
-  std_srvs::Trigger land_out;
   if (switch_tracker_out.response.success == true) {
 
-    service_client_land.call(land_out);
+    std_srvs::Trigger land_out;
+    if (service_client_land.call(land_out)) {
 
-    res.success = land_out.response.success;
-    res.message = land_out.response.message;
+      if (land_out.response.success) {
 
-    ros::Duration wait(1.0);
-    wait.sleep();
+        res.success = land_out.response.success;
+        res.message = land_out.response.message;
 
-    changeLandingState(LANDING_STATE);
+        changeLandingState(LANDING_STATE);
 
-    landing_timer.start();
+        landing_timer.start();
+
+      } else {
+
+        sprintf((char *)&message, "Service call for landing was not successfull: %s", land_out.response.message.c_str());
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+
+        ROS_INFO("[UavManager]: switching back to NullTracker");
+        switch_tracker_out.request.value = null_tracker_name_;
+        service_client_switch_tracker.call(switch_tracker_out);
+
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[UavManager]: service call for landing failed");
+      res.success = false;
+      res.message = "service call for landing failed";
+
+      ROS_INFO("[UavManager]: switching back to NullTracker");
+      switch_tracker_out.request.value = null_tracker_name_;
+      service_client_switch_tracker.call(switch_tracker_out);
+    }
 
   } else {
 
+    ROS_ERROR("[UavManager]: could not switch to tracker %s: %s", landing_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
     res.success = switch_tracker_out.response.success;
     res.message = switch_tracker_out.response.message;
-    changeLandingState(IDLE_STATE);
   }
 
   return true;

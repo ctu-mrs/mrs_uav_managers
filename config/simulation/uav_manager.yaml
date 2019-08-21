@@ -37,7 +37,7 @@ landing:
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
-  disarm: true
+  disarm: false
 
 flight_timer:
 

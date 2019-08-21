@@ -2959,7 +2959,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
     if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
 
-      sprintf((char *)&message, "Can't turn motors on, the UAV is outside of the safety area!");
+      sprintf((char *)&message, "Can't switch motors on, the UAV is outside of the safety area!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2979,7 +2979,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
     std::scoped_lock lock(mutex_mavros_state);
 
     if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
-      sprintf((char *)&message, "Can't takeoff, missing mavros state!");
+      sprintf((char *)&message, "Can't switch motors ON, missing mavros state!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2989,7 +2989,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   if (bumper_enabled_) {
     if (!got_bumper) {
-      sprintf((char *)&message, "Can't turn motors on, missing bumper data!");
+      sprintf((char *)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
