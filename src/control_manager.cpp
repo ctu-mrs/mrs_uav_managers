@@ -478,7 +478,7 @@ private:
   int  rc_joystic_channel_last_value = 0;
   int  rc_joystic_channel_;
   int  rc_joystic_n_switches_;
-  int  rc_joystic_carrot_distance_;
+  double  rc_joystic_carrot_distance_;
   int  rc_joystic_timeout_;
 
   bool      joystick_failsafe_pressed = false;
