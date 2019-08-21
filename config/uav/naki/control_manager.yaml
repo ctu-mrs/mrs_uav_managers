@@ -55,6 +55,7 @@ safety:
   rc_eland:
 
     enabled: true
+    # activation channel
     channel_number: 7 # [-]
     threshold: 1500 # [us]
 
@@ -150,12 +151,15 @@ joystick:
 rc_joystick:
 
   enabled: true
+  # activation channel
   channel_number: 6 # indexed from 0
 
   # switch the chanel repeatedly to enable the joystic control
   # n_switches need to occur within a time timeout
   timeout: 2.0 # [s]
   n_switches: 4 # [-]
+
+  carrot_distance: 1.0 # [m]
 
   channels:
     pitch: 2

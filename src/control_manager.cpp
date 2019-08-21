@@ -478,6 +478,7 @@ private:
   int  rc_joystic_channel_last_value = 0;
   int  rc_joystic_channel_;
   int  rc_joystic_n_switches_;
+  int  rc_joystic_carrot_distance_;
   int  rc_joystic_timeout_;
 
   bool      joystick_failsafe_pressed = false;
@@ -631,6 +632,7 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
   param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
   param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
+  param_loader.load_param("rc_joystick/carrot_distance", rc_joystic_carrot_distance_);
 
   param_loader.load_param("rc_joystick/channels/pitch", rc_channel_pitch_);
   param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
@@ -1971,8 +1973,6 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     double des_z   = 0;
     double des_yaw = 0;
 
-    double speed = 0.1;
-
     bool nothing_to_do = true;
 
     if (uint(3) >= rc_channels.channels.size()) {
@@ -1982,17 +1982,17 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     } else {
 
       if (abs(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * speed;
+        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * speed;
+        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * speed;
+        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
