@@ -15,6 +15,7 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/BoolStamped.h>
+#include <mrs_msgs/LandoffDiagnostics.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
@@ -103,6 +104,13 @@ private:
   bool            got_height = false;
 
 private:
+  void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg);
+  ros::Subscriber              subscriber_landoff_diagnostics;
+  mrs_msgs::LandoffDiagnostics landoff_diagnostics;
+  std::mutex                   mutex_landoff_diagnostics;
+  bool                         got_landoff_diagnostics = false;
+
+private:
   ros::Subscriber       subscriber_motors;
   mrs_msgs::BoolStamped motors;
   std::mutex            mutex_motors;
@@ -176,8 +184,9 @@ private:
 private:
   ros::Timer  takeoff_timer;
   double      takeoff_timer_rate_;
-  bool        takingoff          = false;
-  int         number_of_takeoffs = 0;
+  bool        takingoff           = false;
+  int         number_of_takeoffs  = 0;
+  bool        waiting_for_takeoff = false;
   std::string after_takeoff_tracker_name_;
   std::string after_takeoff_controller_name_;
   std::string takeoff_tracker_name_;
@@ -275,6 +284,8 @@ void UavManager::onInit() {
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_motors           = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
+  subscriber_landoff_diagnostics =
+      nh_.subscribe("landoff_diagnostics_in", 1, &UavManager::callbackLandoffDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
   subscriber_gains = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
   gains_last_time  = ros::Time(0);
@@ -521,11 +532,25 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("takeoffTimer", takeoff_timer_rate_, 0.004, event);
 
+  if (waiting_for_takeoff) {
+
+    std::scoped_lock lock(mutex_landoff_diagnostics);
+
+    if (landoff_diagnostics.taking_off) {
+
+      waiting_for_takeoff = false;
+    } else {
+
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from LandoffTracker");
+      return;
+    }
+  }
+
   if (takingoff) {
     {
-      std::scoped_lock lock(mutex_odometry);
+      std::scoped_lock lock(mutex_odometry, mutex_landoff_diagnostics);
 
-      if (fabs(takeoff_height_ - odometry_z) < 0.2) {
+      if (!landoff_diagnostics.taking_off) {
 
         ROS_INFO("[UavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
 
@@ -938,6 +963,25 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
 
 //}
 
+/* //{ callbackLandoffDiagnostics() */
+
+void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackLandoffDiagnostics");
+
+  {
+    std::scoped_lock lock(mutex_landoff_diagnostics);
+    landoff_diagnostics = *msg;
+  }
+
+  got_landoff_diagnostics = true;
+}
+
+//}
+
 // | -------------------- service callbacks ------------------- |
 
 /* //{ callbackTakeoff() */
@@ -1011,6 +1055,14 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
   if (!got_height) {
     sprintf((char *)&message, "Can't takeoff, missing height");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
+
+  if (!got_landoff_diagnostics) {
+    sprintf((char *)&message, "Can't takeoff, missing landoff diagnostics");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1128,6 +1180,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
       takingoff = true;
       number_of_takeoffs++;
+      waiting_for_takeoff = true;
 
       takeoff_timer.start();
     }
