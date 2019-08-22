@@ -120,13 +120,13 @@ private:
 private:
   ros::Subscriber subscriber_gains;
   ros::Time       gains_last_time;
-  bool            gain_manager_required_;
+  bool            gain_manager_required_ = false;
 
   // checking whether the constraints are being set by the constraint manager
 private:
   ros::Subscriber subscriber_constraints;
   ros::Time       constraints_last_time;
-  bool            constraint_manager_required_;
+  bool            constraint_manager_required_ = false;
 
 private:
   ros::Subscriber         subscriber_tracker_status;
@@ -202,7 +202,7 @@ private:
   double      uav_mass_;
   double      g_;
   double      landing_uav_mass_;
-  bool        landing_disarm_;
+  bool        landing_disarm_ = false;
   double      hover_thrust_a_;
   double      hover_thrust_b_;
 
@@ -219,13 +219,13 @@ private:
   ros::Timer flighttime_timer;
   double     flighttime_timer_rate_;
   double     flighttime_max_time;
-  bool       flighttime_timer_enabled_;
-  double     flighttime = 0;
+  bool       flighttime_timer_enabled_ = false;
+  double     flighttime                = 0;
   std::mutex mutex_flightime_timer;
 
 private:
   ros::Timer maxthrust_timer;
-  bool       maxthrust_timer_enabled_;
+  bool       maxthrust_timer_enabled_ = false;
   double     maxthrust_timer_rate_;
   double     maxthrust_max_thrust_;
 

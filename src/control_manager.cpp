@@ -319,7 +319,7 @@ private:
 
 private:
   mrs_lib::ConvexPolygon *      safety_area_polygon;
-  bool                          use_safety_area_;
+  bool                          use_safety_area_ = false;
   double                        min_height;
   mrs_uav_manager::SafetyArea_t safety_area;
 
@@ -473,13 +473,13 @@ private:
   bool      joystick_back_pressed = false;
   bool      joystick_goto_enabled = false;
 
-  bool rc_goto_enabled_              = false;
-  bool rc_goto_active_               = false;
-  int  rc_joystic_channel_last_value = 0;
-  int  rc_joystic_channel_;
-  int  rc_joystic_n_switches_;
-  double  rc_joystic_carrot_distance_;
-  int  rc_joystic_timeout_;
+  bool   rc_goto_enabled_              = false;
+  bool   rc_goto_active_               = false;
+  int    rc_joystic_channel_last_value = 0;
+  int    rc_joystic_channel_;
+  int    rc_joystic_n_switches_;
+  double rc_joystic_carrot_distance_;
+  int    rc_joystic_timeout_;
 
   bool      joystick_failsafe_pressed = false;
   ros::Time joystick_failsafe_press_time;
