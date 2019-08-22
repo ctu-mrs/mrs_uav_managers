@@ -17,12 +17,12 @@
   <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
 
   <!-- Nodelet Manager -->
-  <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
+  <include file="$(find mrs_general)/launch/nodelet_manager.launch">
+    <arg name="debug" value="$(arg debug)" />
+  </include>
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/simulation/simulation_gps.launch" >
-    <arg name="debug" value="$(arg debug)"/>
-  </include>
+  <include file="$(find mrs_odometry)/launch/simulation/simulation_gps.launch" />
 
   <group ns="$(arg uav_name)">
 
