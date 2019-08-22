@@ -31,13 +31,13 @@ safety:
   tilt_limit_eland: 60 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
-  # tracker used for emergancy hover routine
+  # tracker used for emergency hover routine
   ehover_tracker: "LandoffTracker"
 
   # controller used for safety landing (feed forward)
   failsafe_controller: "FailsafeController"
 
-  # controller used for emergancy (controller) landing
+  # controller used for emergency (controller) landing
   eland_controller: "MpcController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
@@ -132,7 +132,7 @@ joystick:
     LT: 6 # [] left trigger
     RT: 7 # [] right trigger
 
-    # if L_joy and R_joy are pressed together, emergancy landing is triggered
+    # if L_joy and R_joy are pressed together, emergency landing is triggered
     L_joy: 10 # [] pressing left joypad
     R_joy: 11 # [] pressing right joypad
 

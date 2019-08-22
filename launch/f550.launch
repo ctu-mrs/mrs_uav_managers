@@ -41,13 +41,14 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~tracker_status_in" to="control_manager/tracker_status" />
-      <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~target_attitude_in" to="mavros/setpoint_raw/attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gains_in" to="gain_manager/current_gains" />
       <remap from="~constraints_in" to="constraint_manager/current_constraints" />
+      <remap from="~landoff_diagnostics_in" to="control_manager/landoff_tracker/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
@@ -151,6 +152,7 @@
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
       <remap from="~landoff_tracker/eland_in" to="~landoff_tracker/eland" />
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
+      <remap from="~landoff_tracker/diagnostics_out" to="~landoff_tracker/diagnostics" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/f550/mpc_tracker.yaml" />
@@ -196,7 +198,7 @@
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
       <remap from="~thrust_force_out" to="~thrust_force" />
-      <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~target_attitude_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
