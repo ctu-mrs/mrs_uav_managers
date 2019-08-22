@@ -9,7 +9,7 @@
   <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
   <arg name="g" default="9.8" />
-  <arg name="debug" default="false" />
+  <arg name="debug" default="true" />
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
@@ -40,7 +40,7 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
-      <remap from="~tracker_status_in" to="control_manager/tracker_status" />
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~target_attitude_in" to="mavros/setpoint_raw/attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
@@ -206,8 +206,6 @@
 
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
-      <remap from="~tracker_status_out" to="~tracker_status" />
-      <remap from="~controller_status_out" to="~controller_status" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
@@ -216,6 +214,7 @@
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
+      <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
@@ -249,7 +248,7 @@
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
-      <remap from="~controller_status_in" to="control_manager/controller_status" />
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
 
       <!-- Services -->

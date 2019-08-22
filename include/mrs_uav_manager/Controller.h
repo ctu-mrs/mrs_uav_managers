@@ -50,7 +50,7 @@ public:
 
   // getStatus()
   // * self-explanatory
-  virtual const mrs_msgs::ControllerStatus::Ptr getStatus() = 0;
+  virtual const mrs_msgs::ControllerStatus getStatus() = 0;
 
   // switchOdometrySource() is called during every switch of reference frames
   // * the new odometry (which will come in the next update()) is passed

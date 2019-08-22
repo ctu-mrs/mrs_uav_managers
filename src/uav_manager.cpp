@@ -11,11 +11,11 @@
 #include <mrs_msgs/Vec1.h>
 #include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/String.h>
-#include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/LandoffDiagnostics.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
@@ -63,7 +63,7 @@ public:
   bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
+  void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
   void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
@@ -129,10 +129,10 @@ private:
   bool            constraint_manager_required_ = false;
 
 private:
-  ros::Subscriber         subscriber_tracker_status;
-  bool                    got_tracker_status = false;
-  mrs_msgs::TrackerStatus tracker_status;
-  std::mutex              mutex_tracker_status;
+  ros::Subscriber                     subscriber_control_manager_diagnostics;
+  bool                                got_control_manager_diagnostics = false;
+  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics;
+  std::mutex                          mutex_control_manager_diagnostics;
 
 private:
   ros::Subscriber             subscriber_target_attitude;
@@ -277,7 +277,6 @@ void UavManager::onInit() {
   ROS_INFO("[UavManager]: initializing");
 
   subscriber_odometry         = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &UavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
   subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &UavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
@@ -286,6 +285,8 @@ void UavManager::onInit() {
   subscriber_motors           = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
   subscriber_landoff_diagnostics =
       nh_.subscribe("landoff_diagnostics_in", 1, &UavManager::callbackLandoffDiagnostics, this, ros::TransportHints().tcpNoDelay());
+  subscriber_control_manager_diagnostics =
+      nh_.subscribe("control_manager_diagnostics_in", 1, &UavManager::callbackControlManagerDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
   subscriber_gains = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
   gains_last_time  = ros::Time(0);
@@ -460,7 +461,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
   } else if (current_state_landing == LANDING_STATE) {
 
 
-    if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
+    if (landing_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) == 0) {
 
       {
         std::scoped_lock lock(mutex_height);
@@ -774,19 +775,19 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
 
 /* //{ callbackTrackerStatus() */
 
-void UavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
+void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg) {
 
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTrackerStatus");
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControlManagerDiagnostics");
 
   {
-    std::scoped_lock lock(mutex_tracker_status);
-    tracker_status = *msg;
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
+    control_manager_diagnostics = *msg;
   }
 
-  got_tracker_status = true;
+  got_control_manager_diagnostics = true;
 }
 
 //}
@@ -801,7 +802,7 @@ void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTargetAttitude");
 
   {
-    std::scoped_lock lock(mutex_tracker_status);
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
     target_attitude = *msg;
   }
 
@@ -1029,8 +1030,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     }
   }
 
-  if (!got_tracker_status) {
-    sprintf((char *)&message, "Can't takeoff, missing tracker status!");
+  if (!got_control_manager_diagnostics) {
+    sprintf((char *)&message, "Can't takeoff, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1069,7 +1070,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     return true;
   }
 
-  if (null_tracker_name_.compare(tracker_status.tracker) != 0) {
+  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0) {
     sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
     res.message = message;
     res.success = false;
@@ -1229,8 +1230,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
     return true;
   }
 
-  if (!got_tracker_status) {
-    sprintf((char *)&message, "Can't land, missing tracker status!");
+  if (!got_control_manager_diagnostics) {
+    sprintf((char *)&message, "Can't land, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1327,7 +1328,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
     return true;
   }
 
-  if (!got_tracker_status) {
+  if (!got_control_manager_diagnostics) {
     sprintf((char *)&message, "Can't land, missing tracker status!");
     res.message = message;
     res.success = false;

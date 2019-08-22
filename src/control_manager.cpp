@@ -12,6 +12,7 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mrs_lib/ConvexPolygon.h>
 #include <mrs_lib/Profiler.h>
@@ -219,8 +220,7 @@ private:
   ros::Publisher publisher_thrust_force;
   ros::Publisher publisher_cmd_odom;
   ros::Publisher publisher_target_attitude;
-  ros::Publisher publisher_tracker_status;
-  ros::Publisher publisher_controller_status;
+  ros::Publisher publisher_diagnostics;
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
@@ -515,6 +515,10 @@ private:
   double     pirouette_inital_yaw;
   double     pirouette_iterator;
   bool       callbackPirouette(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+private:
+  void       publishDiagnostics(void);
+  std::mutex mutex_diagnostics;
 };
 
 //}
@@ -1009,19 +1013,18 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force      = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
-  publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
-  publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error     = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
-  publisher_rviz              = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
+  publisher_control_output  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_diagnostics     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
+  publisher_motors          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error      = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_rviz            = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1118,55 +1121,10 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   mrs_lib::Routine profiler_routine = profiler->createRoutine("statusTimer", status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
-  // |                publishing the tracker status               |
+  // |                   publish the diagnostics                  |
   // --------------------------------------------------------------
 
-  {
-
-    std::scoped_lock lock(mutex_tracker_list);
-
-    mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
-    mrs_msgs::TrackerStatus      tracker_status;
-
-    tracker_status_ptr = tracker_list[active_tracker_idx]->getStatus();
-
-    tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
-
-    tracker_status.tracker = tracker_names[active_tracker_idx];
-    tracker_status.stamp   = ros::Time::now();
-
-    try {
-      publisher_tracker_status.publish(mrs_msgs::TrackerStatusConstPtr(new mrs_msgs::TrackerStatus(tracker_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
-    }
-  }
-
-  // --------------------------------------------------------------
-  // |              publishing the controller status              |
-  // --------------------------------------------------------------
-
-  {
-    std::scoped_lock lock(mutex_controller_list);
-
-    mrs_msgs::ControllerStatus::Ptr controller_status_ptr;
-    mrs_msgs::ControllerStatus      controller_status;
-
-    controller_status_ptr = controller_list[active_controller_idx]->getStatus();
-
-    controller_status = mrs_msgs::ControllerStatus(*controller_status_ptr);
-
-    controller_status.controller = controller_names[active_controller_idx];
-    controller_status.stamp      = ros::Time::now();
-
-    try {
-      publisher_controller_status.publish(mrs_msgs::ControllerStatusConstPtr(new mrs_msgs::ControllerStatus(controller_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
-    }
-  }
+  publishDiagnostics();
 
   // --------------------------------------------------------------
   // |                 publishing the motors state                |
@@ -4142,6 +4100,54 @@ void ControlManager::setCallbacks(bool in) {
     for (unsigned int i = 0; i < tracker_list.size(); i++) {
       tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
     }
+  }
+}
+
+//}
+
+/* publishDiagnostics() //{ */
+
+void ControlManager::publishDiagnostics(void) {
+
+  std::scoped_lock lock(mutex_diagnostics);
+
+  mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
+
+  diagnostics_msg.stamp = ros::Time::now();
+
+  // | ----------------- fill the tracker status ---------------- |
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    mrs_msgs::TrackerStatus tracker_status;
+
+    tracker_status = tracker_list[active_tracker_idx]->getStatus();
+
+    tracker_status.tracker = tracker_names[active_tracker_idx];
+
+    diagnostics_msg.tracker_status = tracker_status;
+  }
+
+  // | --------------- fill the controller status --------------- |
+
+  {
+    std::scoped_lock lock(mutex_controller_list);
+
+    mrs_msgs::ControllerStatus controller_status;
+
+    controller_status = controller_list[active_controller_idx]->getStatus();
+
+    controller_status.controller = controller_names[active_controller_idx];
+
+    diagnostics_msg.controller_status = controller_status;
+  }
+
+  try {
+    publisher_diagnostics.publish(diagnostics_msg);
+  }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_diagnostics.getTopic().c_str());
   }
 }
 
