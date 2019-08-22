@@ -9,7 +9,7 @@
   <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/simulation/f550/motor_params.yaml" />
   <arg name="g" default="9.8" />
-  <arg name="debug" default="true" />
+  <arg name="debug" default="false" />
 
   <arg unless="$(arg standalone)" name="nodelet" value="load"/>
   <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
