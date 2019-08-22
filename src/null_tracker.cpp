@@ -10,8 +10,6 @@ namespace mrs_uav_manager
 class NullTracker : public mrs_uav_manager::Tracker {
 
 public:
-  NullTracker(void);
-
   virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area);
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
   virtual void deactivate(void);
@@ -43,9 +41,6 @@ private:
   bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 };
-
-NullTracker::NullTracker(void) {
-}
 
 //}
 
