@@ -2085,6 +2085,10 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("bumperTimer", bumper_timer_rate_, 0.01, event);
 
+  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
+    return;
+  }
+
   if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
   }
@@ -2093,6 +2097,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
     return;
   }
 
+  // TODO: odometry_z is not the height above the ground
   {
     std::scoped_lock lock(mutex_odometry);
 
