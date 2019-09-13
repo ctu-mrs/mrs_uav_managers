@@ -1,0 +1,43 @@
+<launch>
+
+  <arg name="standalone" default="true" />
+  <arg name="profiler" default="$(optenv PROFILER false)" />
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
+  <arg name="params_path" default="$(optenv PARAMS_PATH)" />
+
+  <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
+  <arg unless="$(arg standalone)" name="nodelet" value="load"/>
+  <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
+  <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg uav_name)_nodelet_manager"/>
+
+  <group ns="$(arg uav_name)">
+
+    <!-- Constraint Manager -->
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
+
+      <!-- Load the default param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraints.yaml" />
+
+      <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/constraint_manager/constraints.yaml" />
+
+      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+
+      <!-- Subscribers -->
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+
+      <!-- Services -->
+      <remap from="~set_constraints_in" to="~set_constraints" />
+      <remap from="~set_constraints_out" to="control_manager/set_constraints" />
+
+      <!-- Publishers -->
+      <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~profiler" to="profiler" />
+
+    </node>
+
+  </group>
+
+</launch>

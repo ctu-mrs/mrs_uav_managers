@@ -1,0 +1,44 @@
+<launch>
+
+  <arg name="standalone" default="true" />
+  <arg name="profiler" default="$(optenv PROFILER false)" />
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
+  <arg name="params_path" default="$(optenv PARAMS_PATH)" />
+
+  <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
+  <arg unless="$(arg standalone)" name="nodelet" value="load"/>
+  <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
+  <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg uav_name)_nodelet_manager"/>
+
+  <group ns="$(arg uav_name)">
+
+    <!-- Gain Manager -->
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_manager/GainManager $(arg nodelet_manager)" output="screen">
+
+      <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gains.yaml" />
+
+      <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/gain_manager/gains.yaml" />
+
+      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+
+      <!-- Subscribers -->
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+
+      <!-- Services -->
+      <remap from="~set_gains_in" to="~set_gains" />
+      <remap from="~set_gains_out" to="control_manager/so3_controller/set_parameters" />
+
+      <!-- Publishers -->
+      <remap from="~current_gains_out" to="~current_gains" />
+      <remap from="~profiler" to="profiler" />
+
+    </node>
+
+  </group>
+
+</launch>

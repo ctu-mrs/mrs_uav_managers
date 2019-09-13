@@ -779,7 +779,7 @@ void ControlManager::onInit() {
       it = controllers_.find(controller_names[i]);
 
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
-      controller_list[i]->initialize(nh_, motor_params_);
+      controller_list[i]->initialize(nh_, motor_params_, uav_mass_, g_);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
@@ -2335,11 +2335,11 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
+
   std::scoped_lock lock(mutex_joystick);
 
   joystick_data = *msg;
-
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
 
   // | ---- switching back to fallback tracker and controller --- |
 
@@ -2454,6 +2454,8 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackBumper");
 
   ROS_INFO_ONCE("[ControlManager]: getting bumper data");
 
@@ -5078,6 +5080,8 @@ bool ControlManager::failsafe() {
 }
 
 //}
+
+// | ------------------------ routines ------------------------ |
 
 /* arming() //{ */
 
