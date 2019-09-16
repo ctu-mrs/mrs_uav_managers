@@ -1,11 +1,14 @@
 <launch>
 
-  <arg name="params_path" default="$(optenv PARAMS_PATH)" />
+  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
+  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
+  <arg name="PROPULSION_TYPE" default="$(optenv PROPULSION_TYPE)" />
+
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg params_path)/motor_params.yaml" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
   <arg name="standalone" default="true" />
 
@@ -23,7 +26,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/default/uav_manager.yaml" />
 
       <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/uav_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />

@@ -1,6 +1,24 @@
 <launch>
 
-  <arg name="params_path" default="$(optenv PARAMS_PATH)" />
+  <!-- simulation/uav -->
+  <!-- configs are bundled in "simulation" and "uav" folders -->
+  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
+
+  <!-- Distinguishes the type and propulsion of the UAV -->
+  <!-- e.g., f450, f550, t650, etc. -->
+  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
+
+  <!-- Distinguishes the motor+ESC configuration -->
+  <!-- the default is called the same as the UAV_TYPE -->
+  <!-- for the options, look into mrs_controllers/config/uav/UAV_TYPE -->
+  <arg name="PROPULSION_TYPE" default="$(optenv PROPULSION_TYPE)" />
+
+  <!-- Distinguishes the odometry fusion type configuration -->
+  <!-- e.g., gps, optflow, vio, etc. -->
+  <!-- for the options, look into ... -->
+  <arg name="ODOMETRY_TYPE" default="$(optenv ODOMETRY_TYPE)" />
+
+  <!-- Other params from env variables -->
   <arg name="body_disturbance_x" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="body_disturbance_y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="pixgarm" default="$(optenv PIXGARM false)" />
@@ -21,8 +39,12 @@
   </include>
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/simulation/simulation_gps.launch">
+  <include file="$(find mrs_odometry)/launch/odometry.launch">
 
+    <arg name="ODOMETRY_TYPE" value="$(arg ODOMETRY_TYPE)" />
+    <arg name="profiler" value="$(arg profiler)" />
+    <arg name="standalone" value="$(arg standalone)" />
+    <arg name="pixgarm" value="$(arg pixgarm)" />
 
   </include>
 
@@ -34,8 +56,10 @@
     <arg name="g" value="$(arg g)" />
     <arg name="profiler" value="$(arg profiler)" />
     <arg name="world_file" value="$(arg world_file)" />
-    <arg name="params_path" value="$(arg params_path)" />
     <arg name="standalone" value="$(arg standalone)" />
+    <arg name="RUN_TYPE" value="$(arg RUN_TYPE)" />
+    <arg name="UAV_TYPE" value="$(arg UAV_TYPE)" />
+    <arg name="PROPULSION_TYPE" value="$(arg PROPULSION_TYPE)" />
 
   </include>
 
@@ -47,10 +71,12 @@
     <arg name="g" value="$(arg g)" />
     <arg name="profiler" value="$(arg profiler)" />
     <arg name="world_file" value="$(arg world_file)" />
-    <arg name="params_path" value="$(arg params_path)" />
     <arg name="body_disturbance_x" value="$(arg body_disturbance_x)" />
     <arg name="body_disturbance_y" value="$(arg body_disturbance_y)" />
     <arg name="standalone" value="$(arg standalone)" />
+    <arg name="RUN_TYPE" value="$(arg RUN_TYPE)" />
+    <arg name="UAV_TYPE" value="$(arg UAV_TYPE)" />
+    <arg name="PROPULSION_TYPE" value="$(arg PROPULSION_TYPE)" />
 
   </include>
 
@@ -59,7 +85,7 @@
 
     <arg name="uav_name" value="$(arg uav_name)" />
     <arg name="profiler" value="$(arg profiler)" />
-    <arg name="params_path" value="$(arg params_path)" />
+    <arg name="params_path" value="$(arg RUN_TYPE)/$(arg UAV_TYPE)" />
     <arg name="standalone" value="$(arg standalone)" />
 
   </include>
@@ -69,7 +95,7 @@
 
     <arg name="uav_name" value="$(arg uav_name)" />
     <arg name="profiler" value="$(arg profiler)" />
-    <arg name="params_path" value="$(arg params_path)" />
+    <arg name="params_path" value="$(arg RUN_TYPE)/$(arg UAV_TYPE)" />
     <arg name="standalone" value="$(arg standalone)" />
 
   </include>

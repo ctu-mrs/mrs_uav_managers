@@ -1,13 +1,16 @@
 <launch>
 
-  <arg name="params_path" default="$(optenv PARAMS_PATH)" />
+  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
+  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
+  <arg name="PROPULSION_TYPE" default="$(optenv PROPULSION_TYPE)" />
+
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="body_disturbance_x" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="body_disturbance_y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg params_path)/motor_params.yaml" />
+  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
   <arg name="standalone" default="true" />
 
@@ -27,9 +30,9 @@
       <rosparam file="$(find mrs_uav_manager)/config/default/controllers.yaml" />
 
       <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/trackers.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg params_path)/controllers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
@@ -44,37 +47,37 @@
 
       <!-- NSF -->
       <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/default/nsf.yaml" />
-      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/$(arg params_path)/nsf.yaml" />
+      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/nsf.yaml" />
       <param name="nsf_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- SO3 -->
       <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/default/so3.yaml" />
-      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/$(arg params_path)/so3.yaml" />
+      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/so3.yaml" />
       <param name="so3_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
       <!-- MPC controller -->
       <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
-      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/$(arg params_path)/mpc.yaml" />
+      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc.yaml" />
       <param name="mpc_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~mpc_controller/profiler" to="profiler" />
 
       <!-- Acceleration Controller -->
       <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/default/acceleration.yaml" />
-      <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/$(arg params_path)/acceleration.yaml" />
+      <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/acceleration.yaml" />
       <param name="acceleration_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~acceleration_controller/profiler" to="profiler" />
 
       <!-- Attitude controller -->
       <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/default/attitude.yaml" />
-      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/$(arg params_path)/attitude.yaml" />
+      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/attitude.yaml" />
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
 
       <!-- FailSafe -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
-      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg params_path)/failsafe.yaml" />
+      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
       <remap from="~failsafe_controller/arm_out" to="~/arm" />
@@ -83,20 +86,20 @@
 
       <!-- LineTracker -->
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/default/line_tracker.yaml" />
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/line_tracker.yaml" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- JoyTracker -->
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/default/joy_tracker.yaml" />
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- JoyBumperTracker -->
       <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/default/joy_bumper_tracker.yaml" />
-      <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/joy_bumper_tracker.yaml" />
+      <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_bumper_tracker.yaml" />
       <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~joy_bumper_tracker/profiler" to="profiler" />
       <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
@@ -104,14 +107,14 @@
 
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/default/matlab_tracker.yaml" />
-      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/matlab_tracker.yaml" />
+      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/matlab_tracker.yaml" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
 
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/default/landoff_tracker.yaml" />
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
@@ -122,7 +125,7 @@
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg params_path)/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg profiler)" />
       <param name="mpc_tracker/uav_name" value="$(arg uav_name)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
