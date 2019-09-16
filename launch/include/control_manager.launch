@@ -165,6 +165,8 @@
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
+      <remap from="~control_error_out" to="~control_error" />
+      <remap from="~tilt_error_out" to="~tilt_error" />
       <remap from="~thrust_force_out" to="~thrust_force" />
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~motors_out" to="~motors" />
