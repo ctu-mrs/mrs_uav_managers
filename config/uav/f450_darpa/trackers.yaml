@@ -1,8 +1,0 @@
-MpcTracker:
-  address: "mrs_trackers/MpcTracker"
-
-LandoffTracker:
-  address: "mrs_trackers/LandoffTracker"
-
-NullTracker:
-  address: "mrs_uav_manager/NullTracker"
