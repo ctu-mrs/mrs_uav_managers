@@ -85,8 +85,9 @@
 
     <arg name="uav_name" value="$(arg uav_name)" />
     <arg name="profiler" value="$(arg profiler)" />
-    <arg name="params_path" value="$(arg RUN_TYPE)/$(arg UAV_TYPE)" />
     <arg name="standalone" value="$(arg standalone)" />
+    <arg name="RUN_TYPE" value="$(arg RUN_TYPE)" />
+    <arg name="UAV_TYPE" value="$(arg UAV_TYPE)" />
 
   </include>
 
@@ -95,8 +96,9 @@
 
     <arg name="uav_name" value="$(arg uav_name)" />
     <arg name="profiler" value="$(arg profiler)" />
-    <arg name="params_path" value="$(arg RUN_TYPE)/$(arg UAV_TYPE)" />
     <arg name="standalone" value="$(arg standalone)" />
+    <arg name="RUN_TYPE" value="$(arg RUN_TYPE)" />
+    <arg name="UAV_TYPE" value="$(arg UAV_TYPE)" />
 
   </include>
 
