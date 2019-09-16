@@ -15,39 +15,36 @@ estimator_types: [
 ]
 
 gains: [
-  "supersoft",
-  "soft",
-  "tight",
-  "optflow",
+  "default",
 ]
 
 gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
-    BRICKFLOW: ["optflow"]
-    HECTOR: ["soft", "supersoft", "tight", "optflow"]
-    T265: ["soft", "supersoft", "tight"]
-    BRICK: ["supersoft"]
-    VIO: ["supersoft"]
-    ICP: ["supersoft"]
-    RTK: ["soft", "supersoft", "tight"]
-    OPTFLOWGPS: ["soft", "supersoft"]
-    GPS: ["soft", 'supersoft', 'tight']
-    OPTFLOW: ["optflow"]
-    OTHER: ["supersoft"]
+    BRICKFLOW: ["default"]
+    HECTOR: ["default"]
+    T265: ["default"]
+    BRICK: ["default"]
+    VIO: ["default"]
+    ICP: ["default"]
+    RTK: ["default"]
+    OPTFLOWGPS: ["default"]
+    GPS: ["default"]
+    OPTFLOW: ["default"]
+    OTHER: ["default"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
-    BRICKFLOW: "optflow"
-    HECTOR: "optflow"
-    T265: "soft"
-    BRICK: "supersoft"
-    VIO: "supersoft"
-    ICP: "supersoft"
-    RTK: "tight"
-    OPTFLOWGPS: "soft"
-    GPS: "soft"
-    OPTFLOW: "optflow"
-    OTHER: "supersoft"
+    BRICKFLOW: "default"
+    HECTOR: "default"
+    T265: "default"
+    BRICK: "default"
+    VIO: "default"
+    ICP: "default"
+    RTK: "default"
+    OPTFLOWGPS: "default"
+    GPS: "default"
+    OPTFLOW: "default"
+    OTHER: "default"

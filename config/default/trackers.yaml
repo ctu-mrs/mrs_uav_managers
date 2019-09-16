@@ -16,5 +16,8 @@ JoyBumperTracker:
 MatlabTracker:
   address: "mrs_trackers/MatlabTracker"
 
+CsvTracker:
+  address: "mrs_trackers/CsvTracker"
+
 NullTracker:
   address: "mrs_uav_manager/NullTracker"

@@ -27,8 +27,6 @@ takeoff:
 
   takeoff_height: 1.0
 
-  ground_limit_height: 0.5 # under which height the takeoff can happen
-
 landing:
 
   rate: 10 # [Hz]
@@ -37,7 +35,7 @@ landing:
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
-  disarm: false
+  disarm: true
 
 flight_timer:
 
@@ -50,4 +48,4 @@ max_thrust:
 
   enabled: false
   rate: 30 # [Hz]
-  max_thrust: 0.5 # [-]
+  max_thrust: 0.85 # [-]

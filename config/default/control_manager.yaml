@@ -4,18 +4,14 @@ trackers : [
   "LineTracker",
   "LandoffTracker",
   "JoyTracker",
-  "MatlabTracker",
   "NullTracker",
-  "JoyBumperTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 controllers : [
   "So3Controller",
   "MpcController",
-  "NsfController",
   "AttitudeController",
-  "AccelerationController",
   "FailsafeController",
 ]
 
@@ -48,7 +44,6 @@ safety:
   odometry_max_missing_time: 1.0 # [s]
 
   elanding_timer_rate: 10
-  elanding_cutoff_height:  1.0
   elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
 
   tilt_error_failsafe:
@@ -99,8 +94,8 @@ joystick:
   joystick_timer_rate: 30 # [Hz]
 
   # tracker and controller used to control the drone using a joystick
-  tracker: "JoyBumperTracker"
-  controller: "AccelerationController"
+  tracker: "JoyTracker"
+  controller: "AttitudeController"
 
   # what tracker and controller should be activate when
   # switching back from joystick control?
@@ -124,26 +119,26 @@ joystick:
     # if the "start" button is pressed and held down for > 3 sec, the UAV switches
     # to a tracker and controller specified above. Autonomy in this mode is not
     # guaranteed, it depends on the specified tracker and controller.
-    start: 7 # []
+    start: 9 # []
 
     # If "back" button is pressed, the UAV switches to a GOTO mode, where
     # references are set using the joystick. This is fully autonomous mode,
     # or more specifically, it uses the tracker and controller which were
     # already active.
-    back: 6 # []
+    back: 8 # []
 
     # if LT and RT are pressed together, the failsafe is triggered
-    LT: 2 # [] left trigger
-    RT: 5 # [] right trigger
+    LT: 6 # [] left trigger
+    RT: 7 # [] right trigger
 
     # if L_joy and R_joy are pressed together, emergency landing is triggered
-    L_joy: 9 # [] pressing left joypad
-    R_joy: 10 # [] pressing right joypad
+    L_joy: 10 # [] pressing left joypad
+    R_joy: 11 # [] pressing right joypad
 
     pitch: 1 # []
-    roll: 3 # []
+    roll: 2 # []
     yaw: 0 # []
-    thrust: 4 # []
+    thrust: 1 # []
 
   # multipliers for scaling and reversing the channels
   channel_multipliers:
@@ -155,7 +150,7 @@ joystick:
 
 rc_joystick:
 
-  enabled: false
+  enabled: true
   # activation channel
   channel_number: 6 # indexed from 0
 
@@ -164,7 +159,7 @@ rc_joystick:
   timeout: 2.0 # [s]
   n_switches: 4 # [-]
 
-  carrot_distance: 1.0 # [m]
+  carrot_distance: 0.25 # [m]
 
   channels:
     pitch: 2

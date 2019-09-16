@@ -1,17 +1,3 @@
-rate: 25
-
-estimator_types: [
-  "T265",
-  "OBJECT",
-  "VIO",
-  "ICP",
-  "RTK",
-  "OPTFLOWGPS",
-  "GPS",
-  "OPTFLOW",
-  "OTHER",
-]
-
 gains: [
   "supersoft",
   "soft",

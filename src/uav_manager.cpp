@@ -176,7 +176,6 @@ private:
 
 private:
   double takeoff_height_;
-  double ground_limit_height_;
 
 private:
   std::string null_tracker_name_;
@@ -322,7 +321,6 @@ void UavManager::onInit() {
   param_loader.load_param("takeoff/during_takeoff/tracker", takeoff_tracker_name_);
   param_loader.load_param("takeoff/during_takeoff/controller", takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
-  param_loader.load_param("takeoff/ground_limit_height", ground_limit_height_);
 
   param_loader.load_param("landing/rate", landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", landing_tracker_name_);

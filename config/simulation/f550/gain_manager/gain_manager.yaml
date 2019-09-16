@@ -1,53 +1,36 @@
-rate: 25
-
-estimator_types: [
-  "BRICKFLOW",
-  "HECTOR",
-  "T265",
-  "BRICK",
-  "VIO",
-  "ICP",
-  "RTK",
-  "OPTFLOWGPS",
-  "GPS",
-  "OPTFLOW",
-  "OTHER",
-]
-
 gains: [
   "supersoft",
   "soft",
   "tight",
-  "optflow",
 ]
 
 gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
-    BRICKFLOW: ["optflow"]
-    HECTOR: ["soft", "supersoft", "tight", "optflow"]
-    T265: ["soft", "supersoft", "tight"]
+    BRICKFLOW: ["soft"]
+    HECTOR: ["soft"]
+    T265: ["soft"]
     BRICK: ["supersoft"]
     VIO: ["supersoft"]
     ICP: ["supersoft"]
-    RTK: ["soft", "supersoft", "tight"]
-    OPTFLOWGPS: ["soft", "supersoft"]
-    GPS: ["soft", 'supersoft', 'tight']
-    OPTFLOW: ["optflow"]
+    RTK: ["supersoft", "soft", "tight"]
+    OPTFLOWGPS: ["supersoft", "soft", "tight"]
+    GPS: ["supersoft", 'soft', 'tight']
+    OPTFLOW: ["soft"]
     OTHER: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
-    BRICKFLOW: "optflow"
-    HECTOR: "optflow"
+    BRICKFLOW: "soft"
+    HECTOR: "soft"
     T265: "soft"
     BRICK: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
     RTK: "tight"
-    OPTFLOWGPS: "soft"
-    GPS: "soft"
-    OPTFLOW: "optflow"
+    OPTFLOWGPS: "tight"
+    GPS: "tight"
+    OPTFLOW: "soft"
     OTHER: "supersoft"
