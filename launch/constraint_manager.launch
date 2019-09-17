@@ -1,17 +1,17 @@
 <launch>
 
-  <arg name="standalone" default="true" />
-  <arg name="profiler" default="$(optenv PROFILER false)" />
-  <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
+  <arg name="PROFILER" default="$(optenv PROFILER false)" />
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav)" />
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
   <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
+  <arg name="STANDALONE" default="true" />
 
-  <arg     if="$(arg standalone)" name="nodelet" value="standalone"/>
-  <arg unless="$(arg standalone)" name="nodelet" value="load"/>
-  <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
-  <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg uav_name)_nodelet_manager"/>
+  <arg     if="$(arg STANDALONE)" name="nodelet" value="standaloner"/>
+  <arg unless="$(arg STANDALONE)" name="nodelet" value="load"/>
+  <arg     if="$(arg STANDALONE)" name="nodelet_manager" value=""/>
+  <arg unless="$(arg STANDALONE)" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
 
-  <group ns="$(arg uav_name)">
+  <group ns="$(arg UAV_NAME)">
 
     <!-- Constraint Manager -->
     <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen">
@@ -24,7 +24,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
 
-      <param name="enable_profiler" type="bool" value="$(arg profiler)" />
+      <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
 
       <!-- Subscribers -->
       <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
