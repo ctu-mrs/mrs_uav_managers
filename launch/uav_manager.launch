@@ -1,12 +1,17 @@
 <launch>
 
-  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
-  <arg name="PROPULSION_TYPE" default="$(optenv PROPULSION_TYPE)" />
+  <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
+  <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+  <arg name="PROPULSION_TYPE" default="$(env PROPULSION_TYPE)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME uav)" />
-  <arg name="UAV_MASS" default="$(optenv UAV_MASS default)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="STANDALONE" default="true" />
+  <arg name="DEBUG" default="false" />
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.3" />
+  <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
   <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
@@ -17,10 +22,13 @@
   <arg     if="$(arg STANDALONE)" name="nodelet_manager" value=""/>
   <arg unless="$(arg STANDALONE)" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
 
+  <arg     if="$(eval arg('DEBUG') and arg('STANDALONE'))" name="launch_prefix" value="debug_roslaunch"/>
+  <arg unless="$(eval arg('DEBUG') and arg('STANDALONE'))" name="launch_prefix" value=""/>
+
   <group ns="$(arg UAV_NAME)">
 
     <!-- UAV manager -->
-    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
       <rosparam file="$(find mrs_uav_manager)/config/default/uav_manager.yaml" />
