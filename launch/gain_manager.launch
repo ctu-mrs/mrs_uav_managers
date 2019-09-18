@@ -7,14 +7,13 @@
   <arg name="STANDALONE" default="true" />
   <arg name="DEBUG" default="false" />
 
-  <arg     if="$(arg STANDALONE)" name="nodelet" value="standalone"/>
-  <arg unless="$(arg STANDALONE)" name="nodelet" value="load"/>
-  <arg     if="$(arg STANDALONE)" name="nodelet_manager" value=""/>
-  <arg unless="$(arg STANDALONE)" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
+  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="standalone"/>
+  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="load"/>
+  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value=""/>
+  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
 
-  <arg     if="$(eval arg('DEBUG') and arg('STANDALONE'))" name="launch_prefix" value="debug_roslaunch"/>
-  <arg unless="$(eval arg('DEBUG') and arg('STANDALONE'))" name="launch_prefix" value=""/>
-
+  <arg     if="$(arg DEBUG)" name="launch_prefix" value="debug_roslaunch"/>
+  <arg unless="$(arg DEBUG)" name="launch_prefix" value=""/>
 
   <group ns="$(arg UAV_NAME)">
 
@@ -25,7 +24,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gain_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gains.yaml" />
 
-      <!-- Load the particular param files -->
+        <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
 
