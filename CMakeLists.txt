@@ -11,7 +11,6 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   mrs_msgs
   mrs_lib
-  tf
   cmake_modules
   nodelet
   )

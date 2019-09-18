@@ -8,6 +8,11 @@ MpcController:
   eland_threshold: 2.5
   failsafe_threshold: 4.0
 
+AccelerationController:
+  address: "mrs_controllers/AccelerationController"
+  eland_threshold: 0.0
+  failsafe_threshold: 0.0
+
 FailsafeController:
   address: "mrs_controllers/FailsafeController"
   eland_threshold: 0.0

@@ -102,7 +102,7 @@ darpa:
       speed: 0.5
       acceleration: 0.5
       jerk: 1.0
-      snap: 1.0
+      snap: 10.0
 
   yaw:
     speed: 0.5

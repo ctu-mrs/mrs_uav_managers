@@ -11,10 +11,11 @@
 #include <mrs_msgs/Vec1.h>
 #include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/String.h>
-#include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/BoolStamped.h>
+#include <mrs_msgs/LandoffDiagnostics.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
@@ -47,7 +48,7 @@ typedef enum
 
 const char *state_names[4] = {
 
-    "IDLING", "FLYING HOME", "LANDING", "EMERGANCY LANDING"};
+    "IDLING", "FLYING HOME", "LANDING", "emergency LANDING"};
 
 class UavManager : public nodelet::Nodelet {
 
@@ -62,7 +63,7 @@ public:
   bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg);
+  void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
   void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
@@ -103,6 +104,13 @@ private:
   bool            got_height = false;
 
 private:
+  void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg);
+  ros::Subscriber              subscriber_landoff_diagnostics;
+  mrs_msgs::LandoffDiagnostics landoff_diagnostics;
+  std::mutex                   mutex_landoff_diagnostics;
+  bool                         got_landoff_diagnostics = false;
+
+private:
   ros::Subscriber       subscriber_motors;
   mrs_msgs::BoolStamped motors;
   std::mutex            mutex_motors;
@@ -112,19 +120,19 @@ private:
 private:
   ros::Subscriber subscriber_gains;
   ros::Time       gains_last_time;
-  bool            gain_manager_required_;
+  bool            gain_manager_required_ = false;
 
   // checking whether the constraints are being set by the constraint manager
 private:
   ros::Subscriber subscriber_constraints;
   ros::Time       constraints_last_time;
-  bool            constraint_manager_required_;
+  bool            constraint_manager_required_ = false;
 
 private:
-  ros::Subscriber         subscriber_tracker_status;
-  bool                    got_tracker_status = false;
-  mrs_msgs::TrackerStatus tracker_status;
-  std::mutex              mutex_tracker_status;
+  ros::Subscriber                     subscriber_control_manager_diagnostics;
+  bool                                got_control_manager_diagnostics = false;
+  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics;
+  std::mutex                          mutex_control_manager_diagnostics;
 
 private:
   ros::Subscriber             subscriber_target_attitude;
@@ -158,6 +166,7 @@ private:
   ros::ServiceClient service_client_enabled_callbacks;
   ros::ServiceClient service_client_emergency_goto;
   ros::ServiceClient service_client_arm;
+  ros::ServiceClient service_client_pirouette;
 
   std::mutex mutex_services;
 
@@ -175,24 +184,25 @@ private:
 private:
   ros::Timer  takeoff_timer;
   double      takeoff_timer_rate_;
-  bool        takingoff          = false;
-  int         number_of_takeoffs = 0;
+  bool        takingoff           = false;
+  int         number_of_takeoffs  = 0;
+  bool        waiting_for_takeoff = false;
   std::string after_takeoff_tracker_name_;
   std::string after_takeoff_controller_name_;
   std::string takeoff_tracker_name_;
   std::string takeoff_controller_name_;
+  bool        after_takeoff_pirouette_ = false;
 
 private:
   ros::Timer  landing_timer;
   std::string landing_tracker_name_;
-  double      landing_cutoff_height_;
   double      landing_cutoff_mass_factor_;
   double      landing_timer_rate_;
   bool        landing = false;
   double      uav_mass_;
   double      g_;
   double      landing_uav_mass_;
-  bool        landing_disarm_;
+  bool        landing_disarm_ = false;
   double      hover_thrust_a_;
   double      hover_thrust_b_;
 
@@ -209,13 +219,13 @@ private:
   ros::Timer flighttime_timer;
   double     flighttime_timer_rate_;
   double     flighttime_max_time;
-  bool       flighttime_timer_enabled_;
-  double     flighttime = 0;
+  bool       flighttime_timer_enabled_ = false;
+  double     flighttime                = 0;
   std::mutex mutex_flightime_timer;
 
 private:
   ros::Timer maxthrust_timer;
-  bool       maxthrust_timer_enabled_;
+  bool       maxthrust_timer_enabled_ = false;
   double     maxthrust_timer_rate_;
   double     maxthrust_max_thrust_;
 
@@ -267,13 +277,16 @@ void UavManager::onInit() {
   ROS_INFO("[UavManager]: initializing");
 
   subscriber_odometry         = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_tracker_status   = nh_.subscribe("tracker_status_in", 1, &UavManager::callbackTrackerStatus, this, ros::TransportHints().tcpNoDelay());
   subscriber_target_attitude  = nh_.subscribe("target_attitude_in", 1, &UavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_command = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_height           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_motors           = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
+  subscriber_landoff_diagnostics =
+      nh_.subscribe("landoff_diagnostics_in", 1, &UavManager::callbackLandoffDiagnostics, this, ros::TransportHints().tcpNoDelay());
+  subscriber_control_manager_diagnostics =
+      nh_.subscribe("control_manager_diagnostics_in", 1, &UavManager::callbackControlManagerDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
   subscriber_gains = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
   gains_last_time  = ros::Time(0);
@@ -294,6 +307,7 @@ void UavManager::onInit() {
   service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
   service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
+  service_client_pirouette         = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
@@ -304,6 +318,7 @@ void UavManager::onInit() {
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
   param_loader.load_param("takeoff/after_takeoff/tracker", after_takeoff_tracker_name_);
   param_loader.load_param("takeoff/after_takeoff/controller", after_takeoff_controller_name_);
+  param_loader.load_param("takeoff/after_takeoff/pirouette", after_takeoff_pirouette_);
   param_loader.load_param("takeoff/during_takeoff/tracker", takeoff_tracker_name_);
   param_loader.load_param("takeoff/during_takeoff/controller", takeoff_controller_name_);
   param_loader.load_param("takeoff/takeoff_height", takeoff_height_);
@@ -311,7 +326,6 @@ void UavManager::onInit() {
 
   param_loader.load_param("landing/rate", landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
-  param_loader.load_param("landing/landing_cutoff_height", landing_cutoff_height_);
   param_loader.load_param("landing/landing_cutoff_mass_factor", landing_cutoff_mass_factor_);
   param_loader.load_param("landing/disarm", landing_disarm_);
 
@@ -400,8 +414,10 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
       temp_odom_y = odometry_y;
     }
 
+    // TODO: paremetrize the radius
     if (sqrt(pow(temp_odom_x - takeoff_x, 2) + pow(temp_odom_y - takeoff_y, 2)) < 0.5) {
 
+      // TODO: parametrize the timeout
       ros::Duration wait(5.0);
       wait.sleep();
 
@@ -409,20 +425,35 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
       mrs_msgs::String switch_tracker_out;
       switch_tracker_out.request.value = landing_tracker_name_;
-      service_client_switch_tracker.call(switch_tracker_out);
+      if (!service_client_switch_tracker.call(switch_tracker_out)) {
+        ROS_ERROR("[UavManager]: service call for switching to tracker %s failed", landing_tracker_name_.c_str());
+        changeLandingState(LANDING_STATE);
+      }
 
-      std_srvs::Trigger land_out;
       if (switch_tracker_out.response.success == true) {
 
-        service_client_land.call(land_out);
+        std_srvs::Trigger land_out;
+        if (service_client_land.call(land_out)) {
 
-        ros::Duration wait(1.0);
-        wait.sleep();
+          if (land_out.response.success) {
 
-        changeLandingState(LANDING_STATE);
+            changeLandingState(LANDING_STATE);
+
+          } else {
+
+            ROS_ERROR("[UavManager]: service call for landing was unsuccessful: %s", land_out.response.message.c_str());
+            changeLandingState(IDLE_STATE);
+          }
+
+        } else {
+
+          ROS_ERROR("[UavManager]: service call for landing failed");
+          changeLandingState(IDLE_STATE);
+        }
 
       } else {
 
+        ROS_ERROR("[UavManager]: could not switch to tracker %s: %s", landing_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
         changeLandingState(IDLE_STATE);
       }
     }
@@ -430,7 +461,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
   } else if (current_state_landing == LANDING_STATE) {
 
 
-    if (landing_tracker_name_.compare(tracker_status.tracker) == 0) {
+    if (landing_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) == 0) {
 
       {
         std::scoped_lock lock(mutex_height);
@@ -440,7 +471,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
         ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
         // condition for automatic motor turn off
-        if ((height < landing_cutoff_height_) && ((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
+        if (((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
 
           if (current_state_landing == LANDING_STATE) {
 
@@ -465,7 +496,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
             ROS_INFO("[UavManager]: landing finished");
 
-          } else {  // emergancy landing
+          } else {  // emergency landing
 
             std_srvs::SetBool arm_out;
             arm_out.request.data = false;
@@ -477,7 +508,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
             changeLandingState(IDLE_STATE);
 
-            ROS_WARN("[UavManager]: emergancy landing finished");
+            ROS_WARN("[UavManager]: emergency landing finished");
           }
 
           landing_timer.stop();
@@ -502,11 +533,25 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("takeoffTimer", takeoff_timer_rate_, 0.004, event);
 
+  if (waiting_for_takeoff) {
+
+    std::scoped_lock lock(mutex_landoff_diagnostics);
+
+    if (landoff_diagnostics.taking_off) {
+
+      waiting_for_takeoff = false;
+    } else {
+
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from LandoffTracker");
+      return;
+    }
+  }
+
   if (takingoff) {
     {
-      std::scoped_lock lock(mutex_odometry);
+      std::scoped_lock lock(mutex_odometry, mutex_landoff_diagnostics);
 
-      if (fabs(takeoff_height_ - odometry_z) < 0.2) {
+      if (!landoff_diagnostics.taking_off) {
 
         ROS_INFO("[UavManager]: take off finished, switching to %s", after_takeoff_tracker_name_.c_str());
 
@@ -539,6 +584,21 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
         } else {
 
           ROS_ERROR("[UavManager]: could not switch to %s: %s", after_takeoff_controller_name_.c_str(), switch_controller_out.response.message.c_str());
+        }
+
+        if (after_takeoff_pirouette_) {
+
+          std_srvs::Trigger pirouette_out;
+          service_client_pirouette.call(pirouette_out);
+
+          if (pirouette_out.response.success == true) {
+
+            ROS_INFO("[UavManager]: initiated after takeoff pirouette");
+
+          } else {
+
+            ROS_INFO("[UavManager]: pirouette not successfull: %s", pirouette_out.response.message.c_str());
+          }
         }
 
         takeoff_timer.stop();
@@ -715,19 +775,19 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
 
 /* //{ callbackTrackerStatus() */
 
-void UavManager::callbackTrackerStatus(const mrs_msgs::TrackerStatusConstPtr &msg) {
+void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg) {
 
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTrackerStatus");
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControlManagerDiagnostics");
 
   {
-    std::scoped_lock lock(mutex_tracker_status);
-    tracker_status = *msg;
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
+    control_manager_diagnostics = *msg;
   }
 
-  got_tracker_status = true;
+  got_control_manager_diagnostics = true;
 }
 
 //}
@@ -742,7 +802,7 @@ void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackTargetAttitude");
 
   {
-    std::scoped_lock lock(mutex_tracker_status);
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
     target_attitude = *msg;
   }
 
@@ -904,6 +964,25 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
 
 //}
 
+/* //{ callbackLandoffDiagnostics() */
+
+void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackLandoffDiagnostics");
+
+  {
+    std::scoped_lock lock(mutex_landoff_diagnostics);
+    landoff_diagnostics = *msg;
+  }
+
+  got_landoff_diagnostics = true;
+}
+
+//}
+
 // | -------------------- service callbacks ------------------- |
 
 /* //{ callbackTakeoff() */
@@ -951,8 +1030,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     }
   }
 
-  if (!got_tracker_status) {
-    sprintf((char *)&message, "Can't takeoff, missing tracker status!");
+  if (!got_control_manager_diagnostics) {
+    sprintf((char *)&message, "Can't takeoff, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -983,15 +1062,15 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     return true;
   }
 
-  if (odometry_z > ground_limit_height_) {
-    sprintf((char *)&message, "Can't takeoff, already in the air!");
+  if (!got_landoff_diagnostics) {
+    sprintf((char *)&message, "Can't takeoff, missing landoff diagnostics");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
-  if (null_tracker_name_.compare(tracker_status.tracker) != 0) {
+  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0) {
     sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
     res.message = message;
     res.success = false;
@@ -1052,13 +1131,13 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
   ROS_INFO("[UavManager]: taking off");
 
-  mrs_msgs::String switch_tracker_out;
-  switch_tracker_out.request.value = takeoff_tracker_name_;
-  service_client_switch_tracker.call(switch_tracker_out);
-
   mrs_msgs::String switch_controller_out;
   switch_controller_out.request.value = takeoff_controller_name_;
   service_client_switch_controller.call(switch_controller_out);
+
+  mrs_msgs::String switch_tracker_out;
+  switch_tracker_out.request.value = takeoff_tracker_name_;
+  service_client_switch_tracker.call(switch_tracker_out);
 
   mrs_msgs::Vec1 takeoff_out;
   takeoff_out.request.goal = takeoff_height_;
@@ -1102,6 +1181,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
       takingoff = true;
       number_of_takeoffs++;
+      waiting_for_takeoff = true;
 
       takeoff_timer.start();
     }
@@ -1150,8 +1230,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
     return true;
   }
 
-  if (!got_tracker_status) {
-    sprintf((char *)&message, "Can't land, missing tracker status!");
+  if (!got_control_manager_diagnostics) {
+    sprintf((char *)&message, "Can't land, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1172,28 +1252,58 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
 
   mrs_msgs::String switch_tracker_out;
   switch_tracker_out.request.value = landing_tracker_name_;
-  service_client_switch_tracker.call(switch_tracker_out);
+  if (!service_client_switch_tracker.call(switch_tracker_out)) {
+    sprintf((char *)&message, "Service call for switching to tracker %s failed.", landing_tracker_name_.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
 
-  std_srvs::Trigger land_out;
   if (switch_tracker_out.response.success == true) {
 
-    service_client_land.call(land_out);
+    std_srvs::Trigger land_out;
+    if (service_client_land.call(land_out)) {
 
-    res.success = land_out.response.success;
-    res.message = land_out.response.message;
+      if (land_out.response.success) {
 
-    ros::Duration wait(1.0);
-    wait.sleep();
+        res.success = land_out.response.success;
+        res.message = land_out.response.message;
 
-    changeLandingState(LANDING_STATE);
+        changeLandingState(LANDING_STATE);
 
-    landing_timer.start();
+        landing_timer.start();
+
+      } else {
+
+        sprintf((char *)&message, "Service call for landing was not successfull: %s", land_out.response.message.c_str());
+        res.message = message;
+        res.success = false;
+        ROS_ERROR("[UavManager]: %s", message);
+
+        ROS_INFO("[UavManager]: switching back to NullTracker");
+        switch_tracker_out.request.value = null_tracker_name_;
+        service_client_switch_tracker.call(switch_tracker_out);
+
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[UavManager]: service call for landing failed");
+      res.success = false;
+      res.message = "service call for landing failed";
+
+      ROS_INFO("[UavManager]: switching back to NullTracker");
+      switch_tracker_out.request.value = null_tracker_name_;
+      service_client_switch_tracker.call(switch_tracker_out);
+    }
 
   } else {
 
+    ROS_ERROR("[UavManager]: could not switch to tracker %s: %s", landing_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
     res.success = switch_tracker_out.response.success;
     res.message = switch_tracker_out.response.message;
-    changeLandingState(IDLE_STATE);
   }
 
   return true;
@@ -1218,7 +1328,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
     return true;
   }
 
-  if (!got_tracker_status) {
+  if (!got_control_manager_diagnostics) {
     sprintf((char *)&message, "Can't land, missing tracker status!");
     res.message = message;
     res.success = false;

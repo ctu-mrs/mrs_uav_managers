@@ -1,17 +1,14 @@
 # - list of names of dynamically loaded trackers
 trackers : [
   "MpcTracker",
-  "LineTracker",
   "LandoffTracker",
   "NullTracker",
 ]
 
 # - list of names of dynamically loaded controllers
 controllers : [
-  "So3Controller",
   "MpcController",
   "FailsafeController",
-  "AttitudeController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -21,7 +18,7 @@ status_timer_rate:  10 # [Hz]
 
 safety:
 
-  min_thrust_null_tracker: 0.12 # [] minimum thrust when not flying
+  min_thrust_null_tracker: 0.0 # [] minimum thrust when not flying
 
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
@@ -40,7 +37,7 @@ safety:
   eland_controller: "MpcController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 0.5 # [s]
+  odometry_max_missing_time: 1.0 # [s]
 
   elanding_timer_rate: 10
   elanding_cutoff_height:  1.0
@@ -48,7 +45,7 @@ safety:
 
   tilt_error_failsafe:
 
-    enabled: false
+    enabled: true
     tilt_error_threshold: 40 # [deg]
     min_height: 0.5 # [m]
 
@@ -61,11 +58,11 @@ safety:
 
 obstacle_bumper:
 
-  enabled: false
+  enabled: true
   timer_rate: 20 # [Hz]
 
   horizontal_distance: 1.0 # [m]
-  vertical_distance: 1.0 # [m]
+  vertical_distance: 0.5 # [m]
 
   obstacle_hugging:
 
@@ -79,12 +76,12 @@ obstacle_bumper:
     horizontal_distance: 1.0 # [m]
     horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
 
-    vertical_distance: 1.0 # [m]
+    vertical_distance: 0.5 # [m]
     vertical_offset: 0.1 # [m]
 
 automatic_pc_shutdown:
 
-  enabled: false
+  enabled: true
   distance_threshold: 5 # [m]
 
 joystick:
@@ -159,7 +156,7 @@ rc_joystick:
   timeout: 2.0 # [s]
   n_switches: 4 # [-]
 
-  carrot_distance: 0.25 # [m]
+  carrot_distance: 1.0 # [m]
 
   channels:
     pitch: 2

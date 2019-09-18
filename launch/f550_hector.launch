@@ -2,6 +2,8 @@
 
   <arg name="uav_name" default="$(optenv UAV_NAME uav)" />
   <arg name="uav_mass" default="$(optenv UAV_MASS default)" />
+  <arg name="body_disturbance_x" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
+  <arg name="body_disturbance_y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="profiler" default="$(optenv PROFILER false)" />
   <arg name="standalone" default="$(optenv STANDALONE false)" />
   <arg name="world_file" default="$(find mrs_general)/config/world_darpa.yaml" />
@@ -18,7 +20,7 @@
   <include file="$(find mrs_general)/launch/nodelet_manager.launch" />
 
   <!-- Odometry -->
-  <include file="$(find mrs_odometry)/launch/f550_hector.launch" >
+  <include file="$(find mrs_odometry)/launch/uav/hector.launch" >
     <arg name="debug" value="$(arg debug)"/>
   </include>
 
@@ -38,14 +40,15 @@
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
-      <remap from="~tracker_status_in" to="control_manager/tracker_status" />
-      <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~target_attitude_in" to="mavros/setpoint_raw/attitude" />
       <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gains_in" to="gain_manager/current_gains" />
       <remap from="~constraints_in" to="constraint_manager/current_constraints" />
+      <remap from="~landoff_diagnostics_in" to="control_manager/landoff_tracker/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
@@ -65,6 +68,7 @@
       <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
+      <remap from="~pirouette_out" to="control_manager/pirouette" />
 
     </node>
 
@@ -80,6 +84,8 @@
       <param name="uav_name" type="string" value="$(arg uav_name)" />
       <param name="g" value="$(arg g)" />
       <param name="uav_mass" value="$(arg uav_mass)" />
+      <param name="body_disturbance_x" value="$(arg body_disturbance_x)" />
+      <param name="body_disturbance_y" value="$(arg body_disturbance_y)" />
 
       <!-- Controller's configs -->
 
@@ -146,6 +152,7 @@
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
       <remap from="~landoff_tracker/eland_in" to="~landoff_tracker/eland" />
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
+      <remap from="~landoff_tracker/diagnostics_out" to="~landoff_tracker/diagnostics" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/uav/f550/mpc_tracker.yaml" />
@@ -185,15 +192,15 @@
 
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
-      <remap from="~tracker_status_out" to="~tracker_status" />
-      <remap from="~controller_status_out" to="~controller_status" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
       <remap from="~thrust_force_out" to="~thrust_force" />
-      <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
+      <remap from="~target_attitude_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
+      <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
@@ -215,6 +222,7 @@
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
       <remap from="~rc_in" to="mavros/rc/in" />
       <remap from="~shutdown_out" to="automatic_start_darpa/shutdown" />
+      <remap from="~pirouette_in" to="~pirouette" />
 
     </node>
 
@@ -226,7 +234,7 @@
       <param name="enable_profiler" type="bool" value="$(arg profiler)" />
 
       <!-- Subscribers -->
-      <remap from="~controller_status_in" to="control_manager/controller_status" />
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
 
       <!-- Services -->

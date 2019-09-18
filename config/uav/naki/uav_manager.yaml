@@ -23,6 +23,8 @@ takeoff:
     tracker: "MpcTracker"
     controller: "MpcController"
 
+    pirouette: false
+
   takeoff_height: 2.0
 
   ground_limit_height: 1.0 # under which height the takeoff can happen
@@ -33,7 +35,6 @@ landing:
   landing_tracker: "LandoffTracker"
 
   # those two must apply simultaneously
-  landing_cutoff_height:  0.5
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
 
   disarm: true
