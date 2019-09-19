@@ -22,11 +22,11 @@ supersoft:
 
     attitude:
       kq: 1.0
-      kw: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
-    km_lim: 5.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
 
 soft:
 
@@ -51,12 +51,12 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 4.0
-      kw: 1.0
+      kq: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
-    km_lim: 5.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
 
 tight:
 
@@ -81,9 +81,9 @@ tight:
     ka: 1.0
 
     attitude:
-      kq: 8.0
-      kw: 1.0
+      kq: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
-    km_lim: 5.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]

@@ -22,7 +22,7 @@ supersoft:
 
     attitude:
       kq: 1.0
-      kw: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
@@ -39,10 +39,10 @@ soft:
       kq: 8.0
       kw: 0.0
 
-    kib: 0.2
+    kib: 0.1
     kib_lim: 10.0
 
-    kiw: 0.2
+    kiw: 0.1
     kiw_lim: 10.0
 
   vertical:
@@ -51,8 +51,8 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 4.0
-      kw: 2.0
+      kq: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
@@ -81,8 +81,8 @@ tight:
     ka: 1.0
 
     attitude:
-      kq: 8.0
-      kw: 2.0
+      kq: 1.0
+      kw: 0.1
 
   weight_estimator:
     km: 1.0
