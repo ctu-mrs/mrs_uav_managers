@@ -6,6 +6,7 @@
   <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
   <arg name="STANDALONE" default="true" />
   <arg name="DEBUG" default="false" />
+  <arg name="CONFIG" default="" />
 
   <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="standalone"/>
   <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="load"/>
@@ -27,6 +28,7 @@
       <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
+      <rosparam if="$(eval not arg('CONFIG') == '')" file="$(arg CONFIG)" />
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
 
