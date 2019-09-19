@@ -1,20 +1,23 @@
 <launch>
 
+  <!-- args corresponding to environment variables -->
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
   <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
-  <arg name="STANDALONE" default="true" />
-  <arg name="DEBUG" default="false" />
+
+    <!-- other args -->
+  <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
+  <arg name="standalone" default="true" />
 
-  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="standalone"/>
-  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="load"/>
-  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value=""/>
-  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
 
-  <arg     if="$(arg DEBUG)" name="launch_prefix" value="debug_roslaunch"/>
-  <arg unless="$(arg DEBUG)" name="launch_prefix" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
 
   <group ns="$(arg UAV_NAME)">
 
@@ -25,7 +28,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraint_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraints.yaml" />
 
-      <!-- Load the particular param files -->
+        <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
 
