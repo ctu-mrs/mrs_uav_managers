@@ -1,0 +1,52 @@
+<launch>
+
+  <arg name="PROFILER" default="$(optenv PROFILER false)" />
+  <arg name="UAV_NAME" default="$(env UAV_NAME)" />
+  <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
+  <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+  <arg name="STANDALONE" default="true" />
+  <arg name="DEBUG" default="false" />
+  <arg name="custom_config" default="" />
+
+  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="standalone"/>
+  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet" value="load"/>
+  <arg     if="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value=""/>
+  <arg unless="$(eval arg('STANDALONE') or arg('DEBUG'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager"/>
+
+  <arg     if="$(arg DEBUG)" name="launch_prefix" value="debug_roslaunch"/>
+  <arg unless="$(arg DEBUG)" name="launch_prefix" value=""/>
+
+  <group ns="$(arg UAV_NAME)">
+
+    <!-- Constraint Manager -->
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+
+      <!-- Load the default param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraints.yaml" />
+
+      <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
+
+      <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
+
+      <!-- Subscribers -->
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+
+      <!-- Services -->
+      <remap from="~set_constraints_in" to="~set_constraints" />
+      <remap from="~set_constraints_out" to="control_manager/set_constraints" />
+
+      <!-- Publishers -->
+      <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~profiler" to="profiler" />
+
+    </node>
+
+  </group>
+
+</launch>

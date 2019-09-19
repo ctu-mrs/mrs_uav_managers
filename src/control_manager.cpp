@@ -492,7 +492,6 @@ private:
   LandingStates_t previous_state_landing = IDLE_STATE;
   void            changeLandingState(LandingStates_t new_state);
   double          uav_mass_;
-  double          elanding_cutoff_height_;
   double          elanding_cutoff_mass_factor_;
   double          landing_uav_mass_ = 0;
 
@@ -572,7 +571,6 @@ void ControlManager::onInit() {
   param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
   param_loader.load_param("g", g_);
 
-  param_loader.load_param("safety/elanding_cutoff_height", elanding_cutoff_height_);
   param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
 
   param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
@@ -779,7 +777,7 @@ void ControlManager::onInit() {
       it = controllers_.find(controller_names[i]);
 
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
-      controller_list[i]->initialize(nh_, motor_params_);
+      controller_list[i]->initialize(nh_, motor_params_, uav_mass_, g_);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
@@ -1759,7 +1757,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
     ROS_INFO("[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
     // condition for automatic motor turn off
-    if ((odometry_z < elanding_cutoff_height_) && ((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
+    if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
 
       // enable callbacks? ... NO
 
@@ -2335,11 +2333,11 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
+
   std::scoped_lock lock(mutex_joystick);
 
   joystick_data = *msg;
-
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
 
   // | ---- switching back to fallback tracker and controller --- |
 
@@ -2454,6 +2452,8 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackBumper");
 
   ROS_INFO_ONCE("[ControlManager]: getting bumper data");
 
@@ -5078,6 +5078,8 @@ bool ControlManager::failsafe() {
 }
 
 //}
+
+// | ------------------------ routines ------------------------ |
 
 /* arming() //{ */
 

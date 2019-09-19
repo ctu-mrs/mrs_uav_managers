@@ -1,0 +1,43 @@
+# - list of names of dynamically loaded trackers
+trackers : [
+  "MpcTracker",
+  "LineTracker",
+  "LandoffTracker",
+  "JoyTracker",
+  "MatlabTracker",
+  "NullTracker",
+  "JoyBumperTracker",
+]
+
+# - list of names of dynamically loaded controllers
+controllers : [
+  "So3Controller",
+  "MpcController",
+  "NsfController",
+  "AttitudeController",
+  "AccelerationController",
+  "FailsafeController",
+]
+
+safety:
+
+  tilt_limit_eland: 60 # [deg]
+  tilt_limit_disarm: 90 # [deg]
+
+  # tracker used for emergency hover routine
+  ehover_tracker: "LandoffTracker"
+
+  # controller used for safety landing (feed forward)
+  failsafe_controller: "FailsafeController"
+
+  # controller used for emergency (controller) landing
+  eland_controller: "MpcController"
+
+  # after not receiving odometry for more than this, the failsafe landing will trigger
+  odometry_max_missing_time: 1.0 # [s]
+
+  tilt_error_failsafe:
+
+    enabled: false
+    tilt_error_threshold: 30 # [deg]
+    min_height: 0.5 # [m]

@@ -1,0 +1,51 @@
+null_tracker: "NullTracker"
+
+# require gain or constraint manager running to takeoff?
+require_gain_manager: true
+require_constraint_manager: true
+
+# periodically checks if max height was exceeded
+# if so, retakes control and descends below it
+max_height_checking:
+
+  rate: 10 # [Hz]
+  safety_height_offset: 0.5 # how much lower to descend bellow the max height
+
+takeoff:
+
+  rate: 10 # [Hz]
+
+  during_takeoff:
+    tracker: "LandoffTracker"
+    controller: "MpcController"
+
+  after_takeoff:
+    tracker: "MpcTracker"
+    controller: "MpcController"
+
+    pirouette: false
+
+  takeoff_height: 1.0
+
+landing:
+
+  rate: 10 # [Hz]
+  landing_tracker: "LandoffTracker"
+
+  # those two must apply simultaneously
+  landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
+
+  disarm: true
+
+flight_timer:
+
+  enabled: false
+  rate: 1 # [Hz]
+  max_time: 10 # [s]
+
+# detecting if desired thrust cross max threshold, triggers landing after that
+max_thrust:
+
+  enabled: false
+  rate: 30 # [Hz]
+  max_thrust: 0.85 # [-]

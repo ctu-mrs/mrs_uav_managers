@@ -478,6 +478,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     } else {
       if (setGains(it->second)) {
         last_estimator_type = odometry_diagnostics.estimator_type.type;
+        ROS_INFO_THROTTLE(1.0, "[GainManager]: gains updated!");
       } else {
         ROS_ERROR_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
       }
