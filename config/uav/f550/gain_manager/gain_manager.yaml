@@ -11,12 +11,12 @@ gain_management:
   allowed_gains:
     BRICKFLOW: ["supersoft", "soft"]
     BRICK: ["supersoft", "soft"]
-    T265: ["supersoft", "soft", "tight"]
+    T265: ["supersoft"]
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     ICP: ["supersoft"]
     RTK: ["supersoft", "soft", "tight"]
-    OPTFLOWGPS: ["supersoft"]
+    OPTFLOWGPS: ["supersoft", "soft", "tight"]
     GPS: ["supersoft", "soft", "tight"]
     OPTFLOW: ["supersoft", "soft", "optflow"]
     OTHER: ["supersoft"]
@@ -31,9 +31,9 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
-    RTK: "tight"
-    OPTFLOWGPS: "supersoft"
-    GPS: "tight"
+    RTK: "soft"
+    OPTFLOWGPS: "soft"
+    GPS: "soft"
     OPTFLOW: "optflow"
     HECTOR: "supersoft"
     OTHER: "supersoft"
