@@ -18,6 +18,9 @@ controllers : [
 # - this is the "do nothing tracker", which is active when no other is
 null_tracker: "NullTracker"
 
+# tracker used for landing and takeoff
+landing_takeoff_tracker: "LandoffTracker"
+
 status_timer_rate:  10 # [Hz]
 
 safety:
@@ -50,7 +53,6 @@ safety:
 
     enabled: false
     tilt_error_threshold: 30 # [deg]
-    min_height: 0.5 # [m]
 
   rc_eland:
 
