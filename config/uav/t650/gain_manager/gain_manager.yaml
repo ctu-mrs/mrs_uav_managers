@@ -30,7 +30,7 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     ICP: "supersoft"
-    RTK: "tight"
+    RTK: "soft"
     OPTFLOWGPS: "supersoft"
     GPS: "soft"
     OPTFLOW: "soft"

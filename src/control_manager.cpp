@@ -149,6 +149,7 @@ private:
 
   std::string null_tracker_name_;
   std::string ehover_tracker_name_;
+  std::string landoff_tracker_name_;
 
   bool        joystick_enabled_ = false;
   std::string joystick_tracker_name_;
@@ -195,6 +196,7 @@ private:
   int active_tracker_idx               = 0;
   int active_controller_idx            = 0;
   int ehover_tracker_idx               = 0;
+  int landoff_tracker_idx              = 0;
   int joystick_tracker_idx             = 0;
   int joystick_controller_idx          = 0;
   int failsafe_controller_idx          = 0;
@@ -310,7 +312,6 @@ private:
 private:
   bool       tilt_error_failsafe_enabled_ = false;
   double     tilt_error_threshold_;
-  double     tilt_error_failsafe_min_height_;
   double     tilt_error;
   double     position_error_x_, position_error_y_, position_error_z_;
   double     velocity_error_x_, velocity_error_y_, velocity_error_z_;
@@ -577,7 +578,6 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
-  param_loader.load_param("safety/tilt_error_failsafe/min_height", tilt_error_failsafe_min_height_);
   tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
@@ -673,6 +673,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("trackers", tracker_names);
   param_loader.load_param("null_tracker", null_tracker_name_);
+  param_loader.load_param("landing_takeoff_tracker", landoff_tracker_name_);
 
   tracker_loader = new pluginlib::ClassLoader<mrs_uav_manager::Tracker>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
@@ -838,6 +839,27 @@ void ControlManager::onInit() {
   }
   if (!eland_controller_check) {
     ROS_ERROR("[ControlManager]: the eland controller (%s) is not within the loaded controllers", eland_controller_name_.c_str());
+    ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
+  // |           check the existance of landoff tracker           |
+  // --------------------------------------------------------------
+
+  // check if the landoff_tracker is within the loaded trackers
+  bool landoff_tracker_check = false;
+  for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+    std::string tracker_name = tracker_names[i];
+
+    if (tracker_name.compare(landoff_tracker_name_) == 0) {
+      landoff_tracker_check = true;
+      landoff_tracker_idx   = i;
+      break;
+    }
+  }
+  if (!landoff_tracker_check) {
+    ROS_ERROR("[ControlManager]: the landoff tracker (%s) is not within the loaded trackers", landoff_tracker_name_.c_str());
     ros::shutdown();
   }
 
@@ -1697,8 +1719,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list, mutex_controller_tracker_switch_time);
 
-    if (tilt_error_failsafe_enabled_ &&
-        odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
+    if (tilt_error_failsafe_enabled_) {
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
@@ -2083,11 +2104,16 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("bumperTimer", bumper_timer_rate_, 0.01, event);
 
-  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
   }
 
-  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
+  // do not use the bumper, unless with non-special tracker
+  if (active_tracker_idx == ehover_tracker_idx || active_tracker_idx == null_tracker_idx || active_tracker_idx == landoff_tracker_idx) {
+    return;
+  }
+
+  if (!got_odometry) {
     return;
   }
 
@@ -2095,22 +2121,9 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  // TODO: odometry_z is not the height above the ground
-  {
-    std::scoped_lock lock(mutex_odometry);
-
-    if (odometry_z < 0.5) {
-
-      ROS_WARN_THROTTLE(0.5, "[ControlManager]: not using bumper repulsion, height < 0.5 m");
-      return;
-    }
-  }
-
   // --------------------------------------------------------------
   // |                      bumper repulsion                      |
   // --------------------------------------------------------------
-
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumperTimer spinning");
 
   bumperPushFromObstacle();
 }
@@ -4660,7 +4673,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
-  std::scoped_lock lock(mutex_odometry);  // TODO check if it can be here
+  std::scoped_lock lock(mutex_odometry);
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
