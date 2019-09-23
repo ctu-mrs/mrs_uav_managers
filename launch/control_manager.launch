@@ -77,6 +77,7 @@
       <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc.yaml" />
       <param name="mpc_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~mpc_controller/profiler" to="profiler" />
+      <remap from="~mpc_controller/set_integral_terms_in" to="~mpc_controller/set_integral_terms" />
 
       <!-- Acceleration Controller -->
       <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/default/acceleration.yaml" />
