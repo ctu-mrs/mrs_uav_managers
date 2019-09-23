@@ -24,6 +24,6 @@ FailsafeController:
   failsafe_threshold: 0.0
 
 NsfController:
-  address: "mrs_controllers/FailsafeController"
+  address: "mrs_controllers/NsfController"
   eland_threshold: 1.5
   failsafe_threshold: 3.0
