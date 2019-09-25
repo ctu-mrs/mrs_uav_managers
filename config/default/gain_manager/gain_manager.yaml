@@ -1,12 +1,13 @@
 rate: 25
 
 estimator_types: [
+  "VSLAM",
   "BRICKFLOW",
   "HECTOR",
   "T265",
   "BRICK",
   "VIO",
-  "ICP",
+  "LIDAR",
   "RTK",
   "OPTFLOWGPS",
   "GPS",
@@ -22,12 +23,13 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
+    VSLAM: ["default"]
     BRICKFLOW: ["default"]
     HECTOR: ["default"]
     T265: ["default"]
     BRICK: ["default"]
     VIO: ["default"]
-    ICP: ["default"]
+    LIDAR: ["default"]
     RTK: ["default"]
     OPTFLOWGPS: ["default"]
     GPS: ["default"]
@@ -37,12 +39,13 @@ gain_management:
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
+    VSLAM: "default"
     BRICKFLOW: "default"
     HECTOR: "default"
     T265: "default"
     BRICK: "default"
     VIO: "default"
-    ICP: "default"
+    LIDAR: "default"
     RTK: "default"
     OPTFLOWGPS: "default"
     GPS: "default"
