@@ -1886,7 +1886,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     callbackSwitchController(controller_srv, response);
   }
 
-  // if RT+LT were pressed and held for > 1.0 s
+  // if RT+LT were pressed and held for > 0.1 s
   if (joystick_failsafe_pressed && (ros::Time::now() - joystick_failsafe_press_time).toSec() > 0.1) {
 
     ROS_INFO("[ControlManager]: activating failsafe by joystick");
@@ -1896,7 +1896,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     failsafe();
   }
 
-  // if joypads were pressed and held for > 1.0 s
+  // if joypads were pressed and held for > 0.1 s
   if (joystick_eland_pressed && (ros::Time::now() - joystick_eland_press_time).toSec() > 0.1) {
 
     ROS_INFO("[ControlManager]: activating eland by joystick");
@@ -1907,11 +1907,11 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     eland(message_out);
   }
 
-  // if back was pressed and held for > 1.0 s
+  // if back was pressed and held for > 0.1 s
   if (joystick_back_pressed && (ros::Time::now() - joystick_goto_press_time).toSec() > 0.1) {
 
-    // activate the joystick goto functionality
-    joystick_goto_enabled = true;
+    // activate/deactivate the joystick goto functionality
+    joystick_goto_enabled = !joystick_goto_enabled;
   }
 
   // if the GOTO functionality is enabled...
