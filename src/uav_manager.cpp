@@ -183,8 +183,10 @@ private:
 private:
   ros::Timer  takeoff_timer;
   double      takeoff_timer_rate_;
-  bool        takingoff           = false;
-  int         number_of_takeoffs  = 0;
+  bool        takingoff            = false;
+  int         number_of_takeoffs   = 0;
+  double      last_mass_difference = 0;
+  std::mutex  mutex_last_mass_difference;
   bool        waiting_for_takeoff = false;
   std::string after_takeoff_tracker_name_;
   std::string after_takeoff_controller_name_;
@@ -1115,11 +1117,11 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
       return true;
     }
 
-    std::scoped_lock lock(mutex_attitude_command);
+    std::scoped_lock lock(mutex_last_mass_difference);
 
-    if (attitude_command.mass_difference > 0.5) {
+    if (last_mass_difference > 0.5) {
 
-      sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large!");
+      sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large: %.2f!", last_mass_difference);
       res.message = message;
       res.success = false;
       ROS_ERROR("[UavManager]: %s", message);
@@ -1246,8 +1248,14 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
 
   // stop the eventual takeoff
   waiting_for_takeoff = false;
-  takingoff = false;
+  takingoff           = false;
   takeoff_timer.stop();
+
+  {
+    std::scoped_lock lock(mutex_attitude_command, mutex_last_mass_difference);
+
+    last_mass_difference = attitude_command.mass_difference;
+  }
 
   ROS_INFO("[UavManager]: landing");
 
@@ -1357,7 +1365,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
 
   // stop the eventual takeoff
   waiting_for_takeoff = false;
-  takingoff = false;
+  takingoff           = false;
   takeoff_timer.stop();
 
   ROS_INFO("[UavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
