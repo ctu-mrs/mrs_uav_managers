@@ -88,19 +88,21 @@ typedef enum
 class ControllerParams {
 
 public:
-  ControllerParams(std::string address, double eland_threshold, double failsafe_threshold);
+  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold);
 
 public:
   double      failsafe_threshold;
   double      eland_threshold;
   std::string address;
+  std::string name_space;
 };
 
-ControllerParams::ControllerParams(std::string address, double eland_threshold, double failsafe_threshold) {
+ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold) {
 
   this->eland_threshold    = eland_threshold;
   this->failsafe_threshold = failsafe_threshold;
   this->address            = address;
+  this->name_space            = name_space;
 }
 
 //}
@@ -737,8 +739,10 @@ void ControlManager::onInit() {
 
     // load the controller parameters
     std::string address;
+    std::string name_space;
     double      eland_threshold, failsafe_threshold;
     param_loader.load_param(controller_name + "/address", address);
+    param_loader.load_param(controller_name + "/namespace", name_space);
     param_loader.load_param(controller_name + "/eland_threshold", eland_threshold);
     param_loader.load_param(controller_name + "/failsafe_threshold", failsafe_threshold);
 
@@ -750,7 +754,7 @@ void ControlManager::onInit() {
       failsafe_threshold = 1e6;
     }
 
-    ControllerParams new_controller(address, eland_threshold, failsafe_threshold);
+    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold);
     controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
 
     try {
@@ -778,7 +782,7 @@ void ControlManager::onInit() {
       it = controllers_.find(controller_names[i]);
 
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
-      controller_list[i]->initialize(nh_, motor_params_, uav_mass_, g_);
+      controller_list[i]->initialize(nh_, controller_names[i], it->second.name_space, motor_params_, uav_mass_, g_);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());

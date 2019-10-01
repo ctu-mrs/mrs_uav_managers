@@ -1244,6 +1244,11 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
     return true;
   }
 
+  // stop the eventual takeoff
+  waiting_for_takeoff = false;
+  takingoff = false;
+  takeoff_timer.stop();
+
   ROS_INFO("[UavManager]: landing");
 
   flighttime_timer.stop();
@@ -1349,6 +1354,11 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
     ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
+
+  // stop the eventual takeoff
+  waiting_for_takeoff = false;
+  takingoff = false;
+  takeoff_timer.stop();
 
   ROS_INFO("[UavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
 

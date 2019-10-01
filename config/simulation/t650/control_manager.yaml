@@ -17,6 +17,7 @@ controllers : [
   "AttitudeController",
   "AccelerationController",
   "FailsafeController",
+  "EmergancyController",
 ]
 
 safety:
@@ -31,7 +32,7 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # controller used for emergency (controller) landing
-  eland_controller: "MpcController"
+  eland_controller: "EmergancyController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 1.0 # [s]

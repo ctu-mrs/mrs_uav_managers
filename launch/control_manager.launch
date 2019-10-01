@@ -30,6 +30,7 @@
   <arg name="custom_config_attitude_controller" default="" />
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
+  <arg name="custom_config_emergancy_controller" default="" />
   <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_so3_controller" default="" />
 
@@ -115,13 +116,22 @@
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
 
-      <!-- FailSafe -->
+      <!-- Failsafe controller -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
       <rosparam if="$(eval not arg('custom_config_failsafe_controller') == '')" ns="failsafe_controller" file="$(arg custom_config_failsafe_controller)" />
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
       <remap from="~failsafe_controller/arm_out" to="~/arm" />
+
+      <!-- Emergancy controller -->
+      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
+      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/default/emergancy.yaml" />
+      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergancy.yaml" />
+      <rosparam if="$(eval not arg('custom_config_mpc_controller') == '')" ns="emergancy_controller" file="$(arg custom_config_emergancy_controller)" />
+      <param name="emergancy_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~emergancy_controller/profiler" to="profiler" />
+      <remap from="~emergancy_controller/set_integral_terms_in" to="~emergancy_controller/set_integral_terms" />
 
       <!-- Trackers' configs -->
 
