@@ -12,7 +12,7 @@ estimator_types: [
   "OPTFLOWGPS",
   "GPS",
   "OPTFLOW",
-  "PAVEL"
+  "PAVEL",
   "OTHER",
 ]
 
