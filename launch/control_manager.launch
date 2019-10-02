@@ -24,6 +24,7 @@
   <arg name="custom_config_line_tracker" default="" />
   <arg name="custom_config_matlab_tracker" default="" />
   <arg name="custom_config_mpc_tracker" default="" />
+  <arg name="custom_config_uav_names" default="" />
 
     <!-- custom configs for controllers -->
   <arg name="custom_config_acceleration_controller" default="" />
@@ -182,7 +183,9 @@
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
       <rosparam if="$(eval not arg('custom_config_mpc_tracker') == '')" ns="mpc_tracker" file="$(arg custom_config_mpc_tracker)" />
+      <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="mpc_tracker/uav_name" value="$(arg UAV_NAME)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
