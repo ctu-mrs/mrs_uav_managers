@@ -102,7 +102,7 @@ ControllerParams::ControllerParams(std::string address, std::string name_space, 
   this->eland_threshold    = eland_threshold;
   this->failsafe_threshold = failsafe_threshold;
   this->address            = address;
-  this->name_space            = name_space;
+  this->name_space         = name_space;
 }
 
 //}
@@ -391,6 +391,11 @@ private:
   ros::Timer failsafe_timer;
   void       failsafeTimer(const ros::TimerEvent &event);
   bool       failsafe_triggered = false;
+
+private:
+  ros::Timer control_timer;
+  void       controlTimerOneshot(const ros::TimerEvent &event);
+  bool       running_control_timer = false;
 
 private:
   ros::Timer elanding_timer;
@@ -1116,6 +1121,7 @@ void ControlManager::onInit() {
   failsafe_timer  = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
   pirouette_timer = nh_.createTimer(ros::Rate(pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
   joystick_timer  = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
+  control_timer   = nh_.createTimer(ros::Duration(0), &ControlManager::controlTimerOneshot, this, true, false);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -2179,6 +2185,52 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
 
 //}
 
+/* controlTimer() //{ */
+
+void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::ScopeUnset unset_running(running_control_timer);
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("controlTimer");
+
+  if (!failsafe_triggered) {  // when failsafe is triggered, updateControllers() and publish() is called in failsafeTimer()
+
+    // run the safety timer
+    // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
+    ros::TimerEvent safety_timer_event;
+    safetyTimer(safety_timer_event);
+
+    updateTrackers();
+
+    nav_msgs::Odometry temp_odometry;
+
+    {
+      std::scoped_lock lock(mutex_odometry);
+
+      temp_odometry = odometry;
+    }
+
+    updateControllers(temp_odometry);
+
+    publish();
+  }
+
+  if (reseting_odometry) {
+
+    safety_timer.start();
+    reseting_odometry = false;
+
+    std::scoped_lock lock(mutex_odometry);
+
+    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+  }
+}
+
+//}
+
 // --------------------------------------------------------------
 // |                          callbacks                         |
 // --------------------------------------------------------------
@@ -2195,11 +2247,13 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
 
   if (!got_max_height) {
-    ROS_INFO("[ControlerManager]: the safety timer is in the middle of an iteration, waiting for it to finish");
+    ROS_WARN_THROTTLE(1.0, "[ControlerManager]: waiting for max allowed height from odometry");
     return;
   }
 
-  // | -- prepare an OdometryConstPtr for trackers&controllers -- |
+  /* Odometry frame switch //{ */
+
+  // | -- prepare an OdometryConstPtr for trackers & controllers -- |
 
   nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(*msg));
 
@@ -2226,6 +2280,13 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
         wait.sleep();
       }
 
+      // we have to also for the oneshot control timer to finish
+      while (running_control_timer) {
+        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
       {
         std::scoped_lock lock(mutex_controller_list, mutex_tracker_list);
 
@@ -2234,6 +2295,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       }
     }
   }
+
+  //}
 
   // --------------------------------------------------------------
   // |                      copy the odometry                     |
@@ -2253,38 +2316,17 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+
+    got_odometry = true;
+
+    odometry_last_time = ros::Time::now();
   }
 
-  got_odometry = true;
-
-  odometry_last_time = ros::Time::now();
-
-  if (!failsafe_triggered) {  // when failsafe is triggers, updateControllers() and publish() is called in failsafeTimer()
-
-    // run the safety timer
-    // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
-    ros::TimerEvent safety_timer_event;
-    safetyTimer(safety_timer_event);
-
-    updateTrackers();
-
-    {
-      std::scoped_lock lock(mutex_odometry);
-
-      updateControllers(odometry);
-    }
-
-    publish();
-  }
-
-  if (reseting_odometry) {
-
-    safety_timer.start();
-    reseting_odometry = false;
-
-    std::scoped_lock lock(mutex_odometry);
-
-    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+  // run the control loop asynchronously in an OneShotTimer
+  // but only if its not already running
+  if (!running_control_timer) {
+    control_timer.stop();
+    control_timer.start();
   }
 }
 
