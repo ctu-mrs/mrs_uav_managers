@@ -18,7 +18,7 @@ gain_management:
     RTK: ["supersoft", "soft", "tight"]
     OPTFLOWGPS: ["supersoft", "soft", "tight"]
     GPS: ["supersoft", 'soft', 'tight']
-    OPTFLOW: ["soft"]
+    OPTFLOW: ["supersoft", "soft"]
     OTHER: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
@@ -34,5 +34,5 @@ gain_management:
     RTK: "soft"
     OPTFLOWGPS: "soft"
     GPS: "soft"
-    OPTFLOW: "soft"
+    OPTFLOW: "supersoft"
     OTHER: "supersoft"
