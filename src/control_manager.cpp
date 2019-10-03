@@ -405,8 +405,8 @@ private:
 private:
   ros::Timer safety_timer;
   void       safetyTimer(const ros::TimerEvent &event);
-  bool       running_safety_timer = false;
-  double     reseting_odometry    = false;
+  bool       running_safety_timer        = false;
+  double     odometry_switch_in_progress = false;
 
 private:
   ros::Timer pirouette_timer;
@@ -1546,8 +1546,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  if (reseting_odometry) {
-    ROS_WARN("[ControlManager]: safetyTimer tried to run while reseting odometry");
+  if (odometry_switch_in_progress) {
+    ROS_WARN("[ControlManager]: safetyTimer tried to run while odometry switch in progress");
     return;
   }
 
@@ -2218,10 +2218,10 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
     publish();
   }
 
-  if (reseting_odometry) {
+  if (odometry_switch_in_progress) {
 
     safety_timer.start();
-    reseting_odometry = false;
+    odometry_switch_in_progress = false;
 
     std::scoped_lock lock(mutex_odometry);
 
@@ -2269,7 +2269,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
         ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
       }
 
-      reseting_odometry = true;
+      odometry_switch_in_progress = true;
 
       // we have to stop safety timer, otherwise it will interfere
       safety_timer.stop();
