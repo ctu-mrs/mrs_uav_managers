@@ -33,6 +33,7 @@ safety:
   escalating_failsafe_timeout: 1.0 # [s]
 
   tilt_limit_eland: 60 # [deg]
+  yaw_limit_eland: 90 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
   # tracker used for emergency hover routine

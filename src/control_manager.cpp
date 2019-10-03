@@ -314,7 +314,10 @@ private:
 private:
   bool       tilt_error_failsafe_enabled_ = false;
   double     tilt_error_threshold_;
+  bool       yaw_error_eland_enabled_ = false;
+  double     yaw_error_eland_threshold_;
   double     tilt_error;
+  double     yaw_error;
   double     position_error_x_, position_error_y_, position_error_z_;
   double     velocity_error_x_, velocity_error_y_, velocity_error_z_;
   std::mutex mutex_tilt_error;
@@ -379,6 +382,8 @@ private:
 
 private:
   Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
+  double          sanitizeYaw(const double yaw_in);
+  double          angleDist(const double in1, const double in2);
 
 private:
   bool callbacks_enabled = true;
@@ -568,6 +573,8 @@ void ControlManager::onInit() {
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
   param_loader.load_param("safety/tilt_limit_disarm", tilt_limit_disarm_);
   tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * M_PI;
+  param_loader.load_param("safety/yaw_limit_eland", yaw_error_eland_threshold_);
+  yaw_error_eland_threshold_ = (yaw_error_eland_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("status_timer_rate", status_timer_rate_);
   param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
@@ -1578,6 +1585,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
 
     tilt_error = 0;
+    yaw_error  = 0;
 
     // control errors
     position_error_x_ = last_position_cmd->position.x - odometry_x;
@@ -1598,7 +1606,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     // calculate the angle between the drone's z axis and the world's z axis
     tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
 
-    // | ---------------- calculate the tilt error ---------------- |
+    // | ------------ calculate the tilt and yaw error ------------ |
     // to do that, we need the tilt reference, which might not be available
     {
       std::scoped_lock lock(mutex_last_attitude_cmd);
@@ -1606,6 +1614,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
       // if the attitude_cmd exists (a controller is running)
       if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
+        // | --------------------- the tilt error --------------------- |
         tf::Quaternion attitude_cmd_quaternion;
 
         // calculate the quaternion
@@ -1631,11 +1640,29 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
           // calculate the angle between the drone's z axis and the world's z axis
           tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
         }
+
+        // | ---------------------- the yaw error --------------------- |
+        if (last_attitude_cmd->euler_attitude_set) {
+
+          yaw_error = last_attitude_cmd->euler_attitude.z - odometry_yaw;
+
+        } else if (last_attitude_cmd->quater_attitude_set) {
+
+          // calculate the euler angles
+          tf::Quaternion quater_attitude_cmd;
+          quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+          tf::Matrix3x3 m(quater_attitude_cmd);
+          double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
+          m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
+
+          yaw_error = angleDist(attitude_cmd_yaw, odometry_yaw);
+        }
       }
     }
   }
 
-  double control_error_ = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
+  // scalar control error
+  double control_error = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
 
   // --------------------------------------------------------------
   // |   activate the failsafe controller in case of large error  |
@@ -1652,13 +1679,13 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   // | --------------------------------------------------------- |
 
-  if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
+  if (control_error > failsafe_threshold_ && !failsafe_triggered) {
 
     if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%2.2f/%2.2f", control_error, failsafe_threshold_);
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1674,15 +1701,44 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_odometry);
 
-    if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
+    // | ------------------- tilt control error ------------------- |
+    if (tilt_angle > tilt_limit_eland_) {
 
       if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
-                    (180.0 / M_PI) * tilt_limit_eland_, control_error_, eland_threshold_);
+          ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * tilt_angle,
+                    (180.0 / M_PI) * tilt_limit_eland_);
+          std::string message_out;
+          eland(message_out);
+        }
+      }
+    }
 
+    // | ----------------- position control error ----------------- |
+    if (control_error > eland_threshold_) {
+
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
+
+        if (!failsafe_triggered && !eland_triggered) {
+
+          ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f m exceeded %.2f m", control_error, eland_threshold_);
+          std::string message_out;
+          eland(message_out);
+        }
+      }
+    }
+
+    // | -------------------- yaw control error ------------------- |
+    if (yaw_error > yaw_error_eland_threshold_) {
+
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
+
+        if (!failsafe_triggered && !eland_triggered) {
+
+          ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * yaw_error,
+                    (180.0 / M_PI) * yaw_error_eland_threshold_);
           std::string message_out;
           eland(message_out);
         }
@@ -5586,6 +5642,44 @@ Eigen::Vector2d ControlManager::rotateVector(const Eigen::Vector2d vector_in, do
   Eigen::Rotation2D<double> rot2(angle);
 
   return rot2.toRotationMatrix() * vector_in;
+}
+
+//}
+
+/* sanitizeYaw() //{ */
+
+double ControlManager::sanitizeYaw(const double yaw_in) {
+
+  double yaw_out = yaw_in;
+
+  // if desired yaw_out is grater then 2*M_PI mod it
+  if (fabs(yaw_out) > 2 * M_PI) {
+    yaw_out = fmod(yaw_out, 2 * M_PI);
+  }
+
+  // move it to its place
+  if (yaw_out > M_PI) {
+    yaw_out -= 2 * M_PI;
+  } else if (yaw_out < -M_PI) {
+    yaw_out += 2 * M_PI;
+  }
+
+  return yaw_out;
+}
+
+//}
+
+/* angleDist() //{ */
+
+double ControlManager::angleDist(const double in1, const double in2) {
+
+  double sanitized_difference = fabs(sanitizeYaw(in1) - sanitizeYaw(in2));
+
+  if (sanitized_difference > M_PI) {
+    sanitized_difference = 2*M_PI - sanitized_difference;
+  }
+
+  return fabs(sanitized_difference);
 }
 
 //}

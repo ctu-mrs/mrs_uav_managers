@@ -1,41 +1,41 @@
 So3Controller:
   address: "mrs_controllers/So3Controller"
   namespace: "so3_controller"
-  eland_threshold: 1.5
-  failsafe_threshold: 2.5
+  eland_threshold: 1.5 # [m], position error triggering eland
+  failsafe_threshold: 2.5 # [m], position error triggering failsafe land
 
 MpcController:
   address: "mrs_controllers/MpcController"
   namespace: "mpc_controller"
-  eland_threshold: 3.0
-  failsafe_threshold: 4.0
+  eland_threshold: 3.0 # [m], position error triggering eland
+  failsafe_threshold: 4.0 # [m], position error triggering failsafe land
 
 AttitudeController:
   address: "mrs_controllers/AttitudeController"
   namespace: "attitude_controller"
-  eland_threshold: 0.0
-  failsafe_threshold: 0.0
+  eland_threshold: 0.0 # [m], position error triggering eland
+  failsafe_threshold: 0.0 # [m], position error triggering failsafe land
 
 AccelerationController:
   address: "mrs_controllers/AccelerationController"
   namespace: "acceleration_controller"
-  eland_threshold: 0.0
-  failsafe_threshold: 0.0
+  eland_threshold: 0.0 # [m], position error triggering eland
+  failsafe_threshold: 0.0 # [m], position error triggering failsafe land
 
 FailsafeController:
   address: "mrs_controllers/FailsafeController"
   namespace: "failsafe_controller"
-  eland_threshold: 0.0
-  failsafe_threshold: 0.0
+  eland_threshold: 0.0 # [m], position error triggering eland
+  failsafe_threshold: 0.0 # [m], position error triggering failsafe land
 
 EmergancyController:
   address: "mrs_controllers/MpcController"
   namespace: "emergancy_controller"
-  eland_threshold: 3.0
-  failsafe_threshold: 5.0
+  eland_threshold: 3.0 # [m], position error triggering eland
+  failsafe_threshold: 5.0 # [m], position error triggering failsafe land
 
 NsfController:
   address: "mrs_controllers/NsfController"
   namespace: "nsf_controller"
-  eland_threshold: 1.5
-  failsafe_threshold: 3.0
+  eland_threshold: 1.5 # [m], position error triggering eland
+  failsafe_threshold: 3.0 # [m], position error triggering failsafe land
