@@ -381,6 +381,16 @@ private:
   bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
 private:
+  bool got_constraints = false;
+
+  mrs_msgs::TrackerConstraintsRequest current_constraints;
+  mrs_msgs::TrackerConstraintsRequest sanitized_constraints;
+  std::mutex                          mutex_constraints;
+
+  void setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
+  bool enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints);
+
+private:
   Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
   double          sanitizeYaw(const double yaw_in);
   double          angleDist(const double in1, const double in2);
@@ -2271,6 +2281,18 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
 
     updateControllers(temp_odometry);
 
+    if (got_constraints) {
+
+      // update the constraints to trackers, if need to
+      {
+        std::scoped_lock lock(mutex_constraints);
+
+        if (enforceControllersConstraints(sanitized_constraints)) {
+          setConstraints(sanitized_constraints);
+        }
+      }
+    }
+
     publish();
   }
 
@@ -2929,6 +2951,13 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
     }
   }
 
+  {
+    std::scoped_lock lock(mutex_constraints);
+
+    sanitized_constraints = current_constraints;
+    setConstraints(current_constraints);
+  }
+
   res.message = message;
   return true;
 }
@@ -3155,22 +3184,16 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
     return true;
   }
 
-  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
-
-  mrs_msgs::TrackerConstraintsRequest req_constraints;
-  req_constraints = req;
-
   {
-    std::scoped_lock lock(mutex_tracker_list);
+    std::scoped_lock lock(mutex_constraints);
 
-    // for each tracker
-    for (unsigned int i = 0; i < tracker_list.size(); i++) {
-
-      // if it is the active one, update and retrieve the command
-      tracker_response =
-          tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
-    }
+    current_constraints   = req;
+    sanitized_constraints = req;
+    got_constraints       = true;
   }
+
+  enforceControllersConstraints(sanitized_constraints);
+  setConstraints(sanitized_constraints);
 
   res.message = "Setting constraints";
   res.success = true;
@@ -4269,6 +4292,95 @@ void ControlManager::publishDiagnostics(void) {
   catch (...) {
     ROS_ERROR("Exception caught during publishing topic %s.", publisher_diagnostics.getTopic().c_str());
   }
+}
+
+//}
+
+/* setConstraints() //{ */
+
+void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constraints) {
+
+  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    // for each tracker
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+
+      // if it is the active one, update and retrieve the command
+      tracker_response = tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(constraints)));
+    }
+  }
+}
+
+//}
+
+/* enforceControllerConstraints() //{ */
+
+bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints) {
+
+  bool enforcing = false;
+
+  {
+    std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+      if (last_attitude_cmd->controller_enforcing_constraints) {
+
+        std::scoped_lock lock(mutex_tracker_list);
+
+        // enforce horizontal speed
+        if (last_attitude_cmd->horizontal_speed_constraint < constraints.horizontal_speed) {
+          constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce horizontal acceleration
+        if (last_attitude_cmd->horizontal_acc_constraint < constraints.horizontal_acceleration) {
+          constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical ascending speed
+        if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.vertical_ascending_speed) {
+          constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical ascending acceleration
+        if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.vertical_ascending_acceleration) {
+          constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical descending speed
+        if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.vertical_descending_speed) {
+          constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical descending acceleration
+        if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.vertical_descending_acceleration) {
+          constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
+
+          enforcing = true;
+        }
+      }
+    }
+  }
+
+  if (enforcing) {
+    std::scoped_lock lock(mutex_controller_list);
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: %s is enforcing constraints over ConstraintManager", controller_names[active_controller_idx].c_str());
+  }
+
+  return enforcing;
 }
 
 //}
@@ -5676,7 +5788,7 @@ double ControlManager::angleDist(const double in1, const double in2) {
   double sanitized_difference = fabs(sanitizeYaw(in1) - sanitizeYaw(in2));
 
   if (sanitized_difference > M_PI) {
-    sanitized_difference = 2*M_PI - sanitized_difference;
+    sanitized_difference = 2 * M_PI - sanitized_difference;
   }
 
   return fabs(sanitized_difference);
