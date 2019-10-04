@@ -6,11 +6,11 @@ takeoff:
 
   after_takeoff:
     tracker: "MpcTracker"
-    controller: "So3Controller"
+    controller: "MpcController"
 
     pirouette: false
 
-  takeoff_height: 2.0
+  takeoff_height: 1.5
 
 landing:
 

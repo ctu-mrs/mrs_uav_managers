@@ -8,6 +8,7 @@ require_constraint_manager: true
 # if so, retakes control and descends below it
 max_height_checking:
 
+  enabled: true
   rate: 10 # [Hz]
   safety_height_offset: 0.5 # how much lower to descend bellow the max height
 
@@ -25,7 +26,7 @@ takeoff:
 
     pirouette: false
 
-  takeoff_height: 1.0
+  takeoff_height: 1.5
 
 landing:
 

@@ -95,6 +95,7 @@ private:
   bool            got_max_height    = false;
   bool            fixing_max_height = false;
   int             max_height_checking_rate_;
+  bool            max_height_enabled_ = false;
   double          max_height_offset_;
 
 private:
@@ -335,8 +336,10 @@ void UavManager::onInit() {
   param_loader.load_param("hover_thrust/a", hover_thrust_a_);
   param_loader.load_param("hover_thrust/b", hover_thrust_b_);
 
+  param_loader.load_param("max_height_checking/enabled", max_height_enabled_);
   param_loader.load_param("max_height_checking/rate", max_height_checking_rate_);
   param_loader.load_param("max_height_checking/safety_height_offset", max_height_offset_);
+
   param_loader.load_param("safety_area/max_height", max_height);
 
   param_loader.load_param("require_gain_manager", gain_manager_required_);
@@ -368,9 +371,12 @@ void UavManager::onInit() {
 
   landing_timer    = nh_.createTimer(ros::Rate(landing_timer_rate_), &UavManager::landingTimer, this, false, false);
   takeoff_timer    = nh_.createTimer(ros::Rate(takeoff_timer_rate_), &UavManager::takeoffTimer, this, false, false);
-  max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &UavManager::maxHeightTimer, this);
   flighttime_timer = nh_.createTimer(ros::Rate(flighttime_timer_rate_), &UavManager::flighttimeTimer, this, false, false);
   maxthrust_timer  = nh_.createTimer(ros::Rate(maxthrust_timer_rate_), &UavManager::maxthrustTimer, this, false, false);
+
+  if (max_height_enabled_) {
+    max_height_timer = nh_.createTimer(ros::Rate(max_height_checking_rate_), &UavManager::maxHeightTimer, this);
+  }
 
   // | ----------------------- finish init ---------------------- |
 

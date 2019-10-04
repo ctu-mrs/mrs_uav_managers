@@ -161,6 +161,7 @@ private:
 
   std::string failsafe_controller_name_;
   std::string eland_controller_name_;
+  bool        eland_disarm_enabled_ = false;
 
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
@@ -577,7 +578,11 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/min_thrust_null_tracker", min_thrust_null_tracker_);
   param_loader.load_param("safety/ehover_tracker", ehover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
-  param_loader.load_param("safety/eland_controller", eland_controller_name_);
+
+  param_loader.load_param("safety/eland/controller", eland_controller_name_);
+  param_loader.load_param("safety/eland/cutoff_mass_factor", elanding_cutoff_mass_factor_);
+  param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
+  param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
@@ -588,15 +593,12 @@ void ControlManager::onInit() {
 
   param_loader.load_param("status_timer_rate", status_timer_rate_);
   param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
-  param_loader.load_param("safety/elanding_timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/failsafe_timer_rate", failsafe_timer_rate_);
 
   param_loader.load_param("uav_mass", uav_mass_);
   param_loader.load_param("hover_thrust/a", motor_params_.hover_thrust_a);
   param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
   param_loader.load_param("g", g_);
-
-  param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
 
   param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
 
@@ -1858,12 +1860,13 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
 
       // enable callbacks? ... NO
 
+      ROS_INFO("[ControlManager]: reached cutoff thrust, setting motors OFF");
       switchMotors(false);
 
       // disarm the drone
-      if (isOffboard()) {
+      if (isOffboard() && eland_disarm_enabled_) {
 
-        ROS_INFO("[ControlManager]: reached cutoff thrust, calling for disarm");
+        ROS_INFO("[ControlManager]: calling for disarm");
         mavros_msgs::CommandBool srv_out;
         service_client_arm.call(srv_out);
 

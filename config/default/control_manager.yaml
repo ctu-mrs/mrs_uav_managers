@@ -26,7 +26,7 @@ status_timer_rate:  10 # [Hz]
 
 safety:
 
-  min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
+  min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
 
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
@@ -42,14 +42,15 @@ safety:
   # controller used for safety landing (feed forward)
   failsafe_controller: "FailsafeController"
 
-  # controller used for emergency (controller) landing
-  eland_controller: "EmergancyController"
-
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 1.0 # [s]
 
-  elanding_timer_rate: 10
-  elanding_cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+  # emergancy landing (still feedback)
+  eland: 
+    controller: "EmergancyController"
+    cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+    disarm: true
+    timer_rate: 10
 
   tilt_error_failsafe:
 
