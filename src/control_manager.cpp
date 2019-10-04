@@ -997,12 +997,13 @@ void ControlManager::onInit() {
   active_tracker_idx = null_tracker_idx;
 
   // --------------------------------------------------------------
-  // |          activate the first controller on the list         |
+  // |    activate the eland controller as the first controller   |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[eland_controller_idx].c_str());
+  ROS_INFO("[ControlManager]: Activating the the eland controller (%s) as the first controller", controller_names[eland_controller_idx].c_str());
 
-  controller_list[active_controller_idx]->activate(last_attitude_cmd);
+  controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+  active_controller_idx = eland_controller_idx;
 
   // update the time
   {
