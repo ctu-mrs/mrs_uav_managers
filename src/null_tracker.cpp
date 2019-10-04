@@ -125,7 +125,7 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
 
     sprintf((char *)&message, "Callbacks %s", callbacks_enabled ? "enabled" : "disabled");
 
-    ROS_INFO("[MpcTracker]: %s", message);
+    ROS_INFO("[NullTracker]: %s", message);
 
   } else {
 
