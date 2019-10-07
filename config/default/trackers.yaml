@@ -21,3 +21,7 @@ CsvTracker:
 
 NullTracker:
   address: "mrs_uav_manager/NullTracker"
+
+WallTracker:
+  address: "wall/WallTracker"
+

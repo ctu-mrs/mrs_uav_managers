@@ -143,6 +143,15 @@
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
+      <!-- WallTracker -->
+      <rosparam ns="wall_tracker" file="$(find wall)/config/default/wall_tracker.yaml" />
+      <rosparam ns="wall_tracker" file="$(find wall)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/wall_tracker.yaml" />
+      <param name="wall_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <param name="wall_tracker/uav_name" value="$(arg UAV_NAME)" />
+      <remap from="~wall_tracker/set_gains_out" to="gain_manager/set_gains" />
+      <remap from="~wall_tracker/set_integral_out" to="~mpc_controller/set_integral_terms" />
+      <remap from="~wall_tracker/profiler" to="profiler" />
+
       <!-- JoyTracker -->
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/default/joy_tracker.yaml" />
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
