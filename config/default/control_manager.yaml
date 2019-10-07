@@ -164,7 +164,7 @@ rc_joystick:
   timeout: 2.0 # [s]
   n_switches: 4 # [-]
 
-  carrot_distance: 0.25 # [m]
+  carrot_distance: 0.50 # [m]
 
   channels:
     pitch: 2
