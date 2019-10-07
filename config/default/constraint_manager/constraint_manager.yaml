@@ -1,0 +1,56 @@
+rate: 25
+
+estimator_types: [
+  "VSLAM",
+  "BRICKFLOW",
+  "HECTOR",
+  "T265",
+  "BRICK",
+  "VIO",
+  "LIDAR",
+  "RTK",
+  "OPTFLOWGPS",
+  "GPS",
+  "OPTFLOW",
+  "OTHER",
+]
+
+constraints: [
+  "slow",
+  "medium",
+  "fast",
+]
+
+constraint_management:
+
+  # list of allowed gains per odometry mode
+  allowed_constraints:
+    VSLAM: ["slow", "medium"]
+    BRICKFLOW: ["slow"]
+    OPTFLOW: ["slow", "medium"]
+    HECTOR: ["slow"]
+    T265: ["slow"]
+    BRICK: ["slow"]
+    VIO: ["slow", "medium"]
+    LIDAR: ["slow", "medium"]
+    RTK: ["slow", "medium", "fast"]
+    OPTFLOWGPS: ["slow"]
+    GPS: ["slow", "medium", "fast"]
+    OPTFLOW: ["slow", "medium"]
+    OTHER: ["slow"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_constraints:
+    VSLAM: "slow"
+    BRICKFLOW: "slow"
+    HECTOR: "slow"
+    T265: "slow"
+    BRICK: "slow"
+    VIO: "slow"
+    LIDAR: "slow"
+    RTK: "medium"
+    OPTFLOWGPS: "slow"
+    GPS: "medium"
+    OPTFLOW: "slow"
+    OTHER: "slow"

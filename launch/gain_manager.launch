@@ -1,0 +1,56 @@
+<launch>
+
+  <!-- args corresponding to environment variables -->
+  <arg name="PROFILER" default="$(optenv PROFILER false)" />
+  <arg name="UAV_NAME" default="$(env UAV_NAME)" />
+  <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
+  <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+
+    <!-- other args -->
+  <arg name="custom_config" default="" />
+  <arg name="standalone" default="true" />
+  <arg name="debug" default="false" />
+
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <!-- Gain Manager -->
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_manager/GainManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+
+      <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gains.yaml" />
+
+        <!-- Load the particular param files -->
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
+
+      <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
+
+      <!-- Subscribers -->
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+
+      <!-- Services -->
+      <remap from="~set_gains_in" to="~set_gains" />
+      <remap from="~set_gains_out" to="control_manager/so3_controller/set_parameters" />
+
+      <!-- Publishers -->
+      <remap from="~current_gains_out" to="~current_gains" />
+      <remap from="~profiler" to="profiler" />
+
+    </node>
+
+  </group>
+
+</launch>

@@ -14,6 +14,7 @@
 #include <mrs_msgs/BoolStamped.h>
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
@@ -38,12 +39,20 @@
 #include <mutex>
 #include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
+#include <tf_conversions/tf_eigen.h>
+
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 //}
 
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
+#define REF_X 0
+#define REF_Y 1
+#define REF_Z 2
+#define REF_YAW 3
 
 namespace mrs_uav_manager
 {
@@ -81,19 +90,21 @@ typedef enum
 class ControllerParams {
 
 public:
-  ControllerParams(std::string address, double eland_threshold, double failsafe_threshold);
+  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold);
 
 public:
   double      failsafe_threshold;
   double      eland_threshold;
   std::string address;
+  std::string name_space;
 };
 
-ControllerParams::ControllerParams(std::string address, double eland_threshold, double failsafe_threshold) {
+ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold) {
 
   this->eland_threshold    = eland_threshold;
   this->failsafe_threshold = failsafe_threshold;
   this->address            = address;
+  this->name_space         = name_space;
 }
 
 //}
@@ -142,9 +153,17 @@ private:
 
   std::string null_tracker_name_;
   std::string ehover_tracker_name_;
+  std::string landoff_tracker_name_;
+
+  bool        joystick_enabled_ = false;
+  std::string joystick_tracker_name_;
+  std::string joystick_controller_name_;
+  std::string joystick_fallback_tracker_name_;
+  std::string joystick_fallback_controller_name_;
 
   std::string failsafe_controller_name_;
   std::string eland_controller_name_;
+  bool        eland_disarm_enabled_ = false;
 
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
@@ -162,21 +181,39 @@ private:
   ros::Time          odometry_last_time;
   double             odometry_max_missing_time_;
 
+  ros::Subscriber    subscriber_pixhawk_odometry;
+  nav_msgs::Odometry pixhawk_odometry;
+  double             pixhawk_odometry_x;
+  double             pixhawk_odometry_y;
+  double             pixhawk_odometry_z;
+  double             pixhawk_odometry_yaw;
+  double             pixhawk_odometry_roll;
+  double             pixhawk_odometry_pitch;
+  std::mutex         mutex_pixhawk_odometry;
+  bool               got_pixhawk_odometry = false;
+
   ros::Subscriber subscriber_max_height;
   double          max_height;
   bool            got_max_height = false;
   std::mutex      mutex_max_height;
   std::mutex      mutex_min_height;
 
-  int active_tracker_idx      = 0;
-  int active_controller_idx   = 0;
-  int ehover_tracker_idx      = 0;
-  int failsafe_controller_idx = 0;
-  int null_tracker_idx        = 0;
-  int eland_controller_idx    = 0;
+  int active_tracker_idx               = 0;
+  int active_controller_idx            = 0;
+  int ehover_tracker_idx               = 0;
+  int landoff_tracker_idx              = 0;
+  int joystick_tracker_idx             = 0;
+  int joystick_controller_idx          = 0;
+  int failsafe_controller_idx          = 0;
+  int joystick_fallback_controller_idx = 0;
+  int joystick_fallback_tracker_idx    = 0;
+  int null_tracker_idx                 = 0;
+  int eland_controller_idx             = 0;
 
   void switchMotors(bool in);
   bool motors = false;
+
+  double min_thrust_null_tracker_ = 0.0;
 
   int status_timer_rate_   = 0;
   int safety_timer_rate_   = 0;
@@ -190,12 +227,13 @@ private:
   ros::Publisher publisher_thrust_force;
   ros::Publisher publisher_cmd_odom;
   ros::Publisher publisher_target_attitude;
-  ros::Publisher publisher_tracker_status;
-  ros::Publisher publisher_controller_status;
+  ros::Publisher publisher_diagnostics;
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
   ros::Publisher publisher_safe_zone_border;
+  ros::Publisher publisher_control_error;
+  ros::Publisher publisher_rviz;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -218,6 +256,7 @@ private:
   ros::ServiceServer service_server_set_yaw_relative;
 
   ros::ServiceServer service_server_emergency_goto;
+  ros::ServiceServer service_server_pirouette;
   ros::ServiceServer service_server_eland;
 
   ros::ServiceClient service_client_arm;
@@ -239,12 +278,16 @@ private:
   ros::Time                           controller_tracker_switch_time;
   std::mutex                          mutex_controller_tracker_switch_time;
 
+  void shutdown();
+  void setCallbacks(bool in);
+
 private:
   ros::Subscriber    subscriber_mavros_state;
   mavros_msgs::State mavros_state;
   std::mutex         mutex_mavros_state;
   bool               got_mavros_state = false;
   bool               offboard_mode    = false;
+  bool               armed            = false;
 
 private:
   ros::Subscriber      subscriber_rc;
@@ -258,7 +301,7 @@ private:
 
 private:
   void updateTrackers(void);
-  void updateControllers(void);
+  void updateControllers(nav_msgs::Odometry odom_for_control);
   void publish(void);
 
 private:
@@ -269,39 +312,37 @@ private:
   double tilt_limit_eland_;
   double tilt_limit_disarm_;
 
-  double eland_so3_threshold_;
-  double eland_mpc_threshold_;
-  double eland_other_threshold_;
-
-  double failsafe_so3_threshold_;
-  double failsafe_mpc_threshold_;
-  double failsafe_other_threshold_;
-
   double failsafe_threshold_;
   double eland_threshold_;
 
 private:
   bool       tilt_error_failsafe_enabled_ = false;
   double     tilt_error_threshold_;
-  double     tilt_error_failsafe_min_height_;
+  bool       yaw_error_eland_enabled_ = false;
+  double     yaw_error_eland_threshold_;
   double     tilt_error;
+  double     yaw_error;
+  double     position_error_x_, position_error_y_, position_error_z_;
+  double     velocity_error_x_, velocity_error_y_, velocity_error_z_;
   std::mutex mutex_tilt_error;
+  std::mutex mutex_control_error;
 
 private:
   mrs_lib::SafetyZone *         safety_zone;
-  bool                          use_safety_area_;
+  bool                          use_safety_area_ = false;
   double                        min_height;
   mrs_uav_manager::SafetyArea_t safety_area;
 
-  bool   isPointInSafetyArea2d(const double x, const double y);
-  bool   isPointInSafetyArea3d(const double x, const double y, const double z);
-  bool   isPathToPointInSafetyArea2d(const double endX, const double endY);
+  bool isPointInSafetyArea2d(const double x, const double y);
+  bool isPointInSafetyArea3d(const double x, const double y, const double z);
+  bool isPathToPointInSafetyArea2d(const double endX, const double endY);
 
   double getMinHeight(void);
   double getMaxHeight(void);
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
@@ -346,7 +387,19 @@ private:
   bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
 private:
+  bool got_constraints = false;
+
+  mrs_msgs::TrackerConstraintsRequest current_constraints;
+  mrs_msgs::TrackerConstraintsRequest sanitized_constraints;
+  std::mutex                          mutex_constraints;
+
+  void setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
+  bool enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints);
+
+private:
   Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
+  double          sanitizeYaw(const double yaw_in);
+  double          angleDist(const double in1, const double in2);
 
 private:
   bool callbacks_enabled = true;
@@ -361,6 +414,11 @@ private:
   bool       failsafe_triggered = false;
 
 private:
+  ros::Timer control_timer;
+  void       controlTimerOneshot(const ros::TimerEvent &event);
+  bool       running_control_timer = false;
+
+private:
   ros::Timer elanding_timer;
   void       elandingTimer(const ros::TimerEvent &event);
   bool       eland_triggered = false;
@@ -368,8 +426,12 @@ private:
 private:
   ros::Timer safety_timer;
   void       safetyTimer(const ros::TimerEvent &event);
-  bool       running_safety_timer = false;
-  double     reseting_odometry    = false;
+  bool       running_safety_timer        = false;
+  double     odometry_switch_in_progress = false;
+
+private:
+  ros::Timer pirouette_timer;
+  void       pirouetteTimer(const ros::TimerEvent &event);
 
 private:
   double    escalating_failsafe_timeout_;
@@ -418,9 +480,16 @@ private:
   std::mutex mutex_joystick;
 
   ros::Subscriber  subscriber_joystick;
-  void             callbackJoystic(const sensor_msgs::JoyConstPtr &msg);
+  void             callbackJoystick(const sensor_msgs::JoyConstPtr &msg);
   sensor_msgs::Joy joystick_data;
   bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+  // joystick buttons
+  int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
+
+  // channel numbers and channel multipliers
+  int _channel_pitch_, _channel_roll_, _channel_yaw_, _channel_thrust_;
+  int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_yaw_, _channel_mult_thrust_;
 
   ros::Timer joystick_timer;
   void       joystickTimer(const ros::TimerEvent &event);
@@ -433,12 +502,13 @@ private:
   bool      joystick_back_pressed = false;
   bool      joystick_goto_enabled = false;
 
-  bool rc_goto_enabled_              = false;
-  bool rc_goto_active_               = false;
-  int  rc_joystic_channel_last_value = 0;
-  int  rc_joystic_channel_;
-  int  rc_joystic_n_switches_;
-  int  rc_joystic_timeout_;
+  bool   rc_goto_enabled_              = false;
+  bool   rc_goto_active_               = false;
+  int    rc_joystic_channel_last_value = 0;
+  int    rc_joystic_channel_;
+  int    rc_joystic_n_switches_;
+  double rc_joystic_carrot_distance_;
+  int    rc_joystic_timeout_;
 
   bool      joystick_failsafe_pressed = false;
   ros::Time joystick_failsafe_press_time;
@@ -451,13 +521,32 @@ private:
   LandingStates_t previous_state_landing = IDLE_STATE;
   void            changeLandingState(LandingStates_t new_state);
   double          uav_mass_;
-  double          elanding_cutoff_height_;
   double          elanding_cutoff_mass_factor_;
   double          landing_uav_mass_ = 0;
+
+  double initial_body_disturbance_x_;
+  double initial_body_disturbance_y_;
 
 private:
   mrs_lib::Profiler *profiler;
   bool               profiler_enabled_ = false;
+
+private:
+  bool   automatic_pc_shutdown_enabled = false;
+  double automatic_pc_shutdown_threshold;
+
+private:
+  bool       pirouette_enabled_ = false;
+  double     pirouette_speed_;
+  double     pirouette_timer_rate_;
+  std::mutex mutex_pirouette_;
+  double     pirouette_inital_yaw;
+  double     pirouette_iterator;
+  bool       callbackPirouette(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+private:
+  void       publishDiagnostics(void);
+  std::mutex mutex_diagnostics;
 };
 
 //}
@@ -491,18 +580,24 @@ void ControlManager::onInit() {
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
+  param_loader.load_param("safety/min_thrust_null_tracker", min_thrust_null_tracker_);
   param_loader.load_param("safety/ehover_tracker", ehover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
-  param_loader.load_param("safety/eland_controller", eland_controller_name_);
+
+  param_loader.load_param("safety/eland/controller", eland_controller_name_);
+  param_loader.load_param("safety/eland/cutoff_mass_factor", elanding_cutoff_mass_factor_);
+  param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
+  param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
   param_loader.load_param("safety/tilt_limit_disarm", tilt_limit_disarm_);
   tilt_limit_disarm_ = (tilt_limit_disarm_ / 180.0) * M_PI;
+  param_loader.load_param("safety/yaw_limit_eland", yaw_error_eland_threshold_);
+  yaw_error_eland_threshold_ = (yaw_error_eland_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("status_timer_rate", status_timer_rate_);
   param_loader.load_param("safety/safety_timer_rate", safety_timer_rate_);
-  param_loader.load_param("safety/elanding_timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/failsafe_timer_rate", failsafe_timer_rate_);
 
   param_loader.load_param("uav_mass", uav_mass_);
@@ -510,19 +605,43 @@ void ControlManager::onInit() {
   param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
   param_loader.load_param("g", g_);
 
-  param_loader.load_param("safety/elanding_cutoff_height", elanding_cutoff_height_);
-  param_loader.load_param("safety/elanding_cutoff_mass_factor", elanding_cutoff_mass_factor_);
-
   param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
 
   param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
-  param_loader.load_param("safety/tilt_error_failsafe/min_height", tilt_error_failsafe_min_height_);
   tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
 
+  param_loader.load_param("joystick/enabled", joystick_enabled_);
   param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
+  param_loader.load_param("joystick/tracker", joystick_tracker_name_);
+  param_loader.load_param("joystick/controller", joystick_controller_name_);
+  param_loader.load_param("joystick/fallback/tracker", joystick_fallback_tracker_name_);
+  param_loader.load_param("joystick/fallback/controller", joystick_fallback_controller_name_);
+
+  param_loader.load_param("joystick/channels/A", _channel_A_);
+  param_loader.load_param("joystick/channels/B", _channel_B_);
+  param_loader.load_param("joystick/channels/X", _channel_X_);
+  param_loader.load_param("joystick/channels/Y", _channel_Y_);
+  param_loader.load_param("joystick/channels/start", _channel_start_);
+  param_loader.load_param("joystick/channels/back", _channel_back_);
+  param_loader.load_param("joystick/channels/LT", _channel_LT_);
+  param_loader.load_param("joystick/channels/RT", _channel_RT_);
+  param_loader.load_param("joystick/channels/L_joy", _channel_L_joy_);
+  param_loader.load_param("joystick/channels/R_joy", _channel_R_joy_);
+
+  // load channels
+  param_loader.load_param("joystick/channels/pitch", _channel_pitch_);
+  param_loader.load_param("joystick/channels/roll", _channel_roll_);
+  param_loader.load_param("joystick/channels/yaw", _channel_yaw_);
+  param_loader.load_param("joystick/channels/thrust", _channel_thrust_);
+
+  // load channel multipliers
+  param_loader.load_param("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
+  param_loader.load_param("joystick/channel_multipliers/roll", _channel_mult_roll_);
+  param_loader.load_param("joystick/channel_multipliers/yaw", _channel_mult_yaw_);
+  param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
   param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", bumper_timer_rate_);
@@ -546,11 +665,38 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
   param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
   param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
+  param_loader.load_param("rc_joystick/carrot_distance", rc_joystic_carrot_distance_);
 
   param_loader.load_param("rc_joystick/channels/pitch", rc_channel_pitch_);
   param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
   param_loader.load_param("rc_joystick/channels/yaw", rc_channel_yaw_);
   param_loader.load_param("rc_joystick/channels/thrust", rc_channel_thrust_);
+
+  param_loader.load_param("automatic_pc_shutdown/enabled", automatic_pc_shutdown_enabled);
+  param_loader.load_param("automatic_pc_shutdown/distance_threshold", automatic_pc_shutdown_threshold);
+
+  param_loader.load_param("pirouette/speed", pirouette_speed_);
+  param_loader.load_param("pirouette/timer_rate", pirouette_timer_rate_);
+
+  // | ------------- load the body integrator values ------------ |
+
+  param_loader.load_param("body_disturbance_x", initial_body_disturbance_x_);
+  param_loader.load_param("body_disturbance_y", initial_body_disturbance_y_);
+
+  mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
+  last_attitude_cmd = output_command;
+
+  output_command->total_mass      = uav_mass_;
+  output_command->mass_difference = 0.0;
+
+  output_command->disturbance_bx_b = initial_body_disturbance_x_;
+  output_command->disturbance_by_b = initial_body_disturbance_y_;
+  output_command->disturbance_wx_w = 0.0;
+  output_command->disturbance_wy_w = 0.0;
+  output_command->disturbance_bx_w = 0.0;
+  output_command->disturbance_by_w = 0.0;
+
+  output_command->thrust = min_thrust_null_tracker_;
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -558,6 +704,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("trackers", tracker_names);
   param_loader.load_param("null_tracker", null_tracker_name_);
+  param_loader.load_param("landing_takeoff_tracker", landoff_tracker_name_);
 
   tracker_loader = new pluginlib::ClassLoader<mrs_uav_manager::Tracker>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
@@ -621,8 +768,10 @@ void ControlManager::onInit() {
 
     // load the controller parameters
     std::string address;
+    std::string name_space;
     double      eland_threshold, failsafe_threshold;
     param_loader.load_param(controller_name + "/address", address);
+    param_loader.load_param(controller_name + "/namespace", name_space);
     param_loader.load_param(controller_name + "/eland_threshold", eland_threshold);
     param_loader.load_param(controller_name + "/failsafe_threshold", failsafe_threshold);
 
@@ -634,7 +783,7 @@ void ControlManager::onInit() {
       failsafe_threshold = 1e6;
     }
 
-    ControllerParams new_controller(address, eland_threshold, failsafe_threshold);
+    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold);
     controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
 
     try {
@@ -662,7 +811,7 @@ void ControlManager::onInit() {
       it = controllers_.find(controller_names[i]);
 
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
-      controller_list[i]->initialize(nh_, motor_params_);
+      controller_list[i]->initialize(nh_, controller_names[i], it->second.name_space, motor_params_, uav_mass_, g_);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
@@ -688,7 +837,7 @@ void ControlManager::onInit() {
     }
   }
   if (!hover_tracker_check) {
-    ROS_ERROR("[ControlManager]: the safety/hover_tracker is not within the loaded trackers");
+    ROS_ERROR("[ControlManager]: the safety/hover_tracker (%s) is not within the loaded trackers", ehover_tracker_name_.c_str());
     ros::shutdown();
   }
 
@@ -727,6 +876,27 @@ void ControlManager::onInit() {
   }
 
   // --------------------------------------------------------------
+  // |           check the existance of landoff tracker           |
+  // --------------------------------------------------------------
+
+  // check if the landoff_tracker is within the loaded trackers
+  bool landoff_tracker_check = false;
+  for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+    std::string tracker_name = tracker_names[i];
+
+    if (tracker_name.compare(landoff_tracker_name_) == 0) {
+      landoff_tracker_check = true;
+      landoff_tracker_idx   = i;
+      break;
+    }
+  }
+  if (!landoff_tracker_check) {
+    ROS_ERROR("[ControlManager]: the landoff tracker (%s) is not within the loaded trackers", landoff_tracker_name_.c_str());
+    ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
   // |         check for the existance of the NullTracker         |
   // --------------------------------------------------------------
 
@@ -743,8 +913,83 @@ void ControlManager::onInit() {
     }
   }
   if (!null_tracker_check) {
-    ROS_ERROR("[ControlManager]: the null tracker is not within the loaded trackers");
+    ROS_ERROR("[ControlManager]: the null tracker (%s) is not within the loaded trackers", null_tracker_name_.c_str());
     ros::shutdown();
+  }
+
+  // --------------------------------------------------------------
+  // |  check existance of controllers and trackers for joystick  |
+  // --------------------------------------------------------------
+
+  if (joystick_enabled_) {
+
+    // check if the tracker for joystick control exists
+    bool joystick_tracker_check = false;
+    for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+      std::string tracker_name = tracker_names[i];
+
+      if (tracker_name.compare(joystick_tracker_name_) == 0) {
+        joystick_tracker_check = true;
+        joystick_tracker_idx   = i;
+        break;
+      }
+    }
+    if (!joystick_tracker_check) {
+      ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", joystick_tracker_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the controller for joystick control exists
+    bool joystic_controller_check = false;
+    for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+      std::string controller_name = controller_names[i];
+
+      if (controller_name.compare(joystick_controller_name_) == 0) {
+        joystic_controller_check = true;
+        joystick_controller_idx  = i;
+        break;
+      }
+    }
+    if (!joystic_controller_check) {
+      ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", joystick_controller_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the fallback tracker for joystick control exists
+    bool joystick_fallback_tracker_check = false;
+    for (unsigned long i = 0; i < tracker_names.size(); i++) {
+
+      std::string tracker_name = tracker_names[i];
+
+      if (tracker_name.compare(joystick_fallback_tracker_name_) == 0) {
+        joystick_fallback_tracker_check = true;
+        joystick_fallback_tracker_idx   = i;
+        break;
+      }
+    }
+    if (!joystick_fallback_tracker_check) {
+      ROS_ERROR("[ControlManager]: the joystick fallback tracker (%s) is not within the loaded trackers", joystick_fallback_tracker_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the fallback controller for joystick control exists
+    bool joystic_fallback_controller_check = false;
+    for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+      std::string controller_name = controller_names[i];
+
+      if (controller_name.compare(joystick_fallback_controller_name_) == 0) {
+        joystic_fallback_controller_check = true;
+        joystick_fallback_controller_idx  = i;
+        break;
+      }
+    }
+    if (!joystic_fallback_controller_check) {
+      ROS_ERROR("[ControlManager]: the failsafe fallback controller (%s) is not within the loaded controllers", joystick_fallback_controller_name_.c_str());
+      ros::shutdown();
+    }
   }
 
   // --------------------------------------------------------------
@@ -757,12 +1002,13 @@ void ControlManager::onInit() {
   active_tracker_idx = null_tracker_idx;
 
   // --------------------------------------------------------------
-  // |           active the first controller on the list          |
+  // |    activate the eland controller as the first controller   |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: Activating the first controller on the list (%s)", controller_names[eland_controller_idx].c_str());
+  ROS_INFO("[ControlManager]: Activating the the eland controller (%s) as the first controller", controller_names[eland_controller_idx].c_str());
 
-  controller_list[active_controller_idx]->activate(last_attitude_cmd);
+  controller_list[eland_controller_idx]->activate(last_attitude_cmd);
+  active_controller_idx = eland_controller_idx;
 
   // update the time
   {
@@ -782,40 +1028,37 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
-      Eigen::MatrixXd border_points =
-              param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-      std::vector<Eigen::MatrixXd> polygon_obstacle_points =
-              param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-      std::vector<Eigen::MatrixXd> point_obstacle_points =
-              param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    Eigen::MatrixXd              border_points           = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+    std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+    std::vector<Eigen::MatrixXd> point_obstacle_points   = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
 
-      // TODO: remove this when param loader supports proper loading
-      for (auto& matrix: polygon_obstacle_points) {
-        matrix.transposeInPlace();
-      }
+    // TODO: remove this when param loader supports proper loading
+    for (auto &matrix : polygon_obstacle_points) {
+      matrix.transposeInPlace();
+    }
 
-      try { 
-        safety_zone = new mrs_lib::SafetyZone(border_points, polygon_obstacle_points, point_obstacle_points);
-      }
-      catch (mrs_lib::SafetyZone::BorderError) {
-        ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
-        ros::shutdown();
-      }
-      catch (mrs_lib::SafetyZone::PolygonObstacleError) {
-        ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
-        ros::shutdown();
-      }
-      catch (mrs_lib::SafetyZone::PointObstacleError) {
-        ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
-        ros::shutdown();
-      }
+    try {
+      safety_zone = new mrs_lib::SafetyZone(border_points, polygon_obstacle_points, point_obstacle_points);
+    }
+    catch (mrs_lib::SafetyZone::BorderError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PointObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
+      ros::shutdown();
+    }
   }
 
   safety_area.use_safety_area       = use_safety_area_;
   safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1, _2);
   safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1, _2, _3);
-  safety_area.getMinHeight = boost::bind(&ControlManager::getMinHeight, this);
-  safety_area.getMaxHeight = boost::bind(&ControlManager::getMaxHeight, this);
+  safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
+  safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -827,30 +1070,32 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output    = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd      = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd      = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force      = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom          = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude   = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_tracker_status    = nh_.advertise<mrs_msgs::TrackerStatus>("tracker_status_out", 1);
-  publisher_controller_status = nh_.advertise<mrs_msgs::ControllerStatus>("controller_status_out", 1);
-  publisher_motors            = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error        = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate     = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_safe_zone_border  = nh_.advertise<visualization_msgs::Marker>("safe_zone_border_out", 1);
+  publisher_control_output   = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd     = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd     = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force     = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom         = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude  = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_diagnostics      = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
+  publisher_motors           = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error       = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate    = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error    = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_rviz             = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
+  publisher_safe_zone_border = nh_.advertise<visualization_msgs::Marker>("safe_zone_border_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry     = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  odometry_last_time      = ros::Time(0);
-  subscriber_max_height   = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_joystick     = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper       = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_state = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
-  subscriber_rc           = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry         = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
+  odometry_last_time          = ros::Time(0);
+  subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
+  subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -892,17 +1137,20 @@ void ControlManager::onInit() {
   // | --------------------- other services --------------------- |
 
   service_server_emergency_goto = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
+  service_server_pirouette      = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
   // --------------------------------------------------------------
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  status_timer   = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
-  safety_timer   = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
-  bumper_timer   = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
-  elanding_timer = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
-  failsafe_timer = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
-  joystick_timer = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
+  status_timer    = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
+  safety_timer    = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
+  bumper_timer    = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
+  elanding_timer  = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
+  failsafe_timer  = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
+  pirouette_timer = nh_.createTimer(ros::Rate(pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
+  joystick_timer  = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
+  control_timer   = nh_.createTimer(ros::Duration(0), &ControlManager::controlTimerOneshot, this, true, false);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -932,55 +1180,10 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   mrs_lib::Routine profiler_routine = profiler->createRoutine("statusTimer", status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
-  // |                publishing the tracker status               |
+  // |                   publish the diagnostics                  |
   // --------------------------------------------------------------
 
-  {
-
-    std::scoped_lock lock(mutex_tracker_list);
-
-    mrs_msgs::TrackerStatus::Ptr tracker_status_ptr;
-    mrs_msgs::TrackerStatus      tracker_status;
-
-    tracker_status_ptr = tracker_list[active_tracker_idx]->getStatus();
-
-    tracker_status = mrs_msgs::TrackerStatus(*tracker_status_ptr);
-
-    tracker_status.tracker = tracker_names[active_tracker_idx];
-    tracker_status.stamp   = ros::Time::now();
-
-    try {
-      publisher_tracker_status.publish(mrs_msgs::TrackerStatusConstPtr(new mrs_msgs::TrackerStatus(tracker_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tracker_status.getTopic().c_str());
-    }
-  }
-
-  // --------------------------------------------------------------
-  // |              publishing the controller status              |
-  // --------------------------------------------------------------
-
-  {
-    std::scoped_lock lock(mutex_controller_list);
-
-    mrs_msgs::ControllerStatus::Ptr controller_status_ptr;
-    mrs_msgs::ControllerStatus      controller_status;
-
-    controller_status_ptr = controller_list[active_controller_idx]->getStatus();
-
-    controller_status = mrs_msgs::ControllerStatus(*controller_status_ptr);
-
-    controller_status.controller = controller_names[active_controller_idx];
-    controller_status.stamp      = ros::Time::now();
-
-    try {
-      publisher_controller_status.publish(mrs_msgs::ControllerStatusConstPtr(new mrs_msgs::ControllerStatus(controller_status)));
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_controller_status.getTopic().c_str());
-    }
-  }
+  publishDiagnostics();
 
   // --------------------------------------------------------------
   // |                 publishing the motors state                |
@@ -1015,6 +1218,31 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   }
 
   // --------------------------------------------------------------
+  // |                  publish the control error                 |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_control_error);
+
+    nav_msgs::Odometry odom_out;
+
+    odom_out.pose.pose.position.x = position_error_x_;
+    odom_out.pose.pose.position.y = position_error_y_;
+    odom_out.pose.pose.position.z = position_error_z_;
+
+    odom_out.twist.twist.linear.x = velocity_error_x_;
+    odom_out.twist.twist.linear.y = velocity_error_y_;
+    odom_out.twist.twist.linear.z = velocity_error_z_;
+
+    try {
+      publisher_control_error.publish(odom_out);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_error.getTopic().c_str());
+    }
+  }
+
+  // --------------------------------------------------------------
   // |                  publish the mass estimate                 |
   // --------------------------------------------------------------
   {
@@ -1035,19 +1263,315 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   }
 
   // --------------------------------------------------------------
-  // |                  publish the safe zone border              |
+  // |                  publish the rviz markers                  |
   // --------------------------------------------------------------
-  if (use_safety_area_) {
-    auto safety_zone_marker = safety_zone->getMarkerMessage();
+  {
+    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_odometry);
 
-    safety_zone_marker.header.stamp = ros::Time::now();
-    safety_zone_marker.header.frame_id = "local_origin";
-  
-    try {
-      publisher_safe_zone_border.publish(safety_zone_marker);
-    }
-    catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_safe_zone_border.getTopic().c_str());
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && got_odometry) {
+
+      visualization_msgs::MarkerArray msg_out;
+
+      double id = 0;
+
+      double multiplier = 1.0;
+
+      Eigen::Quaterniond quat_eigen(odometry.pose.pose.orientation.w, odometry.pose.pose.orientation.x, odometry.pose.pose.orientation.y,
+                                    odometry.pose.pose.orientation.z);
+
+      Eigen::Vector3d      vec3d;
+      geometry_msgs::Point point;
+
+      /* world x disturbance //{ */
+      {
+
+        visualization_msgs::Marker marker;
+
+        marker.header.frame_id = "local_origin";
+        marker.header.stamp    = ros::Time::now();
+        marker.ns              = "control_manager";
+        marker.id              = id++;
+        marker.type            = visualization_msgs::Marker::ARROW;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        /* position //{ */
+
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 0.0;
+
+        //}
+
+        /* orientation //{ */
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //}
+
+        /* origin //{ */
+        point.x = odometry_x;
+        point.y = odometry_y;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        /* tip //{ */
+
+        point.x = odometry_x + multiplier * last_attitude_cmd->disturbance_wx_w;
+        point.y = odometry_y;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        marker.scale.x = 0.05;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
+
+        marker.color.a = 0.5;
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+
+        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+        msg_out.markers.push_back(marker);
+      }
+
+      //}
+
+      /* world y disturbance //{ */
+      {
+
+        visualization_msgs::Marker marker;
+
+        marker.header.frame_id = "local_origin";
+        marker.header.stamp    = ros::Time::now();
+        marker.ns              = "control_manager";
+        marker.id              = id++;
+        marker.type            = visualization_msgs::Marker::ARROW;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        /* position //{ */
+
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 0.0;
+
+        //}
+
+        /* orientation //{ */
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //}
+
+        // defining points
+
+        /* origin //{ */
+        point.x = odometry_x;
+        point.y = odometry_y;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        /* tip //{ */
+
+        point.x = odometry_x;
+        point.y = odometry_y + multiplier * last_attitude_cmd->disturbance_wy_w;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        marker.scale.x = 0.05;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
+
+        marker.color.a = 0.5;
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+
+        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+        msg_out.markers.push_back(marker);
+      }
+
+      //}
+
+      /* body x disturbance //{ */
+      {
+
+        visualization_msgs::Marker marker;
+
+        marker.header.frame_id = "local_origin";
+        marker.header.stamp    = ros::Time::now();
+        marker.ns              = "control_manager";
+        marker.id              = id++;
+        marker.type            = visualization_msgs::Marker::ARROW;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        /* position //{ */
+
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 0.0;
+
+        //}
+
+        /* orientation //{ */
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //}
+
+        /* origin //{ */
+
+        point.x = odometry_x;
+        point.y = odometry_y;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        /* tip //{ */
+
+        vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, 0, 0;
+        vec3d = quat_eigen * vec3d;
+
+        point.x = odometry_x + vec3d[0];
+        point.y = odometry_y + vec3d[1];
+        point.z = odometry_z + vec3d[2];
+
+        marker.points.push_back(point);
+
+        //}
+
+        marker.scale.x = 0.05;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
+
+        marker.color.a = 0.5;
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+
+        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+        msg_out.markers.push_back(marker);
+      }
+
+      //}
+
+      /* body y disturbance //{ */
+      {
+
+        visualization_msgs::Marker marker;
+
+        marker.header.frame_id = "local_origin";
+        marker.header.stamp    = ros::Time::now();
+        marker.ns              = "control_manager";
+        marker.id              = id++;
+        marker.type            = visualization_msgs::Marker::ARROW;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        /* position //{ */
+
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 0.0;
+
+        //}
+
+        /* orientation //{ */
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //}
+
+        /* origin //{ */
+
+        point.x = odometry_x;
+        point.y = odometry_y;
+        point.z = odometry_z;
+
+        marker.points.push_back(point);
+
+        //}
+
+        /* tip //{ */
+
+        vec3d << 0, multiplier * last_attitude_cmd->disturbance_by_b, 0;
+        vec3d = quat_eigen * vec3d;
+
+        point.x = odometry_x + vec3d[0];
+        point.y = odometry_y + vec3d[1];
+        point.z = odometry_z + vec3d[2];
+
+        marker.points.push_back(point);
+
+        //}
+
+        marker.scale.x = 0.05;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
+
+        marker.color.a = 0.5;
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+
+        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+        msg_out.markers.push_back(marker);
+      }
+
+      //}
+
+      // --------------------------------------------------------------
+      // |                     safety area marker                     |
+      // --------------------------------------------------------------
+
+      if (use_safety_area_) {
+        auto safety_zone_marker = safety_zone->getMarkerMessage();
+
+        safety_zone_marker.header.stamp    = ros::Time::now();
+        safety_zone_marker.header.frame_id = "local_origin";
+
+        try {
+          publisher_safe_zone_border.publish(safety_zone_marker);
+        }
+        catch (...) {
+          ROS_ERROR("Exception caught during publishing topic %s.", publisher_safe_zone_border.getTopic().c_str());
+        }
+
+        try {
+          publisher_rviz.publish(msg_out);
+        }
+        catch (...) {
+          ROS_ERROR("Exception caught during publishing topic %s.", publisher_rviz.getTopic().c_str());
+        }
+      }
     }
   }
 }
@@ -1065,21 +1589,13 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!got_odometry || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
-  if (reseting_odometry) {
-    ROS_WARN("[ControlManager]: safetyTimer tried to run while reseting odometry");
+  if (odometry_switch_in_progress) {
+    ROS_WARN("[ControlManager]: safetyTimer tried to run while odometry switch in progress");
     return;
-  }
-
-  {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd);
-
-    if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
-      return;
-    }
   }
 
   // | -------------- eland and failsafe thresholds ------------- |
@@ -1094,19 +1610,29 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     failsafe_threshold_ = it->second.failsafe_threshold;
   }
 
-  // | -------- cacalculate control errors and tilt angle ------- |
+  // | --------- calculate control errors and tilt angle -------- |
 
-  double position_error_x_, position_error_y_, position_error_z_;
   double tilt_angle;
-  tilt_error = 0;
-
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
+
+    // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
+    // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
+    if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      return;
+    }
+
+    tilt_error = 0;
+    yaw_error  = 0;
 
     // control errors
     position_error_x_ = last_position_cmd->position.x - odometry_x;
     position_error_y_ = last_position_cmd->position.y - odometry_y;
     position_error_z_ = last_position_cmd->position.z - odometry_z;
+
+    velocity_error_x_ = last_position_cmd->velocity.x - odometry.twist.twist.linear.x;
+    velocity_error_y_ = last_position_cmd->velocity.y - odometry.twist.twist.linear.y;
+    velocity_error_z_ = last_position_cmd->velocity.z - odometry.twist.twist.linear.z;
 
     // tilt angle
     tf::Quaternion odometry_quaternion;
@@ -1118,84 +1644,131 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     // calculate the angle between the drone's z axis and the world's z axis
     tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
 
-    // | ---------------- calculate the tilt error ---------------- |
-    // to do that, we need the tilt reference, which might not be available
-    {
-      std::scoped_lock lock(mutex_last_attitude_cmd);
+    // | ------------ calculate the tilt and yaw error ------------ |
 
-      // if the attitude_cmd exists (a controller is running)
-      if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+    // | --------------------- the tilt error --------------------- |
+    tf::Quaternion attitude_cmd_quaternion;
 
-        tf::Quaternion attitude_cmd_quaternion;
+    // calculate the quaternion
+    if (last_attitude_cmd->quater_attitude_set) {
 
-        // calculate the quaternion
-        if (last_attitude_cmd->quater_attitude_set) {
+      attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
+      attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
+      attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
+      attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
 
-          attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
-          attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
-          attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
-          attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+    } else if (last_attitude_cmd->euler_attitude_set) {
 
-        } else if (last_attitude_cmd->euler_attitude_set) {
+      // convert the RPY to quaternion
+      attitude_cmd_quaternion =
+          tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+    }
 
-          // convert the RPY to quaternion
-          attitude_cmd_quaternion =
-              tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-        }
+    if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
 
-        if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
+      // calculate the desired drone's z axis in the world frame
+      tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
 
-          // calculate the desired drone's z axis in the world frame
-          tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
+      // calculate the angle between the drone's z axis and the world's z axis
+      tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
+    }
 
-          // calculate the angle between the drone's z axis and the world's z axis
-          tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
-        }
-      }
+    // | ---------------------- the yaw error --------------------- |
+    if (last_attitude_cmd->euler_attitude_set) {
+
+      yaw_error = last_attitude_cmd->euler_attitude.z - odometry_yaw;
+
+    } else if (last_attitude_cmd->quater_attitude_set) {
+
+      // calculate the euler angles
+      tf::Quaternion quater_attitude_cmd;
+      quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+      tf::Matrix3x3 m(quater_attitude_cmd);
+      double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
+      m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
+
+      yaw_error = angleDist(attitude_cmd_yaw, odometry_yaw);
     }
   }
 
-  double control_error_ = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
+  // scalar control error
+  double control_error = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
 
   // --------------------------------------------------------------
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
+  // | ------ copy the last tracker/controller switch time ------ |
+
+  ros::Time tmp_controller_tracker_switch_time;
   {
     std::scoped_lock lock(mutex_controller_tracker_switch_time);
 
-    if (control_error_ > failsafe_threshold_ && !failsafe_triggered) {
+    tmp_controller_tracker_switch_time = controller_tracker_switch_time;
+  }
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+  // | --------------------------------------------------------- |
 
-        if (!failsafe_triggered) {
+  if (control_error > failsafe_threshold_ && !failsafe_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating failsafe land: control_error_=%2.2f/%2.2f", control_error_, failsafe_threshold_);
+    if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
-          std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+      if (!failsafe_triggered) {
 
-          failsafe();
-        }
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%2.2f/%2.2f", control_error, failsafe_threshold_);
+
+        std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+        failsafe();
       }
     }
   }
 
   // --------------------------------------------------------------
-  // |   activate emergancy land in case of medium control error  |
+  // |   activate emergency land in case of medium control error  |
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_odometry, mutex_controller_tracker_switch_time);
+    std::scoped_lock lock(mutex_odometry);
 
-    if (tilt_angle > tilt_limit_eland_ || control_error_ > eland_threshold_) {
+    // | ------------------- tilt control error ------------------- |
+    if (tilt_angle > tilt_limit_eland_) {
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered && !eland_triggered) {
 
-          ROS_ERROR("[ControlManager]: Activating emergancy land: tilt angle=%2.2f/%2.2f deg, control_error_=%2.2f/%2.2f", (180.0 / M_PI) * tilt_angle,
-                    (180.0 / M_PI) * tilt_limit_eland_, control_error_, eland_threshold_);
+          ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * tilt_angle,
+                    (180.0 / M_PI) * tilt_limit_eland_);
+          std::string message_out;
+          eland(message_out);
+        }
+      }
+    }
 
+    // | ----------------- position control error ----------------- |
+    if (control_error > eland_threshold_) {
+
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
+
+        if (!failsafe_triggered && !eland_triggered) {
+
+          ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f m exceeded %.2f m", control_error, eland_threshold_);
+          std::string message_out;
+          eland(message_out);
+        }
+      }
+    }
+
+    // | -------------------- yaw control error ------------------- |
+    if (yaw_error > yaw_error_eland_threshold_) {
+
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
+
+        if (!failsafe_triggered && !eland_triggered) {
+
+          ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * yaw_error,
+                    (180.0 / M_PI) * yaw_error_eland_threshold_);
           std::string message_out;
           eland(message_out);
         }
@@ -1216,7 +1789,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry, initiating failsafe land");
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land.",
+                           (ros::Time::now() - odometry_last_time).toSec());
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1241,8 +1815,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list, mutex_controller_tracker_switch_time);
 
-    if (tilt_error_failsafe_enabled_ &&
-        odometry_z > tilt_error_failsafe_min_height_) {  // TODO the height conditions will not work when we start to fly under 0 height
+    if (tilt_error_failsafe_enabled_) {
 
       if (fabs(tilt_error) > tilt_error_threshold_) {
 
@@ -1274,14 +1847,6 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  double last_thrust_cmd;
-
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd);
-
-    last_thrust_cmd = last_attitude_cmd->thrust;
-  }
-
   mrs_lib::Routine profiler_routine = profiler->createRoutine("elandingTimer", elanding_timer_rate_, 0.01, event);
 
   if (current_state_landing == IDLE_STATE) {
@@ -1290,21 +1855,36 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
 
   } else if (current_state_landing == LANDING_STATE) {
 
+    double last_thrust_cmd;
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+        return;
+      }
+
+      last_thrust_cmd = last_attitude_cmd->thrust;
+    }
+
     // recalculate the mass based on the thrust
     double thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
     ROS_INFO("[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
     // condition for automatic motor turn off
-    if ((odometry_z < elanding_cutoff_height_) && ((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
+    if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
 
       // enable callbacks? ... NO
 
+      ROS_INFO("[ControlManager]: reached cutoff thrust, setting motors OFF");
       switchMotors(false);
 
       // disarm the drone
-      if (isOffboard()) {
+      if (isOffboard() && eland_disarm_enabled_) {
 
-        ROS_INFO("[ControlManager]: reached cutoff thrust, calling for disarm");
+        ROS_INFO("[ControlManager]: calling for disarm");
         mavros_msgs::CommandBool srv_out;
         service_client_arm.call(srv_out);
 
@@ -1313,14 +1893,11 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
         ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode");
       }
 
-      std_srvs::Trigger shutdown_out;
-      service_client_shutdown.call(shutdown_out);
-
-      // TODO: check the result?
+      shutdown();
 
       changeLandingState(IDLE_STATE);
 
-      ROS_WARN("[ControlManager]: emergancy landing finished");
+      ROS_WARN("[ControlManager]: emergency landing finished");
 
       elanding_timer.stop();
 
@@ -1340,9 +1917,11 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("failsafeTimer", failsafe_timer_rate_, 0.01, event);
 
-  ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe timer spinning");
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
 
-  updateControllers();
+    updateControllers(pixhawk_odometry);
+  }
 
   publish();
 
@@ -1350,6 +1929,12 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
   {
     std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+      return;
+    }
 
     last_thrust = last_attitude_cmd->thrust;
   }
@@ -1382,15 +1967,15 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   // if start was pressed and held for > 3.0 s
   if (joytracker_start_pressed && (ros::Time::now() - joystick_tracker_press_time).toSec() > 3.0) {
 
-    ROS_INFO("[ControlManager]: activating JoyTracker and AttitudeController");
+    ROS_INFO("[ControlManager]: transitioning to joystick control: activating %s and %s", joystick_tracker_name_.c_str(), joystick_controller_name_.c_str());
 
     joytracker_start_pressed = false;
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "AttitudeController";
+    controller_srv.value = joystick_controller_name_;
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "JoyTracker";
+    tracker_srv.value = joystick_tracker_name_;
 
     mrs_msgs::StringResponse response;
 
@@ -1398,7 +1983,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     callbackSwitchController(controller_srv, response);
   }
 
-  // if RT+LT were pressed and held for > 1.0 s
+  // if RT+LT were pressed and held for > 0.1 s
   if (joystick_failsafe_pressed && (ros::Time::now() - joystick_failsafe_press_time).toSec() > 0.1) {
 
     ROS_INFO("[ControlManager]: activating failsafe by joystick");
@@ -1408,7 +1993,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     failsafe();
   }
 
-  // if joypads were pressed and held for > 1.0 s
+  // if joypads were pressed and held for > 0.1 s
   if (joystick_eland_pressed && (ros::Time::now() - joystick_eland_press_time).toSec() > 0.1) {
 
     ROS_INFO("[ControlManager]: activating eland by joystick");
@@ -1419,11 +2004,11 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     eland(message_out);
   }
 
-  // if back was pressed and held for > 1.0 s
+  // if back was pressed and held for > 0.1 s
   if (joystick_back_pressed && (ros::Time::now() - joystick_goto_press_time).toSec() > 0.1) {
 
-    // activate the joystick goto functionality
-    joystick_goto_enabled = true;
+    // activate/deactivate the joystick goto functionality
+    joystick_goto_enabled = !joystick_goto_enabled;
   }
 
   // if the GOTO functionality is enabled...
@@ -1433,15 +2018,15 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     mrs_msgs::Vec4::Request request;
 
-    if (fabs(joystick_data.axes[0]) >= 0.05 || fabs(joystick_data.axes[1]) >= 0.05 || fabs(joystick_data.axes[3]) >= 0.05 ||
-        fabs(joystick_data.axes[4]) >= 0.05) {
+    if (fabs(joystick_data.axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data.axes[_channel_roll_]) >= 0.05 ||
+        fabs(joystick_data.axes[_channel_yaw_]) >= 0.05 || fabs(joystick_data.axes[_channel_thrust_]) >= 0.05) {
 
       double speed = 1.0;
 
-      request.goal[0] = joystick_data.axes[1] * speed;
-      request.goal[1] = joystick_data.axes[3] * speed;
-      request.goal[2] = joystick_data.axes[4] * 1;
-      request.goal[3] = joystick_data.axes[0];
+      request.goal[REF_X]   = _channel_mult_pitch_ * joystick_data.axes[_channel_pitch_] * speed;
+      request.goal[REF_Y]   = _channel_mult_roll_ * joystick_data.axes[_channel_roll_] * speed;
+      request.goal[REF_Z]   = _channel_mult_thrust_ * joystick_data.axes[_channel_thrust_];
+      request.goal[REF_YAW] = _channel_mult_yaw_ * joystick_data.axes[_channel_yaw_];
 
       mrs_msgs::Vec4::Response response;
 
@@ -1462,8 +2047,6 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     double des_z   = 0;
     double des_yaw = 0;
 
-    double speed = 2.0;
-
     bool nothing_to_do = true;
 
     if (uint(3) >= rc_channels.channels.size()) {
@@ -1473,17 +2056,17 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     } else {
 
       if (abs(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * speed;
+        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * speed;
+        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * speed;
+        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
         nothing_to_do = false;
       }
 
@@ -1495,10 +2078,20 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     if (!nothing_to_do) {
 
-      request.goal[0] = des_x;
-      request.goal[1] = des_y;
-      request.goal[2] = des_z;
-      request.goal[3] = des_yaw;
+      request.goal[REF_X]   = des_x;
+      request.goal[REF_Y]   = des_y;
+      request.goal[REF_Z]   = des_z;
+      request.goal[REF_YAW] = des_yaw;
+
+      Eigen::Vector2d des(request.goal[REF_X], request.goal[REF_Y]);
+      {
+        std::scoped_lock lock(mutex_odometry);
+
+        des = rotateVector(des, odometry_yaw);
+      }
+
+      request.goal[REF_X] = des[0];
+      request.goal[REF_Y] = des[1];
 
       mrs_msgs::Vec4Response response;
 
@@ -1516,11 +2109,12 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       callbacks_enabled = true;
 
       // call the goto
-      callbackGoToFcuService(request, response);
+      callbackGoToRelativeService(request, response);
 
       callbacks_enabled = false;
 
-      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[0], request.goal[1], request.goal[2], request.goal[3]);
+      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z],
+               request.goal[REF_YAW]);
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
@@ -1546,7 +2140,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       }
     }
 
-    if (int(rc_channel_switch_time.size()) > rc_joystic_n_switches_) {
+    if (int(rc_channel_switch_time.size()) >= rc_joystic_n_switches_) {
 
       if (rc_goto_active_ == false) {
 
@@ -1611,27 +2205,127 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+  // do not use the bumper, unless with non-special tracker
+  if (active_tracker_idx == ehover_tracker_idx || active_tracker_idx == null_tracker_idx || active_tracker_idx == landoff_tracker_idx) {
     return;
   }
 
-  {
-    std::scoped_lock lock(mutex_odometry);
+  if (!got_odometry) {
+    return;
+  }
 
-    if (odometry_z < 0.5) {
-
-      ROS_WARN_THROTTLE(0.5, "[ControlManager]: not using bumper repulsion, height < 0.5 m");
-      return;
-    }
+  if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+    return;
   }
 
   // --------------------------------------------------------------
   // |                      bumper repulsion                      |
   // --------------------------------------------------------------
 
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumperTimer spinning");
-
   bumperPushFromObstacle();
+}
+
+//}
+
+/* //{ pirouetteTimer() */
+
+void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("pirouetteTimer", pirouette_timer_rate_, 0.01, event);
+
+  pirouette_iterator++;
+
+  double pirouette_duration  = (2 * M_PI) / pirouette_speed_;
+  double pirouette_n_steps   = pirouette_duration * pirouette_timer_rate_;
+  double pirouette_step_size = (2 * M_PI) / pirouette_n_steps;
+
+  if (rc_eland_triggered || failsafe_triggered || eland_triggered || (pirouette_iterator > pirouette_duration * pirouette_timer_rate_)) {
+
+    pirouette_enabled_ = false;
+    pirouette_timer.stop();
+
+    setCallbacks(true);
+
+    return;
+  }
+
+  // enable the callbacks for the active tracker
+  std_srvs::SetBoolRequest req_enable_callbacks;
+  req_enable_callbacks.data = true;
+  tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+
+  // call the goto
+  mrs_msgs::Vec1Request req_goto_out;
+
+  req_goto_out.goal = pirouette_inital_yaw + pirouette_iterator * pirouette_step_size;
+
+  mrs_msgs::Vec1Response::ConstPtr tracker_response;
+  tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+
+  // disable the callbacks for the active tracker
+  req_enable_callbacks.data = false;
+  tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+}
+
+//}
+
+/* controlTimer() //{ */
+
+void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::ScopeUnset unset_running(running_control_timer);
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("controlTimer");
+
+  if (!failsafe_triggered) {  // when failsafe is triggered, updateControllers() and publish() is called in failsafeTimer()
+
+    // run the safety timer
+    // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
+    ros::TimerEvent safety_timer_event;
+    safetyTimer(safety_timer_event);
+
+    updateTrackers();
+
+    nav_msgs::Odometry temp_odometry;
+
+    {
+      std::scoped_lock lock(mutex_odometry);
+
+      temp_odometry = odometry;
+    }
+
+    updateControllers(temp_odometry);
+
+    if (got_constraints) {
+
+      // update the constraints to trackers, if need to
+      {
+        std::scoped_lock lock(mutex_constraints);
+
+        if (enforceControllersConstraints(sanitized_constraints)) {
+          setConstraints(sanitized_constraints);
+        }
+      }
+    }
+
+    publish();
+  }
+
+  if (odometry_switch_in_progress) {
+
+    safety_timer.start();
+    odometry_switch_in_progress = false;
+
+    std::scoped_lock lock(mutex_odometry);
+
+    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+  }
 }
 
 //}
@@ -1649,12 +2343,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   if (!is_initialized)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
+
   if (!got_max_height) {
-    ROS_INFO("[MpcTracker]: the safety timer is in the middle of an iteration, waiting for it to finish");
+    ROS_WARN_THROTTLE(1.0, "[ControlerManager]: waiting for max allowed height from odometry");
     return;
   }
 
-  // | -- prepare an OdometryConstPtr for trackers&controllers -- |
+  /* Odometry frame switch //{ */
+
+  // | -- prepare an OdometryConstPtr for trackers & controllers -- |
 
   nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(*msg));
 
@@ -1664,8 +2362,13 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      {
+        std::scoped_lock lock(mutex_odometry);
 
-      reseting_odometry = true;
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+      }
+
+      odometry_switch_in_progress = true;
 
       // we have to stop safety timer, otherwise it will interfere
       safety_timer.stop();
@@ -1676,9 +2379,23 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
         wait.sleep();
       }
 
-      tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
+      // we have to also for the oneshot control timer to finish
+      while (running_control_timer) {
+        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
+      {
+        std::scoped_lock lock(mutex_controller_list, mutex_tracker_list);
+
+        tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
+        controller_list[active_controller_idx]->switchOdometrySource(odometry_const_ptr);
+      }
     }
   }
+
+  //}
 
   // --------------------------------------------------------------
   // |                      copy the odometry                     |
@@ -1698,31 +2415,52 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+
+    got_odometry = true;
+
+    odometry_last_time = ros::Time::now();
   }
 
-  got_odometry = true;
+  // run the control loop asynchronously in an OneShotTimer
+  // but only if its not already running
+  if (!running_control_timer) {
+    control_timer.stop();
+    control_timer.start();
+  }
+}
 
-  odometry_last_time = ros::Time::now();
+//}
 
-  if (!failsafe_triggered) {  // when failsafe is triggers, updateControllers() and publish() is called in failsafeTimer()
+/* //{ callbackPixhawkOdometry() */
 
-    // run the safety timer
-    // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
-    ros::TimerEvent safety_timer_event;
-    safetyTimer(safety_timer_event);
+void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
-    updateTrackers();
+  if (!is_initialized)
+    return;
 
-    updateControllers();
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackPixhawkOdometry");
 
-    publish();
+  // --------------------------------------------------------------
+  // |                      copy the odometry                     |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_pixhawk_odometry);
+
+    pixhawk_odometry = *msg;
+
+    pixhawk_odometry_x = pixhawk_odometry.pose.pose.position.x;
+    pixhawk_odometry_y = pixhawk_odometry.pose.pose.position.y;
+    pixhawk_odometry_z = pixhawk_odometry.pose.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion quaternion_odometry;
+    quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, quaternion_odometry);
+    tf::Matrix3x3 m(quaternion_odometry);
+    m.getRPY(pixhawk_odometry_roll, pixhawk_odometry_pitch, pixhawk_odometry_yaw);
   }
 
-  if (reseting_odometry) {
-
-    safety_timer.start();
-    reseting_odometry = false;
-  }
+  got_pixhawk_odometry = true;
 }
 
 //}
@@ -1748,30 +2486,30 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
+void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoystick");
 
   std::scoped_lock lock(mutex_joystick);
 
   joystick_data = *msg;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackJoy");
+  // | ---- switching back to fallback tracker and controller --- |
 
-  // | -------------- Switching back to So3 and Mpc ------------- |
-
-  // if any of the A, B, X, Y buttons are pressed when flying with JoyTracker, switch back to Mpc and SO(3)
-  if ((msg->buttons[0] == 1 || msg->buttons[1] == 1 || msg->buttons[2] == 1 || msg->buttons[3] == 1) &&
-      tracker_names[active_tracker_idx].compare("JoyTracker") == 0 && controller_names[active_controller_idx].compare("AttitudeController") == 0) {
+  // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
+  if ((msg->buttons[_channel_A_] == 1 || msg->buttons[_channel_B_] == 1 || msg->buttons[_channel_X_] == 1 || msg->buttons[_channel_Y_] == 1) &&
+      active_tracker_idx == joystick_tracker_idx && active_controller_idx == joystick_controller_idx) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
     mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = "MpcController";
+    controller_srv.value = joystick_fallback_controller_name_;
 
     mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = "MpcTracker";
+    tracker_srv.value = joystick_fallback_tracker_name_;
 
     mrs_msgs::StringResponse response;
 
@@ -1781,10 +2519,10 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
     joystick_goto_enabled = false;
   }
 
-  // | ------- JoyTracker & AttitudeController activation ------- |
+  // | ------- joystick control activation ------- |
 
   // if start button was pressed
-  if (msg->buttons[7] == 1) {
+  if (msg->buttons[_channel_start_] == 1) {
 
     if (!joytracker_start_pressed) {
 
@@ -1805,7 +2543,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ---------------- Joystick goto activation ---------------- |
 
   // if back button was pressed
-  if (msg->buttons[6] == 1) {
+  if (msg->buttons[_channel_back_] == 1) {
 
     if (!joystick_back_pressed) {
 
@@ -1826,7 +2564,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   // | ------------------------ Failsafes ----------------------- |
 
   // if LT and RT buttons are both pressed down
-  if (msg->axes[2] < -0.99 && msg->axes[5] < -0.99) {
+  if (msg->axes[_channel_LT_] < -0.99 && msg->axes[_channel_RT_] < -0.99) {
 
     if (!joystick_failsafe_pressed) {
 
@@ -1845,7 +2583,7 @@ void ControlManager::callbackJoystic(const sensor_msgs::JoyConstPtr &msg) {
   }
 
   // if left and right joypads are both pressed down
-  if (msg->buttons[9] == 1 && msg->buttons[10] == 1) {
+  if (msg->buttons[_channel_L_joy_] == 1 && msg->buttons[_channel_R_joy_] == 1) {
 
     if (!joystick_eland_pressed) {
 
@@ -1872,6 +2610,8 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg
 
   if (!is_initialized)
     return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackBumper");
 
   ROS_INFO_ONCE("[ControlManager]: getting bumper data");
 
@@ -1912,6 +2652,22 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
     if (offboard_mode) {
       offboard_mode = false;
       ROS_INFO("[ControlManager]: OFFBOARD mode OFF");
+    }
+  }
+
+  // | --------- detect and print the changes in arming --------- |
+  if (mavros_state.armed == true) {
+
+    if (!armed) {
+      armed = true;
+      ROS_INFO("[ControlManager]: vehicle ARMED");
+    }
+
+  } else {
+
+    if (armed) {
+      armed = false;
+      ROS_INFO("[ControlManager]: vehicle DISARMED");
     }
   }
 }
@@ -2005,6 +2761,15 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   if (!got_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  if (!got_pixhawk_odometry) {
+
+    sprintf((char *)&message, "Can't switch tracker, missing PixHawk odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -2172,10 +2937,10 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         res.success = true;
 
         // TODO is this the right place?
-        std::string response;
-        ROS_INFO("[ControlManager]: triggering hover after switching to a new controller.");
+        ROS_INFO("[ControlManager]: triggering hover after switching to a new controller, re-activating %s.", tracker_names[active_tracker_idx].c_str());
 
         // reactivate the current tracker
+        // TODO this is not the most elegant way
         {
           std::scoped_lock lock(mutex_tracker_list);
 
@@ -2205,6 +2970,13 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
       ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.value.c_str());
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
+  }
+
+  {
+    std::scoped_lock lock(mutex_constraints);
+
+    sanitized_constraints = current_constraints;
+    setConstraints(current_constraints);
   }
 
   res.message = message;
@@ -2315,7 +3087,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
     if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
 
-      sprintf((char *)&message, "Can't turn motors on, the UAV is outside of the safety area!");
+      sprintf((char *)&message, "Can't switch motors on, the UAV is outside of the safety area!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2324,7 +3096,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   }
 
   if (req.data && (failsafe_triggered || eland_triggered || rc_eland_triggered)) {
-    sprintf((char *)&message, "cannot switch motors ON, we landed in emergancy.");
+    sprintf((char *)&message, "cannot switch motors ON, we landed in emergency.");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -2335,7 +3107,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
     std::scoped_lock lock(mutex_mavros_state);
 
     if (!got_mavros_state || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
-      sprintf((char *)&message, "Can't takeoff, missing mavros state!");
+      sprintf((char *)&message, "Can't switch motors ON, missing mavros state!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2345,7 +3117,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   if (bumper_enabled_) {
     if (!got_bumper) {
-      sprintf((char *)&message, "Can't turn motors on, missing bumper data!");
+      sprintf((char *)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -2409,22 +3181,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   if (!is_initialized)
     return false;
 
-  callbacks_enabled = req.data;
-
-  std_srvs::SetBoolRequest req_goto_out;
-  req_goto_out = req;
-
-  std_srvs::SetBoolRequest req_enable_callbacks;
-  req_enable_callbacks.data = callbacks_enabled;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    // disable callbacks of all trackers
-    for (unsigned int i = 0; i < tracker_list.size(); i++) {
-      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
-    }
-  }
+  setCallbacks(req.data);
 
   char message[200];
   sprintf((char *)&message, "Callbacks: %s", motors ? "enabled" : "disabled");
@@ -2448,22 +3205,16 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
     return true;
   }
 
-  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
-
-  mrs_msgs::TrackerConstraintsRequest req_constraints;
-  req_constraints = req;
-
   {
-    std::scoped_lock lock(mutex_tracker_list);
+    std::scoped_lock lock(mutex_constraints);
 
-    // for each tracker
-    for (unsigned int i = 0; i < tracker_list.size(); i++) {
-
-      // if it is the active one, update and retrieve the command
-      tracker_response =
-          tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(req_constraints)));
-    }
+    current_constraints   = req;
+    sanitized_constraints = req;
+    got_constraints       = true;
   }
+
+  enforceControllersConstraints(sanitized_constraints);
+  setConstraints(sanitized_constraints);
 
   res.message = "Setting constraints";
   res.success = true;
@@ -2524,6 +3275,37 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
 
 //}
 
+/* callbackPirouette() //{ */
+
+bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  if (pirouette_enabled_) {
+    res.success = false;
+    res.message = "already active";
+    return true;
+  }
+
+  pirouette_enabled_ = true;
+
+  std::scoped_lock lock(mutex_odometry);
+
+  setCallbacks(false);
+
+  pirouette_inital_yaw = odometry_yaw;
+  pirouette_iterator   = 0;
+  pirouette_timer.start();
+
+  res.success = true;
+  res.message = "activated";
+
+  return true;
+}
+
+//}
+
 // | -------------- setpoint topics and services -------------- |
 
 /* //{ callbackGoToService() */
@@ -2556,14 +3338,14 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], ABSOLUTE_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], ABSOLUTE_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
-  if (!isPointInSafetyArea3d(request_in.goal[0], request_in.goal[1], request_in.goal[2])) {
+  if (!isPointInSafetyArea3d(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z])) {
     ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -2738,7 +3520,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], FCU_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], FCU_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
@@ -2747,7 +3529,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
 
   // prepare the message for current tracker
   mrs_msgs::Vec4Request request;
-  Eigen::Vector2d       des(request_in.goal[0], request_in.goal[1]);
+  Eigen::Vector2d       des(request_in.goal[REF_X], request_in.goal[REF_Y]);
 
   {
     std::scoped_lock lock(mutex_odometry);
@@ -2755,14 +3537,14 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     // rotate it from the frame of the drone
     des = rotateVector(des, odometry_yaw);
 
-    request.goal[0] = des[0] + odometry_x;
-    request.goal[1] = des[1] + odometry_y;
-    request.goal[2] = request_in.goal[2] + odometry_z;
-    request.goal[3] = request_in.goal[3] + odometry_yaw;
+    request.goal[REF_X]   = des[REF_X] + odometry_x;
+    request.goal[REF_Y]   = des[REF_Y] + odometry_y;
+    request.goal[REF_Z]   = request_in.goal[REF_Z] + odometry_z;
+    request.goal[REF_YAW] = request_in.goal[REF_YAW] + odometry_yaw;
   }
 
   // check the safety area
-  if (!isPointInSafetyArea3d(request.goal[0], request.goal[1], request.goal[2])) {
+  if (!isPointInSafetyArea3d(request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z])) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -2775,9 +3557,6 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     res.success = false;
     return true;
   }
-
-
-
 
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
@@ -2918,7 +3697,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   }
 
   // check the obstacle bumper
-  if (!bumperValidatePoint(request_in.goal[0], request_in.goal[1], request_in.goal[2], RELATIVE_FRAME)) {
+  if (!bumperValidatePoint(request_in.goal[REF_X], request_in.goal[REF_Y], request_in.goal[REF_Z], RELATIVE_FRAME)) {
     ROS_ERROR("[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
@@ -2928,10 +3707,20 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[0], last_position_cmd->position.y + request_in.goal[1],
-                               last_position_cmd->position.z + request_in.goal[2])) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
-      res.message = "the point is outside of the safety area";
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[REF_X], last_position_cmd->position.y + request_in.goal[REF_Y],
+                                 last_position_cmd->position.z + request_in.goal[REF_Z])) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+        res.message = "the point is outside of the safety area";
+        res.success = false;
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
+      res.message = "last_position_cmd is not valid";
       res.success = false;
       return true;
     }
@@ -3024,35 +3813,40 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   // prepare the message for current tracker
   mrs_msgs::TrackerPointStamped request;
 
-  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
-
-    // rotate it from the frame of the drone
-    Eigen::Vector2d des(des_x, des_y);
-    des = rotateVector(des, odometry_yaw);
-
-    {
-      std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
-
-      request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
-      request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
-      request.position.z   = des_z + odometry_z - last_position_cmd->position.z;
-      request.position.yaw = des_yaw + odometry_yaw - last_position_cmd->yaw;
-    }
-
-  } else {
-
-    request.position.x   = des_x;
-    request.position.y   = des_y;
-    request.position.z   = des_z;
-    request.position.yaw = des_yaw;
-  }
-
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
-                               last_position_cmd->position.z + request.position.z)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+        // rotate it from the frame of the drone
+        Eigen::Vector2d des(des_x, des_y);
+        des = rotateVector(des, odometry_yaw);
+
+        request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
+        request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
+        request.position.z   = des_z + odometry_z - last_position_cmd->position.z;
+        request.position.yaw = des_yaw + odometry_yaw - last_position_cmd->yaw;
+
+      } else {
+
+        request.position.x   = des_x;
+        request.position.y   = des_y;
+        request.position.z   = des_z;
+        request.position.yaw = des_yaw;
+      }
+
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
+                                 last_position_cmd->position.z + request.position.z)) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+        return;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, last_position_cmd is not valid!");
       return;
     }
 
@@ -3105,9 +3899,19 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
-      res.message = "the point is outside of the safety area";
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
+        ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+        res.message = "the point is outside of the safety area";
+        res.success = false;
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
+      res.message = "last_position_cmd is not valid";
       res.success = false;
       return true;
     }
@@ -3159,8 +3963,16 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
+        ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+        return;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, last_position_cmd is not valid!");
       return;
     }
   }
@@ -3367,10 +4179,10 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
   char message[400];
 
   mrs_msgs::StringRequest controller_srv;
-  controller_srv.value = "AttitudeController";
+  controller_srv.value = joystick_controller_name_;
 
   mrs_msgs::StringRequest tracker_srv;
-  tracker_srv.value = "JoyTracker";
+  tracker_srv.value = joystick_tracker_name_;
 
   mrs_msgs::StringResponse response;
 
@@ -3378,7 +4190,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to JoyTracker was unsuccssfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_tracker_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3391,7 +4203,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to AttitudeController was unsuccssfull: %s", response.message.c_str());
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_controller_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3408,7 +4220,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
     return true;
   }
 
-  sprintf((char *)&message, "Switched to JoyTracker");
+  sprintf((char *)&message, "Switched to joystick control");
   res.success = true;
   res.message = message;
 
@@ -3483,6 +4295,186 @@ bool ControlManager::isOffboard(void) {
 
 //}
 
+/* shutdown() //{ */
+
+void ControlManager::shutdown() {
+
+  if (automatic_pc_shutdown_enabled) {
+
+    std::scoped_lock lock(mutex_odometry);
+
+    double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
+
+    if (distance_to_origin > automatic_pc_shutdown_threshold) {
+
+      ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
+
+      std_srvs::Trigger shutdown_out;
+      service_client_shutdown.call(shutdown_out);
+    }
+  }
+}
+
+//}
+
+/* setCallbacks() //{ */
+
+void ControlManager::setCallbacks(bool in) {
+
+  callbacks_enabled = in;
+
+  std_srvs::SetBoolRequest req_enable_callbacks;
+  req_enable_callbacks.data = callbacks_enabled;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    // set callbacks to all trackers
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+      tracker_list[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
+    }
+  }
+}
+
+//}
+
+/* publishDiagnostics() //{ */
+
+void ControlManager::publishDiagnostics(void) {
+
+  std::scoped_lock lock(mutex_diagnostics);
+
+  mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
+
+  diagnostics_msg.stamp = ros::Time::now();
+
+  // | ----------------- fill the tracker status ---------------- |
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    mrs_msgs::TrackerStatus tracker_status;
+
+    tracker_status = tracker_list[active_tracker_idx]->getStatus();
+
+    tracker_status.tracker = tracker_names[active_tracker_idx];
+
+    diagnostics_msg.tracker_status = tracker_status;
+  }
+
+  // | --------------- fill the controller status --------------- |
+
+  {
+    std::scoped_lock lock(mutex_controller_list);
+
+    mrs_msgs::ControllerStatus controller_status;
+
+    controller_status = controller_list[active_controller_idx]->getStatus();
+
+    controller_status.controller = controller_names[active_controller_idx];
+
+    diagnostics_msg.controller_status = controller_status;
+  }
+
+  try {
+    publisher_diagnostics.publish(diagnostics_msg);
+  }
+  catch (...) {
+    ROS_ERROR("Exception caught during publishing topic %s.", publisher_diagnostics.getTopic().c_str());
+  }
+}
+
+//}
+
+/* setConstraints() //{ */
+
+void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constraints) {
+
+  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    // for each tracker
+    for (unsigned int i = 0; i < tracker_list.size(); i++) {
+
+      // if it is the active one, update and retrieve the command
+      tracker_response = tracker_list[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(new mrs_msgs::TrackerConstraintsRequest(constraints)));
+    }
+  }
+}
+
+//}
+
+/* enforceControllerConstraints() //{ */
+
+bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints) {
+
+  bool enforcing = false;
+
+  {
+    std::scoped_lock lock(mutex_last_attitude_cmd);
+
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+      if (last_attitude_cmd->controller_enforcing_constraints) {
+
+        std::scoped_lock lock(mutex_tracker_list);
+
+        // enforce horizontal speed
+        if (last_attitude_cmd->horizontal_speed_constraint < constraints.horizontal_speed) {
+          constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce horizontal acceleration
+        if (last_attitude_cmd->horizontal_acc_constraint < constraints.horizontal_acceleration) {
+          constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical ascending speed
+        if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.vertical_ascending_speed) {
+          constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical ascending acceleration
+        if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.vertical_ascending_acceleration) {
+          constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical descending speed
+        if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.vertical_descending_speed) {
+          constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
+
+          enforcing = true;
+        }
+
+        // enforce vertical descending acceleration
+        if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.vertical_descending_acceleration) {
+          constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
+
+          enforcing = true;
+        }
+      }
+    }
+  }
+
+  if (enforcing) {
+    std::scoped_lock lock(mutex_controller_list);
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: %s is enforcing constraints over ConstraintManager", controller_names[active_controller_idx].c_str());
+  }
+
+  return enforcing;
+}
+
+//}
+
 // | ----------------------- safety area ---------------------- |
 
 /* //{ isInSafetyArea3d() */
@@ -3515,13 +4507,14 @@ bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 /* //{ isPathToPointInSafetyArea2d() */
 
 bool ControlManager::isPathToPointInSafetyArea2d(const double endX, const double endY) {
-    if (!use_safety_area_) return true;
+  if (!use_safety_area_)
+    return true;
 
-    mutex_last_position_cmd.lock();
-    double startX = last_position_cmd->position.x, startY = last_position_cmd->position.y;
-    mutex_last_position_cmd.unlock();
+  mutex_last_position_cmd.lock();
+  double startX = last_position_cmd->position.x, startY = last_position_cmd->position.y;
+  mutex_last_position_cmd.unlock();
 
-    return safety_zone->isPathValid(startX, startY, endX, endY);
+  return safety_zone->isPathValid(startX, startY, endX, endY);
 }
 
 //}
@@ -3922,15 +4915,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
       des = rotateVector(des, odometry_yaw);
 
       if (horizontal_collision_detected) {
-        req_goto_out.goal[0] = des[0];
-        req_goto_out.goal[1] = des[1];
+        req_goto_out.goal[REF_X] = des[0];
+        req_goto_out.goal[REF_Y] = des[1];
       }
 
       if (vertical_collision_detected) {
-        req_goto_out.goal[2] = vertical_repulsion_distance;
+        req_goto_out.goal[REF_Z] = vertical_repulsion_distance;
       }
 
-      req_goto_out.goal[3] = 0;
+      req_goto_out.goal[REF_YAW] = 0;
     }
 
     {
@@ -3990,7 +4983,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
-  std::scoped_lock lock(mutex_odometry);  // TODO check if it can be here
+  std::scoped_lock lock(mutex_odometry);
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -4045,7 +5038,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
     break;
   }
 
-  ROS_INFO("[ControlManager]: Switching emergancy landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
+  ROS_INFO("[ControlManager]: Switching emergency landing state %s -> %s", state_names[previous_state_landing], state_names[current_state_landing]);
 }
 
 //}
@@ -4409,6 +5402,8 @@ bool ControlManager::failsafe() {
 
 //}
 
+// | ------------------------ routines ------------------------ |
+
 /* arming() //{ */
 
 bool ControlManager::arming(bool input) {
@@ -4434,8 +5429,7 @@ bool ControlManager::arming(bool input) {
 
       service_client_arm.call(srv_out);
 
-      std_srvs::Trigger shutdown_out;
-      service_client_shutdown.call(shutdown_out);
+      shutdown();
 
       return srv_out.response.success;
 
@@ -4541,22 +5535,36 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(void) {
+void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_controller_list);
+  std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odom_for_control));
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     try {
-      controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
+
+      // for each controller
+      for (unsigned int i = 0; i < controller_list.size(); i++) {
+
+        if ((int)i == active_controller_idx) {
+
+          // if it is the active one, update and retrieve the command
+          controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
+
+        } else {
+
+          // if it is not the active one, just update without retrieving the command
+          controller_list[i]->update(odometry_const_ptr, last_position_cmd);
+        }
+      }
 
       // in normal sitation, the controller returns a valid command
       if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
@@ -4566,7 +5574,7 @@ void ControlManager::updateControllers(void) {
         last_attitude_cmd = controller_output_cmd;
 
         // but it can return an empty command
-        // which means we shoudl trigger the failsafe landing
+        // which means we should trigger the failsafe landing
       } else {
 
         ROS_WARN("[ControlManager]: triggering failsafe, the controller returned null");
@@ -4683,11 +5691,18 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
+    // set the quaternion to the current odometry.. better than setting it to something unrelated
     desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust = 0.0;
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
+
+    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+
+    attitude_target.thrust = min_thrust_null_tracker_;
 
     should_publish = true;
 
@@ -4696,12 +5711,18 @@ void ControlManager::publish(void) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller (%s) returned nil command! Not publishing anything...",
                       controller_names[active_controller_idx].c_str());
 
-    // convert the RPY to quaternion
+    // set the quaternion to the current odometry.. better than setting it to something unrelated
     desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
-    attitude_target.thrust = 0.0;
+    attitude_target.body_rate.x = 0.0;
+    attitude_target.body_rate.y = 0.0;
+    attitude_target.body_rate.z = 0.0;
+
+    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+
+    attitude_target.thrust = min_thrust_null_tracker_;
 
     should_publish = true;
 
@@ -4829,6 +5850,44 @@ Eigen::Vector2d ControlManager::rotateVector(const Eigen::Vector2d vector_in, do
   Eigen::Rotation2D<double> rot2(angle);
 
   return rot2.toRotationMatrix() * vector_in;
+}
+
+//}
+
+/* sanitizeYaw() //{ */
+
+double ControlManager::sanitizeYaw(const double yaw_in) {
+
+  double yaw_out = yaw_in;
+
+  // if desired yaw_out is grater then 2*M_PI mod it
+  if (fabs(yaw_out) > 2 * M_PI) {
+    yaw_out = fmod(yaw_out, 2 * M_PI);
+  }
+
+  // move it to its place
+  if (yaw_out > M_PI) {
+    yaw_out -= 2 * M_PI;
+  } else if (yaw_out < -M_PI) {
+    yaw_out += 2 * M_PI;
+  }
+
+  return yaw_out;
+}
+
+//}
+
+/* angleDist() //{ */
+
+double ControlManager::angleDist(const double in1, const double in2) {
+
+  double sanitized_difference = fabs(sanitizeYaw(in1) - sanitizeYaw(in2));
+
+  if (sanitized_difference > M_PI) {
+    sanitized_difference = 2 * M_PI - sanitized_difference;
+  }
+
+  return fabs(sanitized_difference);
 }
 
 //}

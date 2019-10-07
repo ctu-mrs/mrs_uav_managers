@@ -1,0 +1,177 @@
+# - list of names of dynamically loaded trackers
+trackers : [
+  "MpcTracker",
+  "LineTracker",
+  "LandoffTracker",
+  "JoyTracker",
+  "NullTracker",
+]
+
+# - list of names of dynamically loaded controllers
+controllers : [
+  "So3Controller",
+  "MpcController",
+  "AttitudeController",
+  "FailsafeController",
+  "EmergancyController",
+]
+
+# - this is the "do nothing tracker", which is active when no other is
+null_tracker: "NullTracker"
+
+# tracker used for landing and takeoff
+landing_takeoff_tracker: "LandoffTracker"
+
+status_timer_rate:  10 # [Hz]
+
+safety:
+
+  min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
+
+  safety_timer_rate: 100 # [Hz]
+  failsafe_timer_rate: 100 # [Hz]
+  escalating_failsafe_timeout: 1.0 # [s]
+
+  tilt_limit_eland: 60 # [deg]
+  yaw_limit_eland: 90 # [deg]
+  tilt_limit_disarm: 90 # [deg]
+
+  # tracker used for emergency hover routine
+  ehover_tracker: "LandoffTracker"
+
+  # controller used for safety landing (feed forward)
+  failsafe_controller: "FailsafeController"
+
+  # after not receiving odometry for more than this, the failsafe landing will trigger
+  odometry_max_missing_time: 1.0 # [s]
+
+  # emergancy landing (still feedback)
+  eland: 
+    controller: "EmergancyController"
+    cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+    disarm: true
+    timer_rate: 10
+
+  tilt_error_failsafe:
+
+    enabled: false
+    tilt_error_threshold: 30 # [deg]
+
+  rc_eland:
+
+    enabled: true
+    # activation channel
+    channel_number: 7 # [-]
+    threshold: 1500 # [us]
+
+obstacle_bumper:
+
+  enabled: false
+  timer_rate: 20 # [Hz]
+
+  horizontal_distance: 1.0 # [m]
+  vertical_distance: 1.0 # [m]
+
+  obstacle_hugging:
+
+    enabled: true
+
+  # true: the drone will move away from obstacles that appear within the radius
+  repulsion:
+
+    enabled: true
+
+    horizontal_distance: 1.0 # [m]
+    horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
+
+    vertical_distance: 1.0 # [m]
+    vertical_offset: 0.1 # [m]
+
+automatic_pc_shutdown:
+
+  enabled: false
+  distance_threshold: 5 # [m]
+
+joystick:
+
+  enabled: true
+
+  joystick_timer_rate: 30 # [Hz]
+
+  # tracker and controller used to control the drone using a joystick
+  tracker: "JoyTracker"
+  controller: "AttitudeController"
+
+  # what tracker and controller should be activate when
+  # switching back from joystick control?
+  fallback:
+
+    tracker: "MpcTracker"
+    controller: "MpcController"
+
+  # channel numbers, indeces in array
+  channels:
+
+    # The main front buttons
+    # if any of those are pressend in the "joystic control mode",
+    # the control returns back to autonomy using the "fallback"
+    # controller and tracker
+    A: 0 # []
+    B: 1 # []
+    X: 2 # []
+    Y: 3 # []
+
+    # if the "start" button is pressed and held down for > 3 sec, the UAV switches
+    # to a tracker and controller specified above. Autonomy in this mode is not
+    # guaranteed, it depends on the specified tracker and controller.
+    start: 7 # []
+
+    # If "back" button is pressed, the UAV switches to a GOTO mode, where
+    # references are set using the joystick. This is fully autonomous mode,
+    # or more specifically, it uses the tracker and controller which were
+    # already active.
+    back: 6 # []
+
+    # if LT and RT are pressed together, the failsafe is triggered
+    LT: 2 # [] left trigger
+    RT: 5 # [] right trigger
+
+    # if L_joy and R_joy are pressed together, emergency landing is triggered
+    L_joy: 9 # [] pressing left joypad
+    R_joy: 10 # [] pressing right joypad
+
+    pitch: 1 # []
+    roll: 3 # []
+    yaw: 0 # []
+    thrust: 4 # []
+
+  # multipliers for scaling and reversing the channels
+  channel_multipliers:
+
+    pitch: 1.0 # []
+    roll: 1.0 # []
+    yaw: 1.0 # []
+    thrust: 1.0 # []
+
+rc_joystick:
+
+  enabled: true
+  # activation channel
+  channel_number: 6 # indexed from 0
+
+  # switch the chanel repeatedly to enable the joystic control
+  # n_switches need to occur within a time timeout
+  timeout: 2.0 # [s]
+  n_switches: 4 # [-]
+
+  carrot_distance: 0.50 # [m]
+
+  channels:
+    pitch: 2
+    roll: 0
+    yaw: 3
+    thrust: 1
+
+pirouette:
+  speed: 0.25 # [rad/s]
+  timer_rate: 10 # [Hz]

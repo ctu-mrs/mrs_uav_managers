@@ -6,7 +6,7 @@
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/OdometryDiag.h>
 #include <mrs_msgs/EstimatorType.h>
-#include <mrs_msgs/ControllerStatus.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
@@ -57,7 +57,7 @@ public:
   virtual void onInit();
   bool         callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
-  void         callbackControllerStatus(const mrs_msgs::ControllerStatusConstPtr &msg);
+  void         callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
 
   bool setGains(std::string gains_name);
 
@@ -89,10 +89,10 @@ private:
   // | --------------------- gain management -------------------- |
 
 private:
-  ros::Subscriber            subscriber_controller_status;
-  bool                       got_controller_status = false;
-  mrs_msgs::ControllerStatus controller_status;
-  std::mutex                 mutex_controller_status;
+  ros::Subscriber                     subscriber_control_manager_diagnostics;
+  bool                                got_control_manager_diagnostics = false;
+  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics;
+  std::mutex                          mutex_control_manager_diagnostics;
 
   std::string current_gains;
 
@@ -201,7 +201,8 @@ void GainManager::onInit() {
   // | ----------------------- subscribers ---------------------- |
   subscriber_odometry_diagnostics =
       nh_.subscribe("odometry_diagnostics_in", 1, &GainManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
-  subscriber_controller_status = nh_.subscribe("controller_status_in", 1, &GainManager::callbackControllerStatus, this, ros::TransportHints().tcpNoDelay());
+  subscriber_control_manager_diagnostics =
+      nh_.subscribe("control_manager_diagnostics_in", 1, &GainManager::callbackControlManagerDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
   // | ----------------------- publishers ----------------------- |
 
@@ -359,22 +360,22 @@ void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstP
 
 //}
 
-/* callbackControllerStatus() //{ */
+/* callbackControlManagerDiagnostics() //{ */
 
-void GainManager::callbackControllerStatus(const mrs_msgs::ControllerStatusConstPtr &msg) {
+void GainManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg) {
 
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControllerStatus");
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControlManagerDiagnostics");
 
   {
-    std::scoped_lock lock(mutex_controller_status);
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
 
-    controller_status = *msg;
+    control_manager_diagnostics = *msg;
   }
 
-  got_controller_status = true;
+  got_control_manager_diagnostics = true;
 }
 
 //}
@@ -456,9 +457,9 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   }
 
   {
-    std::scoped_lock lock(mutex_controller_status);
+    std::scoped_lock lock(mutex_control_manager_diagnostics);
 
-    if (!(got_controller_status && controller_status.controller.compare("So3Controller") == STRING_EQUAL)) {
+    if (!(got_control_manager_diagnostics && control_manager_diagnostics.controller_status.controller.compare("So3Controller") == STRING_EQUAL)) {
       ROS_INFO_THROTTLE(1.0, "[GainManager]: can't do gain management, the SO3 controller is not running!");
       return;
     }
@@ -477,6 +478,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     } else {
       if (setGains(it->second)) {
         last_estimator_type = odometry_diagnostics.estimator_type.type;
+        ROS_INFO_THROTTLE(1.0, "[GainManager]: gains updated!");
       } else {
         ROS_ERROR_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
       }

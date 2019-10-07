@@ -352,6 +352,7 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
     } else {
       if (setConstraints(it->second)) {
         last_estimator_type = odometry_diagnostics.estimator_type.type;
+        ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints updated!");
       } else {
         ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
       }

@@ -1,0 +1,31 @@
+# - list of names of dynamically loaded trackers
+trackers : [
+  "MpcTracker",
+  "LineTracker",
+  "LandoffTracker",
+  "JoyTracker",
+  "MatlabTracker",
+  "NullTracker",
+  "JoyBumperTracker",
+]
+
+# - list of names of dynamically loaded controllers
+controllers : [
+  "So3Controller",
+  "MpcController",
+  "NsfController",
+  "AttitudeController",
+  "AccelerationController",
+  "FailsafeController",
+  "EmergancyController",
+]
+
+safety:
+
+  min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
+
+  safety_timer_rate: 10 # [Hz]
+  failsafe_timer_rate: 10 # [Hz]
+
+  # after not receiving odometry for more than this, the failsafe landing will trigger
+  odometry_max_missing_time: 2.0 # [s]

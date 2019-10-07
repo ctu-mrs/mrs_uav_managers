@@ -1,0 +1,17 @@
+takeoff:
+
+  during_takeoff:
+    tracker: "LandoffTracker"
+    controller: "MpcController"
+
+  after_takeoff:
+    tracker: "MpcTracker"
+    controller: "So3Controller"
+
+    pirouette: false
+
+  takeoff_height: 1.5
+
+landing:
+
+  disarm: false

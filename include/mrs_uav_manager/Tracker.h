@@ -62,7 +62,7 @@ public:
   virtual void switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg)                                  = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg) = 0;
-  virtual const mrs_msgs::TrackerStatus::Ptr        getStatus()                                     = 0;
+  virtual const mrs_msgs::TrackerStatus             getStatus()                                     = 0;
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)           = 0;
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd)   = 0;
