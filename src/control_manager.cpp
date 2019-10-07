@@ -1571,14 +1571,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd);
-
-    if (!(last_position_cmd != mrs_msgs::PositionCommand::Ptr() && last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr())) {
-      return;
-    }
-  }
-
   // | -------------- eland and failsafe thresholds ------------- |
 
   {
@@ -1591,11 +1583,17 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     failsafe_threshold_ = it->second.failsafe_threshold;
   }
 
-  // | -------- cacalculate control errors and tilt angle ------- |
+  // | --------- calculate control errors and tilt angle -------- |
 
   double tilt_angle;
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
+
+    // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
+    // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
+    if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      return;
+    }
 
     tilt_error = 0;
     yaw_error  = 0;
@@ -1620,57 +1618,49 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
 
     // | ------------ calculate the tilt and yaw error ------------ |
-    // to do that, we need the tilt reference, which might not be available
-    {
-      std::scoped_lock lock(mutex_last_attitude_cmd);
 
-      // if the attitude_cmd exists (a controller is running)
-      if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+    // | --------------------- the tilt error --------------------- |
+    tf::Quaternion attitude_cmd_quaternion;
 
-        // | --------------------- the tilt error --------------------- |
-        tf::Quaternion attitude_cmd_quaternion;
+    // calculate the quaternion
+    if (last_attitude_cmd->quater_attitude_set) {
 
-        // calculate the quaternion
-        if (last_attitude_cmd->quater_attitude_set) {
+      attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
+      attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
+      attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
+      attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
 
-          attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
-          attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
-          attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
-          attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+    } else if (last_attitude_cmd->euler_attitude_set) {
 
-        } else if (last_attitude_cmd->euler_attitude_set) {
+      // convert the RPY to quaternion
+      attitude_cmd_quaternion =
+          tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+    }
 
-          // convert the RPY to quaternion
-          attitude_cmd_quaternion =
-              tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-        }
+    if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
 
-        if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
+      // calculate the desired drone's z axis in the world frame
+      tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
 
-          // calculate the desired drone's z axis in the world frame
-          tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
+      // calculate the angle between the drone's z axis and the world's z axis
+      tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
+    }
 
-          // calculate the angle between the drone's z axis and the world's z axis
-          tilt_error = acos(uav_z_in_world.dot(uav_z_in_world_desired));
-        }
+    // | ---------------------- the yaw error --------------------- |
+    if (last_attitude_cmd->euler_attitude_set) {
 
-        // | ---------------------- the yaw error --------------------- |
-        if (last_attitude_cmd->euler_attitude_set) {
+      yaw_error = last_attitude_cmd->euler_attitude.z - odometry_yaw;
 
-          yaw_error = last_attitude_cmd->euler_attitude.z - odometry_yaw;
+    } else if (last_attitude_cmd->quater_attitude_set) {
 
-        } else if (last_attitude_cmd->quater_attitude_set) {
+      // calculate the euler angles
+      tf::Quaternion quater_attitude_cmd;
+      quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+      tf::Matrix3x3 m(quater_attitude_cmd);
+      double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
+      m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
 
-          // calculate the euler angles
-          tf::Quaternion quater_attitude_cmd;
-          quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
-          tf::Matrix3x3 m(quater_attitude_cmd);
-          double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
-          m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
-
-          yaw_error = angleDist(attitude_cmd_yaw, odometry_yaw);
-        }
-      }
+      yaw_error = angleDist(attitude_cmd_yaw, odometry_yaw);
     }
   }
 
@@ -3666,10 +3656,20 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[REF_X], last_position_cmd->position.y + request_in.goal[REF_Y],
-                               last_position_cmd->position.z + request_in.goal[REF_Z])) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
-      res.message = "the point is outside of the safety area";
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x + request_in.goal[REF_X], last_position_cmd->position.y + request_in.goal[REF_Y],
+                                 last_position_cmd->position.z + request_in.goal[REF_Z])) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+        res.message = "the point is outside of the safety area";
+        res.success = false;
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
+      res.message = "last_position_cmd is not valid";
       res.success = false;
       return true;
     }
@@ -3755,35 +3755,40 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   // prepare the message for current tracker
   mrs_msgs::TrackerPointStamped request;
 
-  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
-
-    // rotate it from the frame of the drone
-    Eigen::Vector2d des(des_x, des_y);
-    des = rotateVector(des, odometry_yaw);
-
-    {
-      std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
-
-      request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
-      request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
-      request.position.z   = des_z + odometry_z - last_position_cmd->position.z;
-      request.position.yaw = des_yaw + odometry_yaw - last_position_cmd->yaw;
-    }
-
-  } else {
-
-    request.position.x   = des_x;
-    request.position.y   = des_y;
-    request.position.z   = des_z;
-    request.position.yaw = des_yaw;
-  }
-
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
-                               last_position_cmd->position.z + request.position.z)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+
+        // rotate it from the frame of the drone
+        Eigen::Vector2d des(des_x, des_y);
+        des = rotateVector(des, odometry_yaw);
+
+        request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
+        request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
+        request.position.z   = des_z + odometry_z - last_position_cmd->position.z;
+        request.position.yaw = des_yaw + odometry_yaw - last_position_cmd->yaw;
+
+      } else {
+
+        request.position.x   = des_x;
+        request.position.y   = des_y;
+        request.position.z   = des_z;
+        request.position.yaw = des_yaw;
+      }
+
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
+                                 last_position_cmd->position.z + request.position.z)) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
+        return;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, last_position_cmd is not valid!");
       return;
     }
   }
@@ -3831,9 +3836,19 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
-      res.message = "the point is outside of the safety area";
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, req.goal)) {
+        ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+        res.message = "the point is outside of the safety area";
+        res.success = false;
+        return true;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
+      res.message = "last_position_cmd is not valid";
       res.success = false;
       return true;
     }
@@ -3885,8 +3900,16 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
   {
     std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
 
-    if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
+        ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
+        return;
+      }
+
+    } else {
+
+      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, last_position_cmd is not valid!");
       return;
     }
   }
