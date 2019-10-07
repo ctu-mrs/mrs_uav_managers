@@ -231,7 +231,6 @@ private:
   ros::Publisher publisher_motors;
   ros::Publisher publisher_tilt_error;
   ros::Publisher publisher_mass_estimate;
-  ros::Publisher publisher_safe_zone_border;
   ros::Publisher publisher_control_error;
   ros::Publisher publisher_rviz;
 
@@ -329,9 +328,11 @@ private:
 
 private:
   mrs_lib::SafetyZone *         safety_zone;
+  mrs_uav_manager::SafetyArea_t safety_area;
   bool                          use_safety_area_ = false;
   double                        min_height;
-  mrs_uav_manager::SafetyArea_t safety_area;
+  bool                          obstacle_points_not_used_   = true;
+  bool                          obstacle_polygons_not_used_ = true;
 
   bool isPointInSafetyArea2d(const double x, const double y);
   bool isPointInSafetyArea3d(const double x, const double y, const double z);
@@ -1028,9 +1029,23 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/max_height", max_height);
 
   if (use_safety_area_) {
-    Eigen::MatrixXd              border_points           = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    std::vector<Eigen::MatrixXd> point_obstacle_points   = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+
+    param_loader.load_param("safety_area/polygon_obstacles/not_used", obstacle_polygons_not_used_);
+    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+    if (obstacle_polygons_not_used_) {
+      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
+    } else {
+      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+    }
+
+    param_loader.load_param("safety_area/point_obstacles/not_used", obstacle_points_not_used_);
+    std::vector<Eigen::MatrixXd> point_obstacle_points;
+    if (obstacle_polygons_not_used_) {
+      point_obstacle_points = std::vector<Eigen::MatrixXd>();
+    } else {
+      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    }
 
     // TODO: remove this when param loader supports proper loading
     for (auto &matrix : polygon_obstacle_points) {
@@ -1070,19 +1085,18 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output   = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd     = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd     = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force     = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom         = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude  = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_diagnostics      = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
-  publisher_motors           = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error       = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate    = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error    = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
-  publisher_rviz             = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
-  publisher_safe_zone_border = nh_.advertise<visualization_msgs::Marker>("safe_zone_border_out", 1);
+  publisher_control_output  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_diagnostics     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
+  publisher_motors          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error      = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_rviz            = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1548,29 +1562,27 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
       //}
 
-      // --------------------------------------------------------------
-      // |                     safety area marker                     |
-      // --------------------------------------------------------------
+      /* safety area marker //{ */
 
       if (use_safety_area_) {
+
         auto safety_zone_marker = safety_zone->getMarkerMessage();
+
+        safety_zone_marker.id = id++;
 
         safety_zone_marker.header.stamp    = ros::Time::now();
         safety_zone_marker.header.frame_id = "local_origin";
 
-        try {
-          publisher_safe_zone_border.publish(safety_zone_marker);
-        }
-        catch (...) {
-          ROS_ERROR("Exception caught during publishing topic %s.", publisher_safe_zone_border.getTopic().c_str());
-        }
+        msg_out.markers.push_back(safety_zone_marker);
+      }
 
-        try {
-          publisher_rviz.publish(msg_out);
-        }
-        catch (...) {
-          ROS_ERROR("Exception caught during publishing topic %s.", publisher_rviz.getTopic().c_str());
-        }
+      //}
+
+      try {
+        publisher_rviz.publish(msg_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_rviz.getTopic().c_str());
       }
     }
   }
