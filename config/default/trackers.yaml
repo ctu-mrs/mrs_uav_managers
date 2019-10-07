@@ -7,9 +7,6 @@ LandoffTracker:
 LineTracker:
   address: "mrs_trackers/LineTracker"
 
-WallTracker:
-  address: "mrs_trackers/WallTracker"
-
 JoyTracker:
   address: "mrs_trackers/JoyTracker"
 

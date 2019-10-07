@@ -2,7 +2,6 @@
 trackers : [
   "MpcTracker",
   "LineTracker",
-  "WallTracker",
   "LandoffTracker",
   "JoyTracker",
   "MatlabTracker",
