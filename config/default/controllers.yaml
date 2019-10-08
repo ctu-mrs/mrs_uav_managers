@@ -7,8 +7,8 @@ So3Controller:
 MpcController:
   address: "mrs_controllers/MpcController"
   namespace: "mpc_controller"
-  eland_threshold: 3.0 # [m], position error triggering eland
-  failsafe_threshold: 4.0 # [m], position error triggering failsafe land
+  eland_threshold: 2.0 # [m], position error triggering eland
+  failsafe_threshold: 3.0 # [m], position error triggering failsafe land
 
 AttitudeController:
   address: "mrs_controllers/AttitudeController"
@@ -32,7 +32,7 @@ EmergancyController:
   address: "mrs_controllers/MpcController"
   namespace: "emergancy_controller"
   eland_threshold: 3.0 # [m], position error triggering eland
-  failsafe_threshold: 5.0 # [m], position error triggering failsafe land
+  failsafe_threshold: 4.0 # [m], position error triggering failsafe land
 
 NsfController:
   address: "mrs_controllers/NsfController"
