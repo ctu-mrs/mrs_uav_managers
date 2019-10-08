@@ -331,8 +331,8 @@ private:
   mrs_uav_manager::SafetyArea_t safety_area;
   bool                          use_safety_area_ = false;
   double                        min_height;
-  bool                          obstacle_points_not_used_   = true;
-  bool                          obstacle_polygons_not_used_ = true;
+  bool                          obstacle_points_enabled_   = false;
+  bool                          obstacle_polygons_enabled_ = false;
 
   bool isPointInSafetyArea2d(const double x, const double y);
   bool isPointInSafetyArea3d(const double x, const double y, const double z);
@@ -1031,20 +1031,20 @@ void ControlManager::onInit() {
   if (use_safety_area_) {
     Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
 
-    param_loader.load_param("safety_area/polygon_obstacles/not_used", obstacle_polygons_not_used_);
+    param_loader.load_param("safety_area/polygon_obstacles/enabled", obstacle_polygons_enabled_);
     std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-    if (obstacle_polygons_not_used_) {
-      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
-    } else {
+    if (obstacle_polygons_enabled_) {
       polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
     }
 
-    param_loader.load_param("safety_area/point_obstacles/not_used", obstacle_points_not_used_);
+    param_loader.load_param("safety_area/point_obstacles/enabled", obstacle_points_enabled_);
     std::vector<Eigen::MatrixXd> point_obstacle_points;
-    if (obstacle_points_not_used_) {
-      point_obstacle_points = std::vector<Eigen::MatrixXd>();
-    } else {
+    if (obstacle_points_enabled_) {
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      point_obstacle_points = std::vector<Eigen::MatrixXd>();
     }
 
     // TODO: remove this when param loader supports proper loading
