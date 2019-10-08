@@ -336,7 +336,7 @@ private:
 
   bool isPointInSafetyArea2d(const double x, const double y);
   bool isPointInSafetyArea3d(const double x, const double y, const double z);
-  bool isPathToPointInSafetyArea2d(const double endX, const double endY);
+  bool isPathToPointInSafetyArea2d(const double startX, const double startY, const double endX, const double endY);
 
   double getMinHeight(void);
   double getMaxHeight(void);
@@ -1041,7 +1041,7 @@ void ControlManager::onInit() {
 
     param_loader.load_param("safety_area/point_obstacles/not_used", obstacle_points_not_used_);
     std::vector<Eigen::MatrixXd> point_obstacle_points;
-    if (obstacle_polygons_not_used_) {
+    if (obstacle_points_not_used_) {
       point_obstacle_points = std::vector<Eigen::MatrixXd>();
     } else {
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
@@ -3363,11 +3363,19 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     res.success = false;
     return true;
   }
-  if (!isPathToPointInSafetyArea2d(request_in.goal[0], request_in.goal[1])) {
-    ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
-    res.message = "the path is going outside the safety area";
-    res.success = false;
-    return true;
+
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request_in.goal[0], request_in.goal[1])) {
+        ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
+        res.message = "the path is going outside the safety area";
+        res.success = false;
+        return true;
+      }
+    }
   }
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
@@ -3481,9 +3489,12 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
       return;
     }
 
-    if (!isPathToPointInSafetyArea2d(request.position.x, request.position.y)) {
-      ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
-      return;
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request.position.x, request.position.y)) {
+        ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
+        return;
+      }
     }
   }
 
@@ -3563,13 +3574,19 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     return true;
   }
 
-  if (!isPathToPointInSafetyArea2d(request.goal[0], request.goal[1])) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
-    res.message = "the path is going outside the safety area";
-    res.success = false;
-    return true;
-  }
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
 
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request.goal[0], request.goal[1])) {
+        ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
+        res.message = "the path is going outside the safety area";
+        res.success = false;
+        return true;
+      }
+    }
+  }
 
   mrs_msgs::Vec4Response::ConstPtr tracker_response;
   char                             message[200];
@@ -3657,9 +3674,16 @@ void ControlManager::callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedCon
     return;
   }
 
-  if (!isPathToPointInSafetyArea2d(request.position.x, request.position.y)) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, the path is going outside the safety area!");
-    return;
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request.position.x, request.position.y)) {
+        ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, the path is going outside the safety area!");
+        return;
+      }
+    }
   }
 
   bool tracker_response;
@@ -3729,17 +3753,18 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
         return true;
       }
 
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, last_position_cmd->position.x + request_in.goal[0],
+                                       last_position_cmd->position.y + request_in.goal[1])) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
+        res.message = "the path is going outside the safety area";
+        res.success = false;
+        return true;
+      }
+
     } else {
 
       ROS_ERROR("[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
       res.message = "last_position_cmd is not valid";
-      res.success = false;
-      return true;
-    }
-
-    if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x + request_in.goal[0], last_position_cmd->position.y + request_in.goal[1])) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
-      res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
     }
@@ -3856,14 +3881,15 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
         return;
       }
 
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, last_position_cmd->position.x + request.position.x,
+                                       last_position_cmd->position.y + request.position.y)) {
+        ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the path is going outside the safety area!");
+        return;
+      }
+
     } else {
 
       ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, last_position_cmd is not valid!");
-      return;
-    }
-
-    if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the path is going outside the safety area!");
       return;
     }
   }
@@ -4511,6 +4537,7 @@ bool ControlManager::isPointInSafetyArea3d(const double x, const double y, const
 /* //{ isInSafetyArea2d() */
 
 bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
+
   return !use_safety_area_ || safety_zone->isPointValid(x, y);
 }
 
@@ -4518,13 +4545,10 @@ bool ControlManager::isPointInSafetyArea2d(const double x, const double y) {
 
 /* //{ isPathToPointInSafetyArea2d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const double endX, const double endY) {
+bool ControlManager::isPathToPointInSafetyArea2d(const double startX, const double startY, const double endX, const double endY) {
+
   if (!use_safety_area_)
     return true;
-
-  mutex_last_position_cmd.lock();
-  double startX = last_position_cmd->position.x, startY = last_position_cmd->position.y;
-  mutex_last_position_cmd.unlock();
 
   return safety_zone->isPathValid(startX, startY, endX, endY);
 }
