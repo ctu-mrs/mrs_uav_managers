@@ -2299,6 +2299,12 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
 
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
+    while (running_safety_timer) {
+      ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+      ros::Duration wait(0.001);
+      wait.sleep();
+    }
+
     ros::TimerEvent safety_timer_event;
     safetyTimer(safety_timer_event);
 
