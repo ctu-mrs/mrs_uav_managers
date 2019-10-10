@@ -6,7 +6,7 @@ takeoff:
 
   after_takeoff:
     tracker: "MpcTracker"
-    controller: "So3Controller"
+    controller: "MpcController"
 
     pirouette: false
 
