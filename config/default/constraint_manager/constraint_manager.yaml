@@ -12,7 +12,6 @@ estimator_types: [
   "OPTFLOWGPS",
   "GPS",
   "OPTFLOW",
-  "PAVEL",
   "OTHER",
 ]
 
@@ -38,7 +37,6 @@ constraint_management:
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow", "medium"]
-    PAVEL: ["slow"]
     OTHER: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
@@ -55,5 +53,4 @@ constraint_management:
     OPTFLOWGPS: "slow"
     GPS: "medium"
     OPTFLOW: "slow"
-    PAVEL: "slow"
     OTHER: "slow"

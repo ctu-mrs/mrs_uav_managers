@@ -12,7 +12,6 @@ estimator_types: [
   "OPTFLOWGPS",
   "GPS",
   "OPTFLOW",
-  "PAVEL",
   "OTHER",
 ]
 
@@ -35,7 +34,6 @@ gain_management:
     OPTFLOWGPS: ["default"]
     GPS: ["default"]
     OPTFLOW: ["default"]
-    PAVEL: ["default"]
     OTHER: ["default"]
 
   # those gains will be used automatically when a localization mode switches
@@ -52,5 +50,4 @@ gain_management:
     OPTFLOWGPS: "default"
     GPS: "default"
     OPTFLOW: "default"
-    PAVEL: "default"
     OTHER: "default"
