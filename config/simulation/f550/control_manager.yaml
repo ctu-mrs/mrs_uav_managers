@@ -11,8 +11,8 @@ trackers : [
 
 # - list of names of dynamically loaded controllers
 controllers : [
-  "So3Controller",
   "MpcController",
+  "So3Controller",
   "NsfController",
   "AttitudeController",
   "AccelerationController",
