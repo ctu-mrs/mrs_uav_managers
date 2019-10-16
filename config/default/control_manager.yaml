@@ -13,7 +13,7 @@ controllers : [
   "MpcController",
   "AttitudeController",
   "FailsafeController",
-  "EmergancyController",
+  "EmergencyController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -45,10 +45,12 @@ safety:
   # after not receiving odometry for more than this, the failsafe landing will trigger
   odometry_max_missing_time: 1.0 # [s]
 
-  # emergancy landing (still feedback)
+  # emergency landing (still feedback)
   eland: 
-    controller: "EmergancyController"
+    controller: "EmergencyController"
     cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+    cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
+
     disarm: true
     timer_rate: 10
 

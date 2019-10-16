@@ -17,7 +17,7 @@ controllers : [
   "AttitudeController",
   "AccelerationController",
   "FailsafeController",
-  "EmergancyController",
+  "EmergencyController",
 ]
 
 safety:

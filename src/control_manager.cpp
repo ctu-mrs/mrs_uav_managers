@@ -315,6 +315,11 @@ private:
   double eland_threshold_;
 
 private:
+  double    thrust_mass_estimate;
+  bool      thrust_under_threshold = false;
+  ros::Time thrust_mass_estimate_first_time;
+
+private:
   bool       tilt_error_failsafe_enabled_ = false;
   double     tilt_error_threshold_;
   bool       yaw_error_eland_enabled_ = false;
@@ -523,6 +528,7 @@ private:
   void            changeLandingState(LandingStates_t new_state);
   double          uav_mass_;
   double          elanding_cutoff_mass_factor_;
+  double          elanding_cutoff_timeout_;
   double          landing_uav_mass_ = 0;
 
   double initial_body_disturbance_x_;
@@ -587,6 +593,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety/eland/controller", eland_controller_name_);
   param_loader.load_param("safety/eland/cutoff_mass_factor", elanding_cutoff_mass_factor_);
+  param_loader.load_param("safety/eland/cutoff_timeout", elanding_cutoff_timeout_);
   param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
 
@@ -1882,11 +1889,27 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
     }
 
     // recalculate the mass based on the thrust
-    double thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
+    thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
     ROS_INFO("[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
     // condition for automatic motor turn off
     if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust_cmd < 0.01)) {
+
+      if (!thrust_under_threshold) {
+
+        thrust_mass_estimate_first_time = ros::Time::now();
+        thrust_under_threshold          = true;
+      }
+
+      ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time).toSec());
+
+    } else {
+
+      thrust_mass_estimate_first_time = ros::Time::now();
+      thrust_under_threshold          = false;
+    }
+
+    if (thrust_under_threshold && ((ros::Time::now() - thrust_mass_estimate_first_time).toSec() > elanding_cutoff_timeout_)) {
 
       // enable callbacks? ... NO
 
@@ -1955,7 +1978,24 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
   // condition for automatic motor turn off
-  if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_thrust < 0.01)) {
+  if (((thrust_mass_estimate < elanding_cutoff_mass_factor_ * landing_uav_mass_))) {
+
+    if (!thrust_under_threshold) {
+
+      thrust_mass_estimate_first_time = ros::Time::now();
+      thrust_under_threshold          = true;
+    }
+
+    ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time).toSec());
+
+  } else {
+
+    thrust_mass_estimate_first_time = ros::Time::now();
+    thrust_under_threshold          = false;
+  }
+
+  // condition for automatic motor turn off
+  if (thrust_under_threshold && ((ros::Time::now() - thrust_mass_estimate_first_time).toSec() > elanding_cutoff_timeout_)) {
 
     ROS_INFO("[ControlManager]: detecting zero thrust, disarming");
 

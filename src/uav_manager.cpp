@@ -105,6 +105,11 @@ private:
   bool            got_height = false;
 
 private:
+  double    thrust_mass_estimate;
+  bool      thrust_under_threshold = false;
+  ros::Time thrust_mass_estimate_first_time;
+
+private:
   void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg);
   ros::Subscriber              subscriber_landoff_diagnostics;
   mrs_msgs::LandoffDiagnostics landoff_diagnostics;
@@ -199,6 +204,7 @@ private:
   ros::Timer  landing_timer;
   std::string landing_tracker_name_;
   double      landing_cutoff_mass_factor_;
+  double      landing_cutoff_mass_timeout_;
   double      landing_timer_rate_;
   bool        landing = false;
   double      uav_mass_;
@@ -328,6 +334,7 @@ void UavManager::onInit() {
   param_loader.load_param("landing/rate", landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", landing_tracker_name_);
   param_loader.load_param("landing/landing_cutoff_mass_factor", landing_cutoff_mass_factor_);
+  param_loader.load_param("landing/landing_cutoff_timeout", landing_cutoff_mass_timeout_);
   param_loader.load_param("landing/disarm", landing_disarm_);
 
   param_loader.load_param("uav_mass", uav_mass_);
@@ -473,11 +480,26 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
         std::scoped_lock lock(mutex_height);
 
         // recalculate the mass based on the thrust
-        double thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
+        thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
         ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
 
         // condition for automatic motor turn off
         if (((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
+
+          if (!thrust_under_threshold) {
+
+            thrust_mass_estimate_first_time = ros::Time::now();
+            thrust_under_threshold          = true;
+          }
+
+          ROS_INFO_THROTTLE(0.1, "[UavManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time).toSec());
+
+        } else {
+
+          thrust_under_threshold = false;
+        }
+
+        if (thrust_under_threshold && ((ros::Time::now() - thrust_mass_estimate_first_time).toSec() > landing_cutoff_mass_timeout_)) {
 
           if (current_state_landing == LANDING_STATE) {
 

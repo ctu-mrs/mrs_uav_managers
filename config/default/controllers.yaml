@@ -28,9 +28,9 @@ FailsafeController:
   eland_threshold: 0.0 # [m], position error triggering eland
   failsafe_threshold: 0.0 # [m], position error triggering failsafe land
 
-EmergancyController:
+EmergencyController:
   address: "mrs_controllers/MpcController"
-  namespace: "emergancy_controller"
+  namespace: "emergency_controller"
   eland_threshold: 3.0 # [m], position error triggering eland
   failsafe_threshold: 4.0 # [m], position error triggering failsafe land
 
