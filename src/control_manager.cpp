@@ -1727,7 +1727,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
       if (!failsafe_triggered) {
 
-        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%2.2f/%2.2f", control_error, failsafe_threshold_);
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%0.2f/%0.2f", control_error, failsafe_threshold_);
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1816,7 +1816,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
   if (tilt_angle > tilt_limit_disarm_) {
 
-    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * tilt_limit_eland_);
+    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%0.2f/%0.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * tilt_limit_eland_);
 
     arming(false);
   }
@@ -1833,7 +1833,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
         if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-          ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%2.2f/%2.2f deg", (180.0 / M_PI) * tilt_error,
+          ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%0.2f/%0.2f deg", (180.0 / M_PI) * tilt_error,
                     (180.0 / M_PI) * tilt_error_threshold_);
 
           arming(false);
@@ -1842,7 +1842,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
         } else {
 
-          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%2.2f/%2.2f deg), however, controller/tracker just switched so its ok.",
+          ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%0.2f/%0.2f deg), however, controller/tracker just switched so its ok.",
                     (180.0 / M_PI) * tilt_error, (180.0 / M_PI) * tilt_error_threshold_);
         }
       }
@@ -4668,7 +4668,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
   // check whether we measure in that direction
   if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, we do not measure in that direction", fcu_x,
+    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, we do not measure in that direction", fcu_x,
              fcu_y, fcu_z, horizontal_vector_idx);
     return false;
   }
@@ -4689,7 +4689,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
   if (horizontal_point_distance > 0.1 &&
       (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance_)) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f (sector %d) is not valid, obstacle is too close (horizontally)", fcu_x,
+    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, obstacle is too close (horizontally)", fcu_x,
              fcu_y, fcu_z, horizontal_vector_idx);
     return false;
   }
@@ -4698,7 +4698,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
   if (vertical_point_distance > 0.1 &&
       (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance_)) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f, z: %2.2f is not valid, obstacle is too close (vertically)", fcu_x, fcu_y, fcu_z);
+    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f is not valid, obstacle is too close (vertically)", fcu_x, fcu_y, fcu_z);
     return false;
   }
 
@@ -4720,8 +4720,8 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
       new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
 
       ROS_WARN(
-          "[ControlManager]: Bumper: the fcu reference x: %2.2f, y: %2.2f (sector %d) is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it "
-          "to x: %2.2f, y: %2.2f",
+          "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f (sector %d) is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it "
+          "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
           new_y);
     }
@@ -4730,7 +4730,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_);
 
-      ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %2.2f is not valid, distance %2.2f < (%2.2f - %2.2f)., HUGGING IT it z: %2.2f", fcu_z,
+      ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f", fcu_z,
                vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
     }
 
@@ -4860,10 +4860,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       /* int oposite_sector_idx = (i + bumper_data.n_horizontal_sectors / 2) % bumper_data.n_horizontal_sectors; */
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: found potential collision (sector %d vs. %d), obstacle distance: %2.2f, repulsing", i, oposite_sector_idx,
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: found potential collision (sector %d vs. %d), obstacle distance: %0.2f, repulsing", i, oposite_sector_idx,
                         bumper_data.sectors[i]);
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: oposite direction: %2.2f", oposite_direction);
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: oposite direction: %0.2f", oposite_direction);
 
       if (wall_locked_horizontal) {
         if (bumper_data.sectors[i] < bumper_data.sectors[oposite_sector_idx]) {
