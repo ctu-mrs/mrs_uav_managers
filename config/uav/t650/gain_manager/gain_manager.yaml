@@ -35,6 +35,6 @@ gain_management:
     RTK: "soft"
     OPTFLOWGPS: "supersoft"
     GPS: "soft"
-    OPTFLOW: "soft"
+    OPTFLOW: "supersoft"
     HECTOR: "supersoft"
     OTHER: "supersoft"
