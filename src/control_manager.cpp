@@ -961,7 +961,7 @@ void ControlManager::onInit() {
       }
     }
     if (!joystic_controller_check) {
-      ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", joystick_controller_name_.c_str());
+      ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", joystick_controller_name_.c_str());
       ros::shutdown();
     }
 
@@ -995,7 +995,7 @@ void ControlManager::onInit() {
       }
     }
     if (!joystic_fallback_controller_check) {
-      ROS_ERROR("[ControlManager]: the failsafe fallback controller (%s) is not within the loaded controllers", joystick_fallback_controller_name_.c_str());
+      ROS_ERROR("[ControlManager]: the joystick fallback controller (%s) is not within the loaded controllers", joystick_fallback_controller_name_.c_str());
       ros::shutdown();
     }
   }
