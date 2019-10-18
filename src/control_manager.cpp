@@ -619,11 +619,11 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
 
-  param_loader.load_param("partial_landing/enabled", partial_landing_enabled_);
-  param_loader.load_param("partial_landing/mass_factor_trigger", partial_landing_mass_factor_);
-  param_loader.load_param("partial_landing/cutoff_timeout", partial_landing_cutoff_timeout_);
-  param_loader.load_param("partial_landing/controller", partial_landing_controller_name_);
-  param_loader.load_param("partial_landing/timer_rate", partial_landing_timer_rate_);
+  param_loader.load_param("partial_land/enabled", partial_landing_enabled_);
+  param_loader.load_param("partial_land/mass_factor_trigger", partial_landing_mass_factor_);
+  param_loader.load_param("partial_land/cutoff_timeout", partial_landing_cutoff_timeout_);
+  param_loader.load_param("partial_land/controller", partial_landing_controller_name_);
+  param_loader.load_param("partial_land/timer_rate", partial_landing_timer_rate_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
@@ -1180,7 +1180,7 @@ void ControlManager::onInit() {
   service_server_set_constraints     = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
   service_server_use_joystick        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
   service_server_eland               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_partial_landing     = nh_.advertiseService("partial_landing_in", &ControlManager::callbackPartialLanding, this);
+  service_server_partial_landing     = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
 
   service_client_arm      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland    = nh_.serviceClient<std_srvs::Trigger>("eland_out");

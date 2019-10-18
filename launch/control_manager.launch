@@ -260,7 +260,7 @@
       <remap from="~arm_out" to="mavros/cmd/arming" />
       <remap from="~arm_in" to="~arm" />
       <remap from="~eland_in" to="~eland" />
-      <remap from="~partial_landing_in" to="~partial_landing" />
+      <remap from="~partial_land_in" to="~partial_land" />
       <remap from="~failsafe_in" to="~failsafe" />
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />

@@ -95,10 +95,10 @@ automatic_pc_shutdown:
   enabled: false
   distance_threshold: 5 # [m]
 
-partial_landing:
+partial_land:
 
+  enabled: false
   timer_rate: 100 # [Hz]
-  enabled: true
   mass_factor_trigger: 0.75 # [-]
   cutoff_timeout: 0.2 # [s]
   controller: "PartialLandingController"
