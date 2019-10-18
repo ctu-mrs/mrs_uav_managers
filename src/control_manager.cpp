@@ -5620,6 +5620,12 @@ bool ControlManager::partialLanding(std::string &message_out) {
     return false;
 
   if (eland_triggered || failsafe_triggered || partial_landing_triggered) {
+    message_out = "Cannot trigger partial land: eland, failsafe or partial landing is already triggered.";
+    return false;
+  }
+
+  if (!partial_landing_enabled_) {
+    message_out = "Partial landing not enabled.";
     return false;
   }
 
