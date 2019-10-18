@@ -39,3 +39,9 @@ NsfController:
   namespace: "nsf_controller"
   eland_threshold: 1.5 # [m], position error triggering eland
   failsafe_threshold: 3.0 # [m], position error triggering failsafe land
+
+PartialLandingController:
+  address: "mrs_controllers/PartialLandingController"
+  namespace: "partial_landing_controller"
+  eland_threshold: 0.0 # [m], position error triggering eland
+  failsafe_threshold: 0.0 # [m], position error triggering failsafe land

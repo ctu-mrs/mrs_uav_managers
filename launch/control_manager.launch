@@ -34,6 +34,7 @@
   <arg name="custom_config_emergency_controller" default="" />
   <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_so3_controller" default="" />
+  <arg name="custom_config_partial_landing_controller" default="" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
@@ -118,6 +119,13 @@
       <rosparam if="$(eval not arg('custom_config_attitude_controller') == '')" ns="attitude_controller" file="$(arg custom_config_attitude_controller)" />
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
+
+      <!-- Partial landing controller -->
+      <rosparam ns="partial_landing_controller" file="$(find mrs_controllers)/config/default/partial_landing.yaml" />
+      <rosparam ns="partial_landing_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/partial_landing.yaml" />
+      <rosparam if="$(eval not arg('custom_config_attitude_controller') == '')" ns="partial_landing_controller" file="$(arg custom_config_partial_landing_controller)" />
+      <param name="partial_landing_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~partial_landing_controller/profiler" to="profiler" />
 
       <!-- Failsafe controller -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
@@ -252,9 +260,11 @@
       <remap from="~arm_out" to="mavros/cmd/arming" />
       <remap from="~arm_in" to="~arm" />
       <remap from="~eland_in" to="~eland" />
+      <remap from="~partial_landing_in" to="~partial_landing" />
       <remap from="~failsafe_in" to="~failsafe" />
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
+      <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~rc_in" to="mavros/rc/in" />
       <remap from="~shutdown_out" to="~shutdown_out" />
       <remap from="~pirouette_in" to="~pirouette" />

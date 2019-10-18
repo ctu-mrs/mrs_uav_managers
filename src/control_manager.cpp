@@ -198,28 +198,32 @@ private:
   std::mutex      mutex_max_height;
   std::mutex      mutex_min_height;
 
-  int active_tracker_idx               = 0;
-  int active_controller_idx            = 0;
-  int ehover_tracker_idx               = 0;
-  int landoff_tracker_idx              = 0;
-  int joystick_tracker_idx             = 0;
-  int joystick_controller_idx          = 0;
-  int failsafe_controller_idx          = 0;
-  int joystick_fallback_controller_idx = 0;
-  int joystick_fallback_tracker_idx    = 0;
-  int null_tracker_idx                 = 0;
-  int eland_controller_idx             = 0;
+  int active_tracker_idx                      = 0;
+  int active_controller_idx                   = 0;
+  int ehover_tracker_idx                      = 0;
+  int landoff_tracker_idx                     = 0;
+  int joystick_tracker_idx                    = 0;
+  int joystick_controller_idx                 = 0;
+  int failsafe_controller_idx                 = 0;
+  int joystick_fallback_controller_idx        = 0;
+  int joystick_fallback_tracker_idx           = 0;
+  int null_tracker_idx                        = 0;
+  int eland_controller_idx                    = 0;
+  int partial_landing_controller_idx          = 0;
+  int partial_landing_previous_controller_idx = 0;
+  int partial_landing_previous_tracker_idx    = 0;
 
   void switchMotors(bool in);
   bool motors = false;
 
   double min_thrust_null_tracker_ = 0.0;
 
-  int status_timer_rate_   = 0;
-  int safety_timer_rate_   = 0;
-  int elanding_timer_rate_ = 0;
-  int failsafe_timer_rate_ = 0;
-  int bumper_timer_rate_   = 0;
+  int status_timer_rate_          = 0;
+  int safety_timer_rate_          = 0;
+  int elanding_timer_rate_        = 0;
+  int partial_landing_timer_rate_ = 0;
+  int failsafe_timer_rate_        = 0;
+  int bumper_timer_rate_          = 0;
 
   ros::Publisher publisher_control_output;
   ros::Publisher publisher_position_cmd;
@@ -257,9 +261,11 @@ private:
   ros::ServiceServer service_server_emergency_goto;
   ros::ServiceServer service_server_pirouette;
   ros::ServiceServer service_server_eland;
+  ros::ServiceServer service_server_partial_landing;
 
   ros::ServiceClient service_client_arm;
   ros::ServiceClient service_client_eland;
+  ros::ServiceClient service_client_land;
   ros::ServiceClient service_client_shutdown;
 
   ros::Subscriber subscriber_goto;
@@ -377,6 +383,7 @@ private:
   bool ehover(std::string &message_out);
   bool hover(std::string &message_out);
   bool eland(std::string &message_out);
+  bool partialLanding(std::string &message_out);
   bool failsafe();
   bool arming(bool input);
 
@@ -385,6 +392,7 @@ private:
   bool callbackFailsafe(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackEland(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool callbackPartialLanding(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
   bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
   bool callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
@@ -428,6 +436,11 @@ private:
   ros::Timer elanding_timer;
   void       elandingTimer(const ros::TimerEvent &event);
   bool       eland_triggered = false;
+
+private:
+  ros::Timer partial_landing_timer;
+  void       partialLandingTimer(const ros::TimerEvent &event);
+  bool       partial_landing_triggered = false;
 
 private:
   ros::Timer safety_timer;
@@ -531,6 +544,15 @@ private:
   double          elanding_cutoff_timeout_;
   double          landing_uav_mass_ = 0;
 
+private:
+  LandingStates_t current_state_partial_landing  = IDLE_STATE;
+  LandingStates_t previous_state_partial_landing = IDLE_STATE;
+  void            changePartialLandingState(LandingStates_t new_state);
+  bool            partial_landing_enabled_ = false;
+  double          partial_landing_cutoff_timeout_;
+  double          partial_landing_mass_factor_;
+  std::string     partial_landing_controller_name_;
+
   double initial_body_disturbance_x_;
   double initial_body_disturbance_y_;
 
@@ -596,6 +618,12 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/eland/cutoff_timeout", elanding_cutoff_timeout_);
   param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
+
+  param_loader.load_param("partial_landing/enabled", partial_landing_enabled_);
+  param_loader.load_param("partial_landing/mass_factor_trigger", partial_landing_mass_factor_);
+  param_loader.load_param("partial_landing/cutoff_timeout", partial_landing_cutoff_timeout_);
+  param_loader.load_param("partial_landing/controller", partial_landing_controller_name_);
+  param_loader.load_param("partial_landing/timer_rate", partial_landing_timer_rate_);
 
   param_loader.load_param("safety/tilt_limit_eland", tilt_limit_eland_);
   tilt_limit_eland_ = (tilt_limit_eland_ / 180.0) * M_PI;
@@ -883,6 +911,26 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
+  // check if the partial landing controller is within the loaded controllers
+  if (partial_landing_enabled_) {
+
+    bool partial_landing_controller_check = false;
+    for (unsigned long i = 0; i < controller_names.size(); i++) {
+
+      std::string controller_name = controller_names[i];
+
+      if (controller_name.compare(partial_landing_controller_name_) == 0) {
+        partial_landing_controller_check = true;
+        partial_landing_controller_idx   = i;
+        break;
+      }
+    }
+    if (!partial_landing_controller_check) {
+      ROS_ERROR("[ControlManager]: the partial landing controller (%s) is not within the loaded controllers", partial_landing_controller_name_.c_str());
+      ros::shutdown();
+    }
+  }
+
   // --------------------------------------------------------------
   // |           check the existance of landoff tracker           |
   // --------------------------------------------------------------
@@ -1132,9 +1180,11 @@ void ControlManager::onInit() {
   service_server_set_constraints     = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
   service_server_use_joystick        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
   service_server_eland               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_partial_landing     = nh_.advertiseService("partial_landing_in", &ControlManager::callbackPartialLanding, this);
 
   service_client_arm      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_land     = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_shutdown = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
 
   // | ---------------- setpoint command services --------------- |
@@ -1164,14 +1214,15 @@ void ControlManager::onInit() {
   // |                           timers                           |
   // --------------------------------------------------------------
 
-  status_timer    = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
-  safety_timer    = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
-  bumper_timer    = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
-  elanding_timer  = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
-  failsafe_timer  = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
-  pirouette_timer = nh_.createTimer(ros::Rate(pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
-  joystick_timer  = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
-  control_timer   = nh_.createTimer(ros::Duration(0), &ControlManager::controlTimerOneshot, this, true, false);
+  status_timer          = nh_.createTimer(ros::Rate(status_timer_rate_), &ControlManager::statusTimer, this);
+  safety_timer          = nh_.createTimer(ros::Rate(safety_timer_rate_), &ControlManager::safetyTimer, this);
+  bumper_timer          = nh_.createTimer(ros::Rate(bumper_timer_rate_), &ControlManager::bumperTimer, this);
+  elanding_timer        = nh_.createTimer(ros::Rate(elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
+  partial_landing_timer = nh_.createTimer(ros::Rate(partial_landing_timer_rate_), &ControlManager::partialLandingTimer, this, false, false);
+  failsafe_timer        = nh_.createTimer(ros::Rate(failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
+  pirouette_timer       = nh_.createTimer(ros::Rate(pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
+  joystick_timer        = nh_.createTimer(ros::Rate(joystick_timer_rate_), &ControlManager::joystickTimer, this);
+  control_timer         = nh_.createTimer(ros::Duration(0), &ControlManager::controlTimerOneshot, this, true, false);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -1937,6 +1988,98 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
       elanding_timer.stop();
 
       // we should NOT set eland_triggered=true
+    }
+  }
+}
+
+//}
+
+/* //{ partialLandingTimer() */
+
+void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
+
+  if (!is_initialized)
+    return;
+
+  ROS_INFO("[ControlManager]: PES");
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("partialLandingTimer", partial_landing_timer_rate_, 0.01, event);
+
+  if (current_state_partial_landing == IDLE_STATE) {
+
+    return;
+
+  } else if (current_state_partial_landing == LANDING_STATE) {
+
+    double last_thrust_cmd;
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd);
+
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: partialLandingTimer: last_attitude_cmd has not been initialized, returning");
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
+        return;
+      }
+
+      last_thrust_cmd = last_attitude_cmd->thrust;
+    }
+
+    // recalculate the mass based on the thrust
+    thrust_mass_estimate = pow((last_thrust_cmd - motor_params_.hover_thrust_b) / motor_params_.hover_thrust_a, 2) / g_;
+    ROS_INFO("[ControlManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
+
+    // condition for automatic motor turn off
+    if (((thrust_mass_estimate < partial_landing_mass_factor_ * uav_mass_) || last_thrust_cmd < 0.01)) {
+
+      if (!thrust_under_threshold) {
+
+        thrust_mass_estimate_first_time = ros::Time::now();
+        thrust_under_threshold          = true;
+      }
+
+      ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time).toSec());
+
+    } else {
+
+      thrust_mass_estimate_first_time = ros::Time::now();
+      thrust_under_threshold          = false;
+    }
+
+    if (thrust_under_threshold && ((ros::Time::now() - thrust_mass_estimate_first_time).toSec() > partial_landing_cutoff_timeout_)) {
+
+      // enable callbacks? ... NO
+
+      ROS_INFO("[ControlManager]: reached cutoff thrust, switching to partial landing controller");
+
+      changePartialLandingState(IDLE_STATE);
+
+      // request
+      mrs_msgs::StringRequest  request;
+      mrs_msgs::StringResponse response;
+
+      // request
+      request.value = partial_landing_controller_name_;
+
+      mrs_msgs::AttitudeCommand::Ptr new_attitude_cmd(new mrs_msgs::AttitudeCommand);
+      new_attitude_cmd->mass_difference = landing_uav_mass_ - uav_mass_;
+      new_attitude_cmd->total_mass      = landing_uav_mass_;
+      new_attitude_cmd->thrust          = sqrt(partial_landing_mass_factor_ * uav_mass_ * g_) * motor_params_.hover_thrust_a + motor_params_.hover_thrust_b;
+
+      {
+        std::scoped_lock lock(mutex_last_attitude_cmd);
+
+        last_attitude_cmd                       = new_attitude_cmd;
+        partial_landing_previous_controller_idx = active_controller_idx;
+      }
+
+      callbackSwitchController(request, response);
+
+      ROS_WARN("[ControlManager]: partial landing finished");
+
+      partial_landing_triggered = false;
+
+      partial_landing_timer.stop();
     }
   }
 }
@@ -3125,6 +3268,20 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &
     return false;
 
   res.success = eland(res.message);
+
+  return true;
+}
+
+//}
+
+/* //{ callbackPartialLanding()() */
+
+bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  res.success = partialLanding(res.message);
 
   return true;
 }
@@ -5125,6 +5282,39 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 
 //}
 
+/* //{ changePartialLandingState() */
+
+void ControlManager::changePartialLandingState(LandingStates_t new_state) {
+
+  previous_state_partial_landing = current_state_partial_landing;
+  current_state_partial_landing  = new_state;
+
+  switch (current_state_partial_landing) {
+
+    case IDLE_STATE:
+      break;
+
+    case LANDING_STATE: {
+
+      partial_landing_timer.start();
+      partial_landing_triggered = true;
+
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        landing_uav_mass_ = uav_mass_;
+      } else {
+        landing_uav_mass_ = uav_mass_ + last_attitude_cmd->mass_difference;
+      }
+    }
+
+    break;
+  }
+
+  ROS_INFO("[ControlManager]: Triggering partial landing state %s -> %s", state_names[previous_state_partial_landing],
+           state_names[current_state_partial_landing]);
+}
+
+//}
+
 /* hover() //{ */
 
 bool ControlManager::hover(std::string &message_out) {
@@ -5404,12 +5594,106 @@ bool ControlManager::eland(std::string &message_out) {
   if (eland_out.response.success) {
 
     changeLandingState(LANDING_STATE);
+    changePartialLandingState(IDLE_STATE);
+    partial_landing_timer.stop();
+
     sprintf((char *)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
 
   } else {
 
     sprintf((char *)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+
+    message_out = std::string(message);
+    success     = false;
+  }
+
+  return success;
+}
+
+//}
+
+/* partialLanding() //{ */
+
+bool ControlManager::partialLanding(std::string &message_out) {
+
+  if (!is_initialized)
+    return false;
+
+  if (eland_triggered || failsafe_triggered || partial_landing_triggered) {
+    return false;
+  }
+
+  std::scoped_lock lock(mutex_tracker_list, mutex_controller_list, mutex_last_attitude_cmd, mutex_last_position_cmd);
+
+  char message[200];
+  bool success = false;
+
+  partial_landing_previous_tracker_idx = active_tracker_idx;
+
+  try {
+
+    // check if the tracker is not active
+    if (ehover_tracker_idx == active_tracker_idx) {
+
+      sprintf((char *)&message, "Not switching, the tracker %s is already active!", ehover_tracker_name_.c_str());
+      ROS_WARN("[ControlManager]: %s", message);
+
+    } else {
+
+      ROS_INFO("[ControlManager]: Activating tracker %s", tracker_names[ehover_tracker_idx].c_str());
+      tracker_list[ehover_tracker_idx]->activate(last_position_cmd);
+      sprintf((char *)&message, "Tracker %s has been activated", ehover_tracker_name_.c_str());
+      ROS_INFO("[ControlManager]: %s", message);
+
+      {
+        std::scoped_lock lock(mutex_controller_tracker_switch_time);
+
+        // update the time (used in failsafe)
+        controller_tracker_switch_time = ros::Time::now();
+      }
+
+      // super important, switch the active tracker idx
+      try {
+
+        tracker_list[active_tracker_idx]->deactivate();
+        active_tracker_idx = ehover_tracker_idx;
+
+        success = true;
+      }
+      catch (std::runtime_error &exrun) {
+
+        sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names[active_tracker_idx].c_str());
+        ROS_ERROR("[ControlManager]: %s", message);
+
+        message_out = std::string(message);
+        success     = false;
+      }
+    }
+  }
+  catch (std::runtime_error &exrun) {
+
+    sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", ehover_tracker_name_.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+
+    message_out = std::string(message);
+    success     = false;
+  }
+
+  std_srvs::Trigger land_out;
+  service_client_land.call(land_out);
+
+  if (land_out.response.success) {
+
+    changePartialLandingState(LANDING_STATE);
+    sprintf((char *)&message, "[ControlManager]: partial landing activated.");
+    message_out = std::string(message);
+
+  } else {
+
+    sprintf((char *)&message, "[ControlManager]: Error during activation of land: %s", land_out.response.message.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
 
     message_out = std::string(message);

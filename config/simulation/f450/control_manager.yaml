@@ -18,6 +18,7 @@ controllers : [
   "AccelerationController",
   "FailsafeController",
   "EmergencyController",
+  "PartialLandingController",
 ]
 
 safety:

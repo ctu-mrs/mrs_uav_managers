@@ -185,6 +185,7 @@ private:
 
 private:
   std::string null_tracker_name_;
+  std::string partial_landing_controller_name_;
 
 private:
   ros::Timer  takeoff_timer;
@@ -322,6 +323,7 @@ void UavManager::onInit() {
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
   param_loader.load_param("null_tracker", null_tracker_name_);
+  param_loader.load_param("partial_landing_controller", partial_landing_controller_name_);
 
   param_loader.load_param("takeoff/rate", takeoff_timer_rate_);
   param_loader.load_param("takeoff/after_takeoff/tracker", after_takeoff_tracker_name_);
@@ -1098,7 +1100,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     return true;
   }
 
-  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0) {
+  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 && partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
     sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
     res.message = message;
     res.success = false;
