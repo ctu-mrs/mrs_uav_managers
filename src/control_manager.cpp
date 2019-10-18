@@ -2001,8 +2001,6 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  ROS_INFO("[ControlManager]: PES");
-
   mrs_lib::Routine profiler_routine = profiler->createRoutine("partialLandingTimer", partial_landing_timer_rate_, 0.01, event);
 
   if (current_state_partial_landing == IDLE_STATE) {
