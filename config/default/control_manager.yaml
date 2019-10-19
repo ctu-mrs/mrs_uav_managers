@@ -97,7 +97,7 @@ automatic_pc_shutdown:
 
 partial_land:
 
-  enabled: false
+  enabled: true
   timer_rate: 100 # [Hz]
   mass_factor_trigger: 0.75 # [-]
   cutoff_timeout: 0.2 # [s]
