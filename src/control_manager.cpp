@@ -2062,9 +2062,11 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
       request.value = partial_landing_controller_name_;
 
       mrs_msgs::AttitudeCommand::Ptr new_attitude_cmd(new mrs_msgs::AttitudeCommand);
-      new_attitude_cmd->mass_difference = landing_uav_mass_ - uav_mass_;
-      new_attitude_cmd->total_mass      = landing_uav_mass_;
-      new_attitude_cmd->thrust          = sqrt(partial_landing_mass_factor_ * uav_mass_ * g_) * motor_params_.hover_thrust_a + motor_params_.hover_thrust_b;
+      new_attitude_cmd->mass_difference  = landing_uav_mass_ - uav_mass_;
+      new_attitude_cmd->total_mass       = landing_uav_mass_;
+      new_attitude_cmd->thrust           = sqrt(partial_landing_mass_factor_ * uav_mass_ * g_) * motor_params_.hover_thrust_a + motor_params_.hover_thrust_b;
+      new_attitude_cmd->disturbance_bx_b = initial_body_disturbance_x_;
+      new_attitude_cmd->disturbance_by_b = initial_body_disturbance_y_;
 
       {
         std::scoped_lock lock(mutex_last_attitude_cmd);
@@ -3048,10 +3050,10 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
               mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
 
-              output_command->total_mass      = uav_mass_;
+              output_command->total_mass       = uav_mass_;
               output_command->disturbance_bx_b = initial_body_disturbance_x_;
               output_command->disturbance_by_b = initial_body_disturbance_y_;
-              output_command->mass_difference = 0.0;
+              output_command->mass_difference  = 0.0;
 
               last_attitude_cmd = output_command;
 
@@ -5309,8 +5311,6 @@ void ControlManager::changePartialLandingState(LandingStates_t new_state) {
 
     case LANDING_STATE: {
 
-      service_server_switch_tracker.shutdown();
-      service_server_switch_controller.shutdown();
       partial_landing_timer.start();
       partial_landing_triggered = true;
 
