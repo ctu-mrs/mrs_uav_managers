@@ -90,21 +90,24 @@ typedef enum
 class ControllerParams {
 
 public:
-  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold);
+  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold);
 
 public:
   double      failsafe_threshold;
   double      eland_threshold;
+  double      odometry_innovation_threshold;
   std::string address;
   std::string name_space;
 };
 
-ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold) {
+ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold,
+                                   double odometry_innovation_threshold) {
 
-  this->eland_threshold    = eland_threshold;
-  this->failsafe_threshold = failsafe_threshold;
-  this->address            = address;
-  this->name_space         = name_space;
+  this->eland_threshold               = eland_threshold;
+  this->odometry_innovation_threshold = odometry_innovation_threshold;
+  this->failsafe_threshold            = failsafe_threshold;
+  this->address                       = address;
+  this->name_space                    = name_space;
 }
 
 //}
@@ -197,6 +200,11 @@ private:
   bool            got_max_height = false;
   std::mutex      mutex_max_height;
   std::mutex      mutex_min_height;
+
+  ros::Subscriber    subscriber_odometry_innovation;
+  nav_msgs::Odometry odometry_innovation;
+  std::mutex         mutex_odometry_innovation;
+  bool               got_odometry_innovation = false;
 
   int active_tracker_idx                      = 0;
   int active_controller_idx                   = 0;
@@ -319,6 +327,7 @@ private:
 
   double failsafe_threshold_;
   double eland_threshold_;
+  double odometry_innovation_threshold_;
 
 private:
   double    thrust_mass_estimate;
@@ -354,6 +363,7 @@ private:
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg);
   void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
 
@@ -805,11 +815,12 @@ void ControlManager::onInit() {
     // load the controller parameters
     std::string address;
     std::string name_space;
-    double      eland_threshold, failsafe_threshold;
+    double      eland_threshold, failsafe_threshold, odometry_innovation_threshold;
     param_loader.load_param(controller_name + "/address", address);
     param_loader.load_param(controller_name + "/namespace", name_space);
     param_loader.load_param(controller_name + "/eland_threshold", eland_threshold);
     param_loader.load_param(controller_name + "/failsafe_threshold", failsafe_threshold);
+    param_loader.load_param(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
 
     if (eland_threshold == 0) {
       eland_threshold = 1e6;
@@ -819,7 +830,11 @@ void ControlManager::onInit() {
       failsafe_threshold = 1e6;
     }
 
-    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold);
+    if (odometry_innovation_threshold == 0) {
+      odometry_innovation_threshold = 1e6;
+    }
+
+    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold, odometry_innovation_threshold);
     controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
 
     try {
@@ -1165,6 +1180,8 @@ void ControlManager::onInit() {
   subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry_innovation =
+      nh_.subscribe("odometry_innovation_in", 1, &ControlManager::callbackOdometryInnovation, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -1659,7 +1676,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!got_odometry || !got_odometry_innovation || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
@@ -1676,8 +1693,9 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     std::map<std::string, ControllerParams>::iterator it;
     it = controllers_.find(controller_names[active_controller_idx]);
 
-    eland_threshold_    = it->second.eland_threshold;
-    failsafe_threshold_ = it->second.failsafe_threshold;
+    eland_threshold_               = it->second.eland_threshold;
+    failsafe_threshold_            = it->second.failsafe_threshold;
+    odometry_innovation_threshold_ = it->second.odometry_innovation_threshold;
   }
 
   // | --------- calculate control errors and tilt angle -------- |
@@ -1790,6 +1808,32 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
         failsafe();
+      }
+    }
+  }
+
+  // --------------------------------------------------------------
+  // |     activate emergency land in case of large innovation    |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_odometry_innovation);
+
+    double last_innovation = sqrt(pow(odometry_innovation.pose.pose.position.x, 2.0) + pow(odometry_innovation.pose.pose.position.y, 2.0) +
+                                  pow(odometry_innovation.pose.pose.position.z, 2.0));
+
+    if (last_innovation > odometry_innovation_threshold_) {
+
+      if ((ros::Time::now() - tmp_controller_tracker_switch_time).toSec() > 1.0) {
+
+        if (!failsafe_triggered && !eland_triggered) {
+
+          ROS_ERROR("[ControlManager]: Activating emergency land: odometry innovation too large: %.2f exceeded %.2f", last_innovation,
+                    odometry_innovation_threshold_);
+
+          std::string message_out;
+          eland(message_out);
+        }
       }
     }
   }
@@ -2634,6 +2678,26 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 //}
 
+/* //{ callbackOdometryInnovation() */
+
+void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryInnovation");
+
+  {
+    std::scoped_lock lock(mutex_odometry_innovation);
+
+    odometry_innovation = *msg;
+
+    got_odometry_innovation = true;
+  }
+}
+
+//}
+
 /* //{ callbackPixhawkOdometry() */
 
 void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg) {
@@ -2972,6 +3036,15 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
     return true;
   }
 
+  if (!got_odometry_innovation) {
+
+    sprintf((char *)&message, "Can't switch tracker, missing odometry innovation!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
   if (!got_pixhawk_odometry) {
 
     sprintf((char *)&message, "Can't switch tracker, missing PixHawk odometry!");
@@ -3103,6 +3176,33 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
 
   char message[200];
+
+  if (!got_odometry) {
+
+    sprintf((char *)&message, "Can't switch controller, missing odometry!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  if (!got_odometry_innovation) {
+
+    sprintf((char *)&message, "Can't switch controller, missing odometry innovation!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
+
+  if (!got_pixhawk_odometry) {
+
+    sprintf((char *)&message, "Can't switch controller, missing PixHawk odometry!");
+    ROS_ERROR("[ControlManager]: %s", message);
+    res.success = false;
+    res.message = message;
+    return true;
+  }
 
   int new_controller_idx = -1;
 
