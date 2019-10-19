@@ -1896,6 +1896,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
           arming(false);
 
+          service_server_switch_tracker.shutdown();
+          service_server_switch_controller.shutdown();
           failsafe_triggered = true;
 
         } else {
@@ -2935,6 +2937,8 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
         ROS_INFO("[ControlManager]: triggering eland by RC");
 
+        service_server_switch_tracker.shutdown();
+        service_server_switch_controller.shutdown();
         rc_eland_triggered = true;
 
         std::string message_out;
@@ -5269,6 +5273,8 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       break;
     case LANDING_STATE: {
 
+      service_server_switch_tracker.shutdown();
+      service_server_switch_controller.shutdown();
       elanding_timer.start();
       eland_triggered = true;
 
@@ -5301,6 +5307,8 @@ void ControlManager::changePartialLandingState(LandingStates_t new_state) {
 
     case LANDING_STATE: {
 
+      service_server_switch_tracker.shutdown();
+      service_server_switch_controller.shutdown();
       partial_landing_timer.start();
       partial_landing_triggered = true;
 
@@ -5744,6 +5752,8 @@ bool ControlManager::failsafe() {
         controller_tracker_switch_time = ros::Time::now();
       }
 
+      service_server_switch_tracker.shutdown();
+      service_server_switch_controller.shutdown();
       failsafe_triggered = true;
       elanding_timer.stop();
 
