@@ -3049,6 +3049,8 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
               mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
 
               output_command->total_mass      = uav_mass_;
+              output_command->disturbance_bx_b = initial_body_disturbance_x_;
+              output_command->disturbance_by_b = initial_body_disturbance_y_;
               output_command->mass_difference = 0.0;
 
               last_attitude_cmd = output_command;
