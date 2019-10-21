@@ -245,6 +245,7 @@
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
       <remap from="~diagnostics_out" to="~diagnostics" />
+      <remap from="~bumper_status_out" to="~bumper_status" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->

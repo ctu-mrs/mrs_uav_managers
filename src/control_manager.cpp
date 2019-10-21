@@ -12,6 +12,7 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
+#include <mrs_msgs/BumperStatus.h>
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
@@ -245,6 +246,7 @@ private:
   ros::Publisher publisher_mass_estimate;
   ros::Publisher publisher_control_error;
   ros::Publisher publisher_rviz;
+  ros::Publisher publisher_bumper_status;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -1167,6 +1169,7 @@ void ControlManager::onInit() {
   publisher_mass_estimate   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
   publisher_control_error   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
   publisher_rviz            = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
+  publisher_bumper_status   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -5005,6 +5008,16 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
     ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, obstacle is too close (horizontally)", fcu_x,
              fcu_y, fcu_z, horizontal_vector_idx);
+
+    mrs_msgs::BumperStatus bumper_status;
+    bumper_status.modifying_reference = true;
+    try {
+      publisher_bumper_status.publish(bumper_status);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+    }
+
     return false;
   }
 
@@ -5013,6 +5026,16 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
       (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance_)) {
 
     ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f is not valid, obstacle is too close (vertically)", fcu_x, fcu_y, fcu_z);
+
+    mrs_msgs::BumperStatus bumper_status;
+    bumper_status.modifying_reference = true;
+    try {
+      publisher_bumper_status.publish(bumper_status);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+    }
+
     return false;
   }
 
@@ -5038,6 +5061,15 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
           "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
           new_y);
+
+      mrs_msgs::BumperStatus bumper_status;
+      bumper_status.modifying_reference = true;
+      try {
+        publisher_bumper_status.publish(bumper_status);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      }
     }
 
     if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_)) {
@@ -5046,6 +5078,15 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f", fcu_z,
                vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
+
+      mrs_msgs::BumperStatus bumper_status;
+      bumper_status.modifying_reference = true;
+      try {
+        publisher_bumper_status.publish(bumper_status);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      }
     }
 
     // express the point back in the original FRAME
@@ -5252,6 +5293,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
   if (horizontal_collision_detected || vertical_collision_detected) {
 
     ROS_INFO("[ControlManager]: repulsing was initiated");
+
+    mrs_msgs::BumperStatus bumper_status;
+    bumper_status.repulsing = true;
+    try {
+      publisher_bumper_status.publish(bumper_status);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+    }
 
     repulsing = true;
 
