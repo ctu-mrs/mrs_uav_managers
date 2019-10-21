@@ -49,6 +49,6 @@ flight_timer:
 # detecting if desired thrust cross max threshold, triggers landing after that
 max_thrust:
 
-  enabled: false
+  enabled: true
   rate: 30 # [Hz]
   max_thrust: 0.85 # [-]
