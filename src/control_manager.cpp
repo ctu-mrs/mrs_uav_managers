@@ -2109,8 +2109,12 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
       new_attitude_cmd->mass_difference  = landing_uav_mass_ - uav_mass_;
       new_attitude_cmd->total_mass       = landing_uav_mass_;
       new_attitude_cmd->thrust           = sqrt(partial_landing_mass_factor_ * uav_mass_ * g_) * motor_params_.hover_thrust_a + motor_params_.hover_thrust_b;
-      new_attitude_cmd->disturbance_bx_b = initial_body_disturbance_x_;
-      new_attitude_cmd->disturbance_by_b = initial_body_disturbance_y_;
+      new_attitude_cmd->disturbance_bx_b = last_attitude_cmd->disturbance_bx_b;
+      new_attitude_cmd->disturbance_by_b = last_attitude_cmd->disturbance_by_b;
+      new_attitude_cmd->disturbance_bx_w = last_attitude_cmd->disturbance_bx_w;
+      new_attitude_cmd->disturbance_by_w = last_attitude_cmd->disturbance_by_w;
+      new_attitude_cmd->disturbance_wx_w = last_attitude_cmd->disturbance_wx_w;
+      new_attitude_cmd->disturbance_wy_w = last_attitude_cmd->disturbance_wy_w;
 
       {
         std::scoped_lock lock(mutex_last_attitude_cmd);

@@ -99,7 +99,7 @@ partial_land:
 
   enabled: true
   timer_rate: 100 # [Hz]
-  mass_factor_trigger: 0.80 # [-]
+  mass_factor_trigger: 1.00 # [-]
   cutoff_timeout: 0.05 # [s]
   controller: "PartialLandingController"
 
