@@ -770,7 +770,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
 
     maxthrust_timer.stop();
 
-    ROS_WARN("[UavManager]: detecting maximum allowed thrust in attitude_cmd, landing");
+    ROS_WARN("[UavManager]: detecting maximum allowed thrust (%2.f of %.2f), calling emergency landing", attitude_command.thrust, maxthrust_max_thrust_);
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = landing_tracker_name_;
