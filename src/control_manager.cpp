@@ -54,6 +54,9 @@
 #define REF_Y 1
 #define REF_Z 2
 #define REF_YAW 3
+#define ELAND_STR "eland"
+#define ESCALATING_FAILSAFE_STR "escalating_failsafe"
+#define FAILSAFE_STR "failsafe"
 
 namespace mrs_uav_manager
 {
@@ -503,10 +506,11 @@ private:
   Eigen::Vector3d fcu2local(const Eigen::Vector3d in);
 
 private:
-  bool rc_eland_enabled_ = false;
-  int  rc_eland_channel_;
-  int  rc_eland_threshold_;
-  bool rc_eland_triggered = false;
+  bool        rc_eland_enabled_ = false;
+  int         rc_eland_channel_;
+  int         rc_eland_threshold_;
+  bool        rc_eland_triggered = false;
+  std::string rc_eland_action_;
 
 private:
   std::mutex mutex_joystick;
@@ -709,6 +713,15 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/rc_eland/enabled", rc_eland_enabled_);
   param_loader.load_param("safety/rc_eland/channel_number", rc_eland_channel_);
   param_loader.load_param("safety/rc_eland/threshold", rc_eland_threshold_);
+  param_loader.load_param("safety/rc_eland/action", rc_eland_action_);
+
+  // check the values of RC eland action
+  if (rc_eland_action_.compare(ELAND_STR) != STRING_EQUAL && rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) != STRING_EQUAL &&
+      rc_eland_action_.compare(FAILSAFE_STR) != STRING_EQUAL) {
+    ROS_ERROR("[ControlManager]: the rc_eland/action parameter (%s) is not correct, requires {%s, %s, %s}", rc_eland_action_.c_str(), ELAND_STR,
+              ESCALATING_FAILSAFE_STR, FAILSAFE_STR);
+    ros::shutdown();
+  }
 
   param_loader.load_param("rc_joystick/enabled", rc_goto_enabled_);
   param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
@@ -2298,9 +2311,10 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     bool nothing_to_do = true;
 
-    if (uint(3) >= rc_channels.channels.size()) {
+    if (rc_channels.channels.size() >= uint(4)) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in is %d)",
+                         uint(rc_channels.channels.size()));
 
     } else {
 
@@ -2978,8 +2992,8 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
     if (uint(rc_joystic_channel_) >= msg->channels.size()) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
-      return;
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", uint(rc_joystic_channel_),
+                         uint(msg->channels.size()));
 
     } else {
 
@@ -3002,21 +3016,44 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
     if (uint(rc_eland_channel_) >= msg->channels.size()) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number is out of range");
-      return;
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", rc_eland_channel_, uint(msg->channels.size()));
 
     } else {
 
-      if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered && !failsafe_triggered) {
+      if (rc_eland_action_.compare(ELAND_STR) == STRING_EQUAL) {
 
-        ROS_INFO("[ControlManager]: triggering eland by RC");
+        if (msg->channels[rc_eland_channel_] >= uint(rc_eland_threshold_) && !eland_triggered && !failsafe_triggered) {
+
+          ROS_WARN("[ControlManager]: triggering eland by RC");
+
+          service_server_switch_tracker.shutdown();
+          service_server_switch_controller.shutdown();
+          rc_eland_triggered = true;
+
+          std::string message_out;
+          eland(message_out);
+        }
+      } else if (rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) == STRING_EQUAL) {
 
         service_server_switch_tracker.shutdown();
         service_server_switch_controller.shutdown();
-        rc_eland_triggered = true;
 
         std::string message_out;
-        eland(message_out);
+        escalatingFailsafe(message_out);
+
+      } else if (rc_eland_action_.compare(FAILSAFE_STR) == STRING_EQUAL) {
+
+        if (!failsafe_triggered) {
+
+          ROS_WARN("[ControlManager]: triggering failsafe by RC");
+
+          service_server_switch_tracker.shutdown();
+          service_server_switch_controller.shutdown();
+
+          std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+          failsafe();
+        }
       }
     }
   }
@@ -5925,6 +5962,7 @@ bool ControlManager::escalatingFailsafe(std::string &message_out) {
   if ((ros::Time::now() - escalating_failsafe_time).toSec() < escalating_failsafe_timeout_) {
 
     message_out = "too soon for escalating failsafe";
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
     return false;
   }
 
@@ -5933,20 +5971,23 @@ bool ControlManager::escalatingFailsafe(std::string &message_out) {
   if (!eland_triggered && !failsafe_triggered && motors) {
 
     escalating_failsafe_time = ros::Time::now();
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: escalating failsafe calls for eland");
     return eland(message_out);
 
   } else if (eland_triggered) {
 
     std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
-    message_out              = "triggering failsafe";
+    message_out = "escalating failsafe escalates to failsafe";
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
     escalating_failsafe_time = ros::Time::now();
     return failsafe();
 
   } else if (failsafe_triggered) {
 
     escalating_failsafe_time = ros::Time::now();
-    message_out              = "disarming";
+    message_out              = "escalating failsafe escalates to disarm";
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
     return arming(false);
   }
 

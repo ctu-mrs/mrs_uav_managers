@@ -67,9 +67,9 @@ safety:
   rc_eland:
 
     enabled: true
-    # activation channel
-    channel_number: 7 # [-]
+    channel_number: 7 # [-],  activation RC channel
     threshold: 1500 # [us]
+    action: "eland" # {eland, escalating_failsafe, failsafe}
 
 obstacle_bumper:
 
