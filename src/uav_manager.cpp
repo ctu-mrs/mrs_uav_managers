@@ -487,7 +487,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
         // recalculate the mass based on the thrust
         thrust_mass_estimate = pow((target_attitude.thrust - hover_thrust_b_) / hover_thrust_a_, 2) / g_;
-        ROS_INFO("[UavManager]: landing_uav_mass_: %f thrust_mass_estimate: %f", landing_uav_mass_, thrust_mass_estimate);
+        ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate);
 
         // condition for automatic motor turn off
         if (((thrust_mass_estimate < landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
@@ -663,7 +663,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
       if (odometry_z > max_height + 0.25) {
 
-        ROS_WARN("[UavManager]: max height exceeded: %f >  %f, triggering safety goto", odometry_z, max_height);
+        ROS_WARN("[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", odometry_z, max_height);
 
         // get the current odometry
         double current_horizontal_speed = sqrt(pow(odometry.twist.twist.linear.x, 2) + pow(odometry.twist.twist.linear.y, 2));
