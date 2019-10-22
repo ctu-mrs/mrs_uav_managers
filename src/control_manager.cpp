@@ -397,6 +397,7 @@ private:
   bool eland(std::string &message_out);
   bool partialLanding(std::string &message_out);
   bool failsafe();
+  bool escalatingFailsafe(std::string &message_out);
   bool arming(bool input);
 
   bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
@@ -631,6 +632,8 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/eland/timer_rate", elanding_timer_rate_);
   param_loader.load_param("safety/eland/disarm", eland_disarm_enabled_);
 
+  param_loader.load_param("safety/escalating_failsafe/timeout", escalating_failsafe_timeout_);
+
   param_loader.load_param("partial_land/enabled", partial_landing_enabled_);
   param_loader.load_param("partial_land/mass_factor_trigger", partial_landing_mass_factor_);
   param_loader.load_param("partial_land/cutoff_timeout", partial_landing_cutoff_timeout_);
@@ -658,8 +661,6 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
   tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * M_PI;
-
-  param_loader.load_param("safety/escalating_failsafe_timeout", escalating_failsafe_timeout_);
 
   param_loader.load_param("joystick/enabled", joystick_enabled_);
   param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
@@ -3345,35 +3346,7 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackFailsafeEscalating");
 
-  if ((ros::Time::now() - escalating_failsafe_time).toSec() < escalating_failsafe_timeout_) {
-
-    res.message = "too soon for escalating failsafe";
-    res.success = false;
-    return true;
-  }
-
-  ROS_WARN("[ControlManager]: escalating failsafe triggered");
-
-  if (!eland_triggered && !failsafe_triggered && motors) {
-
-    res.success              = eland(res.message);
-    res.message              = "triggering eland";
-    escalating_failsafe_time = ros::Time::now();
-
-  } else if (eland_triggered) {
-
-    std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
-
-    res.success              = failsafe();
-    res.message              = "triggering failsafe";
-    escalating_failsafe_time = ros::Time::now();
-
-  } else if (failsafe_triggered) {
-
-    escalating_failsafe_time = ros::Time::now();
-    res.message              = "disarming";
-    res.success              = arming(false);
-  }
+  res.success = escalatingFailsafe(res.message);
 
   return true;
 }
@@ -5941,6 +5914,43 @@ bool ControlManager::failsafe() {
   }
 
   return true;
+}
+
+//}
+
+/* escalatingFailsafe() //{ */
+
+bool ControlManager::escalatingFailsafe(std::string &message_out) {
+
+  if ((ros::Time::now() - escalating_failsafe_time).toSec() < escalating_failsafe_timeout_) {
+
+    message_out = "too soon for escalating failsafe";
+    return false;
+  }
+
+  ROS_WARN("[ControlManager]: escalating failsafe triggered");
+
+  if (!eland_triggered && !failsafe_triggered && motors) {
+
+    escalating_failsafe_time = ros::Time::now();
+    return eland(message_out);
+
+  } else if (eland_triggered) {
+
+    std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+
+    message_out              = "triggering failsafe";
+    escalating_failsafe_time = ros::Time::now();
+    return failsafe();
+
+  } else if (failsafe_triggered) {
+
+    escalating_failsafe_time = ros::Time::now();
+    message_out              = "disarming";
+    return arming(false);
+  }
+
+  return false;
 }
 
 //}
