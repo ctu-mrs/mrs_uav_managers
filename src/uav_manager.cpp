@@ -237,6 +237,9 @@ private:
   bool       maxthrust_timer_enabled_ = false;
   double     maxthrust_timer_rate_;
   double     maxthrust_max_thrust_;
+  double     maxthrust_timeout_;
+  bool       maxthrust_above_threshold = false;
+  ros::Time  maxthrust_first_time;
 
   // | ------------------------ profiler ------------------------ |
 private:
@@ -361,6 +364,7 @@ void UavManager::onInit() {
   param_loader.load_param("max_thrust/enabled", maxthrust_timer_enabled_);
   param_loader.load_param("max_thrust/rate", maxthrust_timer_rate_);
   param_loader.load_param("max_thrust/max_thrust", maxthrust_max_thrust_);
+  param_loader.load_param("max_thrust/timeout", maxthrust_timeout_);
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
@@ -764,13 +768,35 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
+  std::scoped_lock lock(mutex_attitude_command);
+
   mrs_lib::Routine profiler_routine = profiler->createRoutine("maxthrustTimer", maxthrust_timer_rate_, 0.002, event);
 
   if (attitude_command.thrust >= maxthrust_max_thrust_) {
 
+    if (!maxthrust_above_threshold) {
+
+      maxthrust_first_time      = ros::Time::now();
+      maxthrust_above_threshold = true;
+      ROS_WARN("[UavManager]: max thrust exceeded threshold (%.2f/%.2f)", attitude_command.thrust, maxthrust_max_thrust_);
+
+    } else {
+
+      ROS_WARN_THROTTLE(0.1, "[UavManager]: thrust over threshold (%.2f/%.2f) for %.2f s", attitude_command.thrust, maxthrust_max_thrust_,
+                        (ros::Time::now() - maxthrust_first_time).toSec());
+    }
+
+  } else {
+
+    maxthrust_above_threshold = false;
+  }
+
+  if (maxthrust_above_threshold && (ros::Time::now() - maxthrust_first_time).toSec() > maxthrust_timeout_) {
+
     maxthrust_timer.stop();
 
-    ROS_WARN("[UavManager]: detecting maximum allowed thrust (%2.f of %.2f), calling emergency landing", attitude_command.thrust, maxthrust_max_thrust_);
+    ROS_ERROR("[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, calling emergency landing", attitude_command.thrust, maxthrust_max_thrust_,
+              maxthrust_timeout_);
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = landing_tracker_name_;
@@ -1100,7 +1126,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
     return true;
   }
 
-  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 && partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
+  if (null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 &&
+      partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
     sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", null_tracker_name_.c_str());
     res.message = message;
     res.success = false;
@@ -1207,7 +1234,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
         }
       }
 
-      ROS_INFO("[UavManager]: took off, saving x=%2.2f, y=%2.2f as home position", takeoff_x, takeoff_y);
+      ROS_INFO("[UavManager]: took off, saving x=%0.2f, y=%0.2f as home position", takeoff_x, takeoff_y);
 
       takingoff = true;
       number_of_takeoffs++;
@@ -1398,7 +1425,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   takingoff           = false;
   takeoff_timer.stop();
 
-  ROS_INFO("[UavManager]: landing on home -> x=%2.2f, y=%2.2f", takeoff_x, takeoff_y);
+  ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", takeoff_x, takeoff_y);
 
   mrs_msgs::Vec4 goto_out;
   {

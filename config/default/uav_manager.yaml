@@ -51,4 +51,5 @@ max_thrust:
 
   enabled: true
   rate: 30 # [Hz]
-  max_thrust: 0.85 # [-]
+  max_thrust: 0.80 # [-]
+  timeout: 1.0 # [s]
