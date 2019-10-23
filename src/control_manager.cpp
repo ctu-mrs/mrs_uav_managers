@@ -2311,7 +2311,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
     bool nothing_to_do = true;
 
-    if (rc_channels.channels.size() >= uint(4)) {
+    if (rc_channels.channels.size() < uint(4)) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in is %d)",
                          uint(rc_channels.channels.size()));
