@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.3 (2019-10-25)
+------------------
 * fixed retard mode rc channels
 * added action options to rc eland
 * extracted escalating failsafe into a standalone function
