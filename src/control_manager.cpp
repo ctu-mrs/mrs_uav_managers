@@ -172,6 +172,8 @@ private:
   std::string eland_controller_name_;
   bool        eland_disarm_enabled_ = false;
 
+  std::string local_origin_frame_id_;
+
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
 
@@ -623,6 +625,7 @@ void ControlManager::onInit() {
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
 
   param_loader.load_param("uav_name", uav_name_);
+  local_origin_frame_id_ = uav_name_ + "/local_origin";
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
@@ -1393,7 +1396,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = "local_origin";
+        marker.header.frame_id = local_origin_frame_id_;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1457,7 +1460,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = "local_origin";
+        marker.header.frame_id = local_origin_frame_id_;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1523,7 +1526,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = "local_origin";
+        marker.header.frame_id = local_origin_frame_id_;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1591,7 +1594,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = "local_origin";
+        marker.header.frame_id = local_origin_frame_id_;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1663,7 +1666,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         safety_zone_marker.id = id++;
 
         safety_zone_marker.header.stamp    = ros::Time::now();
-        safety_zone_marker.header.frame_id = "local_origin";
+        safety_zone_marker.header.frame_id = local_origin_frame_id_;
 
         msg_out.markers.push_back(safety_zone_marker);
       }
@@ -6210,7 +6213,7 @@ void ControlManager::publish(void) {
     nav_msgs::Odometry cmd_odom;
 
     cmd_odom.header.stamp         = ros::Time::now();
-    cmd_odom.header.frame_id      = "local_origin";
+    cmd_odom.header.frame_id      = local_origin_frame_id_;
     cmd_odom.pose.pose.position   = last_position_cmd->position;
     cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
     cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
