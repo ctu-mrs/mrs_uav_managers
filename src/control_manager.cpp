@@ -13,9 +13,11 @@
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/BumperStatus.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
+#include <mrs_msgs/UavState.h>
+
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
-#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
@@ -189,6 +191,19 @@ private:
   bool               got_odometry = false;
   ros::Time          odometry_last_time;
   double             odometry_max_missing_time_;
+
+  ros::Subscriber    subscriber_uav_state;
+  mrs_msgs::UavState uav_state;
+  bool               got_uav_state = false;
+  std::mutex         mutex_uav_state;
+  ros::Time          uav_state_last_time;
+  double             uav_state_max_missing_time;
+  double             uav_roll;
+  double             uav_pitch;
+  double             uav_yaw;
+  double             uav_x;
+  double             uav_y;
+  double             uav_z;
 
   ros::Subscriber    subscriber_pixhawk_odometry;
   nav_msgs::Odometry pixhawk_odometry;
@@ -370,6 +385,7 @@ private:
 
 private:
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
+  void callbackUavState(const mrs_msgs::UavStateConstPtr &msg);
   void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg);
   void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
@@ -1193,6 +1209,7 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   subscriber_odometry         = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_uav_state         = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
   subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
   odometry_last_time          = ros::Time(0);
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
@@ -2691,6 +2708,49 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     got_odometry = true;
 
     odometry_last_time = ros::Time::now();
+  }
+
+  // run the control loop asynchronously in an OneShotTimer
+  // but only if its not already running
+  if (!running_control_timer) {
+    control_timer.stop();
+    control_timer.start();
+  }
+}
+
+//}
+
+/* //{ callbackUavState() */
+
+void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackUavState");
+
+  // --------------------------------------------------------------
+  // |           copy the UavState message for later use          |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_uav_state);
+
+    uav_state = *msg;
+
+    uav_x = uav_state.pose.position.x;
+    uav_y = uav_state.pose.position.y;
+    uav_z = uav_state.pose.position.z;
+
+    // calculate the euler angles
+    tf::Quaternion uav_quaternion;
+    quaternionMsgToTF(uav_state.pose.orientation, uav_quaternion);
+    tf::Matrix3x3 m(uav_quaternion);
+    m.getRPY(uav_roll, uav_pitch, uav_yaw);
+
+    got_uav_state = true;
+
+    uav_state_last_time = ros::Time::now();
   }
 
   // run the control loop asynchronously in an OneShotTimer
