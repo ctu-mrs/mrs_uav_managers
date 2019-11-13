@@ -151,6 +151,7 @@
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/default/line_tracker.yaml" />
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/line_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_line_tracker') == '')" ns="line_tracker" file="$(arg custom_config_line_tracker)" />
+      <param name="line_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
@@ -158,6 +159,7 @@
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/default/joy_tracker.yaml" />
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_joy_tracker') == '')" ns="joy_tracker" file="$(arg custom_config_joy_tracker)" />
+      <param name="joy_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
@@ -166,6 +168,7 @@
       <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/default/joy_bumper_tracker.yaml" />
       <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_bumper_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_joy_bumper_tracker') == '')" ns="joy_bumper_tracker" file="$(arg custom_config_joy_bumper_tracker)" />
+      <param name="joy_bumper_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_bumper_tracker/profiler" to="profiler" />
       <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
@@ -175,6 +178,7 @@
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/default/matlab_tracker.yaml" />
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/matlab_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_matlab_tracker') == '')" ns="matlab_tracker" file="$(arg custom_config_matlab_tracker)" />
+      <param name="matlab_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
@@ -184,6 +188,7 @@
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_landoff_tracker') == '')" ns="landoff_tracker" file="$(arg custom_config_landoff_tracker)" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <param name="landoff_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
