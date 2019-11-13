@@ -6174,10 +6174,17 @@ void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
         // which means we should trigger the failsafe landing
       } else {
 
-        ROS_WARN("[ControlManager]: triggering failsafe, the controller returned null");
+        // only if the controller is still active, trigger failsafe
+        // if not active, we don't care, we should not ask the controller for
+        // the result anyway -> this could mean a race condition occured
+        // like it once happend during landing
+        if (controller_list[active_controller_idx]->getStatus().active) {
 
-        std::scoped_lock lock(mutex_last_attitude_cmd);
-        failsafe();
+          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned null");
+
+          std::scoped_lock lock(mutex_last_attitude_cmd);
+          failsafe();
+        }
       }
     }
     catch (std::runtime_error &exrun) {
