@@ -72,10 +72,10 @@
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
-      
+
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
-      
+
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="g" value="$(arg g)" />
