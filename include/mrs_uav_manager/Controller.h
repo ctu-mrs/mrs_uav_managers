@@ -7,7 +7,7 @@
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/AttitudeCommand.h>
-#include <nav_msgs/Odometry.h>
+#include <mrs_msgs/UavState.h>
 
 namespace mrs_uav_manager
 {
@@ -29,7 +29,8 @@ public:
 
   // initialize() is called once for every controller
   // * the run time is not limited
-  virtual void initialize(const ros::NodeHandle &parent_nh, std::string name, std::string name_space, const mrs_uav_manager::MotorParams motor_params, const double uav_mass, const double g) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, std::string name, std::string name_space, const mrs_uav_manager::MotorParams motor_params,
+                          const double uav_mass, const double g) = 0;
 
   // activate() is called before the controllers output will be used
   // * the last command of previously used controller is passed, so mass ans disturbance estimates can be shared
@@ -43,9 +44,9 @@ public:
   // this may be called to reset the controllers disturbance estimators, for safety reasons (typically in failsafe)
   virtual void resetDisturbanceEstimators(void) = 0;
 
-  // update() is called with every odometry update
+  // update() is called with every UavState update
   // * it should not take long to evaluate
-  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &       odometry,
+  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
                                                            const mrs_msgs::PositionCommand::ConstPtr &reference) = 0;
 
   // getStatus()
@@ -53,9 +54,9 @@ public:
   virtual const mrs_msgs::ControllerStatus getStatus() = 0;
 
   // switchOdometrySource() is called during every switch of reference frames
-  // * the new odometry (which will come in the next update()) is passed
+  // * the new UavState (which will come in the next update()) is passed
   // * recalculate internal states from old frame to the new one
-  virtual void switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg) = 0;
+  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg) = 0;
 };
 }  // namespace mrs_uav_manager
 

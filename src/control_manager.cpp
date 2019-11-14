@@ -18,6 +18,7 @@
 
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point32.h>
+#include <nav_msgs/Odometry.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
@@ -180,17 +181,6 @@ private:
   std::mutex mutex_controller_list;
 
   ros::Subscriber    subscriber_odometry;
-  nav_msgs::Odometry odometry;
-  double             odometry_x;
-  double             odometry_y;
-  double             odometry_z;
-  double             odometry_yaw;
-  double             odometry_roll;
-  double             odometry_pitch;
-  std::mutex         mutex_odometry;
-  bool               got_odometry = false;
-  ros::Time          odometry_last_time;
-  double             odometry_max_missing_time_;
 
   ros::Subscriber    subscriber_uav_state;
   mrs_msgs::UavState uav_state;
@@ -2691,23 +2681,27 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    odometry = *msg;
+    uav_state = UavState();
 
-    odometry_x = odometry.pose.pose.position.x;
-    odometry_y = odometry.pose.pose.position.y;
-    odometry_z = odometry.pose.pose.position.z;
+    uav_state.header = msg->header;
+    uav_state.pose = msg->pose.pose;
+    uav_state.velocity = msg->twist.twist;
+
+    uav_x = msg->pose.pose.position.x;
+    uav_y = msg->pose.pose.position.y;
+    uav_z = msg->pose.pose.position.z;
 
     // calculate the euler angles
-    tf::Quaternion quaternion_odometry;
-    quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
-    tf::Matrix3x3 m(quaternion_odometry);
-    m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+    tf::Quaternion uav_attitude;
+    quaternionMsgToTF(msg->pose.pose.orientation, uav_attitude);
+    tf::Matrix3x3 m(uav_attitude);
+    m.getRPY(uav_roll, uav_pitch, uav_yaw);
 
-    got_odometry = true;
+    got_uav_state = true;
 
-    odometry_last_time = ros::Time::now();
+    uav_state_last_time = ros::Time::now();
   }
 
   // run the control loop asynchronously in an OneShotTimer
