@@ -161,6 +161,8 @@ private:
   std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>>    tracker_list;
   std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list;
 
+  int state_input_;
+
   std::string null_tracker_name_;
   std::string ehover_tracker_name_;
   std::string landoff_tracker_name_;
@@ -180,14 +182,14 @@ private:
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
 
-  ros::Subscriber    subscriber_odometry;
+  ros::Subscriber subscriber_odometry;
 
   ros::Subscriber    subscriber_uav_state;
   mrs_msgs::UavState uav_state;
   bool               got_uav_state = false;
   std::mutex         mutex_uav_state;
   ros::Time          uav_state_last_time;
-  double             uav_state_max_missing_time;
+  double             uav_state_max_missing_time_;
   double             uav_roll;
   double             uav_pitch;
   double             uav_yaw;
@@ -197,10 +199,10 @@ private:
 
   ros::Subscriber    subscriber_pixhawk_odometry;
   nav_msgs::Odometry pixhawk_odometry;
-  double             pixhawk_odometry_x;
-  double             pixhawk_odometry_y;
+  double             pixhawk_uav_x;
+  double             pixhawk_uav_y;
   double             pixhawk_odometry_z;
-  double             pixhawk_odometry_yaw;
+  double             pixhawk_uav_yaw;
   double             pixhawk_odometry_roll;
   double             pixhawk_odometry_pitch;
   std::mutex         mutex_pixhawk_odometry;
@@ -326,7 +328,7 @@ private:
 
 private:
   void updateTrackers(void);
-  void updateControllers(nav_msgs::Odometry odom_for_control);
+  void updateControllers(mrs_msgs::UavState uav_state_for_control);
   void publish(void);
 
 private:
@@ -635,6 +637,13 @@ void ControlManager::onInit() {
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
+  param_loader.load_param("state_input", state_input_);
+
+  if (!(state_input_ == 0 || state_input_ == 1)) {
+    ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
+    ros::shutdown();
+  }
+
   param_loader.load_param("safety/min_thrust_null_tracker", min_thrust_null_tracker_);
   param_loader.load_param("safety/ehover_tracker", ehover_tracker_name_);
   param_loader.load_param("safety/failsafe_controller", failsafe_controller_name_);
@@ -669,7 +678,7 @@ void ControlManager::onInit() {
   param_loader.load_param("hover_thrust/b", motor_params_.hover_thrust_b);
   param_loader.load_param("g", g_);
 
-  param_loader.load_param("safety/odometry_max_missing_time", odometry_max_missing_time_);
+  param_loader.load_param("safety/odometry_max_missing_time", uav_state_max_missing_time_);
 
   param_loader.load_param("safety/tilt_error_failsafe/enabled", tilt_error_failsafe_enabled_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", tilt_error_threshold_);
@@ -1198,10 +1207,13 @@ void ControlManager::onInit() {
   // |                         subscribers                        |
   // --------------------------------------------------------------
 
-  subscriber_odometry         = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_uav_state         = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
+  if (state_input_ == 0) {
+    subscriber_uav_state = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
+  } else if (state_input_ == 1) {
+    subscriber_odometry = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  }
+
   subscriber_pixhawk_odometry = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
-  odometry_last_time          = ros::Time(0);
   subscriber_max_height       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_joystick         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
   subscriber_bumper           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
@@ -1209,6 +1221,8 @@ void ControlManager::onInit() {
   subscriber_rc               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
   subscriber_odometry_innovation =
       nh_.subscribe("odometry_innovation_in", 1, &ControlManager::callbackOdometryInnovation, this, ros::TransportHints().tcpNoDelay());
+
+  uav_state_last_time = ros::Time(0);
 
   // | -------------------- general services -------------------- |
 
@@ -1382,9 +1396,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   // |                  publish the rviz markers                  |
   // --------------------------------------------------------------
   {
-    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_odometry);
+    std::scoped_lock lock(mutex_last_attitude_cmd, mutex_uav_state);
 
-    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && got_odometry) {
+    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && got_uav_state) {
 
       visualization_msgs::MarkerArray msg_out;
 
@@ -1392,8 +1406,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
       double multiplier = 1.0;
 
-      Eigen::Quaterniond quat_eigen(odometry.pose.pose.orientation.w, odometry.pose.pose.orientation.x, odometry.pose.pose.orientation.y,
-                                    odometry.pose.pose.orientation.z);
+      Eigen::Quaterniond quat_eigen(uav_state.pose.orientation.w, uav_state.pose.orientation.x, uav_state.pose.orientation.y, uav_state.pose.orientation.z);
 
       Eigen::Vector3d      vec3d;
       geometry_msgs::Point point;
@@ -1428,9 +1441,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         //}
 
         /* origin //{ */
-        point.x = odometry_x;
-        point.y = odometry_y;
-        point.z = odometry_z;
+        point.x = uav_x;
+        point.y = uav_y;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1438,9 +1451,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         /* tip //{ */
 
-        point.x = odometry_x + multiplier * last_attitude_cmd->disturbance_wx_w;
-        point.y = odometry_y;
-        point.z = odometry_z;
+        point.x = uav_x + multiplier * last_attitude_cmd->disturbance_wx_w;
+        point.y = uav_y;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1494,9 +1507,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         // defining points
 
         /* origin //{ */
-        point.x = odometry_x;
-        point.y = odometry_y;
-        point.z = odometry_z;
+        point.x = uav_x;
+        point.y = uav_y;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1504,9 +1517,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         /* tip //{ */
 
-        point.x = odometry_x;
-        point.y = odometry_y + multiplier * last_attitude_cmd->disturbance_wy_w;
-        point.z = odometry_z;
+        point.x = uav_x;
+        point.y = uav_y + multiplier * last_attitude_cmd->disturbance_wy_w;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1559,9 +1572,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         /* origin //{ */
 
-        point.x = odometry_x;
-        point.y = odometry_y;
-        point.z = odometry_z;
+        point.x = uav_x;
+        point.y = uav_y;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1572,9 +1585,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, 0, 0;
         vec3d = quat_eigen * vec3d;
 
-        point.x = odometry_x + vec3d[0];
-        point.y = odometry_y + vec3d[1];
-        point.z = odometry_z + vec3d[2];
+        point.x = uav_x + vec3d[0];
+        point.y = uav_y + vec3d[1];
+        point.z = uav_z + vec3d[2];
 
         marker.points.push_back(point);
 
@@ -1627,9 +1640,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         /* origin //{ */
 
-        point.x = odometry_x;
-        point.y = odometry_y;
-        point.z = odometry_z;
+        point.x = uav_x;
+        point.y = uav_y;
+        point.z = uav_z;
 
         marker.points.push_back(point);
 
@@ -1640,9 +1653,9 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         vec3d << 0, multiplier * last_attitude_cmd->disturbance_by_b, 0;
         vec3d = quat_eigen * vec3d;
 
-        point.x = odometry_x + vec3d[0];
-        point.y = odometry_y + vec3d[1];
-        point.z = odometry_z + vec3d[2];
+        point.x = uav_x + vec3d[0];
+        point.y = uav_y + vec3d[1];
+        point.z = uav_z + vec3d[2];
 
         marker.points.push_back(point);
 
@@ -1703,7 +1716,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("safetyTimer", safety_timer_rate_, 0.04, event);
 
-  if (!got_odometry || !got_odometry_innovation || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
+  if (!got_uav_state || !got_odometry_innovation || !got_pixhawk_odometry || active_tracker_idx == null_tracker_idx) {
     return;
   }
 
@@ -1729,7 +1742,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   double tilt_angle;
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_odometry, mutex_tilt_error, mutex_control_error);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_uav_state, mutex_tilt_error, mutex_control_error);
 
     // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
     // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
@@ -1741,17 +1754,17 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     yaw_error  = 0;
 
     // control errors
-    position_error_x_ = last_position_cmd->position.x - odometry_x;
-    position_error_y_ = last_position_cmd->position.y - odometry_y;
-    position_error_z_ = last_position_cmd->position.z - odometry_z;
+    position_error_x_ = last_position_cmd->position.x - uav_x;
+    position_error_y_ = last_position_cmd->position.y - uav_y;
+    position_error_z_ = last_position_cmd->position.z - uav_z;
 
-    velocity_error_x_ = last_position_cmd->velocity.x - odometry.twist.twist.linear.x;
-    velocity_error_y_ = last_position_cmd->velocity.y - odometry.twist.twist.linear.y;
-    velocity_error_z_ = last_position_cmd->velocity.z - odometry.twist.twist.linear.z;
+    velocity_error_x_ = last_position_cmd->velocity.x - uav_state.velocity.linear.x;
+    velocity_error_y_ = last_position_cmd->velocity.y - uav_state.velocity.linear.y;
+    velocity_error_z_ = last_position_cmd->velocity.z - uav_state.velocity.linear.z;
 
     // tilt angle
     tf::Quaternion odometry_quaternion;
-    quaternionMsgToTF(odometry.pose.pose.orientation, odometry_quaternion);
+    quaternionMsgToTF(uav_state.pose.orientation, odometry_quaternion);
 
     // rotate the drone's z axis
     tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
@@ -1791,7 +1804,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     // | ---------------------- the yaw error --------------------- |
     if (last_attitude_cmd->euler_attitude_set) {
 
-      yaw_error = last_attitude_cmd->euler_attitude.z - odometry_yaw;
+      yaw_error = last_attitude_cmd->euler_attitude.z - uav_yaw;
 
     } else if (last_attitude_cmd->quater_attitude_set) {
 
@@ -1802,7 +1815,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
       double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
       m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
 
-      yaw_error = angleDist(attitude_cmd_yaw, odometry_yaw);
+      yaw_error = angleDist(attitude_cmd_yaw, uav_yaw);
     }
   }
 
@@ -1870,7 +1883,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
     // | ------------------- tilt control error ------------------- |
     if (tilt_angle > tilt_limit_eland_) {
@@ -1924,14 +1937,14 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // in place of the odometryCallback()
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    if ((ros::Time::now() - odometry_last_time).toSec() > odometry_max_missing_time_) {
+    if ((ros::Time::now() - uav_state_last_time).toSec() > uav_state_max_missing_time_) {
 
       if (!failsafe_triggered) {
 
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land.",
-                           (ros::Time::now() - odometry_last_time).toSec());
+                           (ros::Time::now() - uav_state_last_time).toSec());
 
         std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
@@ -1954,7 +1967,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
   {
-    std::scoped_lock lock(mutex_tilt_error, mutex_odometry, mutex_controller_list, mutex_controller_tracker_switch_time);
+    std::scoped_lock lock(mutex_tilt_error, mutex_uav_state, mutex_controller_list, mutex_controller_tracker_switch_time);
 
     if (tilt_error_failsafe_enabled_) {
 
@@ -2175,7 +2188,13 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_pixhawk_odometry);
 
-    updateControllers(pixhawk_odometry);
+    mrs_msgs::UavState pixhawk_odom_uav_state;
+    // TODO add child frame ID.. which one?
+    pixhawk_odom_uav_state.header   = pixhawk_odometry.header;
+    pixhawk_odom_uav_state.pose     = pixhawk_odometry.pose.pose;
+    pixhawk_odom_uav_state.velocity = pixhawk_odometry.twist.twist;
+
+    updateControllers(pixhawk_odom_uav_state);
   }
 
   publish();
@@ -2358,9 +2377,9 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
       Eigen::Vector2d des(request.goal[REF_X], request.goal[REF_Y]);
       {
-        std::scoped_lock lock(mutex_odometry);
+        std::scoped_lock lock(mutex_uav_state);
 
-        des = rotateVector(des, odometry_yaw);
+        des = rotateVector(des, uav_yaw);
       }
 
       request.goal[REF_X] = des[0];
@@ -2483,7 +2502,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  if (!got_odometry) {
+  if (!got_uav_state) {
     return;
   }
 
@@ -2571,15 +2590,15 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
 
     updateTrackers();
 
-    nav_msgs::Odometry temp_odometry;
+    mrs_msgs::UavState temp_uav_state;
 
     {
-      std::scoped_lock lock(mutex_odometry);
+      std::scoped_lock lock(mutex_uav_state);
 
-      temp_odometry = odometry;
+      temp_uav_state = uav_state;
     }
 
-    updateControllers(temp_odometry);
+    updateControllers(temp_uav_state);
 
     if (got_constraints) {
 
@@ -2601,9 +2620,9 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
     safety_timer.start();
     odometry_switch_in_progress = false;
 
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+    ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x, uav_y, uav_z, uav_yaw);
   }
 }
 
@@ -2633,18 +2652,24 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   // | -- prepare an OdometryConstPtr for trackers & controllers -- |
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(*msg));
+  mrs_msgs::UavState uav_state_odom;
+  // TODO child frame id?
+  uav_state_odom.header   = msg->header;
+  uav_state_odom.pose     = msg->pose.pose;
+  uav_state_odom.velocity = msg->twist.twist;
+
+  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(new mrs_msgs::UavState(uav_state_odom));
 
   // | ----- check for change in odometry frame of reference ---- |
 
-  if (got_odometry) {
-    if (odometry.child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
+  if (got_uav_state) {
+    if (msg->child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
       {
-        std::scoped_lock lock(mutex_odometry);
+        std::scoped_lock lock(mutex_uav_state);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", odometry_x, odometry_y, odometry_z, odometry_yaw);
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x, uav_y, uav_z, uav_yaw);
       }
 
       odometry_switch_in_progress = true;
@@ -2668,8 +2693,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       {
         std::scoped_lock lock(mutex_controller_list, mutex_tracker_list);
 
-        tracker_list[active_tracker_idx]->switchOdometrySource(odometry_const_ptr);
-        controller_list[active_controller_idx]->switchOdometrySource(odometry_const_ptr);
+        tracker_list[active_tracker_idx]->switchOdometrySource(uav_state_const_ptr);
+        controller_list[active_controller_idx]->switchOdometrySource(uav_state_const_ptr);
       }
     }
   }
@@ -2683,10 +2708,10 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   {
     std::scoped_lock lock(mutex_uav_state);
 
-    uav_state = UavState();
+    uav_state = mrs_msgs::UavState();
 
-    uav_state.header = msg->header;
-    uav_state.pose = msg->pose.pose;
+    uav_state.header   = msg->header;
+    uav_state.pose     = msg->pose.pose;
     uav_state.velocity = msg->twist.twist;
 
     uav_x = msg->pose.pose.position.x;
@@ -2795,15 +2820,15 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &m
 
     pixhawk_odometry = *msg;
 
-    pixhawk_odometry_x = pixhawk_odometry.pose.pose.position.x;
-    pixhawk_odometry_y = pixhawk_odometry.pose.pose.position.y;
+    pixhawk_uav_x      = pixhawk_odometry.pose.pose.position.x;
+    pixhawk_uav_y      = pixhawk_odometry.pose.pose.position.y;
     pixhawk_odometry_z = pixhawk_odometry.pose.pose.position.z;
 
     // calculate the euler angles
     tf::Quaternion quaternion_odometry;
     quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, quaternion_odometry);
     tf::Matrix3x3 m(quaternion_odometry);
-    m.getRPY(pixhawk_odometry_roll, pixhawk_odometry_pitch, pixhawk_odometry_yaw);
+    m.getRPY(pixhawk_odometry_roll, pixhawk_odometry_pitch, pixhawk_uav_yaw);
   }
 
   got_pixhawk_odometry = true;
@@ -3129,7 +3154,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
   char message[200];
 
-  if (!got_odometry) {
+  if (!got_uav_state) {
 
     sprintf((char *)&message, "Can't switch tracker, missing odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3279,7 +3304,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
   char message[200];
 
-  if (!got_odometry) {
+  if (!got_uav_state) {
 
     sprintf((char *)&message, "Can't switch controller, missing odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3485,9 +3510,9 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   char message[200];
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    if (!isPointInSafetyArea2d(odometry.pose.pose.position.x, odometry.pose.pose.position.y)) {
+    if (!isPointInSafetyArea2d(uav_state.pose.position.x, uav_state.pose.position.y)) {
 
       sprintf((char *)&message, "Can't switch motors on, the UAV is outside of the safety area!");
       res.message = message;
@@ -3692,11 +3717,11 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
   pirouette_enabled_ = true;
 
-  std::scoped_lock lock(mutex_odometry);
+  std::scoped_lock lock(mutex_uav_state);
 
   setCallbacks(false);
 
-  pirouette_inital_yaw = odometry_yaw;
+  pirouette_inital_yaw = uav_yaw;
   pirouette_iterator   = 0;
   pirouette_timer.start();
 
@@ -3852,15 +3877,15 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
 
     // rotate it from the frame of the drone
     Eigen::Vector2d des(des_x, des_y);
-    des = rotateVector(des, odometry_yaw);
+    des = rotateVector(des, uav_yaw);
 
     {
-      std::scoped_lock lock(mutex_odometry);
+      std::scoped_lock lock(mutex_uav_state);
 
-      request.position.x   = des[0] + odometry_x;
-      request.position.y   = des[1] + odometry_y;
-      request.position.z   = des_z + odometry_z;
-      request.position.yaw = des_yaw + odometry_yaw;
+      request.position.x   = des[0] + uav_x;
+      request.position.y   = des[1] + uav_y;
+      request.position.z   = des_z + uav_z;
+      request.position.yaw = des_yaw + uav_yaw;
     }
 
   } else {
@@ -3945,15 +3970,15 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   Eigen::Vector2d       des(request_in.goal[REF_X], request_in.goal[REF_Y]);
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
     // rotate it from the frame of the drone
-    des = rotateVector(des, odometry_yaw);
+    des = rotateVector(des, uav_yaw);
 
-    request.goal[REF_X]   = des[REF_X] + odometry_x;
-    request.goal[REF_Y]   = des[REF_Y] + odometry_y;
-    request.goal[REF_Z]   = request_in.goal[REF_Z] + odometry_z;
-    request.goal[REF_YAW] = request_in.goal[REF_YAW] + odometry_yaw;
+    request.goal[REF_X]   = des[REF_X] + uav_x;
+    request.goal[REF_Y]   = des[REF_Y] + uav_y;
+    request.goal[REF_Z]   = request_in.goal[REF_Z] + uav_z;
+    request.goal[REF_YAW] = request_in.goal[REF_YAW] + uav_yaw;
   }
 
   // check the safety area
@@ -4049,14 +4074,14 @@ void ControlManager::callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedCon
   Eigen::Vector2d               des(des_x, des_y);
 
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
     // rotate it from the frame of the drone
-    des = rotateVector(des, odometry_yaw);
+    des = rotateVector(des, uav_yaw);
 
-    request.position.x   = des[0] + odometry_x;
-    request.position.y   = des[1] + odometry_y;
-    request.position.z   = des_z + odometry_z;
-    request.position.yaw = des_yaw + odometry_yaw;
+    request.position.x   = des[0] + uav_x;
+    request.position.y   = des[1] + uav_y;
+    request.position.z   = des_z + uav_z;
+    request.position.yaw = des_yaw + uav_yaw;
   }
 
   if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
@@ -4131,7 +4156,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   }
 
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
 
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -4241,7 +4266,7 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
   mrs_msgs::TrackerPointStamped request;
 
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
 
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -4249,12 +4274,12 @@ void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStamp
 
         // rotate it from the frame of the drone
         Eigen::Vector2d des(des_x, des_y);
-        des = rotateVector(des, odometry_yaw);
+        des = rotateVector(des, uav_yaw);
 
-        request.position.x   = des[0] + odometry_x - last_position_cmd->position.x;
-        request.position.y   = des[1] + odometry_y - last_position_cmd->position.y;
-        request.position.z   = des_z + odometry_z - last_position_cmd->position.z;
-        request.position.yaw = des_yaw + odometry_yaw - last_position_cmd->yaw;
+        request.position.x   = des[0] + uav_x - last_position_cmd->position.x;
+        request.position.y   = des[1] + uav_y - last_position_cmd->position.y;
+        request.position.z   = des_z + uav_z - last_position_cmd->position.z;
+        request.position.yaw = des_yaw + uav_yaw - last_position_cmd->yaw;
 
       } else {
 
@@ -4325,7 +4350,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   }
 
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
 
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -4389,7 +4414,7 @@ void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &
   }
 
   {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_odometry);
+    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
 
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -4670,15 +4695,15 @@ Eigen::Vector3d ControlManager::local2fcu(const Eigen::Vector3d in) {
   // get uav rotational transform
   tf::Quaternion quaternion_odometry;
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
+    quaternionMsgToTF(uav_state.pose.orientation, quaternion_odometry);
   }
 
   // rotate the point to world and add the UAV position
   // TODO we should do this using tfs
   tf::Vector3 out = tf::Transform(quaternion_odometry) * tf::Vector3(in[0], in[1], in[2]);
-  out += tf::Vector3(odometry_x, odometry_y, odometry_z);
+  out += tf::Vector3(uav_x, uav_y, uav_z);
 
   return Eigen::Vector3d(out[0], out[1], out[2]);
 }
@@ -4690,19 +4715,19 @@ Eigen::Vector3d ControlManager::local2fcu(const Eigen::Vector3d in) {
 Eigen::Vector3d ControlManager::fcu2local(const Eigen::Vector3d in) {
 
   // get uav rotational transform
-  tf::Quaternion quaternion_odometry;
+  tf::Quaternion uav_attitude;
   {
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
+    quaternionMsgToTF(uav_state.pose.orientation, uav_attitude);
   }
 
-  quaternion_odometry = quaternion_odometry.inverse();
+  uav_attitude = uav_attitude.inverse();
 
   // rotate the point to world and add the UAV position
   // TODO we should do this using tfs
-  tf::Vector3 out = tf::Vector3(in[0], in[1], in[2]) - tf::Vector3(odometry_x, odometry_y, odometry_z);
-  out             = tf::Transform(quaternion_odometry) * out;
+  tf::Vector3 out = tf::Vector3(in[0], in[1], in[2]) - tf::Vector3(uav_x, uav_y, uav_z);
+  out             = tf::Transform(uav_attitude) * out;
 
   return Eigen::Vector3d(out[0], out[1], out[2]);
 }
@@ -4729,9 +4754,9 @@ void ControlManager::shutdown() {
 
   if (automatic_pc_shutdown_enabled) {
 
-    std::scoped_lock lock(mutex_odometry);
+    std::scoped_lock lock(mutex_uav_state);
 
-    double distance_to_origin = sqrt(pow(odometry.pose.pose.position.x, 2.0) + pow(odometry.pose.pose.position.y, 2.0));
+    double distance_to_origin = sqrt(pow(uav_state.pose.position.x, 2.0) + pow(uav_state.pose.position.y, 2.0));
 
     if (distance_to_origin > automatic_pc_shutdown_threshold) {
 
@@ -5008,8 +5033,8 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       mrs_msgs::Vec4Request req_goto_out;
       {
-        std::scoped_lock lock(mutex_odometry);
-        temp = rotateVector(temp, -odometry_yaw);
+        std::scoped_lock lock(mutex_uav_state);
+        temp = rotateVector(temp, -uav_yaw);
       }
 
       fcu_x = temp[0];
@@ -5026,14 +5051,14 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       mrs_msgs::Vec4Request req_goto_out;
       {
-        std::scoped_lock lock(mutex_odometry);
-        temp = Eigen::Vector2d(x - odometry_x, y - odometry_y);
-        temp = rotateVector(temp, -odometry_yaw);
+        std::scoped_lock lock(mutex_uav_state);
+        temp = Eigen::Vector2d(x - uav_x, y - uav_y);
+        temp = rotateVector(temp, -uav_yaw);
       }
 
       fcu_x = temp[0];
       fcu_y = temp[1];
-      fcu_z = z - odometry_z;
+      fcu_z = z - uav_z;
 
       break;
     }
@@ -5178,8 +5203,8 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
         mrs_msgs::Vec4Request req_goto_out;
         {
-          std::scoped_lock lock(mutex_odometry);
-          temp = rotateVector(temp, odometry_yaw);
+          std::scoped_lock lock(mutex_uav_state);
+          temp = rotateVector(temp, uav_yaw);
         }
 
         x = temp[0];
@@ -5196,15 +5221,15 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
         mrs_msgs::Vec4Request req_goto_out;
         {
-          std::scoped_lock lock(mutex_odometry);
+          std::scoped_lock lock(mutex_uav_state);
           temp = Eigen::Vector2d(new_x, new_y);
-          temp = rotateVector(temp, odometry_yaw);
-          temp += Eigen::Vector2d(odometry_x, odometry_y);
+          temp = rotateVector(temp, uav_yaw);
+          temp += Eigen::Vector2d(uav_x, uav_y);
         }
 
         x = temp[0];
         y = temp[1];
-        z = new_z + odometry_z;
+        z = new_z + uav_z;
 
         break;
       }
@@ -5382,10 +5407,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     mrs_msgs::Vec4Request req_goto_out;
     {
-      std::scoped_lock lock(mutex_odometry);
+      std::scoped_lock lock(mutex_uav_state);
 
       // rotate it from the frame of the drone
-      des = rotateVector(des, odometry_yaw);
+      des = rotateVector(des, uav_yaw);
 
       if (horizontal_collision_detected) {
         req_goto_out.goal[REF_X] = des[0];
@@ -5456,7 +5481,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
-  std::scoped_lock lock(mutex_odometry);
+  std::scoped_lock lock(mutex_uav_state);
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -6136,11 +6161,11 @@ void ControlManager::updateTrackers(void) {
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_odometry, mutex_last_position_cmd, mutex_tracker_list);
+  std::scoped_lock lock(mutex_uav_state, mutex_last_position_cmd, mutex_tracker_list);
 
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odometry));
+  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(new mrs_msgs::UavState(uav_state));
 
   try {
 
@@ -6150,12 +6175,12 @@ void ControlManager::updateTrackers(void) {
       if ((int)i == active_tracker_idx) {
 
         // if it is the active one, update and retrieve the command
-        tracker_output_cmd = tracker_list[i]->update(odometry_const_ptr);
+        tracker_output_cmd = tracker_list[i]->update(uav_state_const_ptr);
 
       } else {
 
         // if it is not the active one, just update without retrieving the command
-        tracker_list[i]->update(odometry_const_ptr);
+        tracker_list[i]->update(uav_state_const_ptr);
       }
     }
 
@@ -6186,7 +6211,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
+void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
@@ -6194,7 +6219,7 @@ void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
 
   std::scoped_lock lock(mutex_last_position_cmd, mutex_controller_list);
 
-  nav_msgs::Odometry::ConstPtr odometry_const_ptr(new nav_msgs::Odometry(odom_for_control));
+  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(new mrs_msgs::UavState(uav_state_for_control));
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
@@ -6208,12 +6233,12 @@ void ControlManager::updateControllers(nav_msgs::Odometry odom_for_control) {
         if ((int)i == active_controller_idx) {
 
           // if it is the active one, update and retrieve the command
-          controller_output_cmd = controller_list[active_controller_idx]->update(odometry_const_ptr, last_position_cmd);
+          controller_output_cmd = controller_list[active_controller_idx]->update(uav_state_const_ptr, last_position_cmd);
 
         } else {
 
           // if it is not the active one, just update without retrieving the command
-          controller_list[i]->update(odometry_const_ptr, last_position_cmd);
+          controller_list[i]->update(uav_state_const_ptr, last_position_cmd);
         }
       }
 
@@ -6350,7 +6375,7 @@ void ControlManager::publish(void) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: NullTracker is active, publishing zeros...");
 
     // set the quaternion to the current odometry.. better than setting it to something unrelated
-    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+    desired_orientation = tf::createQuaternionFromRPY(uav_roll, uav_roll, uav_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
@@ -6370,7 +6395,7 @@ void ControlManager::publish(void) {
                       controller_names[active_controller_idx].c_str());
 
     // set the quaternion to the current odometry.. better than setting it to something unrelated
-    desired_orientation = tf::createQuaternionFromRPY(odometry_roll, odometry_pitch, odometry_yaw);
+    desired_orientation = tf::createQuaternionFromRPY(uav_roll, uav_roll, uav_yaw);
     desired_orientation.normalize();
     quaternionTFToMsg(desired_orientation, attitude_target.orientation);
 
