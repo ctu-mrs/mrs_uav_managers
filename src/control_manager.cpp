@@ -2643,10 +2643,11 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
 
-  if (!got_max_height) {
-    ROS_WARN_THROTTLE(1.0, "[ControlerManager]: waiting for max allowed height from odometry");
-    return;
-  }
+  /* // TODO remove? */
+  /* if (!got_max_height) { */
+  /*   ROS_WARN_THROTTLE(1.0, "[ControlerManager]: waiting for max allowed height from odometry"); */
+  /*   return; */
+  /* } */
 
   /* Odometry frame switch //{ */
 
@@ -2663,7 +2664,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state) {
-    if (msg->child_frame_id.compare(msg->child_frame_id) != STRING_EQUAL) {
+    if (msg->header.frame_id.compare(uav_state.header.frame_id) != STRING_EQUAL) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
       {
@@ -2747,6 +2748,53 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
     return;
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackUavState");
+
+  /* frame switch //{ */
+
+  // | -- prepare an OdometryConstPtr for trackers & controllers -- |
+
+  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(new mrs_msgs::UavState(*msg));
+
+  // | ----- check for change in odometry frame of reference ---- |
+
+  if (got_uav_state) {
+    if (msg->estimator_iteration != uav_state.estimator_iteration) {
+
+      ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      {
+        std::scoped_lock lock(mutex_uav_state);
+
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x, uav_y, uav_z, uav_yaw);
+      }
+
+      odometry_switch_in_progress = true;
+
+      // we have to stop safety timer, otherwise it will interfere
+      safety_timer.stop();
+      // wait for the safety timer to stop if its running
+      while (running_safety_timer) {
+        ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
+      // we have to also for the oneshot control timer to finish
+      while (running_control_timer) {
+        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ros::Duration wait(0.001);
+        wait.sleep();
+      }
+
+      {
+        std::scoped_lock lock(mutex_controller_list, mutex_tracker_list);
+
+        tracker_list[active_tracker_idx]->switchOdometrySource(uav_state_const_ptr);
+        controller_list[active_controller_idx]->switchOdometrySource(uav_state_const_ptr);
+      }
+    }
+  }
+
+  //}
 
   // --------------------------------------------------------------
   // |           copy the UavState message for later use          |
