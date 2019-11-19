@@ -48,6 +48,10 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_eigen/tf2_eigen.h>
+
 //}
 
 #define STRING_EQUAL 0
@@ -218,6 +222,11 @@ private:
   nav_msgs::Odometry odometry_innovation;
   std::mutex         mutex_odometry_innovation;
   bool               got_odometry_innovation = false;
+
+  tf2_ros::Buffer                             tf_buffer;
+  std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr;
+  std::mutex                                  mutex_tf_buffer;
+  bool                                        transformReference(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref);
 
   int active_tracker_idx                      = 0;
   int active_controller_idx                   = 0;
@@ -1267,6 +1276,10 @@ void ControlManager::onInit() {
 
   service_server_emergency_goto = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
   service_server_pirouette      = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
+
+  // | ----------------------- tf listener ---------------------- |
+
+  tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(tf_buffer, "ControlManager");
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -6619,6 +6632,51 @@ double ControlManager::angleDist(const double in1, const double in2) {
   }
 
   return fabs(sanitized_difference);
+}
+
+//}
+
+/* transformReference() //{ */
+
+bool ControlManager::transformReference(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref) {
+
+  std::scoped_lock lock(mutex_tf_buffer);
+
+  // create the transformer
+  geometry_msgs::TransformStamped transformer;
+  transformer = tf_buffer.lookupTransform(to_frame, from_frame, ref.header.stamp, ros::Duration(0.005));
+
+  // create the pose message
+  geometry_msgs::PoseStamped pose;
+  pose.header = ref.header;
+
+  pose.pose.position.x = ref.position.x;
+  pose.pose.position.y = ref.position.y;
+  pose.pose.position.z = ref.position.z;
+
+  pose.pose.orientation.x = 0;
+  pose.pose.orientation.y = 0;
+  pose.pose.orientation.z = sin(ref.position.yaw / 2.0);
+  pose.pose.orientation.w = cos(ref.position.yaw / 2.0);
+
+  try {
+    tf2::doTransform(pose, pose, transformer);
+
+    // copy the new transformed data back
+    ref.position.x = pose.pose.position.x;
+    ref.position.y = pose.pose.position.y;
+    ref.position.z = pose.pose.position.z;
+
+    ref.position.yaw = asin(pose.pose.orientation.z) * 2.0;
+
+    ref.header.frame_id = to_frame;
+
+    return true;
+  }
+  catch (tf2::TransformException &ex) {
+    ROS_WARN("Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+    return false;
+  }
 }
 
 //}
