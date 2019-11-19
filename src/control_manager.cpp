@@ -227,6 +227,7 @@ private:
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr;
   std::mutex                                  mutex_tf_buffer;
   bool                                        transformReference(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref);
+  mrs_uav_manager::Transformer_t              transformer;
 
   int active_tracker_idx                      = 0;
   int active_controller_idx                   = 0;
@@ -833,7 +834,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, it->second.address.c_str());
-      tracker_list[i]->initialize(nh_, &safety_area);
+      tracker_list[i]->initialize(nh_, &safety_area, &transformer);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
@@ -1280,6 +1281,9 @@ void ControlManager::onInit() {
   // | ----------------------- tf listener ---------------------- |
 
   tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(tf_buffer, "ControlManager");
+
+  // bind routines for the shared transformer
+  transformer.transformReference = boost::bind(&ControlManager::transformReference, this, _1, _2, _3);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -3547,7 +3551,7 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &
 
 //}
 
-/* //{ callbackPartialLanding()() */
+/* //{ callbackPartialLanding() */
 
 bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
 
@@ -6674,7 +6678,7 @@ bool ControlManager::transformReference(const std::string from_frame, const std:
     return true;
   }
   catch (tf2::TransformException &ex) {
-    ROS_WARN("Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.: %s", from_frame.c_str(), to_frame.c_str(), ex.what());
     return false;
   }
 }

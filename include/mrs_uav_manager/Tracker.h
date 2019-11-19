@@ -36,10 +36,12 @@
 namespace mrs_uav_manager
 {
 
-typedef boost::function<bool(const double x, const double y, const double z)> isPointInSafetyArea3d_t;
-typedef boost::function<bool(const double x, const double y)>                 isPointInSafetyArea2d_t;
-typedef boost::function<double(void)>                                         getMaxHeight_t;
-typedef boost::function<double(void)>                                         getMinHeight_t;
+typedef boost::function<bool(const double x, const double y, const double z)>                                               isPointInSafetyArea3d_t;
+typedef boost::function<bool(const double x, const double y)>                                                               isPointInSafetyArea2d_t;
+typedef boost::function<double(void)>                                                                                       getMaxHeight_t;
+typedef boost::function<double(void)>                                                                                       getMinHeight_t;
+
+typedef boost::function<bool(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref)> transformReference_t;
 
 struct SafetyArea_t
 {
@@ -50,16 +52,22 @@ struct SafetyArea_t
   bool                                     use_safety_area;
 };
 
+struct Transformer_t
+{
+  mrs_uav_manager::transformReference_t transformReference;
+};
+
 class Tracker {
 
 public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area) = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                       = 0;
-  virtual void deactivate(void)                                                                               = 0;
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg)                                  = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area,
+                          mrs_uav_manager::Transformer_t const *transformer) = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)      = 0;
+  virtual void deactivate(void)                                              = 0;
+  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg) = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus             getStatus()                                     = 0;
