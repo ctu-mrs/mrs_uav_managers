@@ -25,6 +25,8 @@ landing_takeoff_tracker: "LandoffTracker"
 
 status_timer_rate:  10 # [Hz]
 
+state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
+
 safety:
 
   min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying

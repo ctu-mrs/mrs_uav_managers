@@ -10,14 +10,15 @@ namespace mrs_uav_manager
 class NullTracker : public mrs_uav_manager::Tracker {
 
 public:
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area);
+  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area,
+                          mrs_uav_manager::Transformer_t const *transformer);
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
   virtual void deactivate(void);
 
-  virtual const mrs_msgs::PositionCommand::ConstPtr update(const nav_msgs::Odometry::ConstPtr &msg);
+  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg);
   virtual const mrs_msgs::TrackerStatus             getStatus();
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
-  virtual void                                      switchOdometrySource(const nav_msgs::Odometry::ConstPtr &msg);
+  virtual void                                      switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg);
 
   virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd);
   virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd);
@@ -48,7 +49,8 @@ private:
 
 /* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] mrs_uav_manager::SafetyArea_t const *safety_area) {
+void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] mrs_uav_manager::SafetyArea_t const *safety_area,
+                             [[maybe_unused]] mrs_uav_manager::Transformer_t const *transformer) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -84,14 +86,14 @@ void NullTracker::deactivate(void) {
 
 /* switchOdometrySource() //{ */
 
-void NullTracker::switchOdometrySource([[maybe_unused]] const nav_msgs::Odometry::ConstPtr &msg) {
+void NullTracker::switchOdometrySource([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &msg) {
 }
 
 //}
 
 /* //{ update() */
 
-const mrs_msgs::PositionCommand::ConstPtr NullTracker::update([[maybe_unused]] const nav_msgs::Odometry::ConstPtr &msg) {
+const mrs_msgs::PositionCommand::ConstPtr NullTracker::update([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &msg) {
 
   return mrs_msgs::PositionCommand::Ptr();
 }
