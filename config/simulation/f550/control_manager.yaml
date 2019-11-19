@@ -5,6 +5,7 @@ trackers : [
   "LandoffTracker",
   "JoyTracker",
   "MatlabTracker",
+  "SpeedTracker",
   "NullTracker",
   "JoyBumperTracker",
 ]

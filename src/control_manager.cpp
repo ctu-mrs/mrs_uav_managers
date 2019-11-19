@@ -3498,6 +3498,8 @@ bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::R
   if (!is_initialized)
     return false;
 
+  std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_controller_list);
+
   res.success = ehover(res.message);
 
   return true;
@@ -5682,8 +5684,6 @@ bool ControlManager::ehover(std::string &message_out) {
   if (!is_initialized)
     return false;
 
-  std::scoped_lock lock(mutex_tracker_list, mutex_last_position_cmd, mutex_last_attitude_cmd, mutex_controller_list);
-
   char message[200];
   bool success = false;
 
@@ -6253,17 +6253,33 @@ void ControlManager::updateTrackers(void) {
 
       last_position_cmd = tracker_output_cmd;
 
-    } else if (active_tracker_idx != null_tracker_idx) {
+    } else {
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", tracker_names[active_tracker_idx].c_str());
+      if (active_tracker_idx != null_tracker_idx) {
 
-      std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
+        if (active_tracker_idx == ehover_tracker_idx) {
 
-      failsafe();
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty command!", tracker_names[active_tracker_idx].c_str());
 
-    } else if (active_tracker_idx == null_tracker_idx) {
+          std::scoped_lock lock(mutex_controller_list, mutex_last_attitude_cmd);
 
-      last_position_cmd = tracker_output_cmd;
+          failsafe();
+
+        } else {
+
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", tracker_names[active_tracker_idx].c_str());
+
+          std::scoped_lock lock(mutex_last_attitude_cmd, mutex_controller_list);
+
+          std::string ehover_message;
+
+          [[maybe_unused]] bool ehover_res = ehover(ehover_message);
+        }
+
+      } else {
+
+        last_position_cmd = tracker_output_cmd;
+      }
     }
   }
   catch (std::runtime_error &exrun) {

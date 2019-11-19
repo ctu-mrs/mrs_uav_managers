@@ -16,6 +16,9 @@ JoyBumperTracker:
 MatlabTracker:
   address: "mrs_trackers/MatlabTracker"
 
+SpeedTracker:
+  address: "mrs_trackers/SpeedTracker"
+
 CsvTracker:
   address: "mrs_trackers/CsvTracker"
 
