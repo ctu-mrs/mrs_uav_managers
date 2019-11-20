@@ -140,7 +140,7 @@
       <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
       <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/emergency.yaml" />
       <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergency.yaml" />
-      <rosparam if="$(eval not arg('custom_config_mpc_controller') == '')" ns="emergency_controller" file="$(arg custom_config_emergency_controller)" />
+      <rosparam if="$(eval not arg('custom_config_emergency_controller') == '')" ns="emergency_controller" file="$(arg custom_config_emergency_controller)" />
       <param name="emergency_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~emergency_controller/profiler" to="profiler" />
       <remap from="~emergency_controller/set_integral_terms_in" to="~emergency_controller/set_integral_terms" />
