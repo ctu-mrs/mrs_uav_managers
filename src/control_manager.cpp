@@ -51,6 +51,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 //}
 
@@ -1433,7 +1434,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = local_origin_frame_id_;
+        marker.header.frame_id = uav_state.header.frame_id;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1497,7 +1498,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = local_origin_frame_id_;
+        marker.header.frame_id = uav_state.header.frame_id;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1563,7 +1564,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = local_origin_frame_id_;
+        marker.header.frame_id = uav_state.header.frame_id;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -1631,7 +1632,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
         visualization_msgs::Marker marker;
 
-        marker.header.frame_id = local_origin_frame_id_;
+        marker.header.frame_id = uav_state.header.frame_id;
         marker.header.stamp    = ros::Time::now();
         marker.ns              = "control_manager";
         marker.id              = id++;
@@ -3919,61 +3920,48 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   }
 
   // copy the original message so we can modify it
-  double des_x   = msg->position.x;
-  double des_y   = msg->position.y;
-  double des_z   = msg->position.z;
-  double des_yaw = msg->position.yaw;
 
-  // prepare the message for current tracker
-  mrs_msgs::TrackerPointStamped request;
+  mrs_msgs::TrackerPointStamped transformed_reference = *msg;
+
+  {
+    std::scoped_lock lock(mutex_uav_state);
+
+    if (msg->header.frame_id.compare("") != STRING_EQUAL && !transformReference(msg->header.frame_id, uav_state.header.frame_id, transformed_reference)) {
+
+      ROS_WARN("[ControlManager]: the reference could not be transformed.");
+      return;
+    }
+  }
 
   // check the obstacle bumper
   ReferenceFrameType_t frame_type;
-  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
+  if (msg->header.frame_id.compare(uav_name_ + "/fcu") == STRING_EQUAL) {
     frame_type = FCU_FRAME;
   } else {
     frame_type = ABSOLUTE_FRAME;
   }
+
+  double                  des_x   = transformed_reference.position.x;
+  double                  des_y   = transformed_reference.position.y;
+  double                  des_z   = transformed_reference.position.z;
 
   if (!bumperValidatePoint(des_x, des_y, des_z, frame_type)) {
     ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
     return;
   }
 
-  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
-
-    // rotate it from the frame of the drone
-    Eigen::Vector2d des(des_x, des_y);
-    des = rotateVector(des, uav_yaw);
-
-    {
-      std::scoped_lock lock(mutex_uav_state);
-
-      request.position.x   = des[0] + uav_x;
-      request.position.y   = des[1] + uav_y;
-      request.position.z   = des_z + uav_z;
-      request.position.yaw = des_yaw + uav_yaw;
-    }
-
-  } else {
-
-    request.position.x   = des_x;
-    request.position.y   = des_y;
-    request.position.z   = des_z;
-    request.position.yaw = des_yaw;
-  }
-
   {
     std::scoped_lock lock(mutex_last_position_cmd);
 
-    if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
+    if (!isPointInSafetyArea3d(transformed_reference.position.x, transformed_reference.position.y, transformed_reference.position.z)) {
       ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
       return;
     }
 
     if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
-      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request.position.x, request.position.y)) {
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, transformed_reference.position.x,
+                                       transformed_reference.position.y)) {
         ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
         return;
       }
@@ -3985,7 +3973,8 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
+    tracker_response =
+        tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(transformed_reference)));
   }
 
   if (!tracker_response) {
@@ -6380,7 +6369,7 @@ void ControlManager::publish(void) {
     nav_msgs::Odometry cmd_odom;
 
     cmd_odom.header.stamp         = ros::Time::now();
-    cmd_odom.header.frame_id      = local_origin_frame_id_;
+    cmd_odom.header.frame_id      = uav_state.header.frame_id;
     cmd_odom.pose.pose.position   = last_position_cmd->position;
     cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
     cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
@@ -6664,7 +6653,20 @@ bool ControlManager::transformReference(const std::string from_frame, const std:
 
   // create the transformer
   geometry_msgs::TransformStamped transformer;
-  transformer = tf_buffer.lookupTransform(to_frame, from_frame, ref.header.stamp, ros::Duration(0.005));
+
+  ros::Time transform_time;
+  if (ref.header.stamp == ros::Time(0)) {
+    transform_time = ros::Time::now();
+  } else {
+    transform_time = ref.header.stamp;
+  }
+
+  try {
+    transformer = tf_buffer.lookupTransform(to_frame, from_frame, ref.header.stamp, ros::Duration(0.005));
+  } catch (tf2::TransformException &ex) {
+    ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+    return false;
+  }
 
   // create the pose message
   geometry_msgs::PoseStamped pose;
@@ -6693,8 +6695,8 @@ bool ControlManager::transformReference(const std::string from_frame, const std:
 
     return true;
   }
-  catch (tf2::TransformException &ex) {
-    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.: %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+  catch (...) {
+    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", from_frame.c_str(), to_frame.c_str());
     return false;
   }
 }
