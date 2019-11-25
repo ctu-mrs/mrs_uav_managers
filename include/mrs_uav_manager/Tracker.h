@@ -29,6 +29,8 @@
 
 #include <std_msgs/Float64.h>
 
+#include <geometry_msgs/TransformStamped.h>
+
 #include <mrs_msgs/TrackerPointStamped.h>
 
 #include <Eigen/Eigen>
@@ -36,12 +38,17 @@
 namespace mrs_uav_manager
 {
 
-typedef boost::function<bool(const double x, const double y, const double z)>                                               isPointInSafetyArea3d_t;
-typedef boost::function<bool(const double x, const double y)>                                                               isPointInSafetyArea2d_t;
-typedef boost::function<double(void)>                                                                                       getMaxHeight_t;
-typedef boost::function<double(void)>                                                                                       getMinHeight_t;
+typedef boost::function<bool(const double x, const double y, const double z)> isPointInSafetyArea3d_t;
+typedef boost::function<bool(const double x, const double y)>                 isPointInSafetyArea2d_t;
+typedef boost::function<double(void)>                                         getMaxHeight_t;
+typedef boost::function<double(void)>                                         getMinHeight_t;
 
-typedef boost::function<bool(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref)> transformReference_t;
+typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::TrackerPointStamped &ref)>
+                                                                                                             transformReferenceSingle_t;
+typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref)> transformReference_t;
+typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, const double timeout,
+                             geometry_msgs::TransformStamped &tf)>
+    getTransform_t;
 
 struct SafetyArea_t
 {
@@ -54,7 +61,9 @@ struct SafetyArea_t
 
 struct Transformer_t
 {
-  mrs_uav_manager::transformReference_t transformReference;
+  mrs_uav_manager::transformReference_t       transformReference;
+  mrs_uav_manager::transformReferenceSingle_t transformReferenceSingle;
+  mrs_uav_manager::getTransform_t             getTransform;
 };
 
 class Tracker {

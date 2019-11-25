@@ -182,8 +182,6 @@ private:
   std::string eland_controller_name_;
   bool        eland_disarm_enabled_ = false;
 
-  std::string local_origin_frame_id_;
-
   std::mutex mutex_tracker_list;
   std::mutex mutex_controller_list;
 
@@ -227,8 +225,11 @@ private:
   tf2_ros::Buffer                             tf_buffer;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr;
   std::mutex                                  mutex_tf_buffer;
-  bool                                        transformReference(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref);
-  mrs_uav_manager::Transformer_t              transformer;
+  bool                                        transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref);
+  bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, const double timeout,
+                    geometry_msgs::TransformStamped &tf);
+  bool transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::TrackerPointStamped &ref);
+  mrs_uav_manager::Transformer_t transformer;
 
   int active_tracker_idx                      = 0;
   int active_controller_idx                   = 0;
@@ -644,7 +645,6 @@ void ControlManager::onInit() {
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
 
   param_loader.load_param("uav_name", uav_name_);
-  local_origin_frame_id_ = uav_name_ + "/local_origin";
 
   param_loader.load_param("enable_profiler", profiler_enabled_);
 
@@ -1284,7 +1284,9 @@ void ControlManager::onInit() {
   tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(tf_buffer, "ControlManager");
 
   // bind routines for the shared transformer
-  transformer.transformReference = boost::bind(&ControlManager::transformReference, this, _1, _2, _3);
+  transformer.transformReference       = boost::bind(&ControlManager::transformReference, this, _1, _2);
+  transformer.getTransform             = boost::bind(&ControlManager::getTransform, this, _1, _2, _3, _4, _5);
+  transformer.transformReferenceSingle = boost::bind(&ControlManager::transformReferenceSingle, this, _1, _2, _3, _4);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -1704,7 +1706,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         safety_zone_marker.id = id++;
 
         safety_zone_marker.header.stamp    = ros::Time::now();
-        safety_zone_marker.header.frame_id = local_origin_frame_id_;
+        safety_zone_marker.header.frame_id = uav_state.header.frame_id;
 
         msg_out.markers.push_back(safety_zone_marker);
       }
@@ -3926,7 +3928,8 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
   {
     std::scoped_lock lock(mutex_uav_state);
 
-    if (msg->header.frame_id.compare("") != STRING_EQUAL && !transformReference(msg->header.frame_id, uav_state.header.frame_id, transformed_reference)) {
+    if (msg->header.frame_id.compare("") != STRING_EQUAL &&
+        !transformReferenceSingle(msg->header.frame_id, uav_state.header.frame_id, 0.015, transformed_reference)) {
 
       ROS_WARN("[ControlManager]: the reference could not be transformed.");
       return;
@@ -3941,9 +3944,9 @@ void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstP
     frame_type = ABSOLUTE_FRAME;
   }
 
-  double                  des_x   = transformed_reference.position.x;
-  double                  des_y   = transformed_reference.position.y;
-  double                  des_z   = transformed_reference.position.z;
+  double des_x = transformed_reference.position.x;
+  double des_y = transformed_reference.position.y;
+  double des_z = transformed_reference.position.z;
 
   if (!bumperValidatePoint(des_x, des_y, des_z, frame_type)) {
     ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
@@ -5044,6 +5047,95 @@ double ControlManager::getMinHeight(void) {
   std::scoped_lock lock(mutex_min_height);
 
   return min_height;
+}
+
+//}
+
+// | --------------------- TF transformer --------------------- |
+
+/* transformReferenceSingle() //{ */
+
+bool ControlManager::transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout,
+                                              mrs_msgs::TrackerPointStamped &ref) {
+
+  geometry_msgs::TransformStamped tf;
+
+  // get the transform
+  if (!getTransform(from_frame, to_frame, ref.header.stamp, timeout, tf)) {
+    return false;
+  }
+
+  // do the transformation
+  if (!transformReference(tf, ref)) {
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* transformReference() //{ */
+
+bool ControlManager::transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref) {
+
+  // create the pose message
+  geometry_msgs::PoseStamped pose;
+  pose.header = ref.header;
+
+  pose.pose.position.x = ref.position.x;
+  pose.pose.position.y = ref.position.y;
+  pose.pose.position.z = ref.position.z;
+
+  pose.pose.orientation.x = 0;
+  pose.pose.orientation.y = 0;
+  pose.pose.orientation.z = sin(ref.position.yaw / 2.0);
+  pose.pose.orientation.w = cos(ref.position.yaw / 2.0);
+
+  try {
+    tf2::doTransform(pose, pose, tf);
+
+    // copy the new transformed data back
+    ref.position.x = pose.pose.position.x;
+    ref.position.y = pose.pose.position.y;
+    ref.position.z = pose.pose.position.z;
+
+    ref.position.yaw = asin(pose.pose.orientation.z) * 2.0;
+
+    ref.header.frame_id = tf.child_frame_id;
+
+    return true;
+  }
+  catch (...) {
+    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", tf.header.frame_id.c_str(), tf.child_frame_id.c_str());
+    return false;
+  }
+}
+
+//}
+
+/* getTransform() //{ */
+
+bool ControlManager::getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, const double timeout,
+                                  geometry_msgs::TransformStamped &tf) {
+
+  std::scoped_lock lock(mutex_tf_buffer);
+
+  ros::Time transform_time;
+  if (time_stamp == ros::Time(0)) {
+    transform_time = ros::Time::now();
+  } else {
+    transform_time = time_stamp;
+  }
+
+  try {
+    tf = tf_buffer.lookupTransform(to_frame, from_frame, transform_time, ros::Duration(timeout));
+    return true;
+  }
+  catch (tf2::TransformException &ex) {
+    ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame.c_str(), to_frame.c_str(), ex.what());
+    return false;
+  }
 }
 
 //}
@@ -6641,64 +6733,6 @@ double ControlManager::angleDist(const double in1, const double in2) {
   }
 
   return fabs(sanitized_difference);
-}
-
-//}
-
-/* transformReference() //{ */
-
-bool ControlManager::transformReference(const std::string from_frame, const std::string to_frame, mrs_msgs::TrackerPointStamped &ref) {
-
-  std::scoped_lock lock(mutex_tf_buffer);
-
-  // create the transformer
-  geometry_msgs::TransformStamped transformer;
-
-  ros::Time transform_time;
-  if (ref.header.stamp == ros::Time(0)) {
-    transform_time = ros::Time::now();
-  } else {
-    transform_time = ref.header.stamp;
-  }
-
-  try {
-    transformer = tf_buffer.lookupTransform(to_frame, from_frame, ref.header.stamp, ros::Duration(0.005));
-  } catch (tf2::TransformException &ex) {
-    ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame.c_str(), to_frame.c_str(), ex.what());
-    return false;
-  }
-
-  // create the pose message
-  geometry_msgs::PoseStamped pose;
-  pose.header = ref.header;
-
-  pose.pose.position.x = ref.position.x;
-  pose.pose.position.y = ref.position.y;
-  pose.pose.position.z = ref.position.z;
-
-  pose.pose.orientation.x = 0;
-  pose.pose.orientation.y = 0;
-  pose.pose.orientation.z = sin(ref.position.yaw / 2.0);
-  pose.pose.orientation.w = cos(ref.position.yaw / 2.0);
-
-  try {
-    tf2::doTransform(pose, pose, transformer);
-
-    // copy the new transformed data back
-    ref.position.x = pose.pose.position.x;
-    ref.position.y = pose.pose.position.y;
-    ref.position.z = pose.pose.position.z;
-
-    ref.position.yaw = asin(pose.pose.orientation.z) * 2.0;
-
-    ref.header.frame_id = to_frame;
-
-    return true;
-  }
-  catch (...) {
-    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", from_frame.c_str(), to_frame.c_str());
-    return false;
-  }
 }
 
 //}
