@@ -20,17 +20,17 @@ public:
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
   virtual void                                      switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg);
 
-  virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd);
-  virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd);
-  virtual const mrs_msgs::Vec1Response::ConstPtr goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd);
-  virtual const mrs_msgs::Vec1Response::ConstPtr setYaw(const mrs_msgs::Vec1Request::ConstPtr &cmd);
-  virtual const mrs_msgs::Vec1Response::ConstPtr setYawRelative(const mrs_msgs::Vec1Request::ConstPtr &cmd);
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goToRelative(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
 
-  virtual bool goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  virtual bool goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg);
-  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg);
-  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg);
+  virtual bool goTo(const mrs_msgs::ReferenceConstPtr &msg);
+  virtual bool goToRelative(const mrs_msgs::ReferenceConstPtr &msg);
+  virtual bool goToAltitude(const mrs_msgs::Float64ConstPtr &msg);
+  virtual bool setYaw(const mrs_msgs::Float64ConstPtr &msg);
+  virtual bool setYawRelative(const mrs_msgs::Float64ConstPtr &msg);
 
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
@@ -146,15 +146,15 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
 
 /* //{ goTo() service */
 
-const mrs_msgs::Vec4Response::ConstPtr NullTracker::goTo([[maybe_unused]] const mrs_msgs::Vec4Request::ConstPtr &cmd) {
-  return mrs_msgs::Vec4Response::Ptr();
+const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::goTo([[maybe_unused]] const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::ReferenceSrvResponse::Ptr();
 }
 
 //}
 
 /* //{ goTo() topic */
 
-bool NullTracker::goTo([[maybe_unused]] const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+bool NullTracker::goTo([[maybe_unused]] const mrs_msgs::ReferenceConstPtr &msg) {
   return false;
 }
 
@@ -162,15 +162,15 @@ bool NullTracker::goTo([[maybe_unused]] const mrs_msgs::TrackerPointStampedConst
 
 /* //{ goToRelative() topic */
 
-const mrs_msgs::Vec4Response::ConstPtr NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::Vec4Request::ConstPtr &cmd) {
-  return mrs_msgs::Vec4Response::Ptr();
+const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::ReferenceSrvResponse::Ptr();
 }
 
 //}
 
 /* //{ goToRelative() topic */
 
-bool NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::TrackerPointStampedConstPtr &msg) {
+bool NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::ReferenceConstPtr &msg) {
   return false;
 }
 
@@ -178,15 +178,15 @@ bool NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::TrackerPointStam
 
 /* //{ goToAltitude() service */
 
-const mrs_msgs::Vec1Response::ConstPtr NullTracker::goToAltitude([[maybe_unused]] const mrs_msgs::Vec1Request::ConstPtr &cmd) {
-  return mrs_msgs::Vec1Response::Ptr();
+const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::goToAltitude([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::Float64SrvResponse::Ptr();
 }
 
 //}
 
 /* //{ goToAltitude() topic */
 
-bool NullTracker::goToAltitude([[maybe_unused]] const std_msgs::Float64ConstPtr &msg) {
+bool NullTracker::goToAltitude([[maybe_unused]] const mrs_msgs::Float64ConstPtr &msg) {
   return false;
 }
 
@@ -194,15 +194,15 @@ bool NullTracker::goToAltitude([[maybe_unused]] const std_msgs::Float64ConstPtr 
 
 /* //{ setYaw() service */
 
-const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYaw([[maybe_unused]] const mrs_msgs::Vec1Request::ConstPtr &cmd) {
-  return mrs_msgs::Vec1Response::Ptr();
+const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::setYaw([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::Float64SrvResponse::Ptr();
 }
 
 //}
 
 /* //{ setYaw() topic */
 
-bool NullTracker::setYaw([[maybe_unused]] const std_msgs::Float64ConstPtr &msg) {
+bool NullTracker::setYaw([[maybe_unused]] const mrs_msgs::Float64ConstPtr &msg) {
   return false;
 }
 
@@ -210,15 +210,15 @@ bool NullTracker::setYaw([[maybe_unused]] const std_msgs::Float64ConstPtr &msg) 
 
 /* //{ setYawRelative() service */
 
-const mrs_msgs::Vec1Response::ConstPtr NullTracker::setYawRelative([[maybe_unused]] const mrs_msgs::Vec1Request::ConstPtr &cmd) {
-  return mrs_msgs::Vec1Response::Ptr();
+const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::setYawRelative([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::Float64SrvResponse::Ptr();
 }
 
 //}
 
 /* //{ setYawRelative() topic */
 
-bool NullTracker::setYawRelative([[maybe_unused]] const std_msgs::Float64ConstPtr &msg) {
+bool NullTracker::setYawRelative([[maybe_unused]] const mrs_msgs::Float64ConstPtr &msg) {
   return false;
 }
 

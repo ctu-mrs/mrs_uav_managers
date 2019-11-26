@@ -53,6 +53,24 @@
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include <mrs_msgs/ReferenceStamped.h>
+
+#include <mrs_msgs/ReferenceStampedSrv.h>
+#include <mrs_msgs/ReferenceStampedSrvRequest.h>
+#include <mrs_msgs/ReferenceStampedSrvResponse.h>
+
+#include <mrs_msgs/Float64StampedSrv.h>
+#include <mrs_msgs/Float64StampedSrvRequest.h>
+#include <mrs_msgs/Float64StampedSrvResponse.h>
+
+#include <mrs_msgs/Vec4.h>
+#include <mrs_msgs/Vec4Request.h>
+#include <mrs_msgs/Vec4Response.h>
+
+#include <mrs_msgs/Vec1.h>
+#include <mrs_msgs/Vec1Request.h>
+#include <mrs_msgs/Vec1Response.h>
+
 //}
 
 #define STRING_EQUAL 0
@@ -225,10 +243,10 @@ private:
   tf2_ros::Buffer                             tf_buffer;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr;
   std::mutex                                  mutex_tf_buffer;
-  bool                                        transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref);
+  bool                                        transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref);
   bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, const double timeout,
                     geometry_msgs::TransformStamped &tf);
-  bool transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::TrackerPointStamped &ref);
+  bool transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::ReferenceStamped &ref);
   mrs_uav_manager::Transformer_t transformer;
 
   int active_tracker_idx                      = 0;
@@ -285,12 +303,15 @@ private:
   ros::ServiceServer service_server_set_constraints;
   ros::ServiceServer service_server_use_joystick;
 
+  // human callbable
   ros::ServiceServer service_server_goto;
   ros::ServiceServer service_server_goto_fcu;
   ros::ServiceServer service_server_goto_relative;
   ros::ServiceServer service_server_goto_altitude;
   ros::ServiceServer service_server_set_yaw;
   ros::ServiceServer service_server_set_yaw_relative;
+
+  ros::ServiceServer service_server_set_reference;
 
   ros::ServiceServer service_server_emergency_goto;
   ros::ServiceServer service_server_pirouette;
@@ -308,6 +329,8 @@ private:
   ros::Subscriber subscriber_goto_altitude;
   ros::Subscriber subscriber_set_yaw;
   ros::Subscriber subscriber_set_yaw_relative;
+
+  ros::Subscriber subscriber_set_reference;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
   std::mutex                          mutex_last_position_cmd;
@@ -397,6 +420,9 @@ private:
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
 
+  void callbackSetReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg);
+
+  // human callable
   bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
@@ -404,14 +430,9 @@ private:
   bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
-  void callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  void callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  void callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg);
-  void callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg);
-  void callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg);
-  void callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg);
+  bool callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
 
-  bool callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
+  bool callbackEmergencyGoToService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
 
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
   void callbackRC(const mavros_msgs::RCInConstPtr &msg);
@@ -1208,8 +1229,8 @@ void ControlManager::onInit() {
   publisher_target_attitude = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
   publisher_diagnostics     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error      = nh_.advertise<std_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_tilt_error      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate   = nh_.advertise<mrs_msgs::Float64>("mass_estimate_out", 1);
   publisher_control_error   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
   publisher_rviz            = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array_out", 1);
   publisher_bumper_status   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
@@ -1258,6 +1279,7 @@ void ControlManager::onInit() {
 
   // | ---------------- setpoint command services --------------- |
 
+  // human callable
   service_server_goto             = nh_.advertiseService("goto_in", &ControlManager::callbackGoToService, this);
   service_server_goto_fcu         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGoToFcuService, this);
   service_server_goto_relative    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGoToRelativeService, this);
@@ -1265,14 +1287,9 @@ void ControlManager::onInit() {
   service_server_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
   service_server_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
-  // | ----------------- setpoint command topics ---------------- |
+  service_server_set_reference = nh_.advertiseService("set_reference_in", &ControlManager::callbackSetReferenceService, this);
 
-  subscriber_goto             = nh_.subscribe("goto_in", 1, &ControlManager::callbackGoToTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goto_fcu         = nh_.subscribe("goto_fcu_in", 1, &ControlManager::callbackGoToFcuTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goto_relative    = nh_.subscribe("goto_relative_in", 1, &ControlManager::callbackGoToRelativeTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_goto_altitude    = nh_.subscribe("goto_altitude_in", 1, &ControlManager::callbackGoToAltitudeTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_set_yaw          = nh_.subscribe("set_yaw_in", 1, &ControlManager::callbackSetYawTopic, this, ros::TransportHints().tcpNoDelay());
-  subscriber_set_yaw_relative = nh_.subscribe("set_yaw_relative_in", 1, &ControlManager::callbackSetYawRelativeTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_set_reference = nh_.subscribe("set_reference_in", 1, &ControlManager::callbackSetReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   // | --------------------- other services --------------------- |
 
@@ -1356,8 +1373,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   {
     std::scoped_lock lock(mutex_tilt_error);
 
-    std_msgs::Float64 tilt_error_out;
-    tilt_error_out.data = (180.0 / M_PI) * tilt_error;
+    mrs_msgs::Float64 tilt_error_out;
+    tilt_error_out.value = (180.0 / M_PI) * tilt_error;
 
     try {
       publisher_tilt_error.publish(tilt_error_out);
@@ -1400,8 +1417,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
     if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-      std_msgs::Float64 mass_estimate_out;
-      mass_estimate_out.data = uav_mass_ + last_attitude_cmd->mass_difference;
+      mrs_msgs::Float64 mass_estimate_out;
+      mass_estimate_out.value = uav_mass_ + last_attitude_cmd->mass_difference;
 
       try {
         publisher_mass_estimate.publish(mass_estimate_out);
@@ -2570,12 +2587,12 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
   tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 
   // call the goto
-  mrs_msgs::Vec1Request req_goto_out;
+  mrs_msgs::Float64SrvRequest req_goto_out;
 
-  req_goto_out.goal = pirouette_inital_yaw + pirouette_iterator * pirouette_step_size;
+  req_goto_out.value = pirouette_inital_yaw + pirouette_iterator * pirouette_step_size;
 
-  mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+  mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
+  tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Float64SrvRequest::ConstPtr(new mrs_msgs::Float64SrvRequest(req_goto_out)));
 
   // disable the callbacks for the active tracker
   req_enable_callbacks.data = false;
@@ -3723,20 +3740,20 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
 
 /* //{ callbackEmergencyGoToService() */
 
-bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackEmergencyGoToService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
 
   if (!is_initialized)
     return false;
 
   callbacks_enabled = false;
 
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  char                                     message[200];
 
   std_srvs::SetBoolRequest req_enable_callbacks;
 
-  mrs_msgs::Vec4Request req_goto_out;
-  req_goto_out.goal = req.goal;
+  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  req_goto_out.reference = req.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list);
@@ -3752,14 +3769,15 @@ bool ControlManager::callbackEmergencyGoToService(mrs_msgs::Vec4::Request &req, 
     tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 
     // call the goto
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
 
     // disable the callbacks back again
     req_enable_callbacks.data = false;
     tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+      res.message = tracker_response->message;
+      res.success = tracker_response->success;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -3803,7 +3821,286 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
 //}
 
+/* callbackUseJoystick() //{ */
+
+bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  char message[400];
+
+  mrs_msgs::StringRequest controller_srv;
+  controller_srv.value = joystick_controller_name_;
+
+  mrs_msgs::StringRequest tracker_srv;
+  tracker_srv.value = joystick_tracker_name_;
+
+  mrs_msgs::StringResponse response;
+
+  callbackSwitchTracker(tracker_srv, response);
+
+  if (!response.success) {
+
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_tracker_name_.c_str(), response.message.c_str());
+    res.success = false;
+    res.message = message;
+
+    ROS_ERROR("[ControlManager]: %s", message);
+
+    return true;
+  }
+
+  callbackSwitchController(controller_srv, response);
+
+  if (!response.success) {
+
+    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_controller_name_.c_str(), response.message.c_str());
+    res.success = false;
+    res.message = message;
+
+    // switch back to hover tracker
+    tracker_srv.value = ehover_tracker_name_;
+    callbackSwitchTracker(tracker_srv, response);
+
+    // switch back to safety controller
+    controller_srv.value = controller_names[0];
+    callbackSwitchController(controller_srv, response);
+
+    ROS_ERROR("[ControlManager]: %s", message);
+
+    return true;
+  }
+
+  sprintf((char *)&message, "Switched to joystick control");
+  res.success = true;
+  res.message = message;
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  return true;
+}
+
+//}
+
+/* //{ callbackHoverService() */
+
+bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+
+  if (!is_initialized)
+    return false;
+
+  res.success = hover(res.message);
+
+  return true;
+}
+
+//}
+
 // | -------------- setpoint topics and services -------------- |
+
+/* //{ callbackSetReferenceService() */
+
+bool ControlManager::callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+
+  if (!is_initialized) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    res.message = "callbacks are disabled";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::ReferenceStampedSrv::Request request_in = req;
+
+  if (!std::isfinite(request_in.reference.position.x)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.reference.position.x\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(request_in.reference.position.y)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.reference.position.y\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(request_in.reference.position.z)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.reference.position.z\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(request_in.reference.yaw)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.reference.yaw\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  // check the obstacle bumper
+  if (!bumperValidatePoint(request_in.reference.position.x, request_in.reference.position.y, request_in.reference.position.z, ABSOLUTE_FRAME)) {
+    ROS_ERROR("[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
+    res.message = "potential collision with an obstacle";
+    res.success = false;
+    return true;
+  }
+
+  if (!isPointInSafetyArea3d(request_in.reference.position.x, request_in.reference.position.y, request_in.reference.position.z)) {
+    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request_in.reference.position.x,
+                                       request_in.reference.position.y)) {
+        ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
+        res.message = "the path is going outside the safety area";
+        res.success = false;
+        return true;
+      }
+    }
+  }
+
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  char                                     message[200];
+
+  // prepare the message for current tracker
+  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  req_goto_out.reference = request_in.reference;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
+
+    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
+    } else {
+      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
+      res.message = message;
+      res.success = false;
+    }
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackSetReferenceTopic() */
+
+void ControlManager::callbackSetReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg) {
+
+  if (!is_initialized)
+    return;
+
+  if (!callbacks_enabled) {
+    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
+    return;
+  }
+
+  if (!std::isfinite(msg->reference.position.x)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
+    return;
+  }
+
+  if (!std::isfinite(msg->reference.position.y)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
+    return;
+  }
+
+  if (!std::isfinite(msg->reference.position.z)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
+    return;
+  }
+
+  if (!std::isfinite(msg->reference.yaw)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
+    return;
+  }
+
+  // copy the original message so we can modify it
+
+  mrs_msgs::ReferenceStamped transformed_reference = *msg;
+
+  {
+    std::scoped_lock lock(mutex_uav_state);
+
+    if (msg->header.frame_id.compare("") != STRING_EQUAL &&
+        !transformReferenceSingle(msg->header.frame_id, uav_state.header.frame_id, 0.015, transformed_reference)) {
+
+      ROS_WARN("[ControlManager]: the reference could not be transformed.");
+      return;
+    }
+  }
+
+  // check the obstacle bumper
+  ReferenceFrameType_t frame_type;
+  if (msg->header.frame_id.compare(uav_name_ + "/fcu") == STRING_EQUAL) {
+    frame_type = FCU_FRAME;
+  } else {
+    frame_type = ABSOLUTE_FRAME;
+  }
+
+  double des_x = transformed_reference.reference.position.x;
+  double des_y = transformed_reference.reference.position.y;
+  double des_z = transformed_reference.reference.position.z;
+
+  if (!bumperValidatePoint(des_x, des_y, des_z, frame_type)) {
+    ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
+    return;
+  }
+
+  {
+    std::scoped_lock lock(mutex_last_position_cmd);
+
+    if (!isPointInSafetyArea3d(transformed_reference.reference.position.x, transformed_reference.reference.position.y,
+                               transformed_reference.reference.position.z)) {
+      ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+      return;
+    }
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, transformed_reference.reference.position.x,
+                                       transformed_reference.reference.position.y)) {
+        ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
+        return;
+      }
+    }
+  }
+
+  bool tracker_response;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list);
+
+    mrs_msgs::Reference reference_out = transformed_reference.reference;
+
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Reference::ConstPtr(new mrs_msgs::Reference(reference_out)));
+  }
+
+  if (!tracker_response) {
+    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
+  }
+}
+
+//}
+
+// human callable services
 
 /* //{ callbackGoToService() */
 
@@ -3863,20 +4160,24 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
     }
   }
 
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  char                                     message[200];
 
   // prepare the message for current tracker
-  mrs_msgs::Vec4Request req_goto_out;
-  req_goto_out.goal = request_in.goal;
+  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  req_goto_out.reference.position.x = request_in.goal[REF_X];
+  req_goto_out.reference.position.y = request_in.goal[REF_Y];
+  req_goto_out.reference.position.z = request_in.goal[REF_Z];
+  req_goto_out.reference.yaw        = request_in.goal[REF_YAW];
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
 
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -3885,104 +4186,6 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   }
 
   return true;
-}
-
-//}
-
-/* //{ callbackGoToTopic() */
-
-void ControlManager::callbackGoToTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.x)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.y)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.z)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.yaw)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
-    return;
-  }
-
-  // copy the original message so we can modify it
-
-  mrs_msgs::TrackerPointStamped transformed_reference = *msg;
-
-  {
-    std::scoped_lock lock(mutex_uav_state);
-
-    if (msg->header.frame_id.compare("") != STRING_EQUAL &&
-        !transformReferenceSingle(msg->header.frame_id, uav_state.header.frame_id, 0.015, transformed_reference)) {
-
-      ROS_WARN("[ControlManager]: the reference could not be transformed.");
-      return;
-    }
-  }
-
-  // check the obstacle bumper
-  ReferenceFrameType_t frame_type;
-  if (msg->header.frame_id.compare(uav_name_ + "/fcu") == STRING_EQUAL) {
-    frame_type = FCU_FRAME;
-  } else {
-    frame_type = ABSOLUTE_FRAME;
-  }
-
-  double des_x = transformed_reference.position.x;
-  double des_y = transformed_reference.position.y;
-  double des_z = transformed_reference.position.z;
-
-  if (!bumperValidatePoint(des_x, des_y, des_z, frame_type)) {
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
-    return;
-  }
-
-  {
-    std::scoped_lock lock(mutex_last_position_cmd);
-
-    if (!isPointInSafetyArea3d(transformed_reference.position.x, transformed_reference.position.y, transformed_reference.position.z)) {
-      ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
-      return;
-    }
-
-    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, transformed_reference.position.x,
-                                       transformed_reference.position.y)) {
-        ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
-        return;
-      }
-    }
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response =
-        tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(transformed_reference)));
-  }
-
-  if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
-  }
 }
 
 //}
@@ -4062,16 +4265,23 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     }
   }
 
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  char                                     message[200];
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(request)));
+    mrs_msgs::ReferenceSrvRequest request_out;
+    request_out.reference.position.x = request.goal[REF_X];
+    request_out.reference.position.y = request.goal[REF_Y];
+    request_out.reference.position.z = request.goal[REF_Z];
+    request_out.reference.yaw        = request.goal[REF_YAW];
 
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
+    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(request_out)));
+
+    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -4080,99 +4290,6 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   }
 
   return true;
-}
-
-//}
-
-/* //{ callbackGoToFcuTopic() */
-
-void ControlManager::callbackGoToFcuTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
-
-  if (!is_initialized) {
-    return;
-  }
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.x)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.y)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.z)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.yaw)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
-    return;
-  }
-
-  // copy the original message so we can modify it
-  double des_x   = msg->position.x;
-  double des_y   = msg->position.y;
-  double des_z   = msg->position.z;
-  double des_yaw = msg->position.yaw;
-
-  if (!bumperValidatePoint(des_x, des_y, des_z, FCU_FRAME)) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, potential collision with an obstacle!");
-    return;
-  }
-
-  // prepare the message for current tracker
-  mrs_msgs::TrackerPointStamped request;
-  Eigen::Vector2d               des(des_x, des_y);
-
-  {
-    std::scoped_lock lock(mutex_uav_state);
-    // rotate it from the frame of the drone
-    des = rotateVector(des, uav_yaw);
-
-    request.position.x   = des[0] + uav_x;
-    request.position.y   = des[1] + uav_y;
-    request.position.z   = des_z + uav_z;
-    request.position.yaw = des_yaw + uav_yaw;
-  }
-
-  if (!isPointInSafetyArea3d(request.position.x, request.position.y, request.position.z)) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, the point is outside of the safety area!");
-    return;
-  }
-
-  {
-    std::scoped_lock lock(mutex_last_position_cmd);
-
-    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, request.position.x, request.position.y)) {
-        ROS_ERROR("[ControlManager]: 'goto_fcu' topic failed, the path is going outside the safety area!");
-        return;
-      }
-    }
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response = tracker_list[active_tracker_idx]->goTo(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
-
-    if (!tracker_response) {
-      ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", tracker_names[active_tracker_idx].c_str());
-    }
-  }
-
-  return;
 }
 
 //}
@@ -4244,20 +4361,24 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
     }
   }
 
-  mrs_msgs::Vec4Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  char                                     message[200];
 
   // prepare the message for current tracker
-  mrs_msgs::Vec4Request req_goto_out;
-  req_goto_out.goal = request_in.goal;
+  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  req_goto_out.reference.position.x = request_in.goal[REF_X];
+  req_goto_out.reference.position.y = request_in.goal[REF_Y];
+  req_goto_out.reference.position.z = request_in.goal[REF_Z];
+  req_goto_out.reference.yaw        = request_in.goal[REF_YAW];
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
 
-    if (tracker_response != mrs_msgs::Vec4Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -4266,119 +4387,6 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   }
 
   return true;
-}
-
-//}
-
-/* //{ callbackGoToRelativeTopic() */
-
-void ControlManager::callbackGoToRelativeTopic(const mrs_msgs::TrackerPointStampedConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the goto_relative topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.x)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.x\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.y)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.y\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.z)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.z\"!!!");
-    return;
-  }
-
-  if (!std::isfinite(msg->position.yaw)) {
-    ROS_ERROR("NaN detected in variable \"msg->position.yaw\"!!!");
-    return;
-  }
-
-  // copy the original message so we can modify it
-  double des_x   = msg->position.x;
-  double des_y   = msg->position.y;
-  double des_z   = msg->position.z;
-  double des_yaw = msg->position.yaw;
-
-  // check the obstacle bumper
-  ReferenceFrameType_t frame_type;
-  if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
-    frame_type = FCU_FRAME;
-  } else {
-    frame_type = RELATIVE_FRAME;
-  }
-
-  if (!bumperValidatePoint(des_x, des_y, des_z, frame_type)) {
-    ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, potential collision with an obstacle!");
-    return;
-  }
-
-  // prepare the message for current tracker
-  mrs_msgs::TrackerPointStamped request;
-
-  {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
-
-    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-      if (msg->header.frame_id.compare("fcu") == STRING_EQUAL) {
-
-        // rotate it from the frame of the drone
-        Eigen::Vector2d des(des_x, des_y);
-        des = rotateVector(des, uav_yaw);
-
-        request.position.x   = des[0] + uav_x - last_position_cmd->position.x;
-        request.position.y   = des[1] + uav_y - last_position_cmd->position.y;
-        request.position.z   = des_z + uav_z - last_position_cmd->position.z;
-        request.position.yaw = des_yaw + uav_yaw - last_position_cmd->yaw;
-
-      } else {
-
-        request.position.x   = des_x;
-        request.position.y   = des_y;
-        request.position.z   = des_z;
-        request.position.yaw = des_yaw;
-      }
-
-
-      if (!isPointInSafetyArea3d(last_position_cmd->position.x + request.position.x, last_position_cmd->position.y + request.position.y,
-                                 last_position_cmd->position.z + request.position.z)) {
-        ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the point is outside of the safety area!");
-        return;
-      }
-
-      if (!isPathToPointInSafetyArea2d(last_position_cmd->position.x, last_position_cmd->position.y, last_position_cmd->position.x + request.position.x,
-                                       last_position_cmd->position.y + request.position.y)) {
-        ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, the path is going outside the safety area!");
-        return;
-      }
-
-    } else {
-
-      ROS_ERROR("[ControlManager]: 'goto_relative' topic failed, last_position_cmd is not valid!");
-      return;
-    }
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::TrackerPointStamped::ConstPtr(new mrs_msgs::TrackerPointStamped(request)));
-  }
-
-  if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_relative' topic!", tracker_names[active_tracker_idx].c_str());
-  }
 }
 
 //}
@@ -4429,20 +4437,21 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
     }
   }
 
-  mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
+  char                                   message[200];
 
   // prepare the message for current tracker
-  mrs_msgs::Vec1Request req_goto_out;
-  req_goto_out.goal = req.goal;
+  mrs_msgs::Float64SrvRequest req_goto_out;
+  req_goto_out.value = req.goal;
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(mrs_msgs::Float64SrvRequest::ConstPtr(new mrs_msgs::Float64SrvRequest(req_goto_out)));
 
-    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::Float64SrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'goto_altitude' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -4451,55 +4460,6 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
   }
 
   return true;
-}
-
-//}
-
-/* //{ callbackGoToAltitudeTopic() */
-
-void ControlManager::callbackGoToAltitudeTopic(const std_msgs::Float64ConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the goto_altitude topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->data)) {
-    ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
-    return;
-  }
-
-  {
-    std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state);
-
-    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
-
-      if (!isPointInSafetyArea3d(last_position_cmd->position.x, last_position_cmd->position.y, msg->data)) {
-        ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, the point is outside of the safety area!");
-        return;
-      }
-
-    } else {
-
-      ROS_ERROR("[ControlManager]: 'goto_altitude' topic failed, last_position_cmd is not valid!");
-      return;
-    }
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response = tracker_list[active_tracker_idx]->goToAltitude(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
-  }
-
-  if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto_altitude' topic!", tracker_names[active_tracker_idx].c_str());
-  }
 }
 
 //}
@@ -4529,20 +4489,21 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
     return true;
   }
 
-  mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
+  char                                   message[200];
 
   // prepare the message for current tracker
-  mrs_msgs::Vec1Request req_goto_out;
-  req_goto_out.goal = req.goal;
+  mrs_msgs::Float64SrvRequest req_goto_out;
+  req_goto_out.value = req.goal;
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->setYaw(mrs_msgs::Float64SrvRequest::ConstPtr(new mrs_msgs::Float64SrvRequest(req_goto_out)));
 
-    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::Float64SrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
@@ -4551,38 +4512,6 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
   }
 
   return true;
-}
-
-//}
-
-/* //{ callbackSetYawTopic() */
-
-void ControlManager::callbackSetYawTopic(const std_msgs::Float64ConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->data)) {
-    ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
-    return;
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response = tracker_list[active_tracker_idx]->setYaw(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
-  }
-
-  if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw' topic!", tracker_names[active_tracker_idx].c_str());
-  }
 }
 
 //}
@@ -4606,137 +4535,33 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR("NaN detected in variable \"req.value\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
-  mrs_msgs::Vec1Response::ConstPtr tracker_response;
-  char                             message[200];
+  mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
+  char                                   message[200];
 
   // prepare the message for current tracker
-  mrs_msgs::Vec1Request req_goto_out;
-  req_goto_out.goal = req.goal;
+  mrs_msgs::Float64SrvRequest req_goto_out;
+  req_goto_out.value = req.goal;
 
   {
     std::scoped_lock lock(mutex_tracker_list);
 
-    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Vec1Request::ConstPtr(new mrs_msgs::Vec1Request(req_goto_out)));
+    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(mrs_msgs::Float64SrvRequest::ConstPtr(new mrs_msgs::Float64SrvRequest(req_goto_out)));
 
-    if (tracker_response != mrs_msgs::Vec1Response::Ptr()) {
-      res = *tracker_response;
+    if (tracker_response != mrs_msgs::Float64SrvResponse::Ptr()) {
+      res.success = tracker_response->success;
+      res.message = tracker_response->message;
     } else {
       sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw_relative' service!", tracker_names[active_tracker_idx].c_str());
       res.message = message;
       res.success = false;
     }
   }
-
-  return true;
-}
-
-//}
-
-/* //{ callbackSetYawRelativeTopic() */
-
-void ControlManager::callbackSetYawRelativeTopic(const std_msgs::Float64ConstPtr &msg) {
-
-  if (!is_initialized)
-    return;
-
-  if (!callbacks_enabled) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw_relative topic through, the callbacks are disabled");
-    return;
-  }
-
-  if (!std::isfinite(msg->data)) {
-    ROS_ERROR("NaN detected in variable \"msg->data\"!!!");
-    return;
-  }
-
-  bool tracker_response;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list);
-
-    tracker_response = tracker_list[active_tracker_idx]->setYawRelative(std_msgs::Float64::ConstPtr(new std_msgs::Float64(*msg)));
-  }
-
-  if (!tracker_response) {
-    ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'set_yaw_relative' topic!", tracker_names[active_tracker_idx].c_str());
-  }
-}
-
-//}
-
-/* //{ callbackHoverService() */
-
-bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
-
-  if (!is_initialized)
-    return false;
-
-  res.success = hover(res.message);
-
-  return true;
-}
-
-//}
-
-/* callbackUseJoystick() //{ */
-
-bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
-
-  char message[400];
-
-  mrs_msgs::StringRequest controller_srv;
-  controller_srv.value = joystick_controller_name_;
-
-  mrs_msgs::StringRequest tracker_srv;
-  tracker_srv.value = joystick_tracker_name_;
-
-  mrs_msgs::StringResponse response;
-
-  callbackSwitchTracker(tracker_srv, response);
-
-  if (!response.success) {
-
-    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_tracker_name_.c_str(), response.message.c_str());
-    res.success = false;
-    res.message = message;
-
-    ROS_ERROR("[ControlManager]: %s", message);
-
-    return true;
-  }
-
-  callbackSwitchController(controller_srv, response);
-
-  if (!response.success) {
-
-    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", joystick_controller_name_.c_str(), response.message.c_str());
-    res.success = false;
-    res.message = message;
-
-    // switch back to hover tracker
-    tracker_srv.value = ehover_tracker_name_;
-    callbackSwitchTracker(tracker_srv, response);
-
-    // switch back to safety controller
-    controller_srv.value = controller_names[0];
-    callbackSwitchController(controller_srv, response);
-
-    ROS_ERROR("[ControlManager]: %s", message);
-
-    return true;
-  }
-
-  sprintf((char *)&message, "Switched to joystick control");
-  res.success = true;
-  res.message = message;
-
-  ROS_INFO("[ControlManager]: %s", message);
 
   return true;
 }
@@ -5055,8 +4880,7 @@ double ControlManager::getMinHeight(void) {
 
 /* transformReferenceSingle() //{ */
 
-bool ControlManager::transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout,
-                                              mrs_msgs::TrackerPointStamped &ref) {
+bool ControlManager::transformReferenceSingle(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::ReferenceStamped &ref) {
 
   geometry_msgs::TransformStamped tf;
 
@@ -5077,30 +4901,30 @@ bool ControlManager::transformReferenceSingle(const std::string from_frame, cons
 
 /* transformReference() //{ */
 
-bool ControlManager::transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref) {
+bool ControlManager::transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref) {
 
   // create the pose message
   geometry_msgs::PoseStamped pose;
   pose.header = ref.header;
 
-  pose.pose.position.x = ref.position.x;
-  pose.pose.position.y = ref.position.y;
-  pose.pose.position.z = ref.position.z;
+  pose.pose.position.x = ref.reference.position.x;
+  pose.pose.position.y = ref.reference.position.y;
+  pose.pose.position.z = ref.reference.position.z;
 
   pose.pose.orientation.x = 0;
   pose.pose.orientation.y = 0;
-  pose.pose.orientation.z = sin(ref.position.yaw / 2.0);
-  pose.pose.orientation.w = cos(ref.position.yaw / 2.0);
+  pose.pose.orientation.z = sin(ref.reference.yaw / 2.0);
+  pose.pose.orientation.w = cos(ref.reference.yaw / 2.0);
 
   try {
     tf2::doTransform(pose, pose, tf);
 
     // copy the new transformed data back
-    ref.position.x = pose.pose.position.x;
-    ref.position.y = pose.pose.position.y;
-    ref.position.z = pose.pose.position.z;
+    ref.reference.position.x = pose.pose.position.x;
+    ref.reference.position.y = pose.pose.position.y;
+    ref.reference.position.z = pose.pose.position.z;
 
-    ref.position.yaw = asin(pose.pose.orientation.z) * 2.0;
+    ref.reference.yaw = asin(pose.pose.orientation.z) * 2.0;
 
     ref.header.frame_id = tf.child_frame_id;
 
@@ -5179,7 +5003,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       Eigen::Vector2d temp = Eigen::Vector2d(x, y);
 
-      mrs_msgs::Vec4Request req_goto_out;
+      mrs_msgs::ReferenceSrvRequest req_goto_out;
       {
         std::scoped_lock lock(mutex_uav_state);
         temp = rotateVector(temp, -uav_yaw);
@@ -5197,7 +5021,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
       Eigen::Vector2d temp;
 
-      mrs_msgs::Vec4Request req_goto_out;
+      mrs_msgs::ReferenceSrvRequest req_goto_out;
       {
         std::scoped_lock lock(mutex_uav_state);
         temp = Eigen::Vector2d(x - uav_x, y - uav_y);
@@ -5349,7 +5173,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
         Eigen::Vector2d temp = Eigen::Vector2d(new_x, new_y);
 
-        mrs_msgs::Vec4Request req_goto_out;
+        mrs_msgs::ReferenceSrvRequest req_goto_out;
         {
           std::scoped_lock lock(mutex_uav_state);
           temp = rotateVector(temp, uav_yaw);
@@ -5367,7 +5191,7 @@ bool ControlManager::bumperValidatePoint(double &x, double &y, double &z, Refere
 
         Eigen::Vector2d temp;
 
-        mrs_msgs::Vec4Request req_goto_out;
+        mrs_msgs::ReferenceSrvRequest req_goto_out;
         {
           std::scoped_lock lock(mutex_uav_state);
           temp = Eigen::Vector2d(new_x, new_y);
@@ -5547,13 +5371,13 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     callbacks_enabled = false;
 
-    mrs_msgs::Vec4Response::ConstPtr tracker_response;
+    mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
     Eigen::Vector2d des = Eigen::Vector2d(cos(direction) * repulsion_distance, sin(direction) * repulsion_distance);
 
-    mrs_msgs::Vec4Request req_goto_out;
+    mrs_msgs::ReferenceSrvRequest req_goto_out;
     {
       std::scoped_lock lock(mutex_uav_state);
 
@@ -5561,15 +5385,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
       des = rotateVector(des, uav_yaw);
 
       if (horizontal_collision_detected) {
-        req_goto_out.goal[REF_X] = des[0];
-        req_goto_out.goal[REF_Y] = des[1];
+        req_goto_out.reference.position.x = des[0];
+        req_goto_out.reference.position.y = des[1];
       }
 
       if (vertical_collision_detected) {
-        req_goto_out.goal[REF_Z] = vertical_repulsion_distance;
+        req_goto_out.reference.position.z = vertical_repulsion_distance;
       }
 
-      req_goto_out.goal[REF_YAW] = 0;
+      req_goto_out.reference.yaw = 0;
     }
 
     {
@@ -5586,7 +5410,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
       tracker_list[active_tracker_idx]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 
       // call the goto
-      tracker_response = tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::Vec4Request::ConstPtr(new mrs_msgs::Vec4Request(req_goto_out)));
+      tracker_response =
+          tracker_list[active_tracker_idx]->goToRelative(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;

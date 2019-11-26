@@ -7,13 +7,13 @@
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/UavState.h>
 
-#include <mrs_msgs/Vec1.h>
-#include <mrs_msgs/Vec1Request.h>
-#include <mrs_msgs/Vec1Response.h>
+#include <mrs_msgs/Float64Srv.h>
+#include <mrs_msgs/Float64SrvRequest.h>
+#include <mrs_msgs/Float64SrvResponse.h>
 
-#include <mrs_msgs/Vec4.h>
-#include <mrs_msgs/Vec4Request.h>
-#include <mrs_msgs/Vec4Response.h>
+#include <mrs_msgs/ReferenceSrv.h>
+#include <mrs_msgs/ReferenceSrvRequest.h>
+#include <mrs_msgs/ReferenceSrvResponse.h>
 
 #include <std_srvs/Trigger.h>
 #include <std_srvs/TriggerRequest.h>
@@ -27,11 +27,11 @@
 #include <mrs_msgs/TrackerConstraintsRequest.h>
 #include <mrs_msgs/TrackerConstraintsResponse.h>
 
-#include <std_msgs/Float64.h>
+#include <mrs_msgs/Reference.h>
+#include <mrs_msgs/ReferenceStamped.h>
+#include <mrs_msgs/Float64.h>
 
 #include <geometry_msgs/TransformStamped.h>
-
-#include <mrs_msgs/TrackerPointStamped.h>
 
 #include <Eigen/Eigen>
 
@@ -43,9 +43,9 @@ typedef boost::function<bool(const double x, const double y)>                 is
 typedef boost::function<double(void)>                                         getMaxHeight_t;
 typedef boost::function<double(void)>                                         getMinHeight_t;
 
-typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::TrackerPointStamped &ref)>
-                                                                                                             transformReferenceSingle_t;
-typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, mrs_msgs::TrackerPointStamped &ref)> transformReference_t;
+typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const double timeout, mrs_msgs::ReferenceStamped &ref)>
+                                                                                                          transformReferenceSingle_t;
+typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref)> transformReference_t;
 typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, const double timeout,
                              geometry_msgs::TransformStamped &tf)>
     getTransform_t;
@@ -81,20 +81,16 @@ public:
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg) = 0;
   virtual const mrs_msgs::TrackerStatus             getStatus()                                     = 0;
 
-  virtual const mrs_msgs::Vec4Response::ConstPtr goTo(const mrs_msgs::Vec4Request::ConstPtr &cmd)           = 0;
-  virtual const mrs_msgs::Vec4Response::ConstPtr goToRelative(const mrs_msgs::Vec4Request::ConstPtr &cmd)   = 0;
-  virtual const mrs_msgs::Vec1Response::ConstPtr goToAltitude(const mrs_msgs::Vec1Request::ConstPtr &cmd)   = 0;
-  virtual const mrs_msgs::Vec1Response::ConstPtr setYaw(const mrs_msgs::Vec1Request::ConstPtr &cmd)         = 0;
-  virtual const mrs_msgs::Vec1Response::ConstPtr setYawRelative(const mrs_msgs::Vec1Request::ConstPtr &cmd) = 0;
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd)         = 0;
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goToRelative(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd)   = 0;
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd)         = 0;
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
 
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)           = 0;
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) = 0;
 
-  virtual bool goTo(const mrs_msgs::TrackerPointStampedConstPtr &msg)         = 0;
-  virtual bool goToRelative(const mrs_msgs::TrackerPointStampedConstPtr &msg) = 0;
-  virtual bool goToAltitude(const std_msgs::Float64ConstPtr &msg)             = 0;
-  virtual bool setYaw(const std_msgs::Float64ConstPtr &msg)                   = 0;
-  virtual bool setYawRelative(const std_msgs::Float64ConstPtr &msg)           = 0;
+  virtual bool goTo(const mrs_msgs::ReferenceConstPtr &msg) = 0;
 
   virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &constraints) = 0;
 };
