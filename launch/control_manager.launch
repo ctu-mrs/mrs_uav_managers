@@ -152,7 +152,6 @@
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/default/line_tracker.yaml" />
       <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/line_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_line_tracker') == '')" ns="line_tracker" file="$(arg custom_config_line_tracker)" />
-      <param name="line_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
@@ -160,7 +159,6 @@
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/default/joy_tracker.yaml" />
       <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_joy_tracker') == '')" ns="joy_tracker" file="$(arg custom_config_joy_tracker)" />
-      <param name="joy_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
@@ -169,7 +167,6 @@
       <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/default/joy_bumper_tracker.yaml" />
       <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_bumper_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_joy_bumper_tracker') == '')" ns="joy_bumper_tracker" file="$(arg custom_config_joy_bumper_tracker)" />
-      <param name="joy_bumper_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_bumper_tracker/profiler" to="profiler" />
       <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
@@ -179,7 +176,6 @@
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/default/matlab_tracker.yaml" />
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/matlab_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_matlab_tracker') == '')" ns="matlab_tracker" file="$(arg custom_config_matlab_tracker)" />
-      <param name="matlab_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
@@ -188,7 +184,6 @@
       <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/default/speed_tracker.yaml" />
       <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/speed_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_speed_tracker') == '')" ns="speed_tracker" file="$(arg custom_config_speed_tracker)" />
-      <param name="speed_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="speed_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~speed_tracker/profiler" to="profiler" />
       <remap from="~speed_tracker/command_in" to="~speed_tracker/command" />
@@ -198,7 +193,6 @@
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_landoff_tracker') == '')" ns="landoff_tracker" file="$(arg custom_config_landoff_tracker)" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <param name="landoff_tracker/uav_name" type="string" value="$(arg UAV_NAME)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
       <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
@@ -213,7 +207,6 @@
       <rosparam if="$(eval not arg('custom_config_mpc_tracker') == '')" ns="mpc_tracker" file="$(arg custom_config_mpc_tracker)" />
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <param name="mpc_tracker/uav_name" value="$(arg UAV_NAME)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
@@ -242,12 +235,16 @@
       <remap from="~mavros_state_in" to="mavros/state" />
 
       <!-- Subscribers and Services -->
+      <remap from="~set_reference_in" to="~set_reference" />
       <remap from="~goto_in" to="~goto" />
       <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
       <remap from="~set_yaw_in" to="~set_yaw" />
       <remap from="~set_yaw_relative_in" to="~set_yaw_relative" />
+      <remap from="~transform_reference_in" to="~transform_reference" />
+      <remap from="~transform_pose_in" to="~transform_pose" />
+      <remap from="~transform_vector3_in" to="~transform_vector3" />
 
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
@@ -260,7 +257,7 @@
       <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
-      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
+      <remap from="~visualization_marker_array_out" to="control_manager/visualization_marker_array" />
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~bumper_status_out" to="~bumper_status" />
       <remap from="~profiler" to="profiler" />

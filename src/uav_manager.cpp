@@ -16,6 +16,7 @@
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/LandoffDiagnostics.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
+#include <mrs_msgs/ReferenceStampedSrv.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
@@ -177,8 +178,9 @@ private:
   std::mutex mutex_services;
 
 private:
-  double takeoff_x;
-  double takeoff_y;
+  double      takeoff_x;
+  double      takeoff_y;
+  std::string takeoff_frame_id;
 
 private:
   double takeoff_height_;
@@ -316,7 +318,7 @@ void UavManager::onInit() {
   service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
   service_client_switch_controller = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
   service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::Vec4>("emergency_goto_out");
+  service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_goto_out");
   service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
   service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
   service_client_pirouette         = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
@@ -674,11 +676,11 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
         double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
         double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
 
-        mrs_msgs::Vec4 goto_out;
-        goto_out.request.goal[0] = odometry_x + stop_dist_x;
-        goto_out.request.goal[1] = odometry_y + stop_dist_y;
-        goto_out.request.goal[2] = max_height - fabs(max_height_offset_);
-        goto_out.request.goal[3] = odometry_yaw;
+        mrs_msgs::ReferenceStampedSrv goto_out;
+        goto_out.request.reference.position.x = odometry_x + stop_dist_x;
+        goto_out.request.reference.position.y = odometry_y + stop_dist_y;
+        goto_out.request.reference.position.z = max_height - fabs(max_height_offset_);
+        goto_out.request.reference.yaw        = odometry_yaw;
 
         {
           std::scoped_lock lock(mutex_services);
@@ -1220,8 +1222,9 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
       {
         std::scoped_lock lock(mutex_odometry);
 
-        takeoff_x = odometry_x;
-        takeoff_y = odometry_y;
+        takeoff_x        = odometry_x;
+        takeoff_y        = odometry_y;
+        takeoff_frame_id = odometry.header.frame_id;
       }
 
       {
@@ -1427,14 +1430,16 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
 
   ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", takeoff_x, takeoff_y);
 
-  mrs_msgs::Vec4 goto_out;
+  mrs_msgs::ReferenceStampedSrv goto_out;
   {
     std::scoped_lock lock(mutex_odometry);
 
-    goto_out.request.goal[0] = takeoff_x;
-    goto_out.request.goal[1] = takeoff_y;
-    goto_out.request.goal[2] = odometry_z;
-    goto_out.request.goal[3] = odometry_yaw;
+    goto_out.request.header.frame_id = takeoff_frame_id;
+
+    goto_out.request.reference.position.x = takeoff_x;
+    goto_out.request.reference.position.y = takeoff_y;
+    goto_out.request.reference.position.z = odometry_z;
+    goto_out.request.reference.yaw        = odometry_yaw;
   }
 
   {

@@ -10,12 +10,12 @@ namespace mrs_uav_manager
 class NullTracker : public mrs_uav_manager::Tracker {
 
 public:
-  virtual void initialize(const ros::NodeHandle &parent_nh, mrs_uav_manager::SafetyArea_t const *safety_area,
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, mrs_uav_manager::SafetyArea_t const *safety_area,
                           mrs_uav_manager::Transformer_t const *transformer);
   virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd);
   virtual void deactivate(void);
 
-  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg);
+  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg, const mrs_msgs::AttitudeCommand::ConstPtr &cmd);
   virtual const mrs_msgs::TrackerStatus             getStatus();
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
   virtual void                                      switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg);
@@ -49,7 +49,8 @@ private:
 
 /* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] mrs_uav_manager::SafetyArea_t const *safety_area,
+void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] const std::string uav_name,
+                             [[maybe_unused]] mrs_uav_manager::SafetyArea_t const * safety_area,
                              [[maybe_unused]] mrs_uav_manager::Transformer_t const *transformer) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
@@ -93,7 +94,8 @@ void NullTracker::switchOdometrySource([[maybe_unused]] const mrs_msgs::UavState
 
 /* //{ update() */
 
-const mrs_msgs::PositionCommand::ConstPtr NullTracker::update([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &msg) {
+const mrs_msgs::PositionCommand::ConstPtr NullTracker::update([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &       msg,
+                                                              [[maybe_unused]] const mrs_msgs::AttitudeCommand::ConstPtr &cmd) {
 
   return mrs_msgs::PositionCommand::Ptr();
 }
