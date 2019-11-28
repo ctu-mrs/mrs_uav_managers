@@ -2597,6 +2597,8 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
   // |                      bumper repulsion                      |
   // --------------------------------------------------------------
 
+  std::scoped_lock lock(mutex_uav_state);
+
   bumperPushFromObstacle();
 }
 
@@ -4078,7 +4080,7 @@ bool ControlManager::callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::
     return true;
   }
 
-  std::scoped_lock lock(mutex_uav_state, mutex_last_position_cmd, mutex_tracker_list);
+  std::scoped_lock lock(mutex_last_position_cmd, mutex_uav_state, mutex_tracker_list);
 
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference;
@@ -5320,12 +5322,16 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
 
   mrs_msgs::ReferenceStamped point_fcu = point;
 
+  ROS_INFO("[ControlManager]: 1");
+
   if (!transformReferenceSingle("fcu", point_fcu)) {
 
     ROS_ERROR("[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
     return false;
   }
+
+  ROS_INFO("[ControlManager]: 2");
 
   double fcu_x = point_fcu.reference.position.x;
   double fcu_y = point_fcu.reference.position.y;
@@ -5338,6 +5344,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
   // calculate the horizontal distance to the point
   double horizontal_point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
   double vertical_point_distance   = fabs(fcu_z);
+
+  ROS_INFO("[ControlManager]: 3");
 
   // check whether we measure in that direction
   if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
@@ -5358,6 +5366,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
 
     return true;
   }
+
+  ROS_INFO("[ControlManager]: 4");
 
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
   if (horizontal_point_distance > 0.1 &&
@@ -5626,23 +5636,20 @@ bool ControlManager::bumperPushFromObstacle(void) {
     Eigen::Vector2d des = Eigen::Vector2d(cos(direction) * repulsion_distance, sin(direction) * repulsion_distance);
 
     mrs_msgs::ReferenceSrvRequest req_goto_out;
-    {
-      std::scoped_lock lock(mutex_uav_state);
 
-      // rotate it from the frame of the drone
-      des = rotateVector(des, uav_yaw);
+    // rotate it from the frame of the drone
+    des = rotateVector(des, uav_yaw);
 
-      if (horizontal_collision_detected) {
-        req_goto_out.reference.position.x = des[0];
-        req_goto_out.reference.position.y = des[1];
-      }
-
-      if (vertical_collision_detected) {
-        req_goto_out.reference.position.z = vertical_repulsion_distance;
-      }
-
-      req_goto_out.reference.yaw = 0;
+    if (horizontal_collision_detected) {
+      req_goto_out.reference.position.x = des[0];
+      req_goto_out.reference.position.y = des[1];
     }
+
+    if (vertical_collision_detected) {
+      req_goto_out.reference.position.z = vertical_repulsion_distance;
+    }
+
+    req_goto_out.reference.yaw = 0;
 
     {
       std::scoped_lock lock(mutex_tracker_list);
@@ -5701,8 +5708,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
 /* bumperGetSectorId() //{ */
 
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
-
-  std::scoped_lock lock(mutex_uav_state);
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
