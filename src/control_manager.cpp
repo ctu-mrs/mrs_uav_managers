@@ -5149,10 +5149,12 @@ bool ControlManager::transformReference(const geometry_msgs::TransformStamped &t
   pose.pose.position.y = ref.reference.position.y;
   pose.pose.position.z = ref.reference.position.z;
 
-  pose.pose.orientation.x = 0;
-  pose.pose.orientation.y = 0;
-  pose.pose.orientation.z = sin(ref.reference.yaw / 2.0);
-  pose.pose.orientation.w = cos(ref.reference.yaw / 2.0);
+  tf::Quaternion quat = tf::createQuaternionFromRPY(0, 0, ref.reference.yaw);
+
+  pose.pose.orientation.x = quat.getX();
+  pose.pose.orientation.y = quat.getY();
+  pose.pose.orientation.z = quat.getZ();
+  pose.pose.orientation.w = quat.getW();
 
   try {
     tf2::doTransform(pose, pose, tf);
@@ -5162,7 +5164,10 @@ bool ControlManager::transformReference(const geometry_msgs::TransformStamped &t
     ref.reference.position.y = pose.pose.position.y;
     ref.reference.position.z = pose.pose.position.z;
 
-    ref.reference.yaw = asin(pose.pose.orientation.z) * 2.0;
+    quaternionMsgToTF(pose.pose.orientation, quat);
+    tf::Matrix3x3 m(quat);
+    double        roll, pitch;
+    m.getRPY(roll, pitch, ref.reference.yaw);
 
     ref.header.frame_id = tf.header.frame_id;
     ref.header.stamp    = tf.header.stamp;
