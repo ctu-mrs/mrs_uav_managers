@@ -84,6 +84,8 @@
 
 //}
 
+/* defines //{ */
+
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
@@ -94,6 +96,8 @@
 #define ELAND_STR "eland"
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
+
+//}
 
 namespace mrs_uav_manager
 {
@@ -6575,7 +6579,7 @@ void ControlManager::publish(void) {
     quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
 
     try {
-      publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
+      publisher_cmd_odom.publish(cmd_odom);
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
@@ -6583,7 +6587,7 @@ void ControlManager::publish(void) {
 
     // publish the full command structure
     try {
-      publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd));  // the last_position_cmd is already a ConstPtr
+      publisher_position_cmd.publish(last_position_cmd);  // the last_position_cmd is already a ConstPtr
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
@@ -6687,7 +6691,7 @@ void ControlManager::publish(void) {
       // when controlling with angular rates, PixHawk does not publish the
       // target_attitude topic anymore, thus we need do it here
       try {
-        publisher_target_attitude.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+        publisher_target_attitude.publish(attitude_target);
       }
       catch (...) {
         ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
@@ -6725,7 +6729,7 @@ void ControlManager::publish(void) {
 
     try {
 
-      publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
+      publisher_control_output.publish(attitude_target);
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
@@ -6736,7 +6740,7 @@ void ControlManager::publish(void) {
 
   if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
     try {
-      publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(last_attitude_cmd));  // the control command is already a ConstPtr
+      publisher_attitude_cmd.publish(last_attitude_cmd);  // the control command is already a ConstPtr
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
