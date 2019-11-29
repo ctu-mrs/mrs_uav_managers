@@ -6,7 +6,7 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 6.0
+      kq: 8.0
       kw: 0.0
 
     kib: 1.0
@@ -36,7 +36,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 8.0
       kw: 0.0
 
     kib: 0.1
