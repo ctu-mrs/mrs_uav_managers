@@ -171,7 +171,7 @@ private:
   ros::ServiceClient service_client_eland;
   ros::ServiceClient service_client_motors;
   ros::ServiceClient service_client_enabled_callbacks;
-  ros::ServiceClient service_client_emergency_goto;
+  ros::ServiceClient service_client_emergency_reference;
   ros::ServiceClient service_client_arm;
   ros::ServiceClient service_client_pirouette;
 
@@ -312,16 +312,16 @@ void UavManager::onInit() {
   service_server_land      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
   service_server_land_home = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
 
-  service_client_takeoff           = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
-  service_client_land              = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_eland             = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_switch_tracker    = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
-  service_client_switch_controller = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
-  service_client_motors            = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_emergency_goto    = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_goto_out");
-  service_client_enabled_callbacks = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
-  service_client_arm               = nh_.serviceClient<std_srvs::SetBool>("arm_out");
-  service_client_pirouette         = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
+  service_client_takeoff             = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
+  service_client_land                = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_eland               = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_switch_tracker      = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
+  service_client_switch_controller   = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
+  service_client_motors              = nh_.serviceClient<std_srvs::SetBool>("motors_out");
+  service_client_emergency_reference = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_reference_out");
+  service_client_enabled_callbacks   = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
+  service_client_arm                 = nh_.serviceClient<std_srvs::SetBool>("arm_out");
+  service_client_pirouette           = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
@@ -676,19 +676,19 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
         double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
         double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
 
-        mrs_msgs::ReferenceStampedSrv goto_out;
-        goto_out.request.reference.position.x = odometry_x + stop_dist_x;
-        goto_out.request.reference.position.y = odometry_y + stop_dist_y;
-        goto_out.request.reference.position.z = max_height - fabs(max_height_offset_);
-        goto_out.request.reference.yaw        = odometry_yaw;
+        mrs_msgs::ReferenceStampedSrv reference_out;
+        reference_out.request.reference.position.x = odometry_x + stop_dist_x;
+        reference_out.request.reference.position.y = odometry_y + stop_dist_y;
+        reference_out.request.reference.position.z = max_height - fabs(max_height_offset_);
+        reference_out.request.reference.yaw        = odometry_yaw;
 
         {
           std::scoped_lock lock(mutex_services);
 
-          service_client_emergency_goto.call(goto_out);
+          service_client_emergency_reference.call(reference_out);
         }
 
-        if (goto_out.response.success == true) {
+        if (reference_out.response.success == true) {
 
           ROS_INFO("[UavManager]: descending");
 
@@ -696,7 +696,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
         } else {
 
-          ROS_ERROR("[UavManager]: goto failed: %s", goto_out.response.message.c_str());
+          ROS_ERROR("[UavManager]: goto failed: %s", reference_out.response.message.c_str());
         }
       }
 
@@ -1430,27 +1430,27 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
 
   ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", takeoff_x, takeoff_y);
 
-  mrs_msgs::ReferenceStampedSrv goto_out;
+  mrs_msgs::ReferenceStampedSrv reference_out;
   {
     std::scoped_lock lock(mutex_odometry);
 
-    goto_out.request.header.frame_id = takeoff_frame_id;
+    reference_out.request.header.frame_id = takeoff_frame_id;
 
-    goto_out.request.reference.position.x = takeoff_x;
-    goto_out.request.reference.position.y = takeoff_y;
-    goto_out.request.reference.position.z = odometry_z;
-    goto_out.request.reference.yaw        = odometry_yaw;
+    reference_out.request.reference.position.x = takeoff_x;
+    reference_out.request.reference.position.y = takeoff_y;
+    reference_out.request.reference.position.z = odometry_z;
+    reference_out.request.reference.yaw        = odometry_yaw;
   }
 
   {
     std::scoped_lock lock(mutex_services);
 
-    service_client_emergency_goto.call(goto_out);
+    service_client_emergency_reference.call(reference_out);
   }
 
-  if (goto_out.response.success == true) {
+  if (reference_out.response.success == true) {
 
-    res.success = goto_out.response.success;
+    res.success = reference_out.response.success;
     res.message = "Flying home for landing";
 
     ros::Duration wait(1.0);
@@ -1462,8 +1462,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
 
   } else {
 
-    res.success = goto_out.response.success;
-    res.message = goto_out.response.message;
+    res.success = reference_out.response.success;
+    res.message = reference_out.response.message;
     changeLandingState(IDLE_STATE);
   }
 

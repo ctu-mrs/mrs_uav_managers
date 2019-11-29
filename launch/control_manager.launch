@@ -237,7 +237,7 @@
       <remap from="~mavros_state_in" to="mavros/state" />
 
       <!-- Subscribers and Services -->
-      <remap from="~set_reference_in" to="~set_reference" />
+      <remap from="~reference_in" to="~reference" />
       <remap from="~goto_in" to="~goto" />
       <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
@@ -270,7 +270,7 @@
       <remap from="~hover_in" to="~hover" />
       <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />
-      <remap from="~emergency_goto_in" to="~emergency_goto" />
+      <remap from="~emergency_reference_in" to="~emergency_reference" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
       <remap from="~set_constraints_in" to="control_manager/set_constraints" />

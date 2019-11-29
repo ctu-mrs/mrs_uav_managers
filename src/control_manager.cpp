@@ -340,9 +340,9 @@ private:
   ros::ServiceServer service_server_set_yaw;
   ros::ServiceServer service_server_set_yaw_relative;
 
-  ros::ServiceServer service_server_set_reference;
+  ros::ServiceServer service_server_reference;
 
-  ros::ServiceServer service_server_emergency_goto;
+  ros::ServiceServer service_server_emergency_reference;
   ros::ServiceServer service_server_pirouette;
   ros::ServiceServer service_server_eland;
   ros::ServiceServer service_server_partial_landing;
@@ -363,7 +363,7 @@ private:
   ros::Subscriber subscriber_set_yaw;
   ros::Subscriber subscriber_set_yaw_relative;
 
-  ros::Subscriber subscriber_set_reference;
+  ros::Subscriber subscriber_reference;
 
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd;
   std::mutex                          mutex_last_position_cmd;
@@ -454,7 +454,7 @@ private:
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
 
-  void callbackSetReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg);
+  void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg);
 
   // human callable
   bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
@@ -464,9 +464,9 @@ private:
   bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
 
-  bool callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
 
-  bool callbackEmergencyGoToService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  bool callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
 
   void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
   void callbackRC(const mavros_msgs::RCInConstPtr &msg);
@@ -1329,14 +1329,14 @@ void ControlManager::onInit() {
   service_server_set_yaw          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYawService, this);
   service_server_set_yaw_relative = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
 
-  service_server_set_reference = nh_.advertiseService("set_reference_in", &ControlManager::callbackSetReferenceService, this);
+  service_server_reference = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
 
-  subscriber_set_reference = nh_.subscribe("set_reference_in", 1, &ControlManager::callbackSetReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_reference = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   // | --------------------- other services --------------------- |
 
-  service_server_emergency_goto = nh_.advertiseService("emergency_goto_in", &ControlManager::callbackEmergencyGoToService, this);
-  service_server_pirouette      = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
+  service_server_emergency_reference = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReferenceService, this);
+  service_server_pirouette           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
   // | ----------------------- tf listener ---------------------- |
 
@@ -3791,9 +3791,9 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
 
 //}
 
-/* //{ callbackEmergencyGoToService() */
+/* //{ callbackEmergencyReferenceService() */
 
-bool ControlManager::callbackEmergencyGoToService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
 
   if (!is_initialized)
     return false;
@@ -4035,9 +4035,9 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
 
 // | -------------- setpoint topics and services -------------- |
 
-/* //{ callbackSetReferenceService() */
+/* //{ callbackReferenceService() */
 
-bool ControlManager::callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
 
   if (!is_initialized) {
     res.message = "not initialized";
@@ -4148,9 +4148,9 @@ bool ControlManager::callbackSetReferenceService(mrs_msgs::ReferenceStampedSrv::
 
 //}
 
-/* //{ callbackSetReferenceTopic() */
+/* //{ callbackReferenceTopic() */
 
-void ControlManager::callbackSetReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg) {
+void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg) {
 
   if (!is_initialized)
     return;
