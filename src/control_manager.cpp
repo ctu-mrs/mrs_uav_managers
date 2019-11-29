@@ -4353,7 +4353,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   std::scoped_lock lock(mutex_last_position_cmd, mutex_tracker_list, mutex_uav_state);
 
   mrs_msgs::ReferenceStamped des_reference;
-  des_reference.header.frame_id      = "fcu";
+  des_reference.header.frame_id      = "fcu_untilted";
   des_reference.reference.position.x = req.goal[REF_X];
   des_reference.reference.position.y = req.goal[REF_Y];
   des_reference.reference.position.z = req.goal[REF_Z];
@@ -5323,7 +5323,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
 
   ROS_INFO("[ControlManager]: 1");
 
-  if (!transformReferenceSingle("fcu", point_fcu)) {
+  if (!transformReferenceSingle("fcu_untilted", point_fcu)) {
 
     ROS_ERROR("[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
