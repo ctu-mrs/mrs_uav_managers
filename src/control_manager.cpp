@@ -2137,15 +2137,10 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
       switchMotors(false);
 
       // disarm the drone
-      if (isOffboard() && eland_disarm_enabled_) {
+      if (eland_disarm_enabled_) {
 
         ROS_INFO("[ControlManager]: calling for disarm");
-        mavros_msgs::CommandBool srv_out;
-        service_client_arm.call(srv_out);
-
-      } else {
-
-        ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode");
+        arming(false);
       }
 
       shutdown();
@@ -6327,7 +6322,17 @@ bool ControlManager::arming(bool input) {
 
       ROS_INFO("[ControlManager]: calling for disarming");
 
-      service_client_arm.call(srv_out);
+      if (service_client_arm.call(srv_out)) {
+
+        if (srv_out.response.success) {
+          ROS_INFO("[ControlManager]: service call for disarm was successful");
+        } else {
+          ROS_ERROR("[ControlManager]: service call for disarm was unsuccessful");
+        }
+
+      } else {
+        ROS_ERROR("[ControlManager]: calling for disarm resulted in failure: %d", srv_out.response.result);
+      }
 
       shutdown();
 
