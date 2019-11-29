@@ -1410,7 +1410,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
     publisher_motors.publish(motors_out);
   }
   catch (...) {
-    ROS_ERROR("Exception caught during publishing topic %s.", publisher_motors.getTopic().c_str());
+    ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_motors.getTopic().c_str());
   }
 
   // --------------------------------------------------------------
@@ -1426,7 +1426,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
       publisher_tilt_error.publish(tilt_error_out);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_tilt_error.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_tilt_error.getTopic().c_str());
     }
   }
 
@@ -1451,7 +1451,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
       publisher_control_error.publish(odom_out);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_error.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_error.getTopic().c_str());
     }
   }
 
@@ -1470,7 +1470,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         publisher_mass_estimate.publish(mass_estimate_out);
       }
       catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_mass_estimate.getTopic().c_str());
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_mass_estimate.getTopic().c_str());
       }
     }
   }
@@ -1780,7 +1780,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
         publisher_rviz_marker.publish(msg_out);
       }
       catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_rviz_marker.getTopic().c_str());
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_rviz_marker.getTopic().c_str());
       }
     }
   }
@@ -4252,7 +4252,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -4344,7 +4344,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -4445,7 +4445,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -4542,7 +4542,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4615,7 +4615,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4665,7 +4665,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("NaN detected in variable \"req.value\"!!!");
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.value\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4845,7 +4845,7 @@ void ControlManager::publishDiagnostics(void) {
     publisher_diagnostics.publish(diagnostics_msg);
   }
   catch (...) {
-    ROS_ERROR("Exception caught during publishing topic %s.", publisher_diagnostics.getTopic().c_str());
+    ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_diagnostics.getTopic().c_str());
   }
 }
 
@@ -5382,7 +5382,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     return false;
@@ -5400,7 +5400,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     return false;
@@ -5435,7 +5435,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
         publisher_bumper_status.publish(bumper_status);
       }
       catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
       }
     }
 
@@ -5452,7 +5452,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
         publisher_bumper_status.publish(bumper_status);
       }
       catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
       }
     }
 
@@ -5622,7 +5622,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     repulsing = true;
@@ -6573,7 +6573,7 @@ void ControlManager::publish(void) {
       publisher_cmd_odom.publish(nav_msgs::OdometryConstPtr(new nav_msgs::Odometry(cmd_odom)));
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_cmd_odom.getTopic().c_str());
     }
 
     // publish the full command structure
@@ -6581,7 +6581,7 @@ void ControlManager::publish(void) {
       publisher_position_cmd.publish(mrs_msgs::PositionCommandConstPtr(last_position_cmd));  // the last_position_cmd is already a ConstPtr
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_position_cmd.getTopic().c_str());
     }
   }
 
@@ -6685,7 +6685,7 @@ void ControlManager::publish(void) {
         publisher_target_attitude.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
       }
       catch (...) {
-        ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
       }
     }
 
@@ -6698,23 +6698,23 @@ void ControlManager::publish(void) {
 
     // test the output
     if (!std::isfinite(attitude_target.orientation.x)) {
-      ROS_ERROR("NaN detected in variable \"attitude_target.orientation.x\"!!!");
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.x\"!!!");
       return;
     }
     if (!std::isfinite(attitude_target.orientation.y)) {
-      ROS_ERROR("NaN detected in variable \"attitude_target.orientation.y\"!!!");
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.y\"!!!");
       return;
     }
     if (!std::isfinite(attitude_target.orientation.z)) {
-      ROS_ERROR("NaN detected in variable \"attitude_target.orientation.z\"!!!");
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.z\"!!!");
       return;
     }
     if (!std::isfinite(attitude_target.orientation.w)) {
-      ROS_ERROR("NaN detected in variable \"attitude_target.orientation.w\"!!!");
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.w\"!!!");
       return;
     }
     if (!std::isfinite(attitude_target.thrust)) {
-      ROS_ERROR("NaN detected in variable \"attitude_target.thrust\"!!!");
+      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.thrust\"!!!");
       return;
     }
 
@@ -6723,7 +6723,7 @@ void ControlManager::publish(void) {
       publisher_control_output.publish(mavros_msgs::AttitudeTargetConstPtr(new mavros_msgs::AttitudeTarget(attitude_target)));
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_output.getTopic().c_str());
     }
   }
 
@@ -6734,7 +6734,7 @@ void ControlManager::publish(void) {
       publisher_attitude_cmd.publish(mrs_msgs::AttitudeCommandConstPtr(last_attitude_cmd));  // the control command is already a ConstPtr
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_attitude_cmd.getTopic().c_str());
     }
   }
 
@@ -6750,7 +6750,7 @@ void ControlManager::publish(void) {
       publisher_thrust_force.publish(thrust_out);
     }
     catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_thrust_force.getTopic().c_str());
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_thrust_force.getTopic().c_str());
     }
   }
 }

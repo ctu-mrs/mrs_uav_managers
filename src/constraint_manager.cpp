@@ -366,7 +366,7 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
     publisher_current_constraints.publish(str_out);
   }
   catch (...) {
-    ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
+    ROS_ERROR("[ConstraintManager]: Exception caught during publishing topic %s.", publisher_current_constraints.getTopic().c_str());
   }
 }
 
