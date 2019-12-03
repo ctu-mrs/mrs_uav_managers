@@ -5300,8 +5300,8 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
     return true;
   }
   catch (tf2::TransformException &ex) {
-    ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
-              ex.what());
+    /* ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(), */
+    /*           ex.what()); */
   }
 
   try {
@@ -5450,6 +5450,9 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
           new_y);
 
+      point_fcu.reference.position.x = new_x;
+      point_fcu.reference.position.y = new_y;
+
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
       try {
@@ -5467,6 +5470,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f", fcu_z,
                vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
 
+      point_fcu.reference.position.z = new_z;
+
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
       try {
@@ -5478,7 +5483,6 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
     }
 
     // express the point back in the original FRAME
-
     if (!transformReferenceSingle(point.header.frame_id, point_fcu)) {
 
       ROS_ERROR("[ControlManager]: Bumper: cannot transform reference back to original frame");
