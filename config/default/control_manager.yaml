@@ -113,7 +113,7 @@ joystick:
 
   enabled: true
 
-  mode: 1 # {0 = goto, 1 = trajectory}
+  mode: 0 # {0 = goto, 1 = trajectory}
 
   carrot_distance: 1.00 # [m]
 
