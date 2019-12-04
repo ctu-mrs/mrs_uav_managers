@@ -243,9 +243,6 @@ private:
   double             uav_roll_;
   double             uav_pitch_;
   double             uav_yaw_;
-  double             uav_x_;
-  double             uav_y_;
-  double             uav_z_;
 
   ros::Subscriber    subscriber_pixhawk_odometry_;
   nav_msgs::Odometry pixhawk_odometry_;
@@ -1403,6 +1400,25 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   if (!is_initialized_)
     return;
 
+  /* copy the member variables //{ */
+
+  mrs_msgs::UavState                uav_state;
+  mrs_msgs::AttitudeCommandConstPtr last_attitude_cmd;
+  double                            uav_x, uav_y, uav_z;
+
+  {
+    std::scoped_lock lock(mutex_uav_state_, mutex_last_attitude_cmd_);
+
+    uav_state         = uav_state_;
+    last_attitude_cmd = last_attitude_cmd_;
+
+    uav_x = uav_state.pose.position.x;
+    uav_y = uav_state.pose.position.y;
+    uav_z = uav_state.pose.position.z;
+  }
+
+  //}
+
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("statusTimer", _status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
@@ -1471,345 +1487,336 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
   // --------------------------------------------------------------
   // |                  publish the mass estimate                 |
   // --------------------------------------------------------------
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd_);
 
-    if (last_attitude_cmd_ != mrs_msgs::AttitudeCommand::Ptr()) {
+  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-      mrs_msgs::Float64 mass_estimate_out;
-      mass_estimate_out.value = _uav_mass_ + last_attitude_cmd_->mass_difference;
+    mrs_msgs::Float64 mass_estimate_out;
+    mass_estimate_out.value = _uav_mass_ + last_attitude_cmd->mass_difference;
 
-      try {
-        publisher_mass_estimate_.publish(mass_estimate_out);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_mass_estimate_.getTopic().c_str());
-      }
+    try {
+      publisher_mass_estimate_.publish(mass_estimate_out);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_mass_estimate_.getTopic().c_str());
     }
   }
 
   // --------------------------------------------------------------
   // |               publish the safety area markers              |
   // --------------------------------------------------------------
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_uav_state_);
+  //
+  visualization_msgs::MarkerArray msg_out;
 
-    visualization_msgs::MarkerArray msg_out;
+  Eigen::Vector3d      vec3d;
+  geometry_msgs::Point point;
 
-    Eigen::Vector3d      vec3d;
-    geometry_msgs::Point point;
+  if (_use_safety_area_) {
 
-    if (_use_safety_area_) {
+    auto safety_zone_marker = safety_zone_->getMarkerMessage();
 
-      auto safety_zone_marker = safety_zone_->getMarkerMessage();
+    safety_zone_marker.id = 0;
 
-      safety_zone_marker.id = 0;
+    safety_zone_marker.header.stamp    = ros::Time::now();
+    safety_zone_marker.header.frame_id = resolveFrameName(_safety_area_frame_);
 
-      safety_zone_marker.header.stamp    = ros::Time::now();
-      safety_zone_marker.header.frame_id = resolveFrameName(_safety_area_frame_);
+    msg_out.markers.push_back(safety_zone_marker);
+  }
 
-      msg_out.markers.push_back(safety_zone_marker);
-    }
-
-    try {
-      publisher_safety_area_markers_.publish(msg_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
-    }
+  try {
+    publisher_safety_area_markers_.publish(msg_out);
+  }
+  catch (...) {
+    ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
   }
 
   // --------------------------------------------------------------
   // |              publish the disturbances markers              |
   // --------------------------------------------------------------
-  {
-    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_uav_state_);
 
-    if (last_attitude_cmd_ != mrs_msgs::AttitudeCommand::Ptr() && got_uav_state_) {
+  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && got_uav_state_) {
 
-      visualization_msgs::MarkerArray msg_out;
+    visualization_msgs::MarkerArray msg_out;
 
-      double id = 0;
+    double id = 0;
 
-      double multiplier = 1.0;
+    double multiplier = 1.0;
 
-      Eigen::Quaterniond quat_eigen(uav_state_.pose.orientation.w, uav_state_.pose.orientation.x, uav_state_.pose.orientation.y, uav_state_.pose.orientation.z);
+    Eigen::Quaterniond quat_eigen(uav_state.pose.orientation.w, uav_state.pose.orientation.x, uav_state.pose.orientation.y, uav_state.pose.orientation.z);
 
-      Eigen::Vector3d      vec3d;
-      geometry_msgs::Point point;
+    Eigen::Vector3d      vec3d;
+    geometry_msgs::Point point;
 
-      /* world x disturbance //{ */
-      {
+    /* world x disturbance //{ */
+    {
 
-        visualization_msgs::Marker marker;
+      visualization_msgs::Marker marker;
 
-        marker.header.frame_id = uav_state_.header.frame_id;
-        marker.header.stamp    = ros::Time::now();
-        marker.ns              = "control_manager";
-        marker.id              = id++;
-        marker.type            = visualization_msgs::Marker::ARROW;
-        marker.action          = visualization_msgs::Marker::ADD;
+      marker.header.frame_id = uav_state.header.frame_id;
+      marker.header.stamp    = ros::Time::now();
+      marker.ns              = "control_manager";
+      marker.id              = id++;
+      marker.type            = visualization_msgs::Marker::ARROW;
+      marker.action          = visualization_msgs::Marker::ADD;
 
-        /* position //{ */
+      /* position //{ */
 
-        marker.pose.position.x = 0.0;
-        marker.pose.position.y = 0.0;
-        marker.pose.position.z = 0.0;
-
-        //}
-
-        /* orientation //{ */
-
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.0;
-        marker.pose.orientation.w = 1.0;
-
-        //}
-
-        /* origin //{ */
-        point.x = uav_x_;
-        point.y = uav_y_;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        /* tip //{ */
-
-        point.x = uav_x_ + multiplier * last_attitude_cmd_->disturbance_wx_w;
-        point.y = uav_y_;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        marker.scale.x = 0.05;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-
-        marker.color.a = 0.5;
-        marker.color.r = 1.0;
-        marker.color.g = 0.0;
-        marker.color.b = 0.0;
-
-        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-        msg_out.markers.push_back(marker);
-      }
+      marker.pose.position.x = 0.0;
+      marker.pose.position.y = 0.0;
+      marker.pose.position.z = 0.0;
 
       //}
 
-      /* world y disturbance //{ */
-      {
+      /* orientation //{ */
 
-        visualization_msgs::Marker marker;
-
-        marker.header.frame_id = uav_state_.header.frame_id;
-        marker.header.stamp    = ros::Time::now();
-        marker.ns              = "control_manager";
-        marker.id              = id++;
-        marker.type            = visualization_msgs::Marker::ARROW;
-        marker.action          = visualization_msgs::Marker::ADD;
-
-        /* position //{ */
-
-        marker.pose.position.x = 0.0;
-        marker.pose.position.y = 0.0;
-        marker.pose.position.z = 0.0;
-
-        //}
-
-        /* orientation //{ */
-
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.0;
-        marker.pose.orientation.w = 1.0;
-
-        //}
-
-        // defining points
-
-        /* origin //{ */
-        point.x = uav_x_;
-        point.y = uav_y_;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        /* tip //{ */
-
-        point.x = uav_x_;
-        point.y = uav_y_ + multiplier * last_attitude_cmd_->disturbance_wy_w;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        marker.scale.x = 0.05;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-
-        marker.color.a = 0.5;
-        marker.color.r = 1.0;
-        marker.color.g = 0.0;
-        marker.color.b = 0.0;
-
-        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-        msg_out.markers.push_back(marker);
-      }
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
 
       //}
 
-      /* body x disturbance //{ */
-      {
+      /* origin //{ */
+      point.x = uav_x;
+      point.y = uav_y;
+      point.z = uav_z;
 
-        visualization_msgs::Marker marker;
-
-        marker.header.frame_id = uav_state_.header.frame_id;
-        marker.header.stamp    = ros::Time::now();
-        marker.ns              = "control_manager";
-        marker.id              = id++;
-        marker.type            = visualization_msgs::Marker::ARROW;
-        marker.action          = visualization_msgs::Marker::ADD;
-
-        /* position //{ */
-
-        marker.pose.position.x = 0.0;
-        marker.pose.position.y = 0.0;
-        marker.pose.position.z = 0.0;
-
-        //}
-
-        /* orientation //{ */
-
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.0;
-        marker.pose.orientation.w = 1.0;
-
-        //}
-
-        /* origin //{ */
-
-        point.x = uav_x_;
-        point.y = uav_y_;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        /* tip //{ */
-
-        vec3d << multiplier * last_attitude_cmd_->disturbance_bx_b, 0, 0;
-        vec3d = quat_eigen * vec3d;
-
-        point.x = uav_x_ + vec3d[0];
-        point.y = uav_y_ + vec3d[1];
-        point.z = uav_z_ + vec3d[2];
-
-        marker.points.push_back(point);
-
-        //}
-
-        marker.scale.x = 0.05;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-
-        marker.color.a = 0.5;
-        marker.color.r = 0.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-
-        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-        msg_out.markers.push_back(marker);
-      }
+      marker.points.push_back(point);
 
       //}
 
-      /* body y disturbance //{ */
-      {
+      /* tip //{ */
 
-        visualization_msgs::Marker marker;
+      point.x = uav_x + multiplier * last_attitude_cmd->disturbance_wx_w;
+      point.y = uav_y;
+      point.z = uav_z;
 
-        marker.header.frame_id = uav_state_.header.frame_id;
-        marker.header.stamp    = ros::Time::now();
-        marker.ns              = "control_manager";
-        marker.id              = id++;
-        marker.type            = visualization_msgs::Marker::ARROW;
-        marker.action          = visualization_msgs::Marker::ADD;
-
-        /* position //{ */
-
-        marker.pose.position.x = 0.0;
-        marker.pose.position.y = 0.0;
-        marker.pose.position.z = 0.0;
-
-        //}
-
-        /* orientation //{ */
-
-        marker.pose.orientation.x = 0.0;
-        marker.pose.orientation.y = 0.0;
-        marker.pose.orientation.z = 0.0;
-        marker.pose.orientation.w = 1.0;
-
-        //}
-
-        /* origin //{ */
-
-        point.x = uav_x_;
-        point.y = uav_y_;
-        point.z = uav_z_;
-
-        marker.points.push_back(point);
-
-        //}
-
-        /* tip //{ */
-
-        vec3d << 0, multiplier * last_attitude_cmd_->disturbance_by_b, 0;
-        vec3d = quat_eigen * vec3d;
-
-        point.x = uav_x_ + vec3d[0];
-        point.y = uav_y_ + vec3d[1];
-        point.z = uav_z_ + vec3d[2];
-
-        marker.points.push_back(point);
-
-        //}
-
-        marker.scale.x = 0.05;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-
-        marker.color.a = 0.5;
-        marker.color.r = 0.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-
-        marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-        msg_out.markers.push_back(marker);
-      }
+      marker.points.push_back(point);
 
       //}
 
-      try {
-        publisher_disturbances_markers_.publish(msg_out);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_disturbances_markers_.getTopic().c_str());
-      }
+      marker.scale.x = 0.05;
+      marker.scale.y = 0.05;
+      marker.scale.z = 0.05;
+
+      marker.color.a = 0.5;
+      marker.color.r = 1.0;
+      marker.color.g = 0.0;
+      marker.color.b = 0.0;
+
+      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+      msg_out.markers.push_back(marker);
+    }
+
+    //}
+
+    /* world y disturbance //{ */
+    {
+
+      visualization_msgs::Marker marker;
+
+      marker.header.frame_id = uav_state.header.frame_id;
+      marker.header.stamp    = ros::Time::now();
+      marker.ns              = "control_manager";
+      marker.id              = id++;
+      marker.type            = visualization_msgs::Marker::ARROW;
+      marker.action          = visualization_msgs::Marker::ADD;
+
+      /* position //{ */
+
+      marker.pose.position.x = 0.0;
+      marker.pose.position.y = 0.0;
+      marker.pose.position.z = 0.0;
+
+      //}
+
+      /* orientation //{ */
+
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+
+      //}
+
+      // defining points
+
+      /* origin //{ */
+      point.x = uav_x;
+      point.y = uav_y;
+      point.z = uav_z;
+
+      marker.points.push_back(point);
+
+      //}
+
+      /* tip //{ */
+
+      point.x = uav_x;
+      point.y = uav_y + multiplier * last_attitude_cmd->disturbance_wy_w;
+      point.z = uav_z;
+
+      marker.points.push_back(point);
+
+      //}
+
+      marker.scale.x = 0.05;
+      marker.scale.y = 0.05;
+      marker.scale.z = 0.05;
+
+      marker.color.a = 0.5;
+      marker.color.r = 1.0;
+      marker.color.g = 0.0;
+      marker.color.b = 0.0;
+
+      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+      msg_out.markers.push_back(marker);
+    }
+
+    //}
+
+    /* body x disturbance //{ */
+    {
+
+      visualization_msgs::Marker marker;
+
+      marker.header.frame_id = uav_state.header.frame_id;
+      marker.header.stamp    = ros::Time::now();
+      marker.ns              = "control_manager";
+      marker.id              = id++;
+      marker.type            = visualization_msgs::Marker::ARROW;
+      marker.action          = visualization_msgs::Marker::ADD;
+
+      /* position //{ */
+
+      marker.pose.position.x = 0.0;
+      marker.pose.position.y = 0.0;
+      marker.pose.position.z = 0.0;
+
+      //}
+
+      /* orientation //{ */
+
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+
+      //}
+
+      /* origin //{ */
+
+      point.x = uav_x;
+      point.y = uav_y;
+      point.z = uav_z;
+
+      marker.points.push_back(point);
+
+      //}
+
+      /* tip //{ */
+
+      vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, 0, 0;
+      vec3d = quat_eigen * vec3d;
+
+      point.x = uav_x + vec3d[0];
+      point.y = uav_y + vec3d[1];
+      point.z = uav_z + vec3d[2];
+
+      marker.points.push_back(point);
+
+      //}
+
+      marker.scale.x = 0.05;
+      marker.scale.y = 0.05;
+      marker.scale.z = 0.05;
+
+      marker.color.a = 0.5;
+      marker.color.r = 0.0;
+      marker.color.g = 1.0;
+      marker.color.b = 0.0;
+
+      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+      msg_out.markers.push_back(marker);
+    }
+
+    //}
+
+    /* body y disturbance //{ */
+    {
+
+      visualization_msgs::Marker marker;
+
+      marker.header.frame_id = uav_state.header.frame_id;
+      marker.header.stamp    = ros::Time::now();
+      marker.ns              = "control_manager";
+      marker.id              = id++;
+      marker.type            = visualization_msgs::Marker::ARROW;
+      marker.action          = visualization_msgs::Marker::ADD;
+
+      /* position //{ */
+
+      marker.pose.position.x = 0.0;
+      marker.pose.position.y = 0.0;
+      marker.pose.position.z = 0.0;
+
+      //}
+
+      /* orientation //{ */
+
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+
+      //}
+
+      /* origin //{ */
+
+      point.x = uav_x;
+      point.y = uav_y;
+      point.z = uav_z;
+
+      marker.points.push_back(point);
+
+      //}
+
+      /* tip //{ */
+
+      vec3d << 0, multiplier * last_attitude_cmd->disturbance_by_b, 0;
+      vec3d = quat_eigen * vec3d;
+
+      point.x = uav_x + vec3d[0];
+      point.y = uav_y + vec3d[1];
+      point.z = uav_z + vec3d[2];
+
+      marker.points.push_back(point);
+
+      //}
+
+      marker.scale.x = 0.05;
+      marker.scale.y = 0.05;
+      marker.scale.z = 0.05;
+
+      marker.color.a = 0.5;
+      marker.color.r = 0.0;
+      marker.color.g = 1.0;
+      marker.color.b = 0.0;
+
+      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+
+      msg_out.markers.push_back(marker);
+    }
+
+    //}
+
+    try {
+      publisher_disturbances_markers_.publish(msg_out);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_disturbances_markers_.getTopic().c_str());
     }
   }
 }
@@ -2823,7 +2830,8 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
     {
       std::scoped_lock lock(mutex_uav_state_);
 
-      ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x_, uav_y_, uav_z_, uav_yaw_);
+      ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
+               uav_state.pose.position.z, uav_yaw_);
     }
   }
 }
@@ -2866,7 +2874,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x_, uav_y_, uav_z_, uav_yaw_);
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                 uav_state_.pose.position.z, uav_yaw_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -2910,10 +2919,6 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     uav_state_.header   = msg->header;
     uav_state_.pose     = msg->pose.pose;
     uav_state_.velocity = msg->twist.twist;
-
-    uav_x_ = msg->pose.pose.position.x;
-    uav_y_ = msg->pose.pose.position.y;
-    uav_z_ = msg->pose.pose.position.z;
 
     // calculate the euler angles
     tf::Quaternion uav_attitude;
@@ -2960,7 +2965,8 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_x_, uav_y_, uav_z_, uav_yaw_);
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                 uav_state_.pose.position.z, uav_yaw_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3000,10 +3006,6 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
     std::scoped_lock lock(mutex_uav_state_);
 
     uav_state_ = *msg;
-
-    uav_x_ = uav_state_.pose.position.x;
-    uav_y_ = uav_state_.pose.position.y;
-    uav_z_ = uav_state_.pose.position.z;
 
     // calculate the euler angles
     tf::Quaternion uav_quaternion;
@@ -3106,6 +3108,20 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
   if (!is_initialized_)
     return;
 
+  /* copy the member variables //{ */
+
+  int active_tracker_idx;
+  int active_controller_idx;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
+
+    active_tracker_idx    = active_tracker_idx_;
+    active_controller_idx = active_controller_idx_;
+  }
+
+  //}
+
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackJoystick");
 
   std::scoped_lock lock(mutex_joystick_);
@@ -3116,7 +3132,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
 
   // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
   if ((msg->buttons[_channel_A_] == 1 || msg->buttons[_channel_B_] == 1 || msg->buttons[_channel_X_] == 1 || msg->buttons[_channel_Y_] == 1) &&
-      active_tracker_idx_ == _joystick_tracker_idx_ && active_controller_idx_ == _joystick_controller_idx_) {
+      active_tracker_idx == _joystick_tracker_idx_ && active_controller_idx == _joystick_controller_idx_) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
@@ -3498,11 +3514,11 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
         // super important, switch which the active tracker idx
         try {
 
-          ROS_INFO("[ControlManager]: deactivating %s", tracker_names_[active_tracker_idx].c_str());
-          tracker_list_[active_tracker_idx]->deactivate();
+          ROS_INFO("[ControlManager]: deactivating %s", tracker_names_[active_tracker_idx_].c_str());
+          tracker_list_[active_tracker_idx_]->deactivate();
 
           // if switching from null tracker, activate the active the controller
-          if (tracker_names_[active_tracker_idx].compare(_null_tracker_name_) == 0) {
+          if (tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
 
             ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", controller_names_[active_controller_idx_].c_str());
             {
@@ -3679,11 +3695,11 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         // super important, switch which the active controller idx
         try {
 
-          controller_list_[active_controller_idx]->deactivate();
+          controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = new_controller_idx;
         }
         catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names_[active_controller_idx].c_str());
+          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names_[active_controller_idx_].c_str());
         }
       }
     }
@@ -6168,7 +6184,7 @@ bool ControlManager::ehover(std::string &message_out) {
     try {
 
       // check if the tracker is not active
-      if (_ehover_tracker_idx_ == active_tracker_idx) {
+      if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
         sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
@@ -6190,16 +6206,14 @@ bool ControlManager::ehover(std::string &message_out) {
         // super important, switch the active tracker idx
         try {
 
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          tracker_list_[active_tracker_idx]->deactivate();
+          tracker_list_[active_tracker_idx_]->deactivate();
           active_tracker_idx_ = _ehover_tracker_idx_;
 
           success = true;
         }
         catch (std::runtime_error &exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx].c_str());
+          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6226,7 +6240,7 @@ bool ControlManager::ehover(std::string &message_out) {
       ROS_INFO("[ControlManager]: Activating controller %s", controller_names_[_eland_controller_idx_].c_str());
 
       // check if the controller is not active
-      if (_eland_controller_idx_ == active_controller_idx) {
+      if (_eland_controller_idx_ == active_controller_idx_) {
 
         sprintf((char *)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
@@ -6247,7 +6261,7 @@ bool ControlManager::ehover(std::string &message_out) {
         try {
 
           // deactivate the old controller
-          controller_list_[active_controller_idx]->deactivate();
+          controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = _eland_controller_idx_;  // super important
 
           success = true;
@@ -6321,7 +6335,7 @@ bool ControlManager::eland(std::string &message_out) {
     try {
 
       // check if the tracker is not active
-      if (_ehover_tracker_idx_ == active_tracker_idx) {
+      if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
         sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
@@ -6343,14 +6357,14 @@ bool ControlManager::eland(std::string &message_out) {
         // super important, switch the active tracker idx
         try {
 
-          tracker_list_[active_tracker_idx]->deactivate();
+          tracker_list_[active_tracker_idx_]->deactivate();
           active_tracker_idx_ = _ehover_tracker_idx_;
 
           success = true;
         }
         catch (std::runtime_error &exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx].c_str());
+          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6377,7 +6391,7 @@ bool ControlManager::eland(std::string &message_out) {
       ROS_INFO("[ControlManager]: Activating controller %s", controller_names_[_eland_controller_idx_].c_str());
 
       // check if the controller is not active
-      if (_eland_controller_idx_ == active_controller_idx) {
+      if (_eland_controller_idx_ == active_controller_idx_) {
 
         sprintf((char *)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
@@ -6397,14 +6411,14 @@ bool ControlManager::eland(std::string &message_out) {
 
         try {
 
-          controller_list_[active_controller_idx]->deactivate();
+          controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = _eland_controller_idx_;  // super important
 
           success = true;
         }
         catch (std::runtime_error &exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", controller_names_[active_controller_idx].c_str());
+          sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", controller_names_[active_controller_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6495,7 +6509,7 @@ bool ControlManager::partialLanding(std::string &message_out) {
     try {
 
       // check if the tracker is not active
-      if (_ehover_tracker_idx_ == active_tracker_idx) {
+      if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
         sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
@@ -6517,14 +6531,14 @@ bool ControlManager::partialLanding(std::string &message_out) {
         // super important, switch the active tracker idx
         try {
 
-          tracker_list_[active_tracker_idx]->deactivate();
+          tracker_list_[active_tracker_idx_]->deactivate();
           active_tracker_idx_ = _ehover_tracker_idx_;
 
           success = true;
         }
         catch (std::runtime_error &exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx].c_str());
+          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6634,11 +6648,11 @@ bool ControlManager::failsafe() {
         // super important, switch the active controller idx
         try {
 
-          controller_list_[active_controller_idx]->deactivate();
+          controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = _failsafe_controller_idx_;
         }
         catch (std::runtime_error &exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names_[active_tracker_idx].c_str());
+          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", controller_names_[active_controller_idx_].c_str());
         }
       }
       catch (std::runtime_error &exrun) {
