@@ -82,6 +82,8 @@
 #include <mrs_msgs/Vec1Request.h>
 #include <mrs_msgs/Vec1Response.h>
 
+#include <mrs_msgs/TrackerTrajectory.h>
+
 //}
 
 /* defines //{ */
@@ -218,6 +220,7 @@ private:
   std::string landoff_tracker_name_;
 
   bool        joystick_enabled_ = false;
+  int         joystick_mode_;
   std::string joystick_tracker_name_;
   std::string joystick_controller_name_;
   std::string joystick_fallback_tracker_name_;
@@ -279,7 +282,7 @@ private:
   bool transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped &ref);
   bool transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped &ref);
 
-  mrs_uav_manager::Transformer_t          transformer;
+  mrs_uav_manager::CommonHandlers_t       common_handlers;
   std::map<std::string, TransformCache_t> transformer_cache;
 
   int active_tracker_idx                      = 0;
@@ -323,6 +326,7 @@ private:
   ros::Publisher publisher_safety_area_markers;
   ros::Publisher publisher_disturbances_markers;
   ros::Publisher publisher_bumper_status;
+  ros::Publisher publisher_mpc_trajectory;
 
   ros::ServiceServer service_server_switch_tracker;
   ros::ServiceServer service_server_switch_controller;
@@ -434,13 +438,12 @@ private:
   std::mutex mutex_control_error;
 
 private:
-  mrs_lib::SafetyZone *         safety_zone;
-  mrs_uav_manager::SafetyArea_t safety_area;
-  bool                          use_safety_area_ = false;
-  std::string                   safety_area_frame_;
-  double                        min_height;
-  bool                          obstacle_points_enabled_   = false;
-  bool                          obstacle_polygons_enabled_ = false;
+  mrs_lib::SafetyZone *safety_zone;
+  bool                 use_safety_area_ = false;
+  std::string          safety_area_frame_;
+  double               min_height;
+  bool                 obstacle_points_enabled_   = false;
+  bool                 obstacle_polygons_enabled_ = false;
 
   bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
   bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
@@ -567,8 +570,8 @@ private:
   void            callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg);
   bool            got_bumper = false;
 
-  mrs_msgs::ObstacleSectors bumper_data;
-  std::mutex                mutex_bumper;
+  mrs_msgs::ObstacleSectors bumper_data_;
+  std::mutex                mutex_bumper_data_;
 
   bool bumper_enabled_           = false;
   bool bumper_hugging_enabled_   = false;
@@ -587,9 +590,6 @@ private:
   bool bumperValidatePoint(mrs_msgs::ReferenceStamped &point);
   int  bumperGetSectorId(const double x, const double y, const double z);
   bool bumperPushFromObstacle(void);
-
-  Eigen::Vector3d local2fcu(const Eigen::Vector3d in);
-  Eigen::Vector3d fcu2local(const Eigen::Vector3d in);
 
 private:
   bool        rc_eland_enabled_ = false;
@@ -617,6 +617,8 @@ private:
   void       joystickTimer(const ros::TimerEvent &event);
   double     joystick_timer_rate_;
 
+  double joystick_carrot_distance_;
+
   ros::Time joystick_tracker_press_time;
   bool      joytracker_start_pressed = false;
 
@@ -624,19 +626,20 @@ private:
   bool      joystick_back_pressed = false;
   bool      joystick_goto_enabled = false;
 
-  bool   rc_goto_enabled_              = false;
-  bool   rc_goto_active_               = false;
-  int    rc_joystic_channel_last_value = 0;
-  int    rc_joystic_channel_;
-  int    rc_joystic_n_switches_;
-  double rc_joystic_carrot_distance_;
-  int    rc_joystic_timeout_;
-
   bool      joystick_failsafe_pressed = false;
   ros::Time joystick_failsafe_press_time;
 
   bool      joystick_eland_pressed = false;
   ros::Time joystick_eland_press_time;
+
+  bool   rc_goto_enabled_               = false;
+  bool   rc_goto_active_                = false;
+  int    rc_joystick_channel_last_value = 0;
+  int    rc_joystick_channel_;
+  int    rc_joystick_n_switches_;
+  double rc_joystick_carrot_distance_;
+  int    rc_joystick_timeout_;
+
 
 private:
   LandingStates_t current_state_landing  = IDLE_STATE;
@@ -760,6 +763,8 @@ void ControlManager::onInit() {
   tilt_error_threshold_ = (tilt_error_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("joystick/enabled", joystick_enabled_);
+  param_loader.load_param("joystick/mode", joystick_mode_);
+  param_loader.load_param("joystick/carrot_distance", joystick_carrot_distance_);
   param_loader.load_param("joystick/joystick_timer_rate", joystick_timer_rate_);
   param_loader.load_param("joystick/tracker", joystick_tracker_name_);
   param_loader.load_param("joystick/controller", joystick_controller_name_);
@@ -817,10 +822,10 @@ void ControlManager::onInit() {
   }
 
   param_loader.load_param("rc_joystick/enabled", rc_goto_enabled_);
-  param_loader.load_param("rc_joystick/channel_number", rc_joystic_channel_);
-  param_loader.load_param("rc_joystick/timeout", rc_joystic_timeout_);
-  param_loader.load_param("rc_joystick/n_switches", rc_joystic_n_switches_);
-  param_loader.load_param("rc_joystick/carrot_distance", rc_joystic_carrot_distance_);
+  param_loader.load_param("rc_joystick/channel_number", rc_joystick_channel_);
+  param_loader.load_param("rc_joystick/timeout", rc_joystick_timeout_);
+  param_loader.load_param("rc_joystick/n_switches", rc_joystick_n_switches_);
+  param_loader.load_param("rc_joystick/carrot_distance", rc_joystick_carrot_distance_);
 
   param_loader.load_param("rc_joystick/channels/pitch", rc_channel_pitch_);
   param_loader.load_param("rc_joystick/channels/roll", rc_channel_roll_);
@@ -899,7 +904,7 @@ void ControlManager::onInit() {
 
     try {
       ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, it->second.address.c_str());
-      tracker_list[i]->initialize(nh_, uav_name_, &safety_area, &transformer);
+      tracker_list[i]->initialize(nh_, uav_name_, &common_handlers);
     }
     catch (std::runtime_error &ex) {
       ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
@@ -1121,18 +1126,18 @@ void ControlManager::onInit() {
     }
 
     // check if the controller for joystick control exists
-    bool joystic_controller_check = false;
+    bool joystick_controller_check = false;
     for (unsigned long i = 0; i < controller_names.size(); i++) {
 
       std::string controller_name = controller_names[i];
 
       if (controller_name.compare(joystick_controller_name_) == 0) {
-        joystic_controller_check = true;
-        joystick_controller_idx  = i;
+        joystick_controller_check = true;
+        joystick_controller_idx   = i;
         break;
       }
     }
-    if (!joystic_controller_check) {
+    if (!joystick_controller_check) {
       ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", joystick_controller_name_.c_str());
       ros::shutdown();
     }
@@ -1155,18 +1160,18 @@ void ControlManager::onInit() {
     }
 
     // check if the fallback controller for joystick control exists
-    bool joystic_fallback_controller_check = false;
+    bool joystick_fallback_controller_check = false;
     for (unsigned long i = 0; i < controller_names.size(); i++) {
 
       std::string controller_name = controller_names[i];
 
       if (controller_name.compare(joystick_fallback_controller_name_) == 0) {
-        joystic_fallback_controller_check = true;
-        joystick_fallback_controller_idx  = i;
+        joystick_fallback_controller_check = true;
+        joystick_fallback_controller_idx   = i;
         break;
       }
     }
-    if (!joystic_fallback_controller_check) {
+    if (!joystick_fallback_controller_check) {
       ROS_ERROR("[ControlManager]: the joystick fallback controller (%s) is not within the loaded controllers", joystick_fallback_controller_name_.c_str());
       ros::shutdown();
     }
@@ -1249,11 +1254,14 @@ void ControlManager::onInit() {
     }
   }
 
-  safety_area.use_safety_area       = use_safety_area_;
-  safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
-  safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
-  safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+  common_handlers.safety_area.use_safety_area       = use_safety_area_;
+  common_handlers.safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
+  common_handlers.safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
+  common_handlers.safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
+  common_handlers.safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+
+  common_handlers.bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
+  common_handlers.bumper.enabled             = bumper_enabled_;
 
   // --------------------------------------------------------------
   // |                          profiler                          |
@@ -1279,6 +1287,7 @@ void ControlManager::onInit() {
   publisher_safety_area_markers  = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
   publisher_disturbances_markers = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status        = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
+  publisher_mpc_trajectory       = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1349,13 +1358,13 @@ void ControlManager::onInit() {
   tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(tf_buffer, "ControlManager");
 
   // bind routines for the shared transformer
-  transformer.transformReference       = boost::bind(&ControlManager::transformReference, this, _1, _2);
-  transformer.transformReferenceSingle = boost::bind(&ControlManager::transformReferenceSingle, this, _1, _2);
-  transformer.transformPose            = boost::bind(&ControlManager::transformPose, this, _1, _2);
-  transformer.transformPoseSingle      = boost::bind(&ControlManager::transformPoseSingle, this, _1, _2);
-  transformer.transformVector3         = boost::bind(&ControlManager::transformVector3, this, _1, _2);
-  transformer.transformVector3Single   = boost::bind(&ControlManager::transformVector3Single, this, _1, _2);
-  transformer.getTransform             = boost::bind(&ControlManager::getTransform, this, _1, _2, _3, _4);
+  common_handlers.transformer.transformReference       = boost::bind(&ControlManager::transformReference, this, _1, _2);
+  common_handlers.transformer.transformReferenceSingle = boost::bind(&ControlManager::transformReferenceSingle, this, _1, _2);
+  common_handlers.transformer.transformPose            = boost::bind(&ControlManager::transformPose, this, _1, _2);
+  common_handlers.transformer.transformPoseSingle      = boost::bind(&ControlManager::transformPoseSingle, this, _1, _2);
+  common_handlers.transformer.transformVector3         = boost::bind(&ControlManager::transformVector3, this, _1, _2);
+  common_handlers.transformer.transformVector3Single   = boost::bind(&ControlManager::transformVector3Single, this, _1, _2);
+  common_handlers.transformer.getTransform             = boost::bind(&ControlManager::getTransform, this, _1, _2, _3, _4);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -2288,7 +2297,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
     std::scoped_lock lock(mutex_pixhawk_odometry);
 
     mrs_msgs::UavState pixhawk_odom_uav_state;
-    // TODO add child frame ID.. which one?
+
     pixhawk_odom_uav_state.header   = pixhawk_odometry.header;
     pixhawk_odom_uav_state.pose     = pixhawk_odometry.pose.pose;
     pixhawk_odom_uav_state.velocity = pixhawk_odometry.twist.twist;
@@ -2411,16 +2420,52 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     if (fabs(joystick_data.axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data.axes[_channel_roll_]) >= 0.05 ||
         fabs(joystick_data.axes[_channel_yaw_]) >= 0.05 || fabs(joystick_data.axes[_channel_thrust_]) >= 0.05) {
 
-      double speed = 1.0;
+      if (joystick_mode_ == 0) {
 
-      request.goal[REF_X]   = _channel_mult_pitch_ * joystick_data.axes[_channel_pitch_] * speed;
-      request.goal[REF_Y]   = _channel_mult_roll_ * joystick_data.axes[_channel_roll_] * speed;
-      request.goal[REF_Z]   = _channel_mult_thrust_ * joystick_data.axes[_channel_thrust_];
-      request.goal[REF_YAW] = _channel_mult_yaw_ * joystick_data.axes[_channel_yaw_];
+        request.goal[REF_X]   = _channel_mult_pitch_ * joystick_data.axes[_channel_pitch_] * joystick_carrot_distance_;
+        request.goal[REF_Y]   = _channel_mult_roll_ * joystick_data.axes[_channel_roll_] * joystick_carrot_distance_;
+        request.goal[REF_Z]   = _channel_mult_thrust_ * joystick_data.axes[_channel_thrust_];
+        request.goal[REF_YAW] = _channel_mult_yaw_ * joystick_data.axes[_channel_yaw_];
 
-      mrs_msgs::Vec4::Response response;
+        mrs_msgs::Vec4::Response response;
 
-      callbackGoToFcuService(request, response);
+        callbackGoToFcuService(request, response);
+
+      } else if (joystick_mode_ == 1) {
+
+        mrs_msgs::TrackerTrajectory trajectory;
+
+        trajectory.fly_now         = true;
+        trajectory.header.frame_id = "fcu_untilted";
+        trajectory.use_yaw         = true;
+
+        mrs_msgs::TrackerPoint point;
+        point.x   = 0;
+        point.y   = 0;
+        point.z   = 0;
+        point.yaw = 0;
+
+        trajectory.points.push_back(point);
+
+        double speed = 1.0;
+
+        for (int i = 0; i < 50; i++) {
+
+          point.x += _channel_mult_pitch_ * joystick_data.axes[_channel_pitch_] * (speed * 0.2);
+          point.y += _channel_mult_roll_ * joystick_data.axes[_channel_roll_] * (speed * 0.2);
+          point.z += _channel_mult_thrust_ * joystick_data.axes[_channel_thrust_] * (speed * 0.2);
+          point.yaw = _channel_mult_yaw_ * joystick_data.axes[_channel_yaw_];
+
+          trajectory.points.push_back(point);
+        }
+
+        try {
+          publisher_mpc_trajectory.publish(trajectory);
+        }
+        catch (...) {
+          ROS_ERROR("Exception caught during publishing topic %s.", publisher_mpc_trajectory.getTopic().c_str());
+        }
+      }
     }
   }
 
@@ -2447,17 +2492,17 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     } else {
 
       if (abs(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
+        des_y         = (-(rc_channels.channels[rc_channel_roll_] - PWM_MIDDLE) / 500.0) * rc_joystick_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
+        des_z         = ((rc_channels.channels[rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * rc_joystick_carrot_distance_;
         nothing_to_do = false;
       }
 
       if (abs(rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * rc_joystic_carrot_distance_;
+        des_x         = ((rc_channels.channels[rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * rc_joystick_carrot_distance_;
         nothing_to_do = false;
       }
 
@@ -2524,14 +2569,14 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
     // prune the list of rc_channel_switches
     std::list<ros::Time>::iterator it;
     for (it = rc_channel_switch_time.begin(); it != rc_channel_switch_time.end();) {
-      if ((ros::Time::now() - *it).toSec() > rc_joystic_timeout_) {
+      if ((ros::Time::now() - *it).toSec() > rc_joystick_timeout_) {
         it = rc_channel_switch_time.erase(it);
       } else {
         it++;
       }
     }
 
-    if (int(rc_channel_switch_time.size()) >= rc_joystic_n_switches_) {
+    if (int(rc_channel_switch_time.size()) >= rc_joystick_n_switches_) {
 
       if (rc_goto_active_ == false) {
 
@@ -2603,6 +2648,14 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
 
   if (!got_uav_state) {
     return;
+  }
+
+  mrs_msgs::ObstacleSectors bumper_data;
+
+  {
+    std::scoped_lock lock(mutex_bumper_data_);
+
+    bumper_data = bumper_data_;
   }
 
   if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
@@ -2744,18 +2797,12 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
   mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometry");
 
-  /* // TODO remove? */
-  /* if (!got_max_height) { */
-  /*   ROS_WARN_THROTTLE(1.0, "[ControlerManager]: waiting for max allowed height from odometry"); */
-  /*   return; */
-  /* } */
-
   /* Odometry frame switch //{ */
 
   // | -- prepare an OdometryConstPtr for trackers & controllers -- |
 
   mrs_msgs::UavState uav_state_odom;
-  // TODO child frame id?
+
   uav_state_odom.header   = msg->header;
   uav_state_odom.pose     = msg->pose.pose;
   uav_state_odom.velocity = msg->twist.twist;
@@ -3135,11 +3182,11 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg
 
   ROS_INFO_ONCE("[ControlManager]: getting bumper data");
 
-  std::scoped_lock lock(mutex_bumper);
+  std::scoped_lock lock(mutex_bumper_data_);
 
   got_bumper = true;
 
-  bumper_data = *msg;
+  bumper_data_ = *msg;
 }
 
 //}
@@ -3221,15 +3268,15 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   // when the switch change its position
   if (rc_goto_enabled_) {
 
-    if (uint(rc_joystic_channel_) >= msg->channels.size()) {
+    if (uint(rc_joystick_channel_) >= msg->channels.size()) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", uint(rc_joystic_channel_),
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", uint(rc_joystick_channel_),
                          uint(msg->channels.size()));
 
     } else {
 
-      if ((rc_joystic_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] > PWM_MIDDLE) ||
-          (rc_joystic_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystic_channel_] < PWM_MIDDLE)) {
+      if ((rc_joystick_channel_last_value < PWM_MIDDLE && rc_channels.channels[rc_joystick_channel_] > PWM_MIDDLE) ||
+          (rc_joystick_channel_last_value > PWM_MIDDLE && rc_channels.channels[rc_joystick_channel_] < PWM_MIDDLE)) {
 
         // enter an event to the std vector
         std::scoped_lock lock(mutex_rc_channel_switch_time);
@@ -3240,7 +3287,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
   }
 
   // do not forget to update the last... variable
-  rc_joystic_channel_last_value = rc_channels.channels[rc_joystic_channel_];
+  rc_joystick_channel_last_value = rc_channels.channels[rc_joystick_channel_];
 
   // | ------------------------ rc eland ------------------------ |
   if (rc_eland_enabled_) {
@@ -3526,7 +3573,6 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
-        // TODO is this the right place?
         ROS_INFO("[ControlManager]: triggering hover after switching to a new controller, re-activating %s.", tracker_names[active_tracker_idx].c_str());
 
         // reactivate the current tracker
@@ -4716,52 +4762,6 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
 // |                          routines                          |
 // --------------------------------------------------------------
 
-/* local2fcu() //{ */
-
-Eigen::Vector3d ControlManager::local2fcu(const Eigen::Vector3d in) {
-
-  // get uav rotational transform
-  tf::Quaternion quaternion_odometry;
-  {
-    std::scoped_lock lock(mutex_uav_state);
-
-    quaternionMsgToTF(uav_state.pose.orientation, quaternion_odometry);
-  }
-
-  // rotate the point to world and add the UAV position
-  // TODO we should do this using tfs
-  tf::Vector3 out = tf::Transform(quaternion_odometry) * tf::Vector3(in[0], in[1], in[2]);
-  out += tf::Vector3(uav_x, uav_y, uav_z);
-
-  return Eigen::Vector3d(out[0], out[1], out[2]);
-}
-
-//}
-
-/* fcu2local() //{ */
-
-Eigen::Vector3d ControlManager::fcu2local(const Eigen::Vector3d in) {
-
-  // get uav rotational transform
-  tf::Quaternion uav_attitude;
-  {
-    std::scoped_lock lock(mutex_uav_state);
-
-    quaternionMsgToTF(uav_state.pose.orientation, uav_attitude);
-  }
-
-  uav_attitude = uav_attitude.inverse();
-
-  // rotate the point to world and add the UAV position
-  // TODO we should do this using tfs
-  tf::Vector3 out = tf::Vector3(in[0], in[1], in[2]) - tf::Vector3(uav_x, uav_y, uav_z);
-  out             = tf::Transform(uav_attitude) * out;
-
-  return Eigen::Vector3d(out[0], out[1], out[2]);
-}
-
-//}
-
 /* isOffboard() //{ */
 
 bool ControlManager::isOffboard(void) {
@@ -5300,7 +5300,8 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
     return true;
   }
   catch (tf2::TransformException &ex) {
-    /* ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(), */
+    /* ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(),
+     * to_frame_resolved.c_str(), */
     /*           ex.what()); */
   }
 
@@ -5337,22 +5338,26 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
     return true;
   }
 
+  mrs_msgs::ObstacleSectors bumper_data;
+
+  {
+    std::scoped_lock lock(mutex_bumper_data_);
+
+    bumper_data = bumper_data_;
+  }
+
   if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
     return true;
   }
 
   mrs_msgs::ReferenceStamped point_fcu = point;
 
-  ROS_INFO("[ControlManager]: 1");
-
   if (!transformReferenceSingle("fcu_untilted", point_fcu)) {
 
-    ROS_ERROR("[ControlManager]: Bumper: cannot transform reference to fcu frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
     return false;
   }
-
-  ROS_INFO("[ControlManager]: 2");
 
   double fcu_x = point_fcu.reference.position.x;
   double fcu_y = point_fcu.reference.position.y;
@@ -5366,13 +5371,12 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
   double horizontal_point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
   double vertical_point_distance   = fabs(fcu_z);
 
-  ROS_INFO("[ControlManager]: 3");
-
   // check whether we measure in that direction
   if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, we do not measure in that direction", fcu_x,
-             fcu_y, fcu_z, horizontal_vector_idx);
+    ROS_WARN_THROTTLE(1.0,
+                      "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, we do not measure in that direction",
+                      fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
     return false;
   }
 
@@ -5388,14 +5392,13 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
     return true;
   }
 
-  ROS_INFO("[ControlManager]: 4");
-
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
   if (horizontal_point_distance > 0.1 &&
       (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance_)) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, obstacle is too close (horizontally)", fcu_x,
-             fcu_y, fcu_z, horizontal_vector_idx);
+    ROS_WARN_THROTTLE(1.0,
+                      "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, obstacle is too close (horizontally)",
+                      fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
@@ -5403,7 +5406,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     return false;
@@ -5413,7 +5416,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
   if (vertical_point_distance > 0.1 &&
       (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance_)) {
 
-    ROS_WARN("[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f is not valid, obstacle is too close (vertically)", fcu_x, fcu_y, fcu_z);
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f is not valid, obstacle is too close (vertically)", fcu_x,
+                      fcu_y, fcu_z);
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
@@ -5421,7 +5425,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     return false;
@@ -5444,7 +5448,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
       new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
       new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance_);
 
-      ROS_WARN(
+      ROS_WARN_THROTTLE(
+          1.0,
           "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f (sector %d) is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it "
           "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance_, new_x,
@@ -5459,7 +5464,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
         publisher_bumper_status.publish(bumper_status);
       }
       catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
       }
     }
 
@@ -5467,8 +5472,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
 
       new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance_);
 
-      ROS_WARN("[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f", fcu_z,
-               vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
+                        fcu_z, vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance_, new_z);
 
       point_fcu.reference.position.z = new_z;
 
@@ -5478,14 +5483,14 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
         publisher_bumper_status.publish(bumper_status);
       }
       catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
       }
     }
 
     // express the point back in the original FRAME
     if (!transformReferenceSingle(point.header.frame_id, point_fcu)) {
 
-      ROS_ERROR("[ControlManager]: Bumper: cannot transform reference back to original frame");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
 
       return false;
     }
@@ -5518,7 +5523,13 @@ bool ControlManager::bumperPushFromObstacle(void) {
     return true;
   }
 
-  std::scoped_lock lock(mutex_bumper);
+  mrs_msgs::ObstacleSectors bumper_data;
+
+  {
+    std::scoped_lock lock(mutex_bumper_data_);
+
+    bumper_data = bumper_data_;
+  }
 
   double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
@@ -5647,7 +5658,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       publisher_bumper_status.publish(bumper_status);
     }
     catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Exception caught during publishing topic %s.", publisher_bumper_status.getTopic().c_str());
     }
 
     repulsing = true;
@@ -5733,6 +5744,14 @@ bool ControlManager::bumperPushFromObstacle(void) {
 /* bumperGetSectorId() //{ */
 
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
+
+  mrs_msgs::ObstacleSectors bumper_data;
+
+  {
+    std::scoped_lock lock(mutex_bumper_data_);
+
+    bumper_data = bumper_data_;
+  }
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);

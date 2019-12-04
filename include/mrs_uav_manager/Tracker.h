@@ -47,10 +47,25 @@
 namespace mrs_uav_manager
 {
 
+/* safety area handler //{ */
+
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea3d_t;
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea2d_t;
 typedef boost::function<double(void)>                                 getMaxHeight_t;
 typedef boost::function<double(void)>                                 getMinHeight_t;
+
+struct SafetyArea_t
+{
+  mrs_uav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
+  mrs_uav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
+  mrs_uav_manager::getMaxHeight_t          getMaxHeight;
+  mrs_uav_manager::getMinHeight_t          getMinHeight;
+  bool                                     use_safety_area;
+};
+
+//}
+
+/* tf transformer handler //{ */
 
 typedef boost::function<bool(const std::string to_frame, mrs_msgs::ReferenceStamped &ref)>                transformReferenceSingle_t;
 typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref)> transformReference_t;
@@ -64,15 +79,6 @@ typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, geometry
 typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf)>
     getTransform_t;
 
-struct SafetyArea_t
-{
-  mrs_uav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
-  mrs_uav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
-  mrs_uav_manager::getMaxHeight_t          getMaxHeight;
-  mrs_uav_manager::getMinHeight_t          getMinHeight;
-  bool                                     use_safety_area;
-};
-
 struct Transformer_t
 {
   mrs_uav_manager::transformReference_t       transformReference;
@@ -84,17 +90,37 @@ struct Transformer_t
   mrs_uav_manager::getTransform_t             getTransform;
 };
 
+//}
+
+/* obstacle bumper handler //{ */
+
+typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidatePoint_t;
+
+struct Bumper_t
+{
+  bool                                   enabled;
+  mrs_uav_manager::bumperValidatePoint_t bumperValidatePoint;
+};
+
+//}
+
+struct CommonHandlers_t
+{
+  SafetyArea_t  safety_area;
+  Transformer_t transformer;
+  Bumper_t      bumper;
+};
+
 class Tracker {
 
 public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, mrs_uav_manager::SafetyArea_t const *safety_area,
-                          mrs_uav_manager::Transformer_t const *transformer) = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)      = 0;
-  virtual void deactivate(void)                                              = 0;
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, mrs_uav_manager::CommonHandlers_t const *common_handlers) = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                                                           = 0;
+  virtual void deactivate(void)                                                                                                                   = 0;
+  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg)                                                                      = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg, const mrs_msgs::AttitudeCommand::ConstPtr &cmd) = 0;
   virtual const mrs_msgs::TrackerStatus             getStatus()                                                                                     = 0;
