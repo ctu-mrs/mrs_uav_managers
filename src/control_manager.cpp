@@ -2385,14 +2385,12 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   /* copy the member variables //{ */
 
   mavros_msgs::RCIn rc_channels;
-  double            uav_yaw;
 
   {
 
-    std::scoped_lock lock(mutex_rc_channels_, mutex_uav_state_);
+    std::scoped_lock lock(mutex_rc_channels_);
 
     rc_channels = rc_channels_;
-    uav_yaw     = uav_yaw_;
   }
 
   //}
@@ -2563,12 +2561,6 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       request.goal[REF_Z]   = des_z;
       request.goal[REF_YAW] = des_yaw;
 
-      Eigen::Vector2d des(request.goal[REF_X], request.goal[REF_Y]);
-      des = rotateVector(des, uav_yaw);
-
-      request.goal[REF_X] = des[0];
-      request.goal[REF_Y] = des[1];
-
       mrs_msgs::Vec4Response response;
 
       // disable callbacks of all trackers
@@ -2585,7 +2577,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
       callbacks_enabled_ = true;
 
       // call the goto
-      callbackGoToRelativeService(request, response);
+      callbackGoToFcuService(request, response);
 
       callbacks_enabled_ = false;
 
@@ -3677,7 +3669,8 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
         ROS_INFO("[ControlManager]: triggering hover after switching to a new controller, re-activating %s.", tracker_names_[active_tracker_idx_].c_str());
 
         // reactivate the current tracker
-        // TODO this is not the most elegant way
+        // TODO this is not the most elegant way to handle the tracker after a controller switch
+        // but it serves the purpose
         {
           std::scoped_lock lock(mutex_tracker_list_);
 
@@ -4634,7 +4627,6 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
     res.success = false;
     return true;
   }
-
 
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
@@ -5796,13 +5788,13 @@ bool ControlManager::bumperPushFromObstacle(void) {
   /* copy the member variables //{ */
 
   mrs_msgs::ObstacleSectors bumper_data;
-  double                    uav_yaw;
+  mrs_msgs::UavState        uav_state;
 
   {
     std::scoped_lock lock(mutex_bumper_data_, mutex_uav_state_);
 
     bumper_data = bumper_data_;
-    uav_yaw     = uav_yaw_;
+    uav_state   = uav_state_;
   }
 
   //}
@@ -5907,13 +5899,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) / 2.0;
 
-      /* // should we repulse up or down? */
-      /* if (bumper_data.sectors[bumper_data.n_horizontal_sectors] < bumper_data.sectors[bumper_data.n_horizontal_sectors+1]) { */
-      /*   vertical_repulsion_distance = _bumper_repulsion_vertical_offset_; */
-      /* } else { */
-      /*   vertical_repulsion_distance = -_bumper_repulsion_vertical_offset_; */
-      /* } */
-
       if (fabs(bumper_data.sectors[bumper_data.n_horizontal_sectors] - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
           2 * _bumper_repulsion_vertical_offset_) {
 
@@ -5945,26 +5930,34 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
-    Eigen::Vector2d des = Eigen::Vector2d(cos(direction) * repulsion_distance, sin(direction) * repulsion_distance);
+    // create the reference in the fcu_untilted frame
+    mrs_msgs::ReferenceStamped reference_fcu_untilted;
 
-    mrs_msgs::ReferenceSrvRequest req_goto_out;
-
-    // rotate it from the frame of the drone
-    des = rotateVector(des, uav_yaw);
-
-    if (horizontal_collision_detected) {
-      req_goto_out.reference.position.x = des[0];
-      req_goto_out.reference.position.y = des[1];
-    }
-
+    reference_fcu_untilted.header.frame_id      = "fcu_untilted";
+    reference_fcu_untilted.reference.position.x = cos(direction) * repulsion_distance;
+    reference_fcu_untilted.reference.position.y = sin(direction) * repulsion_distance;
+    reference_fcu_untilted.reference.yaw        = 0;
     if (vertical_collision_detected) {
-      req_goto_out.reference.position.z = vertical_repulsion_distance;
+      reference_fcu_untilted.reference.position.z = vertical_repulsion_distance;
+    } else {
+      reference_fcu_untilted.reference.position.z = 0;
     }
-
-    req_goto_out.reference.yaw = 0;
 
     {
       std::scoped_lock lock(mutex_tracker_list_);
+
+      // transform the reference into the currently used frame
+      // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
+      // to the tracker before we actually call the goto service
+      if (!transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
+
+        ROS_WARN("[ControlManager]: the reference could not be transformed.");
+        return false;
+      }
+
+      // copy the reference into the service type message
+      mrs_msgs::ReferenceSrvRequest req_goto_out;
+      req_goto_out.reference = reference_fcu_untilted.reference;
 
       // disable callbacks of all trackers
       req_enable_callbacks.data = false;
@@ -5977,8 +5970,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(new std_srvs::SetBoolRequest(req_enable_callbacks)));
 
       // call the goto
-      tracker_response =
-          tracker_list_[active_tracker_idx_]->goToRelative(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
+      tracker_response = tracker_list_[active_tracker_idx_]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(new mrs_msgs::ReferenceSrvRequest(req_goto_out)));
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
@@ -7214,18 +7206,6 @@ void ControlManager::publish(void) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_thrust_force_.getTopic().c_str());
     }
   }
-}
-
-//}
-
-// TODO get rid of this
-/* rotateVector() //{ */
-
-Eigen::Vector2d ControlManager::rotateVector(const Eigen::Vector2d vector_in, double angle) {
-
-  Eigen::Rotation2D<double> rot2(angle);
-
-  return rot2.toRotationMatrix() * vector_in;
 }
 
 //}
