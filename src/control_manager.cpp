@@ -246,9 +246,6 @@ private:
 
   ros::Subscriber    subscriber_pixhawk_odometry_;
   nav_msgs::Odometry pixhawk_odometry_;
-  double             pixhawk_uav_x_;
-  double             pixhawk_uav_y_;
-  double             pixhawk_odometry_z_;
   double             pixhawk_uav_yaw_;
   double             pixhawk_odometry_roll_;
   double             pixhawk_odometry_pitch_;
@@ -615,10 +612,10 @@ private:
 
   double _joystick_carrot_distance_;
 
-  ros::Time joystick_tracker_press_time_;
-  bool      joytracker_start_pressed_ = false;
+  ros::Time joystick_start_press_time_;
+  bool      joystick_start_pressed_ = false;
 
-  ros::Time joystick_goto_press_time_;
+  ros::Time joystick_back_press_time_;
   bool      joystick_back_pressed_ = false;
   bool      joystick_goto_enabled_ = false;
 
@@ -689,7 +686,7 @@ void ControlManager::onInit() {
 
   ros::Time::waitForValid();
 
-  joystick_tracker_press_time_    = ros::Time(0);
+  joystick_start_press_time_      = ros::Time(0);
   joystick_failsafe_press_time_   = ros::Time(0);
   joystick_eland_press_time_      = ros::Time(0);
   escalating_failsafe_time_       = ros::Time(0);
@@ -761,10 +758,10 @@ void ControlManager::onInit() {
   param_loader.load_param("joystick/mode", _joystick_mode_);
   param_loader.load_param("joystick/carrot_distance", _joystick_carrot_distance_);
   param_loader.load_param("joystick/joystick_timer_rate", _joystick_timer_rate_);
-  param_loader.load_param("joystick/tracker", _joystick_tracker_name_);
-  param_loader.load_param("joystick/controller", _joystick_controller_name_);
-  param_loader.load_param("joystick/fallback/tracker", _joystick_fallback_tracker_name_);
-  param_loader.load_param("joystick/fallback/controller", _joystick_fallback_controller_name_);
+  param_loader.load_param("joystick/attitude_control/tracker", _joystick_tracker_name_);
+  param_loader.load_param("joystick/attitude_control/controller", _joystick_controller_name_);
+  param_loader.load_param("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
+  param_loader.load_param("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
 
   param_loader.load_param("joystick/channels/A", _channel_A_);
   param_loader.load_param("joystick/channels/B", _channel_B_);
@@ -1882,100 +1879,97 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
   // | --------- calculate control errors and tilt angle -------- |
 
-  double tilt_angle;
+  // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
+  // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+    return;
+  }
+
   {
-    // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
-    // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
-    if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-      return;
+    std::scoped_lock lock(mutex_attitude_error_);
+
+    tilt_error_ = 0;
+    yaw_error_  = 0;
+  }
+
+  // control errors
+  {
+    std::scoped_lock lock(mutex_control_error_);
+
+    position_error_x_ = last_position_cmd->position.x - uav_state.pose.position.x;
+    position_error_y_ = last_position_cmd->position.y - uav_state.pose.position.y;
+    position_error_z_ = last_position_cmd->position.z - uav_state.pose.position.z;
+
+    velocity_error_x_ = last_position_cmd->velocity.x - uav_state.velocity.linear.x;
+    velocity_error_y_ = last_position_cmd->velocity.y - uav_state.velocity.linear.y;
+    velocity_error_z_ = last_position_cmd->velocity.z - uav_state.velocity.linear.z;
+  }
+
+  // tilt angle
+  tf::Quaternion odometry_quaternion;
+  quaternionMsgToTF(uav_state.pose.orientation, odometry_quaternion);
+
+  // rotate the drone's z axis
+  tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
+
+  // calculate the angle between the drone's z axis and the world's z axis
+  double tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
+
+  // | ------------ calculate the tilt and yaw error ------------ |
+
+  // | --------------------- the tilt error --------------------- |
+  tf::Quaternion attitude_cmd_quaternion;
+
+  // calculate the quaternion
+  if (last_attitude_cmd->quater_attitude_set) {
+
+    attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
+    attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
+    attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
+    attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+
+  } else if (last_attitude_cmd->euler_attitude_set) {
+
+    // convert the RPY to quaternion
+    attitude_cmd_quaternion =
+        tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
+  }
+
+  if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
+
+    // calculate the desired drone's z axis in the world frame
+    tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
+
+    // calculate the angle between the drone's z axis and the world's z axis
+    {
+      std::scoped_lock lock(mutex_attitude_error_);
+
+      tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
     }
+  }
+
+  // | ---------------------- the yaw error --------------------- |
+  if (last_attitude_cmd->euler_attitude_set) {
 
     {
       std::scoped_lock lock(mutex_attitude_error_);
 
-      tilt_error_ = 0;
-      yaw_error_  = 0;
+      yaw_error_ = last_attitude_cmd->euler_attitude.z - uav_yaw;
     }
 
-    // control errors
+  } else if (last_attitude_cmd->quater_attitude_set) {
+
+    // calculate the euler angles
+    tf::Quaternion quater_attitude_cmd;
+    quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+    tf::Matrix3x3 m(quater_attitude_cmd);
+    double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
+    m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
+
     {
-      std::scoped_lock lock(mutex_control_error_);
+      std::scoped_lock lock(mutex_attitude_error_);
 
-      position_error_x_ = last_position_cmd->position.x - uav_state.pose.position.x;
-      position_error_y_ = last_position_cmd->position.y - uav_state.pose.position.y;
-      position_error_z_ = last_position_cmd->position.z - uav_state.pose.position.z;
-
-      velocity_error_x_ = last_position_cmd->velocity.x - uav_state.velocity.linear.x;
-      velocity_error_y_ = last_position_cmd->velocity.y - uav_state.velocity.linear.y;
-      velocity_error_z_ = last_position_cmd->velocity.z - uav_state.velocity.linear.z;
-    }
-
-    // tilt angle
-    tf::Quaternion odometry_quaternion;
-    quaternionMsgToTF(uav_state.pose.orientation, odometry_quaternion);
-
-    // rotate the drone's z axis
-    tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
-
-    // calculate the angle between the drone's z axis and the world's z axis
-    tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
-
-    // | ------------ calculate the tilt and yaw error ------------ |
-
-    // | --------------------- the tilt error --------------------- |
-    tf::Quaternion attitude_cmd_quaternion;
-
-    // calculate the quaternion
-    if (last_attitude_cmd->quater_attitude_set) {
-
-      attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
-      attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
-      attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
-      attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
-
-    } else if (last_attitude_cmd->euler_attitude_set) {
-
-      // convert the RPY to quaternion
-      attitude_cmd_quaternion =
-          tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-    }
-
-    if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
-
-      // calculate the desired drone's z axis in the world frame
-      tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
-
-      // calculate the angle between the drone's z axis and the world's z axis
-      {
-        std::scoped_lock lock(mutex_attitude_error_);
-
-        tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
-      }
-    }
-
-    // | ---------------------- the yaw error --------------------- |
-    if (last_attitude_cmd->euler_attitude_set) {
-
-      {
-        std::scoped_lock lock(mutex_attitude_error_);
-
-        yaw_error_ = last_attitude_cmd->euler_attitude.z - uav_yaw;
-      }
-
-    } else if (last_attitude_cmd->quater_attitude_set) {
-
-      // calculate the euler angles
-      tf::Quaternion quater_attitude_cmd;
-      quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
-      tf::Matrix3x3 m(quater_attitude_cmd);
-      double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
-      m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
-
-      {
-        std::scoped_lock lock(mutex_attitude_error_);
-
-        yaw_error_ = angleDist(attitude_cmd_yaw, uav_yaw);
-      }
+      yaw_error_ = angleDist(attitude_cmd_yaw, uav_yaw);
     }
   }
 
@@ -2388,8 +2382,6 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
 
-  std::scoped_lock lock(mutex_joystick_);
-
   /* copy the member variables //{ */
 
   mavros_msgs::RCIn rc_channels;
@@ -2405,12 +2397,16 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
   //}
 
+  std::scoped_lock lock(mutex_joystick_);
+
   // if start was pressed and held for > 3.0 s
-  if (joytracker_start_pressed_ && (ros::Time::now() - joystick_tracker_press_time_).toSec() > 3.0) {
+  if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
+
+    joystick_start_press_time_ = ros::Time(0);
 
     ROS_INFO("[ControlManager]: transitioning to joystick control: activating %s and %s", _joystick_tracker_name_.c_str(), _joystick_controller_name_.c_str());
 
-    joytracker_start_pressed_ = false;
+    joystick_start_pressed_ = false;
 
     mrs_msgs::StringRequest controller_srv;
     controller_srv.value = _joystick_controller_name_;
@@ -2425,7 +2421,9 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   }
 
   // if RT+LT were pressed and held for > 0.1 s
-  if (joystick_failsafe_pressed_ && (ros::Time::now() - joystick_failsafe_press_time_).toSec() > 0.1) {
+  if (joystick_failsafe_pressed_ && joystick_failsafe_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_failsafe_press_time_).toSec() > 0.1) {
+
+    joystick_failsafe_press_time_ = ros::Time(0);
 
     ROS_INFO("[ControlManager]: activating failsafe by joystick");
 
@@ -2435,7 +2433,9 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   }
 
   // if joypads were pressed and held for > 0.1 s
-  if (joystick_eland_pressed_ && (ros::Time::now() - joystick_eland_press_time_).toSec() > 0.1) {
+  if (joystick_eland_pressed_ && joystick_eland_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_eland_press_time_).toSec() > 0.1) {
+
+    joystick_eland_press_time_ = ros::Time(0);
 
     ROS_INFO("[ControlManager]: activating eland by joystick");
 
@@ -2446,10 +2446,14 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
   }
 
   // if back was pressed and held for > 0.1 s
-  if (joystick_back_pressed_ && (ros::Time::now() - joystick_goto_press_time_).toSec() > 0.1) {
+  if (joystick_back_pressed_ && joystick_back_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_back_press_time_).toSec() > 0.1) {
+
+    joystick_back_press_time_ = ros::Time(0);
 
     // activate/deactivate the joystick goto functionality
     joystick_goto_enabled_ = !joystick_goto_enabled_;
+
+    ROS_INFO("[ControlManager]: joystick controll %s", joystick_goto_enabled_ ? "activated" : "deactivated");
   }
 
   // if the GOTO functionality is enabled...
@@ -3066,10 +3070,6 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &m
 
     pixhawk_odometry_ = *msg;
 
-    pixhawk_uav_x_      = pixhawk_odometry_.pose.pose.position.x;
-    pixhawk_uav_y_      = pixhawk_odometry_.pose.pose.position.y;
-    pixhawk_odometry_z_ = pixhawk_odometry_.pose.pose.position.z;
-
     // calculate the euler angles
     tf::Quaternion quaternion_odometry;
     quaternionMsgToTF(pixhawk_odometry_.pose.pose.orientation, quaternion_odometry);
@@ -3155,20 +3155,20 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
   // if start button was pressed
   if (msg->buttons[_channel_start_] == 1) {
 
-    if (!joytracker_start_pressed_) {
+    if (!joystick_start_pressed_) {
 
       ROS_INFO("[ControlManager]: joystick start button pressed");
 
-      joytracker_start_pressed_    = true;
-      joystick_tracker_press_time_ = ros::Time::now();
+      joystick_start_pressed_    = true;
+      joystick_start_press_time_ = ros::Time::now();
     }
 
-  } else if (joytracker_start_pressed_) {
+  } else if (joystick_start_pressed_) {
 
     ROS_INFO("[ControlManager]: joystick start button released");
 
-    joytracker_start_pressed_    = false;
-    joystick_tracker_press_time_ = ros::Time(0);
+    joystick_start_pressed_    = false;
+    joystick_start_press_time_ = ros::Time(0);
   }
 
   // | ---------------- Joystick goto activation ---------------- |
@@ -3181,7 +3181,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
       ROS_INFO("[ControlManager]: joystick back button pressed");
 
       joystick_back_pressed_    = true;
-      joystick_goto_press_time_ = ros::Time::now();
+      joystick_back_press_time_ = ros::Time::now();
     }
 
   } else if (joystick_back_pressed_) {
@@ -3189,7 +3189,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
     ROS_INFO("[ControlManager]: joystick back button released");
 
     joystick_back_pressed_    = false;
-    joystick_goto_press_time_ = ros::Time(0);
+    joystick_back_press_time_ = ros::Time(0);
   }
 
   // | ------------------------ Failsafes ----------------------- |
@@ -3419,7 +3419,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   int                               active_tracker_idx;
 
   {
-    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_last_position_cmd_);
+    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_last_position_cmd_, mutex_tracker_list_);
 
     last_attitude_cmd  = last_attitude_cmd_;
     last_position_cmd  = last_position_cmd_;
@@ -3592,7 +3592,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
   int                               active_controller_idx;
 
   {
-    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_last_position_cmd_);
+    std::scoped_lock lock(mutex_last_attitude_cmd_, mutex_last_position_cmd_, mutex_controller_list_);
 
     last_attitude_cmd     = last_attitude_cmd_;
     last_position_cmd     = last_position_cmd_;
@@ -3709,12 +3709,15 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
     }
   }
 
+  mrs_msgs::TrackerConstraintsRequest sanitized_constraints;
   {
     std::scoped_lock lock(mutex_constraints_);
 
     sanitized_constraints_ = current_constraints_;
-    setConstraints(current_constraints_);
+    sanitized_constraints  = sanitized_constraints_;
   }
+
+  setConstraints(sanitized_constraints);
 
   res.message = message;
   return true;
@@ -5519,8 +5522,6 @@ bool ControlManager::transformVector3(const geometry_msgs::TransformStamped &tf,
 
 bool ControlManager::getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf) {
 
-  std::scoped_lock lock(mutex_tf_buffer_);
-
   std::string to_frame_resolved   = resolveFrameName(to_frame);
   std::string from_frame_resolved = resolveFrameName(from_frame);
 
@@ -5550,6 +5551,9 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
   }
 
   try {
+
+    std::scoped_lock lock(mutex_tf_buffer_);
+
     tf = tf_buffer_.lookupTransform(to_frame_resolved, from_frame_resolved, time_stamp, ros::Duration(0.0));
 
     it->second.stamp = ros::Time::now();
@@ -5558,12 +5562,15 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
     return true;
   }
   catch (tf2::TransformException &ex) {
-    /* ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(),
-     * to_frame_resolved.c_str(), */
-    /*           ex.what()); */
+    // this happens often -> DEBUG
+    ROS_DEBUG("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
+              ex.what());
   }
 
   try {
+
+    std::scoped_lock lock(mutex_tf_buffer_);
+
     tf = tf_buffer_.lookupTransform(to_frame_resolved, from_frame_resolved, ros::Time(0), ros::Duration(0.0));
 
     it->second.stamp = ros::Time::now();
@@ -5572,6 +5579,7 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
     return true;
   }
   catch (tf2::TransformException &ex) {
+    // this does not happen often and when it does, it should be seen
     ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
               ex.what());
   }
@@ -6165,7 +6173,7 @@ bool ControlManager::ehover(std::string &message_out) {
   mrs_msgs::PositionCommandConstPtr last_position_cmd;
 
   {
-    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
+    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_, mutex_last_attitude_cmd_, mutex_last_position_cmd_);
 
     active_tracker_idx    = active_tracker_idx_;
     active_controller_idx = active_controller_idx_;
@@ -6309,7 +6317,7 @@ bool ControlManager::eland(std::string &message_out) {
   mrs_msgs::PositionCommandConstPtr last_position_cmd;
 
   {
-    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
+    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_, mutex_last_attitude_cmd_, mutex_last_position_cmd_);
 
     active_tracker_idx    = active_tracker_idx_;
     active_controller_idx = active_controller_idx_;
@@ -6475,7 +6483,7 @@ bool ControlManager::partialLanding(std::string &message_out) {
   mrs_msgs::PositionCommandConstPtr last_position_cmd;
 
   {
-    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
+    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_, mutex_last_attitude_cmd_, mutex_last_position_cmd_);
 
     active_tracker_idx    = active_tracker_idx_;
     active_controller_idx = active_controller_idx_;
@@ -6595,7 +6603,7 @@ bool ControlManager::failsafe() {
   mrs_msgs::PositionCommandConstPtr last_position_cmd;
 
   {
-    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
+    std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_, mutex_last_attitude_cmd_, mutex_last_position_cmd_);
 
     active_tracker_idx    = active_tracker_idx_;
     active_controller_idx = active_controller_idx_;
