@@ -78,8 +78,8 @@ obstacle_bumper:
   enabled: false
   timer_rate: 20 # [Hz]
 
-  horizontal_distance: 1.0 # [m]
-  vertical_distance: 1.0 # [m]
+  horizontal_distance: 1.2 # [m]
+  vertical_distance: 1.2 # [m]
 
   obstacle_hugging:
 
@@ -112,6 +112,10 @@ partial_land:
 joystick:
 
   enabled: true
+
+  mode: 1 # {0 = goto, 1 = trajectory}
+
+  carrot_distance: 1.00 # [m]
 
   joystick_timer_rate: 30 # [Hz]
 

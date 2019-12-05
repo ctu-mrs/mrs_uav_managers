@@ -264,6 +264,7 @@
       <remap from="~disturbances_markers_out" to="~disturbances_markers" />
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~bumper_status_out" to="~bumper_status" />
+      <remap from="~mpc_trajectory_out" to="~mpc_tracker/set_trajectory" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
