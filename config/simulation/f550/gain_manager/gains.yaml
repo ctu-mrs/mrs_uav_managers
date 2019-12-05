@@ -9,10 +9,10 @@ supersoft:
       kq: 8.0
       kw: 0.0
 
-    kib: 1.0
+    kib: 0.1
     kib_lim: 10.0
 
-    kiw: 1.0
+    kiw: 0.1
     kiw_lim: 10.0
 
   vertical:
