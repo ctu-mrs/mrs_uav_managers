@@ -18,6 +18,7 @@
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Float64.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
@@ -1274,7 +1275,7 @@ void ControlManager::onInit() {
   publisher_diagnostics_          = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error_           = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate_        = nh_.advertise<mrs_msgs::Float64>("mass_estimate_out", 1);
+  publisher_mass_estimate_        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
   publisher_control_error_        = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
   publisher_safety_area_markers_  = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
   publisher_disturbances_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
@@ -1487,8 +1488,8 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
   if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    mrs_msgs::Float64 mass_estimate_out;
-    mass_estimate_out.value = _uav_mass_ + last_attitude_cmd->mass_difference;
+    std_msgs::Float64 mass_estimate_out;
+    mass_estimate_out.data = _uav_mass_ + last_attitude_cmd->mass_difference;
 
     try {
       publisher_mass_estimate_.publish(mass_estimate_out);
@@ -3255,6 +3256,8 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
 
   if (!is_initialized_)
     return;
+
+  ROS_INFO("[ControlManager]: getting mavros state");
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMavrosState");
 
