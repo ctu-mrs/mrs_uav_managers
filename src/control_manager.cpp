@@ -3257,8 +3257,6 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
   if (!is_initialized_)
     return;
 
-  ROS_INFO("[ControlManager]: getting mavros state");
-
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMavrosState");
 
   std::scoped_lock lock(mutex_mavros_state_);
