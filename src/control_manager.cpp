@@ -194,31 +194,36 @@ public:
   virtual void onInit();
 
 private:
+  // node handle stuff
   ros::NodeHandle nh_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
 
-  std::string resolveFrameName(const std::string in);
+  pluginlib::ClassLoader<mrs_uav_manager::Tracker> *       tracker_loader_;  // pluginlib loader of dynamically loaded trackers
+  std::vector<std::string>                                 tracker_names_;   // list of tracker names
+  std::map<std::string, TrackerParams>                     trackers_;        // map between tracker names and tracker param
+  std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>> tracker_list_;    // list of trackers, routines are callable from this
+  std::mutex                                               mutex_tracker_list_;
 
-private:
-  pluginlib::ClassLoader<mrs_uav_manager::Tracker> *   tracker_loader_;
-  pluginlib::ClassLoader<mrs_uav_manager::Controller> *controller_loader_;
+  pluginlib::ClassLoader<mrs_uav_manager::Controller> *       controller_loader_;  // pluginlib loader of dynamically loaded controllers
+  std::vector<std::string>                                    controller_names_;   // list of controller names
+  std::map<std::string, ControllerParams>                     controllers_;        // map between controller names and controller params
+  std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list_;    // list of controllers, routines are callable from this
+  std::mutex                                                  mutex_controller_list_;
 
-  std::vector<std::string>             tracker_names_;
-  std::map<std::string, TrackerParams> trackers_;
-
-  std::vector<std::string>                controller_names_;
-  std::map<std::string, ControllerParams> controllers_;
-
-  std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>>    tracker_list_;
-  std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list_;
-
+  // defines the type of state input: odometry or uav_state mesasge types
   int _state_input_;
 
-  std::string _null_tracker_name_;
-  std::string _ehover_tracker_name_;
-  std::string _landoff_tracker_name_;
+  // names of important trackers
+  std::string _null_tracker_name_;     // null tracker is active when UAV is not in the air
+  std::string _ehover_tracker_name_;   // ehover tracker is used for emergency hovering
+  std::string _landoff_tracker_name_;  // landoff is used for landing and takeoff
 
+  // names of important controllers
+  std::string _failsafe_controller_name_;  // controller used for feed-forward failsafe
+  std::string _eland_controller_name_;     // controller used for emergancy landing
+
+  // joystick control
   bool        _joystick_enabled_ = false;
   int         _joystick_mode_;
   std::string _joystick_tracker_name_;
@@ -226,79 +231,97 @@ private:
   std::string _joystick_fallback_tracker_name_;
   std::string _joystick_fallback_controller_name_;
 
-  std::string _failsafe_controller_name_;
-  std::string _eland_controller_name_;
-  bool        _eland_disarm_enabled_ = false;
+  // should disarm after emergancy landing?
+  bool _eland_disarm_enabled_ = false;
 
-  std::mutex mutex_tracker_list_;
-  std::mutex mutex_controller_list_;
-
-  ros::Subscriber subscriber_odometry_;
-
+  // uav_state (odometry) subscriber gets the state estimate for control
+  ros::Subscriber    subscriber_odometry_;
   ros::Subscriber    subscriber_uav_state_;
   mrs_msgs::UavState uav_state_;
   bool               got_uav_state_ = false;
-  std::mutex         mutex_uav_state_;
-  ros::Time          uav_state_last_time_;
-  double             _uav_state_max_missing_time_;
+  ros::Time          uav_state_last_time_;          // when was the last time we got the state estimate?
+  double             _uav_state_max_missing_time_;  // how long should we tolerate missing state estimate?
   double             uav_roll_;
   double             uav_pitch_;
   double             uav_yaw_;
+  std::mutex         mutex_uav_state_;
 
+  // pixhawk odom is used to initialize the failsafe routine
   ros::Subscriber    subscriber_pixhawk_odometry_;
   nav_msgs::Odometry pixhawk_odometry_;
-  double             pixhawk_uav_yaw_;
-  double             pixhawk_odometry_roll_;
-  double             pixhawk_odometry_pitch_;
-  std::mutex         mutex_pixhawk_odometry_;
   bool               got_pixhawk_odometry_ = false;
+  std::mutex         mutex_pixhawk_odometry_;
 
+  // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
   double          max_height_;
   bool            got_max_height_ = false;
   std::mutex      mutex_max_height_;
   std::mutex      mutex_min_height_;
 
+  // odometry innovation is published by the odometry node
+  // it is used to issue eland if the estimator's input is too wonky
   ros::Subscriber    subscriber_odometry_innovation_;
   nav_msgs::Odometry odometry_innovation_;
   std::mutex         mutex_odometry_innovation_;
   bool               got_odometry_innovation_ = false;
 
+  // tf buffer for listening to transformations
   tf2_ros::Buffer                             tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr_;
   std::mutex                                  mutex_tf_buffer_;
-  bool                                        transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref);
-  bool                                        transformPose(const geometry_msgs::TransformStamped &tf, geometry_msgs::PoseStamped &pose);
-  bool                                        transformVector3(const geometry_msgs::TransformStamped &tf, geometry_msgs::Vector3Stamped &twist);
+
+  // caches the last calculated transforms
+  // if someone asks for tf which was calculated within the last 1 ms
+  // it is pulled from a cache
+  std::map<std::string, TransformCache_t> transformer_cache_;
+
+  // resolves simplified frame names
+  std::string resolveFrameName(const std::string in);
+
+  // basic routines for transformations
+  bool transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref);
+  bool transformPose(const geometry_msgs::TransformStamped &tf, geometry_msgs::PoseStamped &pose);
+  bool transformVector3(const geometry_msgs::TransformStamped &tf, geometry_msgs::Vector3Stamped &twist);
   bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf);
 
+  // one-time-use routines for transformations
   bool transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped &ref);
   bool transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped &ref);
   bool transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped &ref);
 
-  mrs_uav_manager::CommonHandlers_t       common_handlers_;
-  std::map<std::string, TransformCache_t> transformer_cache_;
+  // contains handlers that are shared with trackers and controllers
+  // safety area, tf transformer and bumper
+  mrs_uav_manager::CommonHandlers_t common_handlers_;
 
-  int active_tracker_idx_                      = 0;
-  int active_controller_idx_                   = 0;
-  int _ehover_tracker_idx_                     = 0;
-  int _landoff_tracker_idx_                    = 0;
-  int _joystick_tracker_idx_                   = 0;
-  int _joystick_controller_idx_                = 0;
-  int _failsafe_controller_idx_                = 0;
-  int _joystick_fallback_controller_idx_       = 0;
-  int _joystick_fallback_tracker_idx_          = 0;
-  int _null_tracker_idx_                       = 0;
-  int _eland_controller_idx_                   = 0;
-  int _partial_landing_controller_idx_         = 0;
+  // keeping track of currently active controllers and trackers
+  int active_tracker_idx_    = 0;
+  int active_controller_idx_ = 0;
+
+  // indeces of some notable trackers
+  int _ehover_tracker_idx_               = 0;
+  int _landoff_tracker_idx_              = 0;
+  int _joystick_tracker_idx_             = 0;
+  int _joystick_controller_idx_          = 0;
+  int _failsafe_controller_idx_          = 0;
+  int _joystick_fallback_controller_idx_ = 0;
+  int _joystick_fallback_tracker_idx_    = 0;
+  int _null_tracker_idx_                 = 0;
+  int _eland_controller_idx_             = 0;
+  int _partial_landing_controller_idx_   = 0;
+
+  // partial landing remembers what controller and tracker was used before
+  int partial_landing_previous_tracker_idx_    = 0;
   int partial_landing_previous_controller_idx_ = 0;
-  int _partial_landing_previous_tracker_idx_   = 0;
 
+  // motors on/off enables the control output from the control manager
   void switchMotors(bool in);
   bool motors_ = false;
 
+  // what thrust should be output when null tracker is active?
   double _min_thrust_null_tracker_ = 0.0;
 
+  // rates of all the timers
   int _status_timer_rate_          = 0;
   int _safety_timer_rate_          = 0;
   int _elanding_timer_rate_        = 0;
@@ -306,6 +329,7 @@ private:
   int _failsafe_timer_rate_        = 0;
   int _bumper_timer_rate_          = 0;
 
+  // publishers
   ros::Publisher publisher_control_output_;
   ros::Publisher publisher_position_cmd_;
   ros::Publisher publisher_attitude_cmd_;
@@ -322,20 +346,24 @@ private:
   ros::Publisher publisher_bumper_status_;
   ros::Publisher publisher_mpc_trajectory_;
 
+  // service servers
   ros::ServiceServer service_server_switch_tracker_;
   ros::ServiceServer service_server_switch_controller_;
   ros::ServiceServer service_server_hover_;
   ros::ServiceServer service_server_ehover_;
   ros::ServiceServer service_server_failsafe_;
   ros::ServiceServer service_server_failsafe_escalating_;
-
   ros::ServiceServer service_server_motors_;
   ros::ServiceServer service_server_arm_;
   ros::ServiceServer service_server_enable_callbacks_;
   ros::ServiceServer service_server_set_constraints_;
   ros::ServiceServer service_server_use_joystick_;
+  ros::ServiceServer service_server_emergency_reference_;
+  ros::ServiceServer service_server_pirouette_;
+  ros::ServiceServer service_server_eland_;
+  ros::ServiceServer service_server_partial_landing_;
 
-  // human callbable
+  // human callbable services for references
   ros::ServiceServer service_server_goto_;
   ros::ServiceServer service_server_goto_fcu_;
   ros::ServiceServer service_server_goto_relative_;
@@ -343,43 +371,34 @@ private:
   ros::ServiceServer service_server_set_yaw_;
   ros::ServiceServer service_server_set_yaw_relative_;
 
+  // the main reference
   ros::ServiceServer service_server_reference_;
+  ros::Subscriber    subscriber_reference_;
 
-  ros::ServiceServer service_server_emergency_reference_;
-  ros::ServiceServer service_server_pirouette_;
-  ros::ServiceServer service_server_eland_;
-  ros::ServiceServer service_server_partial_landing_;
-
+  // transform service servers
   ros::ServiceServer service_server_transform_reference_;
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
+  // service clients
   ros::ServiceClient service_client_arm_;
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
 
-  ros::Subscriber subscriber_goto_;
-  ros::Subscriber subscriber_goto_fcu_;
-  ros::Subscriber subscriber_goto_relative_;
-  ros::Subscriber subscriber_goto_altitude_;
-  ros::Subscriber subscriber_set_yaw_;
-  ros::Subscriber subscriber_set_yaw_relative_;
-
-  ros::Subscriber subscriber_reference;
-
+  // the last result of an active tracker
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
   std::mutex                          mutex_last_position_cmd_;
 
+  // the last result of an active controller
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd_;
   std::mutex                          mutex_last_attitude_cmd_;
-  ros::Time                           controller_tracker_switch_time_;
-  std::mutex                          mutex_controller_tracker_switch_time_;
 
-  void shutdown();
-  void setCallbacks(bool in);
+  // the time of last switching of a tracker or a controller
+  ros::Time  controller_tracker_switch_time_;
+  std::mutex mutex_controller_tracker_switch_time_;
 
-private:
+  // mavros state tell us about the inner pixhwak state
   ros::Subscriber    subscriber_mavros_state_;
   mavros_msgs::State mavros_state_;
   std::mutex         mutex_mavros_state_;
@@ -387,7 +406,7 @@ private:
   bool               offboard_mode_    = false;
   bool               armed_            = false;
 
-private:
+  // listening to the RC channels as told by pixhawk
   ros::Subscriber      subscriber_rc_;
   mavros_msgs::RCIn    rc_channels_;
   std::mutex           mutex_rc_channels_;
@@ -395,35 +414,42 @@ private:
   std::list<ros::Time> rc_channel_switch_time_;
   std::mutex           mutex_rc_channel_switch_time_;
 
+  // the RC channel mapping of the main 4 control signals
   double rc_channel_pitch_, rc_channel_roll_, rc_channel_yaw_, rc_channel_thrust_;
 
-private:
+  // this is called to update the trackers and to receive the new position control command from the active one
   void updateTrackers(void);
+
+  // this is called to update the controllers and to receive the new attitude control command from the active one
   void updateControllers(mrs_msgs::UavState uav_state_for_control);
+
+  // this publishes the control commands
   void publish(void);
 
-private:
+  // parameters of the motor model, magnitude of gravity
   mrs_uav_manager::MotorParams _motor_params_;
   double                       _g_;
 
-private:
-  double _tilt_limit_eland_;
-  double _tilt_limit_disarm_;
-
-  double _failsafe_threshold_;
-  double _eland_threshold_;
-  double _odometry_innovation_threshold_;
-
-private:
+  // thrust mass estimation during eland
   double    thrust_mass_estimate_;
   bool      thrust_under_threshold_ = false;
   ros::Time thrust_mass_estimate_first_time_;
 
-private:
-  bool       _tilt_error_failsafe_enabled_ = false;
-  double     _tilt_error_threshold_;
-  bool       _yaw_error_eland_enabled_ = false;
-  double     _yaw_error_eland_threshold_;
+  // failsafe when tilt error is too large
+  bool   _tilt_error_failsafe_enabled_ = false;
+  double _tilt_error_threshold_;
+
+  // elanding when tilt error is too large
+  double _tilt_limit_eland_;  // tilt error for triggering eland
+
+  // disarming when tilt error is too large
+  double _tilt_limit_disarm_;  // tilt error for triggering disarm
+
+  // elanding when yaw error is too large
+  bool   _yaw_error_eland_enabled_ = false;
+  double _yaw_error_eland_threshold_;
+
+  // keeping track of control errors
   double     tilt_error_;
   double     yaw_error_;
   double     position_error_x_, position_error_y_, position_error_z_;
@@ -431,7 +457,13 @@ private:
   std::mutex mutex_attitude_error_;
   std::mutex mutex_control_error_;
 
-private:
+  // control error for triggering failsafe, eland, etc.
+  // this filled with the current controllers failsafe threshold
+  double _failsafe_threshold_;             // control error for triggering failsafe
+  double _eland_threshold_;                // control error for triggering eland
+  double _odometry_innovation_threshold_;  // innovation size for triggering eland
+
+  // safety area
   mrs_lib::SafetyZone *safety_zone_;
   bool                 _use_safety_area_ = false;
   std::string          _safety_area_frame_;
@@ -439,127 +471,114 @@ private:
   bool                 _obstacle_points_enabled_   = false;
   bool                 _obstacle_polygons_enabled_ = false;
 
-  bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
-  bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
-  bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
-
+  // safety area routines
+  // those and passed to trackers using the common_handlers object
+  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   double getMinHeight(void);
   double getMaxHeight(void);
 
-private:
+  // getting info callbacks
   void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackUavState(const mrs_msgs::UavStateConstPtr &msg);
   void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg);
   void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
+  void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
+  void callbackRC(const mavros_msgs::RCInConstPtr &msg);
 
+  // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
   bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
 
+  // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg);
-
-  // human callable
   bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
   bool callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
   bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
-
   bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
-
   bool callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
 
-  void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
-  void callbackRC(const mavros_msgs::RCInConstPtr &msg);
-  bool isOffboard(void);
-
-  bool ehover(std::string &message_out);
-  bool hover(std::string &message_out);
-  bool eland(std::string &message_out);
-  bool partialLanding(std::string &message_out);
-  bool failsafe();
-  bool escalatingFailsafe(std::string &message_out);
-  bool arming(bool input);
-
+  // safety callbacks
   bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackFailsafe(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
   bool callbackEland(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackPartialLanding(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  bool callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
 
+  // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request &req, mrs_msgs::TransformReferenceSrv::Response &res);
   bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request &req, mrs_msgs::TransformPoseSrv::Response &res);
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request &req, mrs_msgs::TransformVector3Srv::Response &res);
 
-  bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
-  bool callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
-
-  bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  // sets constraints to all trackers
   bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
 
-private:
-  bool got_constraints_ = false;
+  // land and sit while applying thrust
+  bool callbackPartialLanding(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+  // constraints management
+  bool       got_constraints_ = false;
+  std::mutex mutex_constraints_;
+  void       setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
+  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints);
 
   mrs_msgs::TrackerConstraintsRequest current_constraints_;
   mrs_msgs::TrackerConstraintsRequest sanitized_constraints_;
-  std::mutex                          mutex_constraints_;
 
-  void setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
-  bool enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints);
+  // yaw manipulation
+  double sanitizeYaw(const double yaw_in);
+  double angleDist(const double in1, const double in2);
 
-private:
-  Eigen::Vector2d rotateVector(const Eigen::Vector2d vector_in, double angle);
-  double          sanitizeYaw(const double yaw_in);
-  double          angleDist(const double in1, const double in2);
-
-private:
+  // are callbacks enabled to trackers?
   bool callbacks_enabled_ = true;
 
-private:
+  // timer for regular status publishing
   ros::Timer status_timer_;
   void       statusTimer(const ros::TimerEvent &event);
 
-private:
+  // timer for issuing the failsafe landing
   ros::Timer failsafe_timer_;
   void       failsafeTimer(const ros::TimerEvent &event);
   bool       failsafe_triggered_ = false;
 
-private:
+  // oneshot timer for running controllers and trackers
   ros::Timer control_timer_;
   void       controlTimerOneshot(const ros::TimerEvent &event);
   bool       running_control_timer_ = false;
 
-private:
+  // timer for issuing emergancy landing
   ros::Timer elanding_timer_;
   void       elandingTimer(const ros::TimerEvent &event);
   bool       eland_triggered_ = false;
 
-private:
+  // timer for issuing partial landing
   ros::Timer partial_landing_timer_;
   void       partialLandingTimer(const ros::TimerEvent &event);
   bool       partial_landing_triggered_ = false;
 
-private:
+  // timer for regular checking of controller errors
   ros::Timer safety_timer_;
   void       safetyTimer(const ros::TimerEvent &event);
   bool       running_safety_timer_        = false;
   double     odometry_switch_in_progress_ = false;
 
-private:
+  // timer for issuing the pirouette
   ros::Timer pirouette_timer_;
   void       pirouetteTimer(const ros::TimerEvent &event);
 
-private:
-  double    _escalating_failsafe_timeout_;
-  ros::Time escalating_failsafe_time_;
-
-private:
+  // timer for checking the bumper collisions
   ros::Timer bumper_timer_;
   void       bumperTimer(const ros::TimerEvent &event);
 
-private:
+  // obstacle bumper
   ros::Subscriber subscriber_bumper_;
   void            callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg);
   bool            got_bumper_ = false;
@@ -585,14 +604,18 @@ private:
   int  bumperGetSectorId(const double x, const double y, const double z);
   bool bumperPushFromObstacle(void);
 
-private:
+  // escalating failsafe (eland -> failsafe -> disarm)
+  double    _escalating_failsafe_timeout_;
+  ros::Time escalating_failsafe_time_;
+
+  // rc control
   bool        _rc_eland_enabled_ = false;
   int         _rc_eland_channel_;
   int         _rc_eland_threshold_;
-  bool        rc_eland_triggered_ = false;
   std::string _rc_eland_action_;
+  bool        rc_eland_triggered_ = false;
 
-private:
+  // joystick control
   std::mutex mutex_joystick_;
 
   ros::Subscriber  subscriber_joystick_;
@@ -600,7 +623,7 @@ private:
   sensor_msgs::Joy joystick_data_;
   bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
-  // joystick buttons
+  // joystick buttons mappings
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
 
   // channel numbers and channel multipliers
@@ -634,7 +657,7 @@ private:
   double _rc_joystick_carrot_distance_;
   int    _rc_joystick_timeout_;
 
-private:
+  // emergancy landing state machine
   LandingStates_t current_state_landing_  = IDLE_STATE;
   LandingStates_t previous_state_landing_ = IDLE_STATE;
   void            changeLandingState(LandingStates_t new_state);
@@ -643,7 +666,7 @@ private:
   double          _elanding_cutoff_timeout_;
   double          landing_uav_mass_ = 0;
 
-private:
+  // partial landing state machine
   LandingStates_t current_state_partial_landing_  = IDLE_STATE;
   LandingStates_t previous_state_partial_landing_ = IDLE_STATE;
   void            changePartialLandingState(LandingStates_t new_state);
@@ -652,18 +675,19 @@ private:
   double          _partial_landing_mass_factor_;
   std::string     _partial_landing_controller_name_;
 
-  double initial_body_disturbance_x_;
-  double initial_body_disturbance_y_;
+  // initial body disturbance loaded from params
+  double _initial_body_disturbance_x_;
+  double _initial_body_disturbance_y_;
 
-private:
+  // profiling
   mrs_lib::Profiler *profiler_;
   bool               _profiler_enabled_ = false;
 
-private:
+  // automatic pc shutdown (DARPA specific)
   bool   _automatic_pc_shutdown_enabled_ = false;
   double _automatic_pc_shutdown_threshold_;
 
-private:
+  // pirouette
   bool       _pirouette_enabled_ = false;
   double     _pirouette_speed_;
   double     _pirouette_timer_rate_;
@@ -672,9 +696,21 @@ private:
   double     pirouette_iterator_;
   bool       callbackPirouette(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
-private:
+  // diagnostics publishing
   void       publishDiagnostics(void);
   std::mutex mutex_diagnostics_;
+
+  // standalone function handlers
+  void shutdown();
+  void setCallbacks(bool in);
+  bool ehover(std::string &message_out);
+  bool hover(std::string &message_out);
+  bool eland(std::string &message_out);
+  bool partialLanding(std::string &message_out);
+  bool failsafe();
+  bool escalatingFailsafe(std::string &message_out);
+  bool arming(bool input);
+  bool isOffboard(void);
 };
 
 //}
@@ -833,8 +869,8 @@ void ControlManager::onInit() {
 
   // | ------------- load the body integrator values ------------ |
 
-  param_loader.load_param("body_disturbance_x", initial_body_disturbance_x_);
-  param_loader.load_param("body_disturbance_y", initial_body_disturbance_y_);
+  param_loader.load_param("body_disturbance_x", _initial_body_disturbance_x_);
+  param_loader.load_param("body_disturbance_y", _initial_body_disturbance_y_);
 
   mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
   last_attitude_cmd_ = output_command;
@@ -842,8 +878,8 @@ void ControlManager::onInit() {
   output_command->total_mass      = _uav_mass_;
   output_command->mass_difference = 0.0;
 
-  output_command->disturbance_bx_b = initial_body_disturbance_x_;
-  output_command->disturbance_by_b = initial_body_disturbance_y_;
+  output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+  output_command->disturbance_by_b = _initial_body_disturbance_y_;
   output_command->disturbance_wx_w = 0.0;
   output_command->disturbance_wy_w = 0.0;
   output_command->disturbance_bx_w = 0.0;
@@ -1339,7 +1375,7 @@ void ControlManager::onInit() {
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
 
-  subscriber_reference = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  subscriber_reference_ = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   // | --------------------- other services --------------------- |
 
@@ -3062,12 +3098,6 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &m
     std::scoped_lock lock(mutex_pixhawk_odometry_);
 
     pixhawk_odometry_ = *msg;
-
-    // calculate the euler angles
-    tf::Quaternion quaternion_odometry;
-    quaternionMsgToTF(pixhawk_odometry_.pose.pose.orientation, quaternion_odometry);
-    tf::Matrix3x3 m(quaternion_odometry);
-    m.getRPY(pixhawk_odometry_roll_, pixhawk_odometry_pitch_, pixhawk_uav_yaw_);
   }
 
   got_pixhawk_odometry_ = true;
@@ -3520,8 +3550,8 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
               mrs_msgs::AttitudeCommand::Ptr output_command(new mrs_msgs::AttitudeCommand);
 
               output_command->total_mass       = _uav_mass_;
-              output_command->disturbance_bx_b = initial_body_disturbance_x_;
-              output_command->disturbance_by_b = initial_body_disturbance_y_;
+              output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+              output_command->disturbance_by_b = _initial_body_disturbance_y_;
               output_command->mass_difference  = 0.0;
 
               {
@@ -6502,7 +6532,7 @@ bool ControlManager::partialLanding(std::string &message_out) {
   char message[200];
   bool success = false;
 
-  _partial_landing_previous_tracker_idx_ = active_tracker_idx;
+  partial_landing_previous_tracker_idx_ = active_tracker_idx;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
