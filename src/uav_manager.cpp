@@ -22,10 +22,10 @@
 #include <mavros_msgs/State.h>
 
 #include <mrs_lib/Profiler.h>
+#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/Utils.h>
 
 #include <tf/transform_datatypes.h>
-
-#include <mrs_lib/ParamLoader.h>
 
 //}
 
@@ -251,43 +251,6 @@ public:
 
 //}
 
-/* //{ changeLandingState() */
-
-void UavManager::changeLandingState(LandingStates_t new_state) {
-
-  /* copy member variables //{ */
-
-  mrs_msgs::AttitudeCommand attitude_command;
-
-  {
-    std::scoped_lock lock(mutex_attitude_command_);
-
-    attitude_command = attitude_command_;
-  }
-
-  //}
-
-  previous_state_landing_ = current_state_landing_;
-  current_state_landing_  = new_state;
-
-  switch (current_state_landing_) {
-
-    case IDLE_STATE:
-      break;
-    case FLY_HOME_STATE:
-      break;
-    case LANDING_STATE: {
-
-      landing_uav_mass_ = _uav_mass_ + attitude_command.mass_difference;
-    } break;
-  }
-
-  // just for ROS_INFO
-  ROS_INFO("[UavManager]: Switching landing state %s -> %s", state_names[previous_state_landing_], state_names[current_state_landing_]);
-}
-
-//}
-
 /* //{ onInit() */
 
 void UavManager::onInit() {
@@ -419,6 +382,36 @@ void UavManager::onInit() {
 
 //}
 
+// | ---------------------- state machine --------------------- |
+
+/* //{ changeLandingState() */
+
+void UavManager::changeLandingState(LandingStates_t new_state) {
+
+  // copy member variables
+  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
+
+  previous_state_landing_ = current_state_landing_;
+  current_state_landing_  = new_state;
+
+  switch (current_state_landing_) {
+
+    case IDLE_STATE:
+      break;
+    case FLY_HOME_STATE:
+      break;
+    case LANDING_STATE: {
+
+      landing_uav_mass_ = _uav_mass_ + attitude_command.mass_difference;
+    } break;
+  }
+
+  // just for ROS_INFO
+  ROS_INFO("[UavManager]: Switching landing state %s -> %s", state_names[previous_state_landing_], state_names[current_state_landing_]);
+}
+
+//}
+
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
@@ -432,24 +425,14 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("landingTimer", _landing_timer_rate_, 0.01, event);
 
-  /* copy the member variables //{ */
+  // copy member variables
+  auto control_manager_diagnostics = mrs_lib::get_mutexed(control_manager_diagnostics_, mutex_control_manager_diagnostics_);
+  auto target_attitude             = mrs_lib::get_mutexed(target_attitude_, mutex_target_attitude_);
+  auto odometry                    = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
 
-  double                              odometry_x, odometry_y;
-  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics;
-  mavros_msgs::AttitudeTarget         target_attitude;
-
-  {
-    std::scoped_lock lock(mutex_odometry_, mutex_control_manager_diagnostics_, mutex_target_attitude_);
-
-    odometry_x = odometry_.pose.pose.position.x;
-    odometry_y = odometry_.pose.pose.position.y;
-
-    control_manager_diagnostics = control_manager_diagnostics_;
-
-    target_attitude = target_attitude_;
-  }
-
-  //}
+  double odometry_x, odometry_y;
+  odometry_x = odometry.pose.pose.position.x;
+  odometry_y = odometry.pose.pose.position.y;
 
   if (current_state_landing_ == IDLE_STATE) {
 
@@ -587,17 +570,7 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.004, event);
 
-  /* copy member variables //{ */
-
-  mrs_msgs::LandoffDiagnostics landoff_diagnostics;
-
-  {
-    std::scoped_lock lock(mutex_landoff_diagnostics_);
-
-    landoff_diagnostics = landoff_diagnostics_;
-  }
-
-  //}
+  auto landoff_diagnostics = mrs_lib::get_mutexed(landoff_diagnostics_, mutex_landoff_diagnostics_);
 
   if (waiting_for_takeoff_) {
 
@@ -679,23 +652,14 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
 
-  /* copy the member variables //{ */
+  auto max_height   = mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
+  auto odometry     = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
+  auto odometry_yaw = mrs_lib::get_mutexed(odometry_yaw_, mutex_odometry_);
 
-  double odometry_x, odometry_y, odometry_z, odometry_yaw;
-  double max_height;
-
-  {
-    std::scoped_lock lock(mutex_odometry_, mutex_max_height_);
-
-    odometry_x   = odometry_.pose.pose.position.x;
-    odometry_y   = odometry_.pose.pose.position.y;
-    odometry_z   = odometry_.pose.pose.position.z;
-    odometry_yaw = odometry_yaw_;
-
-    max_height = _max_height_;
-  }
-
-  //}
+  double odometry_x, odometry_y, odometry_z;
+  odometry_x = odometry.pose.pose.position.x;
+  odometry_y = odometry.pose.pose.position.y;
+  odometry_z = odometry.pose.pose.position.z;
 
   if (!got_max_height_ || !got_odometry_) {
     return;
@@ -809,17 +773,8 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
 
-  /* copy member variables //{ */
-
-  mrs_msgs::AttitudeCommand attitude_command;
-
-  {
-    std::scoped_lock lock(mutex_attitude_command_);
-
-    attitude_command = attitude_command_;
-  }
-
-  //}
+  // copy member variables
+  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
 
   if (attitude_command.thrust >= _maxthrust_max_thrust_) {
 
@@ -891,9 +846,9 @@ void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManage
     std::scoped_lock lock(mutex_control_manager_diagnostics_);
 
     control_manager_diagnostics_ = *msg;
-  }
 
-  got_control_manager_diagnostics_ = true;
+    got_control_manager_diagnostics_ = true;
+  }
 }
 
 //}
@@ -911,9 +866,9 @@ void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
     std::scoped_lock lock(mutex_target_attitude_);
 
     target_attitude_ = *msg;
-  }
 
-  got_target_attitude_ = true;
+    got_target_attitude_ = true;
+  }
 }
 
 //}
@@ -931,9 +886,9 @@ void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
     std::scoped_lock lock(mutex_mavros_state_);
 
     mavros_state_ = *msg;
-  }
 
-  got_mavros_state_ = true;
+    got_mavros_state_ = true;
+  }
 }
 
 //}
@@ -951,9 +906,9 @@ void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr
     std::scoped_lock lock(mutex_attitude_command_);
 
     attitude_command_ = *msg;
-  }
 
-  got_attitude_command_ = true;
+    got_attitude_command_ = true;
+  }
 }
 
 //}
@@ -971,9 +926,9 @@ void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) 
     std::scoped_lock lock(mutex_max_height_);
 
     _max_height_ = msg->value;
-  }
 
-  got_max_height_ = true;
+    got_max_height_ = true;
+  }
 }
 
 //}
@@ -991,9 +946,9 @@ void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
     std::scoped_lock lock(mutex_height_);
 
     height_ = msg->value;
-  }
 
-  got_height_ = true;
+    got_height_ = true;
+  }
 }
 
 //}
@@ -1053,9 +1008,9 @@ void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
     quaternionMsgToTF(odometry_.pose.pose.orientation, quaternion_odometry);
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll_, odometry_pitch_, odometry_yaw_);
-  }
 
-  got_odometry_ = true;
+    got_odometry_ = true;
+  }
 }
 
 //}
@@ -1073,9 +1028,9 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
     std::scoped_lock lock(mutex_motors_);
 
     motors_ = *msg;
-  }
 
-  got_motors_ = true;
+    got_motors_ = true;
+  }
 }
 
 //}
@@ -1093,9 +1048,9 @@ void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsCo
     std::scoped_lock lock(mutex_landoff_diagnostics_);
 
     landoff_diagnostics_ = *msg;
-  }
 
-  got_landoff_diagnostics_ = true;
+    got_landoff_diagnostics_ = true;
+  }
 }
 
 //}
@@ -1109,39 +1064,18 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   if (!is_initialized_)
     return false;
 
-  /* copy the member variables //{ */
+  // copy member variables
+  auto odometry                    = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
+  auto motors                      = mrs_lib::get_mutexed(motors_, mutex_motors_);
+  auto gains_last_time             = mrs_lib::get_mutexed(gains_last_time_, mutex_gains_);
+  auto constraints_last_time       = mrs_lib::get_mutexed(constraints_last_time_, mutex_constraints_);
+  auto control_manager_diagnostics = mrs_lib::get_mutexed(control_manager_diagnostics_, mutex_control_manager_diagnostics_);
+  auto mavros_state                = mrs_lib::get_mutexed(mavros_state_, mutex_mavros_state_);
+  auto last_mass_difference        = mrs_lib::get_mutexed(last_mass_difference_, mutex_last_mass_difference_);
 
-  nav_msgs::Odometry                  odometry;
-  double                              odometry_x, odometry_y;
-  mrs_msgs::BoolStamped               motors;
-  ros::Time                           gains_last_time;
-  ros::Time                           constraints_last_time;
-  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics;
-  mavros_msgs::State                  mavros_state;
-  double                              last_mass_difference;
-
-  {
-    std::scoped_lock lock(mutex_odometry_, mutex_motors_, mutex_gains_, mutex_constraints_, mutex_control_manager_diagnostics_, mutex_mavros_state_,
-                          mutex_last_mass_difference_);
-
-    odometry   = odometry_;
-    odometry_x = odometry_.pose.pose.position.x;
-    odometry_y = odometry_.pose.pose.position.y;
-
-    motors = motors_;
-
-    gains_last_time = gains_last_time_;
-
-    constraints_last_time = constraints_last_time_;
-
-    control_manager_diagnostics = control_manager_diagnostics_;
-
-    mavros_state = mavros_state_;
-
-    last_mass_difference = last_mass_difference_;
-  }
-
-  //}
+  double odometry_x, odometry_y;
+  odometry_x = odometry.pose.pose.position.x;
+  odometry_y = odometry.pose.pose.position.y;
 
   char message[200];
 
@@ -1356,17 +1290,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
   if (!is_initialized_)
     return false;
 
-  mrs_msgs::AttitudeCommand attitude_command;
-
-  /* copy member variables //{ */
-
-  {
-    std::scoped_lock lock(mutex_attitude_command_);
-
-    attitude_command = attitude_command_;
-  }
-
-  //}
+  // copy member variables
+  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
 
   char message[100];
 
@@ -1477,17 +1402,11 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   if (!is_initialized_)
     return false;
 
-  /* copy member variables //{ */
+  // copy member variables
+  auto odometry = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
 
   double odometry_z;
-
-  {
-    std::scoped_lock lock(mutex_odometry_);
-
-    odometry_z = odometry_.pose.pose.position.z;
-  }
-
-  //}
+  odometry_z = odometry.pose.pose.position.z;
 
   char message[100];
 
