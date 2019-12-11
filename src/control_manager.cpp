@@ -24,6 +24,7 @@
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
+#include <mrs_lib/Mutex.h>
 
 #include <sensor_msgs/Joy.h>
 
@@ -119,7 +120,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char *state_names[2] = {
+const char* state_names[2] = {
 
     "IDLING", "LANDING"};
 
@@ -199,13 +200,13 @@ private:
   bool            is_initialized_ = false;
   std::string     _uav_name_;
 
-  pluginlib::ClassLoader<mrs_uav_manager::Tracker> *       tracker_loader_;  // pluginlib loader of dynamically loaded trackers
+  pluginlib::ClassLoader<mrs_uav_manager::Tracker>*        tracker_loader_;  // pluginlib loader of dynamically loaded trackers
   std::vector<std::string>                                 _tracker_names_;  // list of tracker names
   std::map<std::string, TrackerParams>                     trackers_;        // map between tracker names and tracker param
   std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>> tracker_list_;    // list of trackers, routines are callable from this
   std::mutex                                               mutex_tracker_list_;
 
-  pluginlib::ClassLoader<mrs_uav_manager::Controller> *       controller_loader_;  // pluginlib loader of dynamically loaded controllers
+  pluginlib::ClassLoader<mrs_uav_manager::Controller>*        controller_loader_;  // pluginlib loader of dynamically loaded controllers
   std::vector<std::string>                                    _controller_names_;  // list of controller names
   std::map<std::string, ControllerParams>                     controllers_;        // map between controller names and controller params
   std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list_;    // list of controllers, routines are callable from this
@@ -280,15 +281,15 @@ private:
   std::string resolveFrameName(const std::string in);
 
   // basic routines for transformations
-  bool transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref);
-  bool transformPose(const geometry_msgs::TransformStamped &tf, geometry_msgs::PoseStamped &pose);
-  bool transformVector3(const geometry_msgs::TransformStamped &tf, geometry_msgs::Vector3Stamped &twist);
-  bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf);
+  bool transformReference(const geometry_msgs::TransformStamped& tf, mrs_msgs::ReferenceStamped& ref);
+  bool transformPose(const geometry_msgs::TransformStamped& tf, geometry_msgs::PoseStamped& pose);
+  bool transformVector3(const geometry_msgs::TransformStamped& tf, geometry_msgs::Vector3Stamped& twist);
+  bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped& tf);
 
   // one-time-use routines for transformations
-  bool transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped &ref);
-  bool transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped &ref);
-  bool transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped &ref);
+  bool transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped& ref);
+  bool transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped& ref);
+  bool transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped& ref);
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
@@ -464,7 +465,7 @@ private:
   double _odometry_innovation_threshold_;  // innovation size for triggering eland
 
   // safety area
-  mrs_lib::SafetyZone *safety_zone_;
+  mrs_lib::SafetyZone* safety_zone_;
   bool                 _use_safety_area_ = false;
   std::string          _safety_area_frame_;
   double               _min_height_;
@@ -480,55 +481,55 @@ private:
   double getMaxHeight(void);
 
   // getting info callbacks
-  void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackUavState(const mrs_msgs::UavStateConstPtr &msg);
-  void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg);
-  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
-  void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
-  void callbackRC(const mavros_msgs::RCInConstPtr &msg);
+  void callbackOdometry(const nav_msgs::OdometryConstPtr& msg);
+  void callbackUavState(const mrs_msgs::UavStateConstPtr& msg);
+  void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr& msg);
+  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& msg);
+  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
+  void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
+  void callbackRC(const mavros_msgs::RCInConstPtr& msg);
 
   // switching controller and tracker services
-  bool callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
-  bool callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
   // reference callbacks
-  void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg);
-  bool callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res);
-  bool callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
-  bool callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
-  bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res);
-  bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
-  bool callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
+  bool callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
+  bool callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
+  bool callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
+  bool callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  bool callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   // safety callbacks
-  bool callbackHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackEHoverService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackFailsafe(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackFailsafeEscalating(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackEland(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
-  bool callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
-  bool callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  bool callbackHoverService(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackEHoverService(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackFailsafe(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   // transformation callbacks
-  bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request &req, mrs_msgs::TransformReferenceSrv::Response &res);
-  bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request &req, mrs_msgs::TransformPoseSrv::Response &res);
-  bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request &req, mrs_msgs::TransformVector3Srv::Response &res);
+  bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
+  bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res);
+  bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res);
+  bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res);
 
   // land and sit while applying thrust
-  bool callbackPartialLanding(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool callbackPartialLanding(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // constraints management
   bool       got_constraints_ = false;
   std::mutex mutex_constraints_;
   void       setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
-  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints);
+  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints);
 
   mrs_msgs::TrackerConstraintsRequest current_constraints_;
   mrs_msgs::TrackerConstraintsRequest sanitized_constraints_;
@@ -542,45 +543,45 @@ private:
 
   // timer for regular status publishing
   ros::Timer status_timer_;
-  void       statusTimer(const ros::TimerEvent &event);
+  void       statusTimer(const ros::TimerEvent& event);
 
   // timer for issuing the failsafe landing
   ros::Timer failsafe_timer_;
-  void       failsafeTimer(const ros::TimerEvent &event);
+  void       failsafeTimer(const ros::TimerEvent& event);
   bool       failsafe_triggered_ = false;
 
   // oneshot timer for running controllers and trackers
   ros::Timer control_timer_;
-  void       controlTimerOneshot(const ros::TimerEvent &event);
+  void       controlTimerOneshot(const ros::TimerEvent& event);
   bool       running_control_timer_ = false;
 
   // timer for issuing emergancy landing
   ros::Timer elanding_timer_;
-  void       elandingTimer(const ros::TimerEvent &event);
+  void       elandingTimer(const ros::TimerEvent& event);
   bool       eland_triggered_ = false;
 
   // timer for issuing partial landing
   ros::Timer partial_landing_timer_;
-  void       partialLandingTimer(const ros::TimerEvent &event);
+  void       partialLandingTimer(const ros::TimerEvent& event);
   bool       partial_landing_triggered_ = false;
 
   // timer for regular checking of controller errors
   ros::Timer safety_timer_;
-  void       safetyTimer(const ros::TimerEvent &event);
+  void       safetyTimer(const ros::TimerEvent& event);
   bool       running_safety_timer_        = false;
   double     odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
   ros::Timer pirouette_timer_;
-  void       pirouetteTimer(const ros::TimerEvent &event);
+  void       pirouetteTimer(const ros::TimerEvent& event);
 
   // timer for checking the bumper collisions
   ros::Timer bumper_timer_;
-  void       bumperTimer(const ros::TimerEvent &event);
+  void       bumperTimer(const ros::TimerEvent& event);
 
   // obstacle bumper
   ros::Subscriber subscriber_bumper_;
-  void            callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg);
+  void            callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr& msg);
   bool            got_bumper_ = false;
 
   mrs_msgs::ObstacleSectors bumper_data_;
@@ -600,7 +601,7 @@ private:
   double _bumper_repulsion_vertical_distance_;
   double _bumper_repulsion_vertical_offset_;
 
-  bool bumperValidatePoint(mrs_msgs::ReferenceStamped &point);
+  bool bumperValidatePoint(mrs_msgs::ReferenceStamped& point);
   int  bumperGetSectorId(const double x, const double y, const double z);
   bool bumperPushFromObstacle(void);
 
@@ -619,9 +620,9 @@ private:
   std::mutex mutex_joystick_;
 
   ros::Subscriber  subscriber_joystick_;
-  void             callbackJoystick(const sensor_msgs::JoyConstPtr &msg);
+  void             callbackJoystick(const sensor_msgs::JoyConstPtr& msg);
   sensor_msgs::Joy joystick_data_;
-  bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
@@ -631,7 +632,7 @@ private:
   int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_yaw_, _channel_mult_thrust_;
 
   ros::Timer joystick_timer_;
-  void       joystickTimer(const ros::TimerEvent &event);
+  void       joystickTimer(const ros::TimerEvent& event);
   double     _joystick_timer_rate_;
 
   double _joystick_carrot_distance_;
@@ -682,7 +683,7 @@ private:
   double _initial_body_disturbance_y_;
 
   // profiling
-  mrs_lib::Profiler *profiler_;
+  mrs_lib::Profiler* profiler_;
   bool               _profiler_enabled_ = false;
 
   // automatic pc shutdown (DARPA specific)
@@ -696,7 +697,7 @@ private:
   std::mutex mutex_pirouette_;
   double     pirouette_inital_yaw_;
   double     pirouette_iterator_;
-  bool       callbackPirouette(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+  bool       callbackPirouette(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // diagnostics publishing
   void       publishDiagnostics(void);
@@ -705,12 +706,12 @@ private:
   // standalone function handlers
   void shutdown();
   void setCallbacks(bool in);
-  bool ehover(std::string &message_out);
-  bool hover(std::string &message_out);
-  bool eland(std::string &message_out);
-  bool partialLanding(std::string &message_out);
+  bool ehover(std::string& message_out);
+  bool hover(std::string& message_out);
+  bool eland(std::string& message_out);
+  bool partialLanding(std::string& message_out);
   bool failsafe();
-  bool escalatingFailsafe(std::string &message_out);
+  bool escalatingFailsafe(std::string& message_out);
   bool arming(bool input);
   bool isOffboard(void);
 };
@@ -914,12 +915,12 @@ void ControlManager::onInit() {
       ROS_INFO("[ControlManager]: Trying to load tracker %s", new_tracker.address.c_str());
       tracker_list_.push_back(tracker_loader_->createInstance(new_tracker.address.c_str()));
     }
-    catch (pluginlib::CreateClassException &ex1) {
+    catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for tracker %s", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
       ros::shutdown();
     }
-    catch (pluginlib::PluginlibException &ex) {
+    catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for tracker %s", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
       ros::shutdown();
@@ -937,7 +938,7 @@ void ControlManager::onInit() {
       ROS_INFO("[ControlManager]: Initializing tracker %d: %s", (int)i, it->second.address.c_str());
       tracker_list_[i]->initialize(nh_, _uav_name_, &common_handlers_);
     }
-    catch (std::runtime_error &ex) {
+    catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: Exception caught during tracker initialization: %s", ex.what());
     }
   }
@@ -986,12 +987,12 @@ void ControlManager::onInit() {
       ROS_INFO("[ControlManager]: Loading controller %s", new_controller.address.c_str());
       controller_list_.push_back(controller_loader_->createInstance(new_controller.address.c_str()));
     }
-    catch (pluginlib::CreateClassException &ex1) {
+    catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for controller %s", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
       ros::shutdown();
     }
-    catch (pluginlib::PluginlibException &ex) {
+    catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for controller %s", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
       ros::shutdown();
@@ -1009,7 +1010,7 @@ void ControlManager::onInit() {
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
       controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _motor_params_, _uav_mass_, _g_);
     }
-    catch (std::runtime_error &ex) {
+    catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
     }
   }
@@ -1264,7 +1265,7 @@ void ControlManager::onInit() {
     }
 
     // TODO: remove this when param loader supports proper loading
-    for (auto &matrix : polygon_obstacle_points) {
+    for (auto& matrix : polygon_obstacle_points) {
       matrix.transposeInPlace();
     }
 
@@ -1431,7 +1432,7 @@ void ControlManager::onInit() {
 
 /* //{ statusTimer() */
 
-void ControlManager::statusTimer(const ros::TimerEvent &event) {
+void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -1851,7 +1852,7 @@ void ControlManager::statusTimer(const ros::TimerEvent &event) {
 
 /* //{ safetyTimer() */
 
-void ControlManager::safetyTimer(const ros::TimerEvent &event) {
+void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
   mrs_lib::ScopeUnset unset_running(running_safety_timer_);
 
@@ -1859,15 +1860,13 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
     return;
 
   // copy member variables
-  auto last_attitude_cmd              = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd              = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto uav_state                      = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto uav_state_last_time            = mrs_lib::get_mutexed(uav_state_last_time_, mutex_uav_state_);
-  auto odometry_innovation            = mrs_lib::get_mutexed(odometry_innovation_, mutex_odometry_innovation_);
-  auto controller_tracker_switch_time = mrs_lib::get_mutexed(controller_tracker_switch_time_, mutex_controller_tracker_switch_time_);
-  auto active_controller_idx          = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
-  auto active_tracker_idx             = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
-  auto uav_yaw                        = mrs_lib::get_mutexed(uav_yaw_, mutex_uav_state_);
+  auto last_attitude_cmd                         = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_position_cmd                         = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto [uav_state, uav_state_last_time, uav_yaw] = mrs_lib::get_mutexed(uav_state_, uav_state_last_time_, uav_yaw_, mutex_uav_state_);
+  auto odometry_innovation                       = mrs_lib::get_mutexed(odometry_innovation_, mutex_odometry_innovation_);
+  auto controller_tracker_switch_time            = mrs_lib::get_mutexed(controller_tracker_switch_time_, mutex_controller_tracker_switch_time_);
+  auto active_controller_idx                     = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
+  auto active_tracker_idx                        = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
 
@@ -2136,7 +2135,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent &event) {
 
 /* //{ elandingTimer() */
 
-void ControlManager::elandingTimer(const ros::TimerEvent &event) {
+void ControlManager::elandingTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2210,7 +2209,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent &event) {
 
 /* //{ partialLandingTimer() */
 
-void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
+void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2302,7 +2301,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent &event) {
 
 /* //{ failsafeTimer() */
 
-void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
+void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2361,7 +2360,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent &event) {
 
 /* //{ joystickTimer() */
 
-void ControlManager::joystickTimer(const ros::TimerEvent &event) {
+void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2636,7 +2635,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent &event) {
 
 /* //{ bumperTimer() */
 
-void ControlManager::bumperTimer(const ros::TimerEvent &event) {
+void ControlManager::bumperTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2675,7 +2674,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent &event) {
 
 /* //{ pirouetteTimer() */
 
-void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
+void ControlManager::pirouetteTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2724,7 +2723,7 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent &event) {
 
 /* controlTimer() //{ */
 
-void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent &event) {
+void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -2796,7 +2795,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent 
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -2893,7 +2892,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
+void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -2980,7 +2979,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr &msg) {
 
 /* //{ callbackOdometryInnovation() */
 
-void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr &msg) {
+void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3000,7 +2999,7 @@ void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr
 
 /* //{ callbackPixhawkOdometry() */
 
-void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &msg) {
+void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3024,7 +3023,7 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr &m
 
 /* callbackMaxHeight() //{ */
 
-void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3044,7 +3043,7 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &m
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
+void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3168,7 +3167,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr &msg) {
 
 /* callbackBumper() //{ */
 
-void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg) {
+void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3190,7 +3189,7 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr &msg
 
 /* //{ callbackMavrosState() */
 
-void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
+void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3240,7 +3239,7 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) 
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
+void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3339,7 +3338,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr &msg) {
 
 /* //{ callbackSwitchTracker() */
 
-bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3353,7 +3352,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
   if (!got_uav_state_) {
 
-    sprintf((char *)&message, "Can't switch tracker, missing odometry!");
+    sprintf((char*)&message, "Can't switch tracker, missing odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3362,7 +3361,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
   if (!got_odometry_innovation_) {
 
-    sprintf((char *)&message, "Can't switch tracker, missing odometry innovation!");
+    sprintf((char*)&message, "Can't switch tracker, missing odometry innovation!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3371,7 +3370,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
   if (!got_pixhawk_odometry_) {
 
-    sprintf((char *)&message, "Can't switch tracker, missing PixHawk odometry!");
+    sprintf((char*)&message, "Can't switch tracker, missing PixHawk odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3389,7 +3388,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   // check if the tracker exists
   if (new_tracker_idx < 0) {
 
-    sprintf((char *)&message, "The tracker %s does not exist!", req.value.c_str());
+    sprintf((char*)&message, "The tracker %s does not exist!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3399,7 +3398,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
   // check if the tracker is already active
   if (new_tracker_idx == active_tracker_idx) {
 
-    sprintf((char *)&message, "Not switching, the tracker %s is already active!", req.value.c_str());
+    sprintf((char*)&message, "Not switching, the tracker %s is already active!", req.value.c_str());
     ROS_WARN("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
@@ -3415,13 +3414,13 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
       if (!tracker_list_[new_tracker_idx]->activate(last_position_cmd)) {
 
-        sprintf((char *)&message, "Tracker %s was not activated", req.value.c_str());
+        sprintf((char*)&message, "Tracker %s was not activated", req.value.c_str());
         ROS_WARN("[ControlManager]: %s", message);
         res.success = false;
 
       } else {
 
-        sprintf((char *)&message, "Tracker %s has been activated", req.value.c_str());
+        sprintf((char*)&message, "Tracker %s has been activated", req.value.c_str());
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
@@ -3482,12 +3481,12 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
           active_tracker_idx_ = new_tracker_idx;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
           ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
       ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.value.c_str());
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
@@ -3502,7 +3501,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request &req, mrs_m
 
 /* callbackSwitchController() //{ */
 
-bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
   char message[200];
 
@@ -3513,7 +3512,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
   if (!got_uav_state_) {
 
-    sprintf((char *)&message, "Can't switch controller, missing odometry!");
+    sprintf((char*)&message, "Can't switch controller, missing odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3522,7 +3521,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
   if (!got_odometry_innovation_) {
 
-    sprintf((char *)&message, "Can't switch controller, missing odometry innovation!");
+    sprintf((char*)&message, "Can't switch controller, missing odometry innovation!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3531,7 +3530,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
   if (!got_pixhawk_odometry_) {
 
-    sprintf((char *)&message, "Can't switch controller, missing PixHawk odometry!");
+    sprintf((char*)&message, "Can't switch controller, missing PixHawk odometry!");
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3549,7 +3548,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
   // check if the controller exists
   if (new_controller_idx < 0) {
 
-    sprintf((char *)&message, "The controller %s does not exist!", req.value.c_str());
+    sprintf((char*)&message, "The controller %s does not exist!", req.value.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
     res.success = false;
     res.message = message;
@@ -3559,7 +3558,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
   // check if the controller is not active
   if (new_controller_idx == active_controller_idx) {
 
-    sprintf((char *)&message, "Not switching, the controller %s is already active!", req.value.c_str());
+    sprintf((char*)&message, "Not switching, the controller %s is already active!", req.value.c_str());
     ROS_WARN("[ControlManager]: %s", message);
     res.success = true;
     res.message = message;
@@ -3574,13 +3573,13 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
       ROS_INFO("[ControlManager]: Activating controller %s", _controller_names_[new_controller_idx].c_str());
       if (!controller_list_[new_controller_idx]->activate(last_attitude_cmd)) {
 
-        sprintf((char *)&message, "Controller %s was not activated", req.value.c_str());
+        sprintf((char*)&message, "Controller %s was not activated", req.value.c_str());
         ROS_WARN("[ControlManager]: %s", message);
         res.success = false;
 
       } else {
 
-        sprintf((char *)&message, "Controller %s has been activated", req.value.c_str());
+        sprintf((char*)&message, "Controller %s has been activated", req.value.c_str());
         ROS_INFO("[ControlManager]: %s", message);
         res.success = true;
 
@@ -3609,12 +3608,12 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
           controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = new_controller_idx;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
           ROS_ERROR("[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
       ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.value.c_str());
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
     }
@@ -3638,7 +3637,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request &req, mr
 
 /* //{ callbackEHover() */
 
-bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3652,7 +3651,7 @@ bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::R
 
 /* callbackFailsafe() //{ */
 
-bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3666,7 +3665,7 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
 
 /* callbackFailsafeEscalating() //{ */
 
-bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3680,7 +3679,7 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
 
 /* //{ callbackELand() */
 
-bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3694,7 +3693,7 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request &
 
 /* //{ callbackPartialLanding() */
 
-bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3708,7 +3707,7 @@ bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::
 
 /* //{ callbackMotors() */
 
-bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3726,7 +3725,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   if (!isPointInSafetyArea2d(current_coord)) {
 
-    sprintf((char *)&message, "Can't switch motors on, the UAV is outside of the safety area!");
+    sprintf((char*)&message, "Can't switch motors on, the UAV is outside of the safety area!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3734,7 +3733,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   }
 
   if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_)) {
-    sprintf((char *)&message, "cannot switch motors ON, we landed in emergency.");
+    sprintf((char*)&message, "cannot switch motors ON, we landed in emergency.");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3742,7 +3741,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
   }
 
   if (!got_mavros_state_ || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
-    sprintf((char *)&message, "Can't switch motors ON, missing mavros state!");
+    sprintf((char*)&message, "Can't switch motors ON, missing mavros state!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3751,7 +3750,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   if (_bumper_enabled_) {
     if (!got_bumper_) {
-      sprintf((char *)&message, "Can't switch motors on, missing bumper data!");
+      sprintf((char*)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -3761,7 +3760,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
   switchMotors(req.data);
 
-  sprintf((char *)&message, "Motors: %s", motors_ ? "ON" : "OFF");
+  sprintf((char*)&message, "Motors: %s", motors_ ? "ON" : "OFF");
   res.message = message;
   res.success = true;
 
@@ -3774,13 +3773,13 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request &req, std_srvs::S
 
 /* callbackArm() //{ */
 
-bool ControlManager::callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   char message[200];
 
   if (req.data) {
 
-    sprintf((char *)&message, "Not allowed to arm the drone.");
+    sprintf((char*)&message, "Not allowed to arm the drone.");
     res.message = message;
     res.success = false;
     ROS_ERROR("[ControlManager]: %s", message);
@@ -3789,14 +3788,14 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetB
 
     if (arming(false)) {
 
-      sprintf((char *)&message, "Disarmed");
+      sprintf((char*)&message, "Disarmed");
       res.message = message;
       res.success = true;
       ROS_INFO("[ControlManager]: %s", message);
 
     } else {
 
-      sprintf((char *)&message, "Could not disarm");
+      sprintf((char*)&message, "Could not disarm");
       res.message = message;
       res.success = false;
       ROS_ERROR("[ControlManager]: %s", message);
@@ -3810,7 +3809,7 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request &req, std_srvs::SetB
 
 /* //{ callbackEnableCallbacks() */
 
-bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3818,7 +3817,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
   setCallbacks(req.data);
 
   char message[200];
-  sprintf((char *)&message, "Callbacks: %s", motors_ ? "enabled" : "disabled");
+  sprintf((char*)&message, "Callbacks: %s", motors_ ? "enabled" : "disabled");
   res.message = message;
   res.success = true;
 
@@ -3831,7 +3830,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request &req, st
 
 /* callbackSetConstraints() //{ */
 
-bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Request &req, mrs_msgs::TrackerConstraints::Response &res) {
+bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -3866,7 +3865,7 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
 
 /* //{ callbackEmergencyReferenceService() */
 
-bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -3905,7 +3904,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
       res.message = tracker_response->message;
       res.success = tracker_response->success;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -3918,7 +3917,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
 
 /* callbackPirouette() //{ */
 
-bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   // copy member variables
   auto uav_yaw = mrs_lib::get_mutexed(uav_yaw_, mutex_uav_state_);
@@ -3950,7 +3949,7 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
 /* callbackUseJoystick() //{ */
 
-bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   char message[400];
 
@@ -3966,7 +3965,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", _joystick_tracker_name_.c_str(), response.message.c_str());
+    sprintf((char*)&message, "Switching to %s was unsuccessfull: %s", _joystick_tracker_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3979,7 +3978,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
   if (!response.success) {
 
-    sprintf((char *)&message, "Switching to %s was unsuccessfull: %s", _joystick_controller_name_.c_str(), response.message.c_str());
+    sprintf((char*)&message, "Switching to %s was unsuccessfull: %s", _joystick_controller_name_.c_str(), response.message.c_str());
     res.success = false;
     res.message = message;
 
@@ -3996,7 +3995,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
     return true;
   }
 
-  sprintf((char *)&message, "Switched to joystick control");
+  sprintf((char*)&message, "Switched to joystick control");
   res.success = true;
   res.message = message;
 
@@ -4009,7 +4008,7 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
 /* //{ callbackHoverService() */
 
-bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4023,7 +4022,7 @@ bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Re
 
 /* //{ callbackTransformReference() */
 
-bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request &req, mrs_msgs::TransformReferenceSrv::Response &res) {
+bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4051,7 +4050,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 /* //{ transformPoseSrv() */
 
-bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request &req, mrs_msgs::TransformPoseSrv::Response &res) {
+bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4080,7 +4079,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request &
 
 /* //{ transformVector3Srv() */
 
-bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request &req, mrs_msgs::TransformVector3Srv::Response &res) {
+bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4111,7 +4110,7 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
 
 /* //{ callbackReferenceService() */
 
-bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4217,7 +4216,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4230,7 +4229,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
 /* //{ callbackReferenceTopic() */
 
-void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr &msg) {
+void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -4318,7 +4317,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 /* //{ callbackGoToService() */
 
-bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
@@ -4403,7 +4402,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4416,7 +4415,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request &req, mrs_msgs:
 
 /* //{ callbackGoToFcuService() */
 
-bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
@@ -4508,7 +4507,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4521,7 +4520,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request &req, mrs_ms
 
 /* //{ callbackGoToRelativeService() */
 
-bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, mrs_msgs::Vec4::Response &res) {
+bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
@@ -4615,7 +4614,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_relative' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto_relative' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4628,7 +4627,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request &req, m
 
 /* //{ callbackGoToAltitudeService() */
 
-bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
@@ -4694,7 +4693,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto_altitude' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto_altitude' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4707,7 +4706,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request &req, m
 
 /* //{ callbackSetYawService() */
 
-bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4746,7 +4745,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'set_yaw' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4759,7 +4758,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request &req, mrs_msg
 
 /* //{ callbackSetYawRelativeService() */
 
-bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req, mrs_msgs::Vec1::Response &res) {
+bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4798,7 +4797,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request &req,
       res.success = tracker_response->success;
       res.message = tracker_response->message;
     } else {
-      sprintf((char *)&message, "The tracker '%s' does not implement 'set_yaw_relative' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'set_yaw_relative' service!", _tracker_names_[active_tracker_idx_].c_str());
       res.message = message;
       res.success = false;
     }
@@ -4944,7 +4943,7 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
 
 /* enforceControllerConstraints() //{ */
 
-bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest &constraints) {
+bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
@@ -5118,7 +5117,7 @@ double ControlManager::getMinHeight(void) {
 
 /* transformReferenceSingle() //{ */
 
-bool ControlManager::transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped &ref) {
+bool ControlManager::transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped& ref) {
 
   ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
   std::string to_frame_resolved = resolveFrameName(to_frame);
@@ -5146,7 +5145,7 @@ bool ControlManager::transformReferenceSingle(const std::string to_frame, mrs_ms
 
 /* transformPoseSingle() //{ */
 
-bool ControlManager::transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped &ref) {
+bool ControlManager::transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped& ref) {
 
   ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
   std::string to_frame_resolved = resolveFrameName(to_frame);
@@ -5174,7 +5173,7 @@ bool ControlManager::transformPoseSingle(const std::string to_frame, geometry_ms
 
 /* transformVector3Single() //{ */
 
-bool ControlManager::transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped &ref) {
+bool ControlManager::transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped& ref) {
 
   ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
   std::string to_frame_resolved = resolveFrameName(to_frame);
@@ -5202,7 +5201,7 @@ bool ControlManager::transformVector3Single(const std::string to_frame, geometry
 
 /* transformReference() //{ */
 
-bool ControlManager::transformReference(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref) {
+bool ControlManager::transformReference(const geometry_msgs::TransformStamped& tf, mrs_msgs::ReferenceStamped& ref) {
 
   ref.header.frame_id = resolveFrameName(ref.header.frame_id);
 
@@ -5253,7 +5252,7 @@ bool ControlManager::transformReference(const geometry_msgs::TransformStamped &t
 
 /* transformPose() //{ */
 
-bool ControlManager::transformPose(const geometry_msgs::TransformStamped &tf, geometry_msgs::PoseStamped &pose) {
+bool ControlManager::transformPose(const geometry_msgs::TransformStamped& tf, geometry_msgs::PoseStamped& pose) {
 
   pose.header.frame_id = resolveFrameName(pose.header.frame_id);
 
@@ -5282,7 +5281,7 @@ bool ControlManager::transformPose(const geometry_msgs::TransformStamped &tf, ge
 
 /* transformVector3() //{ */
 
-bool ControlManager::transformVector3(const geometry_msgs::TransformStamped &tf, geometry_msgs::Vector3Stamped &vector3) {
+bool ControlManager::transformVector3(const geometry_msgs::TransformStamped& tf, geometry_msgs::Vector3Stamped& vector3) {
 
   vector3.header.frame_id = resolveFrameName(vector3.header.frame_id);
 
@@ -5311,7 +5310,7 @@ bool ControlManager::transformVector3(const geometry_msgs::TransformStamped &tf,
 
 /* getTransform() //{ */
 
-bool ControlManager::getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf) {
+bool ControlManager::getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped& tf) {
 
   std::string to_frame_resolved   = resolveFrameName(to_frame);
   std::string from_frame_resolved = resolveFrameName(from_frame);
@@ -5352,7 +5351,7 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
 
     return true;
   }
-  catch (tf2::TransformException &ex) {
+  catch (tf2::TransformException& ex) {
     // this happens often -> DEBUG
     ROS_DEBUG("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
               ex.what());
@@ -5369,7 +5368,7 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
 
     return true;
   }
-  catch (tf2::TransformException &ex) {
+  catch (tf2::TransformException& ex) {
     // this does not happen often and when it does, it should be seen
     ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
               ex.what());
@@ -5385,7 +5384,7 @@ bool ControlManager::getTransform(const std::string from_frame, const std::strin
 /* bumperValidatePoint() //{ */
 
 // everything here happens in FCU
-bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped &point) {
+bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
   if (!_bumper_enabled_) {
     return true;
@@ -5905,7 +5904,7 @@ void ControlManager::changePartialLandingState(LandingStates_t new_state) {
 
 /* hover() //{ */
 
-bool ControlManager::hover(std::string &message_out) {
+bool ControlManager::hover(std::string& message_out) {
 
   if (!is_initialized_) {
 
@@ -5930,7 +5929,7 @@ bool ControlManager::hover(std::string &message_out) {
 
     } else {
 
-      sprintf((char *)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
+      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
       message_out = std::string(message);
       return false;
     }
@@ -5941,7 +5940,7 @@ bool ControlManager::hover(std::string &message_out) {
 
 /* //{ ehover() */
 
-bool ControlManager::ehover(std::string &message_out) {
+bool ControlManager::ehover(std::string& message_out) {
 
   if (!is_initialized_)
     return false;
@@ -5961,14 +5960,14 @@ bool ControlManager::ehover(std::string &message_out) {
       // check if the tracker is not active
       if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
-        sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
 
       } else {
 
         ROS_INFO("[ControlManager]: Activating tracker %s", _tracker_names_[_ehover_tracker_idx_].c_str());
         tracker_list_[_ehover_tracker_idx_]->activate(last_position_cmd);
-        sprintf((char *)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
         ROS_INFO("[ControlManager]: %s", message);
 
         {
@@ -5986,9 +5985,9 @@ bool ControlManager::ehover(std::string &message_out) {
 
           success = true;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
+          sprintf((char*)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -5996,9 +5995,9 @@ bool ControlManager::ehover(std::string &message_out) {
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
+      sprintf((char*)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -6017,13 +6016,13 @@ bool ControlManager::ehover(std::string &message_out) {
       // check if the controller is not active
       if (_eland_controller_idx_ == active_controller_idx_) {
 
-        sprintf((char *)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
+        sprintf((char*)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
 
       } else {
 
         controller_list_[_eland_controller_idx_]->activate(last_attitude_cmd);
-        sprintf((char *)&message, "Controller %s has been activated", _controller_names_[_eland_controller_idx_].c_str());
+        sprintf((char*)&message, "Controller %s has been activated", _controller_names_[_eland_controller_idx_].c_str());
         ROS_INFO("[ControlManager]: %s", message);
 
         {
@@ -6041,9 +6040,9 @@ bool ControlManager::ehover(std::string &message_out) {
 
           success = true;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", _tracker_names_[active_tracker_idx_].c_str());
+          sprintf((char*)&message, "[ControlManager]: Could not deactivate controller %s", _tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6051,9 +6050,9 @@ bool ControlManager::ehover(std::string &message_out) {
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", _ehover_tracker_name_.c_str());
+      sprintf((char*)&message, "[ControlManager]: Error during activation of controller %s", _ehover_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -6063,7 +6062,7 @@ bool ControlManager::ehover(std::string &message_out) {
   }
 
   if (success) {
-    sprintf((char *)&message, "[ControlManager]: ehover activated.");
+    sprintf((char*)&message, "[ControlManager]: ehover activated.");
     message_out = std::string(message);
   }
 
@@ -6074,7 +6073,7 @@ bool ControlManager::ehover(std::string &message_out) {
 
 /* eland() //{ */
 
-bool ControlManager::eland(std::string &message_out) {
+bool ControlManager::eland(std::string& message_out) {
 
   if (!is_initialized_)
     return false;
@@ -6098,14 +6097,14 @@ bool ControlManager::eland(std::string &message_out) {
       // check if the tracker is not active
       if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
-        sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
 
       } else {
 
         ROS_INFO("[ControlManager]: Activating tracker %s", _tracker_names_[_ehover_tracker_idx_].c_str());
         tracker_list_[_ehover_tracker_idx_]->activate(last_position_cmd);
-        sprintf((char *)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
         ROS_INFO("[ControlManager]: %s", message);
 
         {
@@ -6123,9 +6122,9 @@ bool ControlManager::eland(std::string &message_out) {
 
           success = true;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
+          sprintf((char*)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6133,9 +6132,9 @@ bool ControlManager::eland(std::string &message_out) {
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
+      sprintf((char*)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -6154,13 +6153,13 @@ bool ControlManager::eland(std::string &message_out) {
       // check if the controller is not active
       if (_eland_controller_idx_ == active_controller_idx_) {
 
-        sprintf((char *)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
+        sprintf((char*)&message, "Not switching, the controller %s is already active!", _eland_controller_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
 
       } else {
 
         controller_list_[_eland_controller_idx_]->activate(last_attitude_cmd);
-        sprintf((char *)&message, "Controller %s has been activated", _controller_names_[_eland_controller_idx_].c_str());
+        sprintf((char*)&message, "Controller %s has been activated", _controller_names_[_eland_controller_idx_].c_str());
         ROS_INFO("[ControlManager]: %s", message);
 
         {
@@ -6177,9 +6176,9 @@ bool ControlManager::eland(std::string &message_out) {
 
           success = true;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
+          sprintf((char*)&message, "[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6187,9 +6186,9 @@ bool ControlManager::eland(std::string &message_out) {
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of controller %s", _ehover_tracker_name_.c_str());
+      sprintf((char*)&message, "[ControlManager]: Error during activation of controller %s", _ehover_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -6207,12 +6206,12 @@ bool ControlManager::eland(std::string &message_out) {
     changePartialLandingState(IDLE_STATE);
     partial_landing_timer_.stop();
 
-    sprintf((char *)&message, "[ControlManager]: eland activated.");
+    sprintf((char*)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
 
   } else {
 
-    sprintf((char *)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
+    sprintf((char*)&message, "[ControlManager]: Error during activation of eland: %s", eland_out.response.message.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
 
     message_out = std::string(message);
@@ -6226,7 +6225,7 @@ bool ControlManager::eland(std::string &message_out) {
 
 /* partialLanding() //{ */
 
-bool ControlManager::partialLanding(std::string &message_out) {
+bool ControlManager::partialLanding(std::string& message_out) {
 
   // copy member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
@@ -6259,14 +6258,14 @@ bool ControlManager::partialLanding(std::string &message_out) {
       // check if the tracker is not active
       if (_ehover_tracker_idx_ == active_tracker_idx_) {
 
-        sprintf((char *)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Not switching, the tracker %s is already active!", _ehover_tracker_name_.c_str());
         ROS_WARN("[ControlManager]: %s", message);
 
       } else {
 
         ROS_INFO("[ControlManager]: Activating tracker %s", _tracker_names_[_ehover_tracker_idx_].c_str());
         tracker_list_[_ehover_tracker_idx_]->activate(last_position_cmd);
-        sprintf((char *)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
+        sprintf((char*)&message, "Tracker %s has been activated", _ehover_tracker_name_.c_str());
         ROS_INFO("[ControlManager]: %s", message);
 
         {
@@ -6284,9 +6283,9 @@ bool ControlManager::partialLanding(std::string &message_out) {
 
           success = true;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
 
-          sprintf((char *)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
+          sprintf((char*)&message, "[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
           ROS_ERROR("[ControlManager]: %s", message);
 
           message_out = std::string(message);
@@ -6294,9 +6293,9 @@ bool ControlManager::partialLanding(std::string &message_out) {
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
-      sprintf((char *)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
+      sprintf((char*)&message, "[ControlManager]: Error during activation of tracker %s", _ehover_tracker_name_.c_str());
       ROS_ERROR("[ControlManager]: %s", message);
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
 
@@ -6311,12 +6310,12 @@ bool ControlManager::partialLanding(std::string &message_out) {
   if (land_out.response.success) {
 
     changePartialLandingState(LANDING_STATE);
-    sprintf((char *)&message, "[ControlManager]: partial landing activated.");
+    sprintf((char*)&message, "[ControlManager]: partial landing activated.");
     message_out = std::string(message);
 
   } else {
 
-    sprintf((char *)&message, "[ControlManager]: Error during activation of land: %s", land_out.response.message.c_str());
+    sprintf((char*)&message, "[ControlManager]: Error during activation of land: %s", land_out.response.message.c_str());
     ROS_ERROR("[ControlManager]: %s", message);
 
     message_out = std::string(message);
@@ -6383,11 +6382,11 @@ bool ControlManager::failsafe() {
           controller_list_[active_controller_idx_]->deactivate();
           active_controller_idx_ = _failsafe_controller_idx_;
         }
-        catch (std::runtime_error &exrun) {
+        catch (std::runtime_error& exrun) {
           ROS_ERROR("[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
         }
       }
-      catch (std::runtime_error &exrun) {
+      catch (std::runtime_error& exrun) {
         ROS_ERROR("[ControlManager]: Error during activation of controller %s", _failsafe_controller_name_.c_str());
         ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
       }
@@ -6401,7 +6400,7 @@ bool ControlManager::failsafe() {
 
 /* escalatingFailsafe() //{ */
 
-bool ControlManager::escalatingFailsafe(std::string &message_out) {
+bool ControlManager::escalatingFailsafe(std::string& message_out) {
 
   if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
 
@@ -6586,7 +6585,7 @@ void ControlManager::updateTrackers(void) {
       }
     }
   }
-  catch (std::runtime_error &exrun) {
+  catch (std::runtime_error& exrun) {
     ROS_INFO("[ControlManager]: Exception while updateing trackers.");
     ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
   }
@@ -6653,7 +6652,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
         }
       }
     }
-    catch (std::runtime_error &exrun) {
+    catch (std::runtime_error& exrun) {
 
       ROS_INFO("[ControlManager]: Exception while updating the active controller.");
       ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());

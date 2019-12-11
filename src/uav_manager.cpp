@@ -23,7 +23,7 @@
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
-#include <mrs_lib/Utils.h>
+#include <mrs_lib/Mutex.h>
 
 #include <tf/transform_datatypes.h>
 
@@ -47,7 +47,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char *state_names[3] = {
+const char* state_names[3] = {
 
     "IDLING", "FLYING HOME", "LANDING"};
 
@@ -60,19 +60,19 @@ private:
 public:
   virtual void onInit();
 
-  bool callbackTakeoff(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackLand(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  bool callbackLandHome(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
-  void callbackOdometry(const nav_msgs::OdometryConstPtr &msg);
-  void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
-  void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg);
-  void callbackMavrosState(const mavros_msgs::StateConstPtr &msg);
-  void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg);
-  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg);
-  void callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg);
-  void callbackGains(const std_msgs::StringConstPtr &msg);
-  void callbackConstraints(const std_msgs::StringConstPtr &msg);
-  void callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg);
+  bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackLand(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackLandHome(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  void callbackOdometry(const nav_msgs::OdometryConstPtr& msg);
+  void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr& msg);
+  void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr& msg);
+  void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
+  void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr& msg);
+  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
+  void callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg);
+  void callbackGains(const std_msgs::StringConstPtr& msg);
+  void callbackConstraints(const std_msgs::StringConstPtr& msg);
+  void callbackMotors(const mrs_msgs::BoolStampedConstPtr& msg);
 
   void changeLandingState(LandingStates_t new_state);
 
@@ -109,7 +109,7 @@ public:
   ros::Time thrust_mass_estimate_first_time_;
 
   // diagnostics from landoff tracker
-  void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg);
+  void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr& msg);
   ros::Subscriber              subscriber_landoff_diagnostics_;
   mrs_msgs::LandoffDiagnostics landoff_diagnostics_;
   std::mutex                   mutex_landoff_diagnostics_;
@@ -222,11 +222,11 @@ public:
   LandingStates_t previous_state_landing_ = IDLE_STATE;
 
   // timer callbacks
-  void landingTimer(const ros::TimerEvent &event);
-  void takeoffTimer(const ros::TimerEvent &event);
-  void maxHeightTimer(const ros::TimerEvent &event);
-  void flighttimeTimer(const ros::TimerEvent &event);
-  void maxthrustTimer(const ros::TimerEvent &event);
+  void landingTimer(const ros::TimerEvent& event);
+  void takeoffTimer(const ros::TimerEvent& event);
+  void maxHeightTimer(const ros::TimerEvent& event);
+  void flighttimeTimer(const ros::TimerEvent& event);
+  void maxthrustTimer(const ros::TimerEvent& event);
 
   // Timer for checking max flight time
   ros::Timer flighttime_timer_;
@@ -245,7 +245,7 @@ public:
   ros::Time  maxthrust_first_time_;
 
   // profiler
-  mrs_lib::Profiler *profiler_;
+  mrs_lib::Profiler* profiler_;
   bool               _profiler_enabled_ = false;
 };
 
@@ -418,7 +418,7 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
 /* //{ landingTimer() */
 
-void UavManager::landingTimer(const ros::TimerEvent &event) {
+void UavManager::landingTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -563,7 +563,7 @@ void UavManager::landingTimer(const ros::TimerEvent &event) {
 
 /* //{ takeoffTimer() */
 
-void UavManager::takeoffTimer(const ros::TimerEvent &event) {
+void UavManager::takeoffTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -645,16 +645,15 @@ void UavManager::takeoffTimer(const ros::TimerEvent &event) {
 
 /* //{ maxHeightTimer() */
 
-void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
+void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
 
-  auto max_height   = mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
-  auto odometry     = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
-  auto odometry_yaw = mrs_lib::get_mutexed(odometry_yaw_, mutex_odometry_);
+  auto max_height               = mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
+  auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(odometry_, odometry_yaw_, mutex_odometry_);
 
   double odometry_x, odometry_y, odometry_z;
   odometry_x = odometry.pose.pose.position.x;
@@ -723,7 +722,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent &event) {
 
 /* //{ flighttimeTimer() */
 
-void UavManager::flighttimeTimer(const ros::TimerEvent &event) {
+void UavManager::flighttimeTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -766,7 +765,7 @@ void UavManager::flighttimeTimer(const ros::TimerEvent &event) {
 
 /* //{ maxthrustTimer() */
 
-void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
+void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -835,7 +834,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent &event) {
 
 /* //{ callbackTrackerStatus() */
 
-void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg) {
+void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -855,7 +854,7 @@ void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManage
 
 /* //{ callbackTargetAttitude() */
 
-void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr &msg) {
+void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -875,7 +874,7 @@ void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
 
 /* //{ callbackMavrosState() */
 
-void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
+void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -895,7 +894,7 @@ void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr &msg) {
 
 /* //{ callbackAttitudeCommand() */
 
-void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr &msg) {
+void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -915,7 +914,7 @@ void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr
 
 /* //{ callbackMaxHeight() */
 
-void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -935,7 +934,7 @@ void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr &msg) 
 
 /* //{ callbackHeight() */
 
-void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
+void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -955,7 +954,7 @@ void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr &msg) {
 
 /* //{ callbackGains() */
 
-void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr &msg) {
+void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -973,7 +972,7 @@ void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr &
 
 /* //{ callbackConstraints() */
 
-void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringConstPtr &msg) {
+void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -991,7 +990,7 @@ void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringCons
 
 /* //{ callbackOdometry() */
 
-void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
+void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -1017,7 +1016,7 @@ void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) {
 
 /* //{ callbackMotors() */
 
-void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
+void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -1037,7 +1036,7 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr &msg) {
 
 /* //{ callbackLandoffDiagnostics() */
 
-void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr &msg) {
+void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -1059,7 +1058,7 @@ void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsCo
 
 /* //{ callbackTakeoff() */
 
-bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -1080,7 +1079,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   char message[200];
 
   if (!got_odometry_) {
-    sprintf((char *)&message, "Can't takeoff, missing odometry!");
+    sprintf((char*)&message, "Can't takeoff, missing odometry!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1088,7 +1087,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_mavros_state_ || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
-    sprintf((char *)&message, "Can't takeoff, missing mavros state!");
+    sprintf((char*)&message, "Can't takeoff, missing mavros state!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1096,7 +1095,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!mavros_state.armed) {
-    sprintf((char *)&message, "Can't takeoff, UAV not armed!");
+    sprintf((char*)&message, "Can't takeoff, UAV not armed!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1104,7 +1103,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (mavros_state.mode.compare(std::string("OFFBOARD")) != 0) {
-    sprintf((char *)&message, "Can't takeoff, UAV not in offboard mode!");
+    sprintf((char*)&message, "Can't takeoff, UAV not in offboard mode!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1112,7 +1111,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char *)&message, "Can't takeoff, missing control manager diagnostics!");
+    sprintf((char*)&message, "Can't takeoff, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1120,7 +1119,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_target_attitude_) {
-    sprintf((char *)&message, "Can't takeoff, missing target attitude!");
+    sprintf((char*)&message, "Can't takeoff, missing target attitude!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1128,7 +1127,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_max_height_) {
-    sprintf((char *)&message, "Can't takeoff, missing max height");
+    sprintf((char*)&message, "Can't takeoff, missing max height");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1136,7 +1135,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_height_) {
-    sprintf((char *)&message, "Can't takeoff, missing height");
+    sprintf((char*)&message, "Can't takeoff, missing height");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1144,7 +1143,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_landoff_diagnostics_) {
-    sprintf((char *)&message, "Can't takeoff, missing landoff diagnostics");
+    sprintf((char*)&message, "Can't takeoff, missing landoff diagnostics");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1153,7 +1152,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
   if (_null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 &&
       _partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
-    sprintf((char *)&message, "Can't takeoff, need '%s' to be active!", _null_tracker_name_.c_str());
+    sprintf((char*)&message, "Can't takeoff, need '%s' to be active!", _null_tracker_name_.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1161,7 +1160,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (_gain_manager_required_ && (ros::Time::now() - gains_last_time).toSec() > 5.0) {
-    sprintf((char *)&message, "Can't takeoff, GainManager is not running!");
+    sprintf((char*)&message, "Can't takeoff, GainManager is not running!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1169,7 +1168,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (_constraint_manager_required_ && (ros::Time::now() - constraints_last_time).toSec() > 5.0) {
-    sprintf((char *)&message, "Can't takeoff, ConstraintManager is not running!");
+    sprintf((char*)&message, "Can't takeoff, ConstraintManager is not running!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1177,7 +1176,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
   }
 
   if (!got_motors_ || (ros::Time::now() - motors.stamp).toSec() > 1.0 || !motors.data) {
-    sprintf((char *)&message, "Can't takeoff, motors are off!");
+    sprintf((char*)&message, "Can't takeoff, motors are off!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1188,7 +1187,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
     if (!got_attitude_command_) {
 
-      sprintf((char *)&message, "Can't takeoff, missing attitude command!");
+      sprintf((char*)&message, "Can't takeoff, missing attitude command!");
       res.message = message;
       res.success = false;
       ROS_ERROR("[UavManager]: %s", message);
@@ -1197,7 +1196,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
     if (last_mass_difference > 0.5) {
 
-      sprintf((char *)&message, "Can't takeoff, estimated mass difference is too large: %.2f!", last_mass_difference);
+      sprintf((char*)&message, "Can't takeoff, estimated mass difference is too large: %.2f!", last_mass_difference);
       res.message = message;
       res.success = false;
       ROS_ERROR("[UavManager]: %s", message);
@@ -1285,7 +1284,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request &re
 
 /* //{ callbackLand() */
 
-bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -1296,7 +1295,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
   char message[100];
 
   if (!got_odometry_) {
-    sprintf((char *)&message, "Can't land, missing odometry!");
+    sprintf((char*)&message, "Can't land, missing odometry!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1304,7 +1303,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char *)&message, "Can't land, missing control manager diagnostics!");
+    sprintf((char*)&message, "Can't land, missing control manager diagnostics!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1312,7 +1311,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
   }
 
   if (!got_attitude_command_) {
-    sprintf((char *)&message, "Can't land, missing attitude command!");
+    sprintf((char*)&message, "Can't land, missing attitude command!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1337,7 +1336,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
   mrs_msgs::String switch_tracker_out;
   switch_tracker_out.request.value = _landing_tracker_name_;
   if (!service_client_switch_tracker_.call(switch_tracker_out)) {
-    sprintf((char *)&message, "Service call for switching to tracker %s failed.", _landing_tracker_name_.c_str());
+    sprintf((char*)&message, "Service call for switching to tracker %s failed.", _landing_tracker_name_.c_str());
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1360,7 +1359,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
 
       } else {
 
-        sprintf((char *)&message, "Service call for landing was not successfull: %s", land_out.response.message.c_str());
+        sprintf((char*)&message, "Service call for landing was not successfull: %s", land_out.response.message.c_str());
         res.message = message;
         res.success = false;
         ROS_ERROR("[UavManager]: %s", message);
@@ -1397,7 +1396,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request &req, 
 
 /* //{ callbackLandHome() */
 
-bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -1411,7 +1410,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   char message[100];
 
   if (!got_odometry_) {
-    sprintf((char *)&message, "Can't land, missing odometry!");
+    sprintf((char*)&message, "Can't land, missing odometry!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1419,7 +1418,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char *)&message, "Can't land, missing tracker status!");
+    sprintf((char*)&message, "Can't land, missing tracker status!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1427,7 +1426,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   }
 
   if (!got_attitude_command_) {
-    sprintf((char *)&message, "Can't land, missing attitude command!");
+    sprintf((char*)&message, "Can't land, missing attitude command!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
@@ -1435,7 +1434,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request &r
   }
 
   if (fixing_max_height_) {
-    sprintf((char *)&message, "Can't land, descedning to safety height!");
+    sprintf((char*)&message, "Can't land, descedning to safety height!");
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
