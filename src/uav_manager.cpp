@@ -23,7 +23,7 @@
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
-#include <mrs_lib/Mutex.h>
+#include <mrs_lib/mutex.h>
 
 #include <tf/transform_datatypes.h>
 
@@ -389,7 +389,7 @@ void UavManager::onInit() {
 void UavManager::changeLandingState(LandingStates_t new_state) {
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
+  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
 
   previous_state_landing_ = current_state_landing_;
   current_state_landing_  = new_state;
@@ -426,9 +426,9 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("landingTimer", _landing_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto control_manager_diagnostics = mrs_lib::get_mutexed(control_manager_diagnostics_, mutex_control_manager_diagnostics_);
-  auto target_attitude             = mrs_lib::get_mutexed(target_attitude_, mutex_target_attitude_);
-  auto odometry                    = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
+  auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
+  auto target_attitude             = mrs_lib::get_mutexed(mutex_target_attitude_, target_attitude_);
+  auto odometry                    = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
   double odometry_x, odometry_y;
   odometry_x = odometry.pose.pose.position.x;
@@ -570,7 +570,7 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.004, event);
 
-  auto landoff_diagnostics = mrs_lib::get_mutexed(landoff_diagnostics_, mutex_landoff_diagnostics_);
+  auto landoff_diagnostics = mrs_lib::get_mutexed(mutex_landoff_diagnostics_, landoff_diagnostics_);
 
   if (waiting_for_takeoff_) {
 
@@ -652,8 +652,8 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
 
-  auto max_height               = mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
-  auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(odometry_, odometry_yaw_, mutex_odometry_);
+  auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
+  auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
 
   double odometry_x, odometry_y, odometry_z;
   odometry_x = odometry.pose.pose.position.x;
@@ -773,7 +773,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
+  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
 
   if (attitude_command.thrust >= _maxthrust_max_thrust_) {
 
@@ -1064,13 +1064,13 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     return false;
 
   // copy member variables
-  auto odometry                    = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
-  auto motors                      = mrs_lib::get_mutexed(motors_, mutex_motors_);
-  auto gains_last_time             = mrs_lib::get_mutexed(gains_last_time_, mutex_gains_);
-  auto constraints_last_time       = mrs_lib::get_mutexed(constraints_last_time_, mutex_constraints_);
-  auto control_manager_diagnostics = mrs_lib::get_mutexed(control_manager_diagnostics_, mutex_control_manager_diagnostics_);
-  auto mavros_state                = mrs_lib::get_mutexed(mavros_state_, mutex_mavros_state_);
-  auto last_mass_difference        = mrs_lib::get_mutexed(last_mass_difference_, mutex_last_mass_difference_);
+  auto odometry                    = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
+  auto motors                      = mrs_lib::get_mutexed(mutex_motors_, motors_);
+  auto gains_last_time             = mrs_lib::get_mutexed(mutex_gains_, gains_last_time_);
+  auto constraints_last_time       = mrs_lib::get_mutexed(mutex_constraints_, constraints_last_time_);
+  auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
+  auto mavros_state                = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
+  auto last_mass_difference        = mrs_lib::get_mutexed(mutex_last_mass_difference_, last_mass_difference_);
 
   double odometry_x, odometry_y;
   odometry_x = odometry.pose.pose.position.x;
@@ -1290,7 +1290,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
     return false;
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(attitude_command_, mutex_attitude_command_);
+  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
 
   char message[100];
 
@@ -1402,7 +1402,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     return false;
 
   // copy member variables
-  auto odometry = mrs_lib::get_mutexed(odometry_, mutex_odometry_);
+  auto odometry = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
   double odometry_z;
   odometry_z = odometry.pose.pose.position.z;

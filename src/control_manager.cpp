@@ -24,7 +24,7 @@
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
-#include <mrs_lib/Mutex.h>
+#include <mrs_lib/mutex.h>
 
 #include <sensor_msgs/Joy.h>
 
@@ -41,7 +41,6 @@
 
 #include <nodelet/loader.h>
 
-#include <mutex>
 #include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
 #include <tf_conversions/tf_eigen.h>
@@ -1438,8 +1437,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     return;
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   double uav_x, uav_y, uav_z;
   uav_x = uav_state.pose.position.x;
@@ -1860,13 +1859,13 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
     return;
 
   // copy member variables
-  auto last_attitude_cmd                         = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd                         = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto [uav_state, uav_state_last_time, uav_yaw] = mrs_lib::get_mutexed(uav_state_, uav_state_last_time_, uav_yaw_, mutex_uav_state_);
-  auto odometry_innovation                       = mrs_lib::get_mutexed(odometry_innovation_, mutex_odometry_innovation_);
-  auto controller_tracker_switch_time            = mrs_lib::get_mutexed(controller_tracker_switch_time_, mutex_controller_tracker_switch_time_);
-  auto active_controller_idx                     = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
-  auto active_tracker_idx                        = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
+  auto last_attitude_cmd                         = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd                         = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto [uav_state, uav_state_last_time, uav_yaw] = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_state_last_time_, uav_yaw_);
+  auto odometry_innovation                       = mrs_lib::get_mutexed(mutex_odometry_innovation_, odometry_innovation_);
+  auto controller_tracker_switch_time            = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+  auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
 
@@ -2143,7 +2142,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("elandingTimer", _elanding_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   if (current_state_landing_ == IDLE_STATE) {
 
@@ -2217,7 +2216,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("partialLandingTimer", _partial_landing_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   if (current_state_partial_landing_ == IDLE_STATE) {
 
@@ -2309,8 +2308,8 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("failsafeTimer", _failsafe_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto pixhawk_odometry  = mrs_lib::get_mutexed(pixhawk_odometry_, mutex_pixhawk_odometry_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto pixhawk_odometry  = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
 
   mrs_msgs::UavState pixhawk_odom_uav_state;
   pixhawk_odom_uav_state.header   = pixhawk_odometry.header;
@@ -2368,7 +2367,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto rc_channels = mrs_lib::get_mutexed(rc_channels_, mutex_rc_channels_);
+  auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
 
   std::scoped_lock lock(mutex_joystick_);
 
@@ -2643,8 +2642,8 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("bumperTimer", _bumper_timer_rate_, 0.01, event);
 
   // copy member variables
-  auto active_tracker_idx = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
-  auto bumper_data        = mrs_lib::get_mutexed(bumper_data_, mutex_bumper_data_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto bumper_data        = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
   if (!_bumper_enabled_ || !_bumper_repulsion_enabled_) {
     return;
@@ -2733,8 +2732,8 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("controlTimerOneshot");
 
   // copy member variables
-  auto uav_state             = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto sanitized_constraints = mrs_lib::get_mutexed(sanitized_constraints_, mutex_constraints_);
+  auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
 
   if (!failsafe_triggered_) {  // when failsafe is triggered, updateControllers() and publish() is called in failsafeTimer()
 
@@ -3049,8 +3048,8 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
     return;
 
   // copy member variables
-  auto active_tracker_idx    = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
-  auto active_controller_idx = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackJoystick");
 
@@ -3344,9 +3343,9 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
     return false;
 
   // copy member variables
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd  = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   char message[200];
 
@@ -3506,9 +3505,9 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
   char message[200];
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto active_controller_idx = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   if (!got_uav_state_) {
 
@@ -3713,8 +3712,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     return false;
 
   // copy member variables
-  auto uav_state    = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto mavros_state = mrs_lib::get_mutexed(mavros_state_, mutex_mavros_state_);
+  auto uav_state    = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
 
   char message[200];
 
@@ -3839,7 +3838,7 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Reques
   }
 
   // copy member variables
-  auto sanitized_constraints = mrs_lib::get_mutexed(sanitized_constraints_, mutex_constraints_);
+  auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
 
   {
     std::scoped_lock lock(mutex_constraints_);
@@ -3920,7 +3919,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
 bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   // copy member variables
-  auto uav_yaw = mrs_lib::get_mutexed(uav_yaw_, mutex_uav_state_);
+  auto uav_yaw = mrs_lib::get_mutexed(mutex_uav_state_, uav_yaw_);
 
   if (!is_initialized_)
     return false;
@@ -4154,8 +4153,8 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference;
@@ -4260,8 +4259,8 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // copy the original message so we can modify it
 
@@ -4320,8 +4319,8 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4418,8 +4417,8 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
 bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4523,8 +4522,8 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4630,8 +4629,8 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4817,7 +4816,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
 bool ControlManager::isOffboard(void) {
 
   // copy member variables
-  auto mavros_state = mrs_lib::get_mutexed(mavros_state_, mutex_mavros_state_);
+  auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
 
   if (got_mavros_state_ && (ros::Time::now() - mavros_state.header.stamp).toSec() < 1.0 && mavros_state.mode.compare(std::string("OFFBOARD")) == STRING_EQUAL) {
 
@@ -4834,7 +4833,7 @@ bool ControlManager::isOffboard(void) {
 void ControlManager::shutdown() {
 
   // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   if (_automatic_pc_shutdown_enabled_) {
 
@@ -4946,8 +4945,8 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
 bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints) {
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto active_controller_idx = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   bool enforcing = false;
 
@@ -5020,8 +5019,8 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height = mrs_lib::get_mutexed(_min_height_, mutex_min_height_);
-  auto max_height = mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
+  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
+  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
@@ -5099,7 +5098,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxHeight(void) {
 
-  return mrs_lib::get_mutexed(_max_height_, mutex_max_height_);
+  return mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
 }
 
 //}
@@ -5108,7 +5107,7 @@ double ControlManager::getMaxHeight(void) {
 
 double ControlManager::getMinHeight(void) {
 
-  return mrs_lib::get_mutexed(_min_height_, mutex_min_height_);
+  return mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
 }
 
 //}
@@ -5395,7 +5394,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   }
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(bumper_data_, mutex_bumper_data_);
+  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
   if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
     return true;
@@ -5575,8 +5574,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
   }
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(bumper_data_, mutex_bumper_data_);
-  auto uav_state   = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
+  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
+  auto uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
@@ -5793,7 +5792,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(bumper_data_, mutex_bumper_data_);
+  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -5827,7 +5826,7 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
 void ControlManager::changeLandingState(LandingStates_t new_state) {
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   {
     std::scoped_lock lock(mutex_landing_state_machine_);
@@ -5867,7 +5866,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 void ControlManager::changePartialLandingState(LandingStates_t new_state) {
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   {
     std::scoped_lock lock(mutex_partial_landing_state_machine_);
@@ -5946,8 +5945,8 @@ bool ControlManager::ehover(std::string& message_out) {
     return false;
 
   // copy the member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   char message[200];
   bool success = false;
@@ -6083,8 +6082,8 @@ bool ControlManager::eland(std::string& message_out) {
   }
 
   // copy member variables
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   char message[200];
   bool success = false;
@@ -6228,9 +6227,9 @@ bool ControlManager::eland(std::string& message_out) {
 bool ControlManager::partialLanding(std::string& message_out) {
 
   // copy member variables
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd  = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (!is_initialized_)
     return false;
@@ -6332,9 +6331,9 @@ bool ControlManager::partialLanding(std::string& message_out) {
 bool ControlManager::failsafe() {
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto active_controller_idx = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   if (!is_initialized_)
     return false;
@@ -6523,8 +6522,8 @@ void ControlManager::switchMotors(bool input) {
 void ControlManager::updateTrackers(void) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -6598,7 +6597,7 @@ void ControlManager::updateTrackers(void) {
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
   // copy member variables
-  auto last_position_cmd = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
@@ -6671,11 +6670,11 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 void ControlManager::publish(void) {
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(last_attitude_cmd_, mutex_last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(last_position_cmd_, mutex_last_position_cmd_);
-  auto active_tracker_idx    = mrs_lib::get_mutexed(active_tracker_idx_, mutex_tracker_list_);
-  auto active_controller_idx = mrs_lib::get_mutexed(active_controller_idx_, mutex_controller_list_);
-  auto uav_state             = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   tf::Quaternion desired_orientation;
 
@@ -6954,7 +6953,7 @@ double ControlManager::angleDist(const double in1, const double in2) {
 std::string ControlManager::resolveFrameName(const std::string in) {
 
   // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(uav_state_, mutex_uav_state_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   if (in.compare("") == STRING_EQUAL) {
 
