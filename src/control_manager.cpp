@@ -3271,6 +3271,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
     } else {
 
+      // detect the switch of a switch on the RC
       if ((rc_joystick_channel_last_value_ < PWM_MIDDLE && msg->channels[_rc_joystick_channel_] > PWM_MIDDLE) ||
           (rc_joystick_channel_last_value_ > PWM_MIDDLE && msg->channels[_rc_joystick_channel_] < PWM_MIDDLE)) {
 
@@ -3279,11 +3280,12 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
         rc_channel_switch_time_.insert(rc_channel_switch_time_.begin(), ros::Time::now());
       }
+
+      // do not forget to update the last... variable
+      rc_joystick_channel_last_value_ = msg->channels[_rc_joystick_channel_];
+
     }
   }
-
-  // do not forget to update the last... variable
-  rc_joystick_channel_last_value_ = msg->channels[_rc_joystick_channel_];
 
   // | ------------------------ rc eland ------------------------ |
   if (_rc_eland_enabled_) {
