@@ -25,6 +25,7 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Utils.h>
 #include <mrs_lib/mutex.h>
+#include <mrs_lib/transformer.h>
 
 #include <sensor_msgs/Joy.h>
 
@@ -42,8 +43,6 @@
 #include <nodelet/loader.h>
 
 #include <eigen3/Eigen/Eigen>
-#include <tf/transform_datatypes.h>
-#include <tf_conversions/tf_eigen.h>
 
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -52,6 +51,8 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf/transform_datatypes.h>
+#include <tf_conversions/tf_eigen.h>
 
 #include <mrs_msgs/ReferenceStamped.h>
 
@@ -178,16 +179,6 @@ TrackerParams::TrackerParams(std::string address) {
 
 //}
 
-/* struct TransformCached_t //{ */
-
-typedef struct
-{
-  ros::Time                       stamp;
-  geometry_msgs::TransformStamped tf;
-} TransformCache_t;
-
-//}
-
 class ControlManager : public nodelet::Nodelet {
 
 public:
@@ -210,6 +201,9 @@ private:
   std::map<std::string, ControllerParams>                     controllers_;        // map between controller names and controller params
   std::vector<boost::shared_ptr<mrs_uav_manager::Controller>> controller_list_;    // list of controllers, routines are callable from this
   std::mutex                                                  mutex_controller_list_;
+
+  // transfomer
+  mrs_lib::Transformer* transformer_;
 
   // defines the type of state input: odometry or uav_state mesasge types
   int _state_input_;
@@ -266,29 +260,8 @@ private:
   std::mutex         mutex_odometry_innovation_;
   bool               got_odometry_innovation_ = false;
 
-  // tf buffer for listening to transformations
-  tf2_ros::Buffer                             tf_buffer_;
-  std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr_;
-  std::mutex                                  mutex_tf_buffer_;
-
-  // caches the last calculated transforms
-  // if someone asks for tf which was calculated within the last 1 ms
-  // it is pulled from a cache
-  std::map<std::string, TransformCache_t> transformer_cache_;
-
   // resolves simplified frame names
   std::string resolveFrameName(const std::string in);
-
-  // basic routines for transformations
-  bool transformReference(const geometry_msgs::TransformStamped& tf, mrs_msgs::ReferenceStamped& ref);
-  bool transformPose(const geometry_msgs::TransformStamped& tf, geometry_msgs::PoseStamped& pose);
-  bool transformVector3(const geometry_msgs::TransformStamped& tf, geometry_msgs::Vector3Stamped& twist);
-  bool getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped& tf);
-
-  // one-time-use routines for transformations
-  bool transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped& ref);
-  bool transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped& ref);
-  bool transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped& ref);
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
@@ -1386,16 +1359,16 @@ void ControlManager::onInit() {
 
   // | ----------------------- tf listener ---------------------- |
 
-  tf_listener_ptr_ = std::make_unique<tf2_ros::TransformListener>(tf_buffer_, "ControlManager");
+  transformer_ = new mrs_lib::Transformer("ControlManager", _uav_name_, 0.001);
 
   // bind routines for the shared transformer
-  common_handlers_.transformer.transformReference       = boost::bind(&ControlManager::transformReference, this, _1, _2);
-  common_handlers_.transformer.transformReferenceSingle = boost::bind(&ControlManager::transformReferenceSingle, this, _1, _2);
-  common_handlers_.transformer.transformPose            = boost::bind(&ControlManager::transformPose, this, _1, _2);
-  common_handlers_.transformer.transformPoseSingle      = boost::bind(&ControlManager::transformPoseSingle, this, _1, _2);
-  common_handlers_.transformer.transformVector3         = boost::bind(&ControlManager::transformVector3, this, _1, _2);
-  common_handlers_.transformer.transformVector3Single   = boost::bind(&ControlManager::transformVector3Single, this, _1, _2);
-  common_handlers_.transformer.getTransform             = boost::bind(&ControlManager::getTransform, this, _1, _2, _3, _4);
+  common_handlers_.transformer.transformReference       = boost::bind(&mrs_lib::Transformer::transformReference, transformer_, _1, _2);
+  common_handlers_.transformer.transformReferenceSingle = boost::bind(&mrs_lib::Transformer::transformReferenceSingle, transformer_, _1, _2);
+  common_handlers_.transformer.transformPose            = boost::bind(&mrs_lib::Transformer::transformPose, transformer_, _1, _2);
+  common_handlers_.transformer.transformPoseSingle      = boost::bind(&mrs_lib::Transformer::transformPoseSingle, transformer_, _1, _2);
+  common_handlers_.transformer.transformVector3         = boost::bind(&mrs_lib::Transformer::transformVector3, transformer_, _1, _2);
+  common_handlers_.transformer.transformVector3Single   = boost::bind(&mrs_lib::Transformer::transformVector3Single, transformer_, _1, _2);
+  common_handlers_.transformer.getTransform             = boost::bind(&mrs_lib::Transformer::getTransform, transformer_, _1, _2, _3, _4);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -2876,6 +2849,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
     uav_state_last_time_ = ros::Time::now();
 
+    transformer_->setCurrentControlFrame(msg->header.frame_id);
+
     got_uav_state_ = true;
   }
 
@@ -2962,6 +2937,8 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
     m.getRPY(uav_roll_, uav_pitch_, uav_yaw_);
 
     uav_state_last_time_ = ros::Time::now();
+
+    transformer_->setCurrentControlFrame(msg->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -3283,7 +3260,6 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
       // do not forget to update the last... variable
       rc_joystick_channel_last_value_ = msg->channels[_rc_joystick_channel_];
-
     }
   }
 
@@ -4031,7 +4007,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
 
-  if (!transformReferenceSingle(req.frame_id, transformed_reference)) {
+  if (!transformer_->transformReferenceSingle(req.frame_id, transformed_reference)) {
 
     res.message = "the reference could not be transformed";
     res.success = false;
@@ -4059,7 +4035,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
 
-  if (!transformPoseSingle(req.frame_id, transformed_pose)) {
+  if (!transformer_->transformPoseSingle(req.frame_id, transformed_pose)) {
 
     res.message = "the pose could not be transformed";
     res.success = false;
@@ -4088,7 +4064,7 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
 
-  if (!transformVector3Single(req.frame_id, transformed_vector3)) {
+  if (!transformer_->transformVector3Single(req.frame_id, transformed_vector3)) {
 
     res.message = "the twist could not be transformed";
     res.success = false;
@@ -4163,7 +4139,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   transformed_reference.header    = req.header;
   transformed_reference.reference = req.reference;
 
-  if (!transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -4268,7 +4244,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
   mrs_msgs::ReferenceStamped transformed_reference = *msg;
 
-  if (!transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     return;
@@ -4462,7 +4438,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
-  if (!transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
+  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -5026,7 +5002,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
-  if (!transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
@@ -5053,7 +5029,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
-  if (!transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
@@ -5076,14 +5052,14 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
   mrs_msgs::ReferenceStamped start_transformed = start;
   mrs_msgs::ReferenceStamped end_transformed   = end;
 
-  if (!transformReferenceSingle(_safety_area_frame_, start_transformed)) {
+  if (!transformer_->transformReferenceSingle(_safety_area_frame_, start_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
     return false;
   }
 
-  if (!transformReferenceSingle(_safety_area_frame_, end_transformed)) {
+  if (!transformer_->transformReferenceSingle(_safety_area_frame_, end_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
@@ -5114,272 +5090,6 @@ double ControlManager::getMinHeight(void) {
 
 //}
 
-// | --------------------- TF transformer --------------------- |
-
-/* transformReferenceSingle() //{ */
-
-bool ControlManager::transformReferenceSingle(const std::string to_frame, mrs_msgs::ReferenceStamped& ref) {
-
-  ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
-  std::string to_frame_resolved = resolveFrameName(to_frame);
-
-  if (to_frame_resolved.compare(ref.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  geometry_msgs::TransformStamped tf;
-
-  // get the transform
-  if (!getTransform(ref.header.frame_id, to_frame_resolved, ref.header.stamp, tf)) {
-    return false;
-  }
-
-  // do the transformation
-  if (!transformReference(tf, ref)) {
-    return false;
-  }
-
-  return true;
-}
-
-//}
-
-/* transformPoseSingle() //{ */
-
-bool ControlManager::transformPoseSingle(const std::string to_frame, geometry_msgs::PoseStamped& ref) {
-
-  ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
-  std::string to_frame_resolved = resolveFrameName(to_frame);
-
-  if (to_frame_resolved.compare(ref.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  geometry_msgs::TransformStamped tf;
-
-  // get the transform
-  if (!getTransform(ref.header.frame_id, to_frame_resolved, ref.header.stamp, tf)) {
-    return false;
-  }
-
-  // do the transformation
-  if (!transformPose(tf, ref)) {
-    return false;
-  }
-
-  return true;
-}
-
-//}
-
-/* transformVector3Single() //{ */
-
-bool ControlManager::transformVector3Single(const std::string to_frame, geometry_msgs::Vector3Stamped& ref) {
-
-  ref.header.frame_id           = resolveFrameName(ref.header.frame_id);
-  std::string to_frame_resolved = resolveFrameName(to_frame);
-
-  if (to_frame_resolved.compare(ref.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  geometry_msgs::TransformStamped tf;
-
-  // get the transform
-  if (!getTransform(ref.header.frame_id, to_frame_resolved, ref.header.stamp, tf)) {
-    return false;
-  }
-
-  // do the transformation
-  if (!transformVector3(tf, ref)) {
-    return false;
-  }
-
-  return true;
-}
-
-//}
-
-/* transformReference() //{ */
-
-bool ControlManager::transformReference(const geometry_msgs::TransformStamped& tf, mrs_msgs::ReferenceStamped& ref) {
-
-  ref.header.frame_id = resolveFrameName(ref.header.frame_id);
-
-  if (tf.header.frame_id.compare(ref.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  // create the pose message
-  geometry_msgs::PoseStamped pose;
-  pose.header = ref.header;
-
-  pose.pose.position.x = ref.reference.position.x;
-  pose.pose.position.y = ref.reference.position.y;
-  pose.pose.position.z = ref.reference.position.z;
-
-  tf::Quaternion quat = tf::createQuaternionFromRPY(0, 0, ref.reference.yaw);
-
-  pose.pose.orientation.x = quat.getX();
-  pose.pose.orientation.y = quat.getY();
-  pose.pose.orientation.z = quat.getZ();
-  pose.pose.orientation.w = quat.getW();
-
-  try {
-    tf2::doTransform(pose, pose, tf);
-
-    // copy the new transformed data back
-    ref.reference.position.x = pose.pose.position.x;
-    ref.reference.position.y = pose.pose.position.y;
-    ref.reference.position.z = pose.pose.position.z;
-
-    quaternionMsgToTF(pose.pose.orientation, quat);
-    tf::Matrix3x3 m(quat);
-    double        roll, pitch;
-    m.getRPY(roll, pitch, ref.reference.yaw);
-
-    ref.header.frame_id = tf.header.frame_id;
-    ref.header.stamp    = tf.header.stamp;
-
-    return true;
-  }
-  catch (...) {
-    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", tf.header.frame_id.c_str(), tf.child_frame_id.c_str());
-    return false;
-  }
-}
-
-//}
-
-/* transformPose() //{ */
-
-bool ControlManager::transformPose(const geometry_msgs::TransformStamped& tf, geometry_msgs::PoseStamped& pose) {
-
-  pose.header.frame_id = resolveFrameName(pose.header.frame_id);
-
-  if (tf.header.frame_id.compare(pose.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  // create the pose message
-  geometry_msgs::PoseStamped pose_transformed = pose;
-
-  try {
-    tf2::doTransform(pose_transformed, pose_transformed, tf);
-
-    // copy the new transformed data back
-    pose = pose_transformed;
-
-    return true;
-  }
-  catch (...) {
-    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", tf.header.frame_id.c_str(), tf.child_frame_id.c_str());
-    return false;
-  }
-}
-
-//}
-
-/* transformVector3() //{ */
-
-bool ControlManager::transformVector3(const geometry_msgs::TransformStamped& tf, geometry_msgs::Vector3Stamped& vector3) {
-
-  vector3.header.frame_id = resolveFrameName(vector3.header.frame_id);
-
-  if (tf.header.frame_id.compare(vector3.header.frame_id) == STRING_EQUAL) {
-    return true;
-  }
-
-  // create the pose message
-  geometry_msgs::Vector3Stamped vector3_transformed = vector3;
-
-  try {
-    tf2::doTransform(vector3_transformed, vector3_transformed, tf);
-
-    // copy the new transformed data back
-    vector3 = vector3_transformed;
-
-    return true;
-  }
-  catch (...) {
-    ROS_WARN("[ControlManager]: Error during transform from \"%s\" frame to \"%s\" frame.", tf.header.frame_id.c_str(), tf.child_frame_id.c_str());
-    return false;
-  }
-}
-
-//}
-
-/* getTransform() //{ */
-
-bool ControlManager::getTransform(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped& tf) {
-
-  std::string to_frame_resolved   = resolveFrameName(to_frame);
-  std::string from_frame_resolved = resolveFrameName(from_frame);
-
-  std::string tf_frame_combined = to_frame_resolved + "->" + from_frame_resolved;
-
-  // check the cache
-  std::map<std::string, TransformCache_t>::iterator it;
-  it = transformer_cache_.find(tf_frame_combined);
-
-  if (it != transformer_cache_.end()) {  // found in the cache
-
-    double tf_age = (ros::Time::now() - it->second.stamp).toSec();
-
-    if (tf_age < 0.001) {
-
-      tf = it->second.tf;
-      return true;
-    }
-
-  } else {
-
-    TransformCache_t new_tf;
-    new_tf.stamp = ros::Time(0);
-    transformer_cache_.insert(std::pair<std::string, TransformCache_t>(tf_frame_combined, new_tf));
-
-    it = transformer_cache_.find(tf_frame_combined);
-  }
-
-  try {
-
-    std::scoped_lock lock(mutex_tf_buffer_);
-
-    tf = tf_buffer_.lookupTransform(to_frame_resolved, from_frame_resolved, time_stamp, ros::Duration(0.0));
-
-    it->second.stamp = ros::Time::now();
-    it->second.tf    = tf;
-
-    return true;
-  }
-  catch (tf2::TransformException& ex) {
-    // this happens often -> DEBUG
-    ROS_DEBUG("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
-              ex.what());
-  }
-
-  try {
-
-    std::scoped_lock lock(mutex_tf_buffer_);
-
-    tf = tf_buffer_.lookupTransform(to_frame_resolved, from_frame_resolved, ros::Time(0), ros::Duration(0.0));
-
-    it->second.stamp = ros::Time::now();
-    it->second.tf    = tf;
-
-    return true;
-  }
-  catch (tf2::TransformException& ex) {
-    // this does not happen often and when it does, it should be seen
-    ROS_ERROR("[ControlManager]: Exception caught while constructing transform from '%s' to '%s': %s", from_frame_resolved.c_str(), to_frame_resolved.c_str(),
-              ex.what());
-  }
-
-  return false;
-}
-
-//}
-
 // | --------------------- obstacle bumper -------------------- |
 
 /* bumperValidatePoint() //{ */
@@ -5404,7 +5114,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
   mrs_msgs::ReferenceStamped point_fcu = point;
 
-  if (!transformReferenceSingle("fcu_untilted", point_fcu)) {
+  if (!transformer_->transformReferenceSingle("fcu_untilted", point_fcu)) {
 
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
@@ -5540,7 +5250,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    if (!transformReferenceSingle(point.header.frame_id, point_fcu)) {
+    if (!transformer_->transformReferenceSingle(point.header.frame_id, point_fcu)) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
 
@@ -5729,7 +5439,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // transform the reference into the currently used frame
       // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
       // to the tracker before we actually call the goto service
-      if (!transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
+      if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
 
         ROS_WARN("[ControlManager]: the reference could not be transformed.");
         return false;
