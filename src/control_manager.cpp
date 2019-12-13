@@ -1357,11 +1357,11 @@ void ControlManager::onInit() {
   service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReferenceService, this);
   service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
-  // | ----------------------- tf listener ---------------------- |
+  // | --------------------- tf transformer --------------------- |
 
   transformer_ = new mrs_lib::Transformer("ControlManager", _uav_name_, 0.001);
 
-  // bind routines for the shared transformer
+  // bind transformer routines so trackers and controllers can use them
   common_handlers_.transformer.transformReference       = boost::bind(&mrs_lib::Transformer::transformReference, transformer_, _1, _2);
   common_handlers_.transformer.transformReferenceSingle = boost::bind(&mrs_lib::Transformer::transformReferenceSingle, transformer_, _1, _2);
   common_handlers_.transformer.transformPose            = boost::bind(&mrs_lib::Transformer::transformPose, transformer_, _1, _2);
