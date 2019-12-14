@@ -102,8 +102,8 @@ private:
 
   // | ------------------------ profiler ------------------------ |
 private:
-  mrs_lib::Profiler *profiler;
-  bool               profiler_enabled_ = false;
+  mrs_lib::Profiler profiler;
+  bool              profiler_enabled_ = false;
   ;
 };
 
@@ -220,7 +220,7 @@ void GainManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler = new mrs_lib::Profiler(nh_, "GainManager", profiler_enabled_);
+  profiler = mrs_lib::Profiler(nh_, "GainManager", profiler_enabled_);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -351,7 +351,7 @@ void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstP
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackOdometryDiagnostics");
+  mrs_lib::Routine profiler_routine = profiler.createRoutine("callbackOdometryDiagnostics");
 
   {
     std::scoped_lock lock(mutex_odometry_diagnostics);
@@ -371,7 +371,7 @@ void GainManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManag
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("callbackControlManagerDiagnostics");
+  mrs_lib::Routine profiler_routine = profiler.createRoutine("callbackControlManagerDiagnostics");
 
   {
     std::scoped_lock lock(mutex_control_manager_diagnostics);
@@ -443,7 +443,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   if (!is_initialized)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler->createRoutine("gainManagementTimer", rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler.createRoutine("gainManagementTimer", rate_, 0.01, event);
 
   if (!got_odometry_diagnostics) {
     ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, missing odometry diagnostics!");

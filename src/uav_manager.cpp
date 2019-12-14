@@ -245,8 +245,8 @@ public:
   ros::Time  maxthrust_first_time_;
 
   // profiler
-  mrs_lib::Profiler* profiler_;
-  bool               _profiler_enabled_ = false;
+  mrs_lib::Profiler profiler_;
+  bool              _profiler_enabled_ = false;
 };
 
 //}
@@ -358,7 +358,7 @@ void UavManager::onInit() {
   // |                          profiler                          |
   // --------------------------------------------------------------
 
-  profiler_ = new mrs_lib::Profiler(nh_, "UavManager", _profiler_enabled_);
+  profiler_ = mrs_lib::Profiler(nh_, "UavManager", _profiler_enabled_);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -423,7 +423,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("landingTimer", _landing_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("landingTimer", _landing_timer_rate_, 0.01, event);
 
   // copy member variables
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
@@ -568,7 +568,7 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.004, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.004, event);
 
   auto landoff_diagnostics = mrs_lib::get_mutexed(mutex_landoff_diagnostics_, landoff_diagnostics_);
 
@@ -650,7 +650,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
 
   auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
   auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
@@ -727,7 +727,7 @@ void UavManager::flighttimeTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("flighttimeTimer", _flighttime_timer_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("flighttimeTimer", _flighttime_timer_rate_, 0.1, event);
 
   flighttime_ += 1.0 / _flighttime_timer_rate_;
 
@@ -770,7 +770,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
 
   // copy member variables
   auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
@@ -839,7 +839,7 @@ void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManage
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackControlManagerDiagnostics");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackControlManagerDiagnostics");
 
   {
     std::scoped_lock lock(mutex_control_manager_diagnostics_);
@@ -859,7 +859,7 @@ void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPt
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackTargetAttitude");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTargetAttitude");
 
   {
     std::scoped_lock lock(mutex_target_attitude_);
@@ -879,7 +879,7 @@ void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMavrosState");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosState");
 
   {
     std::scoped_lock lock(mutex_mavros_state_);
@@ -899,7 +899,7 @@ void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackAttitudeCommand");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackAttitudeCommand");
 
   {
     std::scoped_lock lock(mutex_attitude_command_);
@@ -919,7 +919,7 @@ void UavManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg) 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMaxHeight");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMaxHeight");
 
   {
     std::scoped_lock lock(mutex_max_height_);
@@ -939,7 +939,7 @@ void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackHeight");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackHeight");
 
   {
     std::scoped_lock lock(mutex_height_);
@@ -959,7 +959,7 @@ void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr& 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackGains");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGains");
 
   {
     std::scoped_lock lock(mutex_gains_);
@@ -977,7 +977,7 @@ void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringCons
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackConstraints");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackConstraints");
 
   {
     std::scoped_lock lock(mutex_constraints_);
@@ -995,7 +995,7 @@ void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackOdometry");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
   {
     std::scoped_lock lock(mutex_odometry_);
@@ -1021,7 +1021,7 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMotors");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMotors");
 
   {
     std::scoped_lock lock(mutex_motors_);
@@ -1041,7 +1041,7 @@ void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsCo
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackLandoffDiagnostics");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackLandoffDiagnostics");
 
   {
     std::scoped_lock lock(mutex_landoff_diagnostics_);

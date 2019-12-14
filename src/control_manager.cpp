@@ -203,7 +203,7 @@ private:
   std::mutex                                                  mutex_controller_list_;
 
   // transfomer
-  mrs_lib::Transformer* transformer_;
+  mrs_lib::Transformer transformer_;
 
   // defines the type of state input: odometry or uav_state mesasge types
   int _state_input_;
@@ -655,8 +655,8 @@ private:
   double _initial_body_disturbance_y_;
 
   // profiling
-  mrs_lib::Profiler* profiler_;
-  bool               _profiler_enabled_ = false;
+  mrs_lib::Profiler profiler_;
+  bool              _profiler_enabled_ = false;
 
   // automatic pc shutdown (DARPA specific)
   bool   _automatic_pc_shutdown_enabled_ = false;
@@ -1271,7 +1271,7 @@ void ControlManager::onInit() {
   // |                          profiler_                          |
   // --------------------------------------------------------------
 
-  profiler_ = new mrs_lib::Profiler(nh_, "ControlManager", _profiler_enabled_);
+  profiler_ = mrs_lib::Profiler(nh_, "ControlManager", _profiler_enabled_);
 
   // --------------------------------------------------------------
   // |                         publishers                         |
@@ -1359,16 +1359,16 @@ void ControlManager::onInit() {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = new mrs_lib::Transformer("ControlManager", _uav_name_, 0.001);
+  transformer_ = mrs_lib::Transformer("ControlManager", _uav_name_);
 
   // bind transformer routines so trackers and controllers can use them
-  common_handlers_.transformer.transformReference       = boost::bind(&mrs_lib::Transformer::transformReference, transformer_, _1, _2);
-  common_handlers_.transformer.transformReferenceSingle = boost::bind(&mrs_lib::Transformer::transformReferenceSingle, transformer_, _1, _2);
-  common_handlers_.transformer.transformPose            = boost::bind(&mrs_lib::Transformer::transformPose, transformer_, _1, _2);
-  common_handlers_.transformer.transformPoseSingle      = boost::bind(&mrs_lib::Transformer::transformPoseSingle, transformer_, _1, _2);
-  common_handlers_.transformer.transformVector3         = boost::bind(&mrs_lib::Transformer::transformVector3, transformer_, _1, _2);
-  common_handlers_.transformer.transformVector3Single   = boost::bind(&mrs_lib::Transformer::transformVector3Single, transformer_, _1, _2);
-  common_handlers_.transformer.getTransform             = boost::bind(&mrs_lib::Transformer::getTransform, transformer_, _1, _2, _3, _4);
+  common_handlers_.transformer.transformReference       = boost::bind(&mrs_lib::Transformer::transformReference, &transformer_, _1, _2);
+  common_handlers_.transformer.transformReferenceSingle = boost::bind(&mrs_lib::Transformer::transformReferenceSingle, &transformer_, _1, _2);
+  common_handlers_.transformer.transformPose            = boost::bind(&mrs_lib::Transformer::transformPose, &transformer_, _1, _2);
+  common_handlers_.transformer.transformPoseSingle      = boost::bind(&mrs_lib::Transformer::transformPoseSingle, &transformer_, _1, _2);
+  common_handlers_.transformer.transformVector3         = boost::bind(&mrs_lib::Transformer::transformVector3, &transformer_, _1, _2);
+  common_handlers_.transformer.transformVector3Single   = boost::bind(&mrs_lib::Transformer::transformVector3Single, &transformer_, _1, _2);
+  common_handlers_.transformer.getTransform             = boost::bind(&mrs_lib::Transformer::getTransform, &transformer_, _1, _2, _3, _4);
 
   // --------------------------------------------------------------
   // |                           timers                           |
@@ -1418,7 +1418,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   uav_y = uav_state.pose.position.y;
   uav_z = uav_state.pose.position.z;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("statusTimer", _status_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
   // |                   publish the diagnostics                  |
@@ -1840,7 +1840,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
 
   if (!got_uav_state_ || !got_odometry_innovation_ || !got_pixhawk_odometry_ || active_tracker_idx == _null_tracker_idx_) {
     return;
@@ -2112,7 +2112,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("elandingTimer", _elanding_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("elandingTimer", _elanding_timer_rate_, 0.01, event);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2186,7 +2186,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("partialLandingTimer", _partial_landing_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("partialLandingTimer", _partial_landing_timer_rate_, 0.01, event);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2278,7 +2278,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("failsafeTimer", _failsafe_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("failsafeTimer", _failsafe_timer_rate_, 0.01, event);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2337,7 +2337,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
 
   // copy member variables
   auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
@@ -2612,7 +2612,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("bumperTimer", _bumper_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.01, event);
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -2651,7 +2651,7 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("pirouetteTimer", _pirouette_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("pirouetteTimer", _pirouette_timer_rate_, 0.01, event);
 
   pirouette_iterator_++;
 
@@ -2702,7 +2702,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
 
   mrs_lib::ScopeUnset unset_running(running_control_timer_);
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("controlTimerOneshot");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("controlTimerOneshot");
 
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -2772,7 +2772,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackOdometry");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
   /* Odometry frame switch //{ */
 
@@ -2849,7 +2849,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
     uav_state_last_time_ = ros::Time::now();
 
-    transformer_->setCurrentControlFrame(msg->header.frame_id);
+    transformer_.setCurrentControlFrame(msg->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -2871,7 +2871,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackUavState");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
 
   /* frame switch //{ */
 
@@ -2938,7 +2938,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
     uav_state_last_time_ = ros::Time::now();
 
-    transformer_->setCurrentControlFrame(msg->header.frame_id);
+    transformer_.setCurrentControlFrame(msg->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -2960,7 +2960,7 @@ void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackOdometryInnovation");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometryInnovation");
 
   {
     std::scoped_lock lock(mutex_odometry_innovation_);
@@ -2980,7 +2980,7 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& m
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackPixhawkOdometry");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackPixhawkOdometry");
 
   // --------------------------------------------------------------
   // |                      copy the odometry                     |
@@ -3004,7 +3004,7 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& m
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMaxHeight");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMaxHeight");
 
   {
     std::scoped_lock lock(mutex_max_height_);
@@ -3028,7 +3028,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackJoystick");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
 
   std::scoped_lock lock(mutex_joystick_);
 
@@ -3148,7 +3148,7 @@ void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr& msg
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackBumper");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackBumper");
 
   ROS_INFO_ONCE("[ControlManager]: getting bumper data");
 
@@ -3170,7 +3170,7 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackMavrosState");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosState");
 
   std::scoped_lock lock(mutex_mavros_state_);
 
@@ -3224,7 +3224,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_->createRoutine("callbackRC");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackRC");
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
@@ -4007,7 +4007,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(req.frame_id, transformed_reference)) {
+  if (!transformer_.transformReferenceSingle(req.frame_id, transformed_reference)) {
 
     res.message = "the reference could not be transformed";
     res.success = false;
@@ -4035,7 +4035,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
 
-  if (!transformer_->transformPoseSingle(req.frame_id, transformed_pose)) {
+  if (!transformer_.transformPoseSingle(req.frame_id, transformed_pose)) {
 
     res.message = "the pose could not be transformed";
     res.success = false;
@@ -4064,7 +4064,7 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
 
-  if (!transformer_->transformVector3Single(req.frame_id, transformed_vector3)) {
+  if (!transformer_.transformVector3Single(req.frame_id, transformed_vector3)) {
 
     res.message = "the twist could not be transformed";
     res.success = false;
@@ -4139,7 +4139,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   transformed_reference.header    = req.header;
   transformed_reference.reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!transformer_.transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -4244,7 +4244,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
   mrs_msgs::ReferenceStamped transformed_reference = *msg;
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!transformer_.transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     return;
@@ -4438,7 +4438,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
+  if (!transformer_.transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -5002,7 +5002,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!transformer_.transformReferenceSingle(_safety_area_frame_, point_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
@@ -5029,7 +5029,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!transformer_.transformReferenceSingle(_safety_area_frame_, point_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
@@ -5052,14 +5052,14 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
   mrs_msgs::ReferenceStamped start_transformed = start;
   mrs_msgs::ReferenceStamped end_transformed   = end;
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, start_transformed)) {
+  if (!transformer_.transformReferenceSingle(_safety_area_frame_, start_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
     return false;
   }
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, end_transformed)) {
+  if (!transformer_.transformReferenceSingle(_safety_area_frame_, end_transformed)) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
@@ -5114,7 +5114,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
   mrs_msgs::ReferenceStamped point_fcu = point;
 
-  if (!transformer_->transformReferenceSingle("fcu_untilted", point_fcu)) {
+  if (!transformer_.transformReferenceSingle("fcu_untilted", point_fcu)) {
 
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
@@ -5250,7 +5250,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    if (!transformer_->transformReferenceSingle(point.header.frame_id, point_fcu)) {
+    if (!transformer_.transformReferenceSingle(point.header.frame_id, point_fcu)) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
 
@@ -5439,7 +5439,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // transform the reference into the currently used frame
       // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
       // to the tracker before we actually call the goto service
-      if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
+      if (!transformer_.transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
 
         ROS_WARN("[ControlManager]: the reference could not be transformed.");
         return false;
