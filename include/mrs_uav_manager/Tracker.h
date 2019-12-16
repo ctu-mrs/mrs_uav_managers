@@ -42,6 +42,8 @@
 
 #include <Eigen/Eigen>
 
+#include <mrs_lib/transformer.h>
+
 //}
 
 namespace mrs_uav_manager
@@ -65,33 +67,6 @@ struct SafetyArea_t
 
 //}
 
-/* tf transformer handler //{ */
-
-typedef boost::function<bool(const std::string to_frame, mrs_msgs::ReferenceStamped &ref)>                transformReferenceSingle_t;
-typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, mrs_msgs::ReferenceStamped &ref)> transformReference_t;
-
-typedef boost::function<bool(const std::string to_frame, geometry_msgs::PoseStamped &ref)>                transformPoseSingle_t;
-typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, geometry_msgs::PoseStamped &ref)> transformPose_t;
-
-typedef boost::function<bool(const std::string to_frame, geometry_msgs::Vector3Stamped &ref)>                transformVector3Single_t;
-typedef boost::function<bool(const geometry_msgs::TransformStamped &tf, geometry_msgs::Vector3Stamped &ref)> transformVector3_t;
-
-typedef boost::function<bool(const std::string from_frame, const std::string to_frame, const ros::Time time_stamp, geometry_msgs::TransformStamped &tf)>
-    getTransform_t;
-
-struct Transformer_t
-{
-  mrs_uav_manager::transformReference_t       transformReference;
-  mrs_uav_manager::transformReferenceSingle_t transformReferenceSingle;
-  mrs_uav_manager::transformPose_t            transformPose;
-  mrs_uav_manager::transformPoseSingle_t      transformPoseSingle;
-  mrs_uav_manager::transformVector3_t         transformVector3;
-  mrs_uav_manager::transformVector3Single_t   transformVector3Single;
-  mrs_uav_manager::getTransform_t             getTransform;
-};
-
-//}
-
 /* obstacle bumper handler //{ */
 
 typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidatePoint_t;
@@ -106,9 +81,9 @@ struct Bumper_t
 
 struct CommonHandlers_t
 {
-  SafetyArea_t  safety_area;
-  Transformer_t transformer;
-  Bumper_t      bumper;
+  SafetyArea_t                          safety_area;
+  std::shared_ptr<mrs_lib::Transformer> transformer;
+  Bumper_t                              bumper;
 };
 
 class Tracker {
