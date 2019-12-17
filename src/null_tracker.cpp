@@ -142,7 +142,7 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
   res.message = message;
   res.success = true;
 
-  return std_srvs::SetBoolResponse::ConstPtr(new std_srvs::SetBoolResponse(res));
+  return std_srvs::SetBoolResponse::ConstPtr(std::make_unique<std_srvs::SetBoolResponse>(res));
 }
 
 //}
