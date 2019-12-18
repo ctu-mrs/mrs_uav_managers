@@ -92,10 +92,10 @@ public:
   virtual ~Tracker(void) {
   }
 
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, mrs_uav_manager::CommonHandlers_t const *common_handlers) = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                                                           = 0;
-  virtual void deactivate(void)                                                                                                                   = 0;
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg)                                                                      = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) = 0;
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                                                                     = 0;
+  virtual void deactivate(void)                                                                                                                             = 0;
+  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg)                                                                                = 0;
 
   virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg, const mrs_msgs::AttitudeCommand::ConstPtr &cmd) = 0;
   virtual const mrs_msgs::TrackerStatus             getStatus()                                                                                     = 0;
