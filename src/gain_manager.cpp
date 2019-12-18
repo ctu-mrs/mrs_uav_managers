@@ -464,7 +464,6 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     std::scoped_lock lock(mutex_control_manager_diagnostics);
 
     if (!(got_control_manager_diagnostics && control_manager_diagnostics.controller_status.controller.compare("So3Controller") == STRING_EQUAL)) {
-      ROS_INFO_THROTTLE(1.0, "[GainManager]: can't do gain management, the SO3 controller is not running!");
       return;
     }
   }
