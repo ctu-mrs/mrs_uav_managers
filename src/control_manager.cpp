@@ -28,6 +28,7 @@
 #include <mrs_lib/transformer.h>
 
 #include <sensor_msgs/Joy.h>
+#include <sensor_msgs/NavSatFix.h>
 
 #include <mrs_uav_manager/Controller.h>
 #include <mrs_uav_manager/Tracker.h>
@@ -246,6 +247,9 @@ private:
   bool               got_pixhawk_odometry_ = false;
   std::mutex         mutex_pixhawk_odometry_;
 
+  // subscriber for mavros' GPS data
+  ros::Subscriber subscriber_mavros_gps_;
+
   // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
   double          _max_height_;
@@ -457,6 +461,7 @@ private:
   void callbackUavState(const mrs_msgs::UavStateConstPtr& msg);
   void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr& msg);
   void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& msg);
+  void callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
   void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
   void callbackRC(const mavros_msgs::RCInConstPtr& msg);
@@ -1315,6 +1320,7 @@ void ControlManager::onInit() {
   }
 
   subscriber_pixhawk_odometry_ = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_gps_       = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height_       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_joystick_         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
   subscriber_bumper_           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
@@ -2994,6 +3000,18 @@ void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& m
 
     got_pixhawk_odometry_ = true;
   }
+}
+
+//}
+
+/* //{ callbackMavrosGps() */
+
+void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg) {
+
+  if (!is_initialized_)
+    return;
+
+  transformer_->setCurrentLatLon(msg->latitude, msg->longitude);
 }
 
 //}

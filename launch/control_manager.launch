@@ -231,6 +231,7 @@
       <remap from="~uav_state_in" to="odometry/uav_state" />
       <remap from="~odometry_innovation_in" to="odometry/odom_main_innovation" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
+      <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
       <remap from="~bumper_in" to="bumper/obstacle_sectors" />
