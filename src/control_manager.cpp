@@ -252,7 +252,7 @@ private:
 
   // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
-  double          _max_height_;
+  double          max_height_;
   bool            got_max_height_ = false;
   std::mutex      mutex_max_height_;
   std::mutex      mutex_min_height_;
@@ -1231,7 +1231,7 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
   param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
   param_loader.load_param("safety_area/min_height", _min_height_);
-  param_loader.load_param("safety_area/max_height", _max_height_);
+  param_loader.load_param("safety_area/max_height", max_height_);
 
   if (_use_safety_area_) {
     Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
@@ -1416,6 +1416,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto max_height        = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
 
   double uav_x, uav_y, uav_z;
   uav_x = uav_state.pose.position.x;
@@ -1507,29 +1508,94 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   // |               publish the safety area markers              |
   // --------------------------------------------------------------
-  //
-  visualization_msgs::MarkerArray msg_out;
-
-  Eigen::Vector3d      vec3d;
-  geometry_msgs::Point point;
 
   if (_use_safety_area_) {
 
-    auto safety_zone_marker = safety_zone_->getMarkerMessage();
+    visualization_msgs::MarkerArray msg_out;
 
-    safety_zone_marker.id = 0;
+    mrs_lib::Polygon                  border            = safety_zone_->getBorder();
+    std::vector<geometry_msgs::Point> border_points_bot = border.getPointMessageVector(_min_height_);
+    std::vector<geometry_msgs::Point> border_points_top = border.getPointMessageVector(max_height);
 
-    safety_zone_marker.header.stamp    = ros::Time::now();
-    safety_zone_marker.header.frame_id = resolveFrameName(_safety_area_frame_);
+    std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
 
-    msg_out.markers.push_back(safety_zone_marker);
-  }
+    std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
 
-  try {
-    publisher_safety_area_markers_.publish(msg_out);
-  }
-  catch (...) {
-    ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+    visualization_msgs::Marker marker;
+
+    marker.header.frame_id = _uav_name_ + "/" + _safety_area_frame_;
+    marker.type            = visualization_msgs::Marker::LINE_LIST;
+    marker.color.a         = 1;
+    marker.scale.x         = 0.2;
+    marker.color.r         = 1;
+    marker.color.g         = 0;
+    marker.color.b         = 0;
+
+    // bottom border
+    for (size_t i = 0; i < border_points_bot.size(); ++i) {
+      marker.points.push_back(border_points_bot[i]);
+      marker.points.push_back(border_points_bot[(i + 1) % border_points_bot.size()]);
+    }
+
+    // top border + top/bot edges
+    for (size_t i = 0; i < border_points_top.size(); ++i) {
+      marker.points.push_back(border_points_top[i]);
+      marker.points.push_back(border_points_top[(i + 1) % border_points_top.size()]);
+
+      marker.points.push_back(border_points_bot[i]);
+      marker.points.push_back(border_points_top[i]);
+    }
+
+    for (auto polygon : polygon_obstacles) {
+
+      std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
+      std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
+
+      // bottom points
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+        marker.points.push_back(points_bot[i]);
+        marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+      }
+
+      // top points + top/bot edges
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+        marker.points.push_back(points_top[i]);
+        marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+        marker.points.push_back(points_bot[i]);
+        marker.points.push_back(points_top[i]);
+      }
+    }
+
+    for (auto point : point_obstacles) {
+
+      std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
+      std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
+
+      // botom points
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+        marker.points.push_back(points_bot[i]);
+        marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+      }
+
+      // top points + bot/top edges
+      for (size_t i = 0; i < points_top.size(); ++i) {
+        marker.points.push_back(points_top[i]);
+        marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+        marker.points.push_back(points_bot[i]);
+        marker.points.push_back(points_top[i]);
+      }
+    }
+
+    msg_out.markers.push_back(marker);
+
+    try {
+      publisher_safety_area_markers_.publish(msg_out);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+    }
   }
 
   // --------------------------------------------------------------
@@ -3028,7 +3094,7 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& m
   {
     std::scoped_lock lock(mutex_max_height_);
 
-    _max_height_ = msg->value;
+    max_height_ = msg->value;
 
     got_max_height_ = true;
   }
@@ -5026,7 +5092,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   // copy member variables
   auto min_height = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
-  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
+  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
@@ -5104,7 +5170,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
+  return mrs_lib::get_mutexed(mutex_max_height_, max_height_);
 }
 
 //}
