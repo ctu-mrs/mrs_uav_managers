@@ -225,6 +225,7 @@
       <remap from="~mpc_tracker/debug_set_trajectory_out" to="~mpc_tracker/debug_set_trajectory" />
       <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
+      <remap from="~mpc_tracker/debug_trajectory_marker_out" to="~mpc_tracker/debug_trajectory_marker" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
