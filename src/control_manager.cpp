@@ -357,6 +357,10 @@ private:
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
+  // bumper service servers
+  ros::ServiceServer service_server_bumper_enabler_;
+  ros::ServiceServer service_server_bumper_repulsion_enabler_;
+
   // service clients
   ros::ServiceClient service_client_arm_;
   ros::ServiceClient service_client_eland_;
@@ -490,6 +494,8 @@ private:
   bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -564,10 +570,10 @@ private:
   mrs_msgs::ObstacleSectors bumper_data_;
   std::mutex                mutex_bumper_data_;
 
-  bool _bumper_enabled_           = false;
-  bool _bumper_hugging_enabled_   = false;
-  bool _bumper_repulsion_enabled_ = false;
-  bool repulsing_                 = false;
+  bool bumper_enabled_           = false;
+  bool _bumper_hugging_enabled_  = false;
+  bool bumper_repulsion_enabled_ = false;
+  bool repulsing_                = false;
   uint repulsing_from_;
 
   double _bumper_horizontal_distance_;
@@ -803,14 +809,14 @@ void ControlManager::onInit() {
   param_loader.load_param("joystick/channel_multipliers/yaw", _channel_mult_yaw_);
   param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
-  param_loader.load_param("obstacle_bumper/enabled", _bumper_enabled_);
+  param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", _bumper_timer_rate_);
   param_loader.load_param("obstacle_bumper/horizontal_distance", _bumper_horizontal_distance_);
   param_loader.load_param("obstacle_bumper/vertical_distance", _bumper_vertical_distance_);
 
   param_loader.load_param("obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
 
-  param_loader.load_param("obstacle_bumper/repulsion/enabled", _bumper_repulsion_enabled_);
+  param_loader.load_param("obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
 
   param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", _bumper_repulsion_horizontal_distance_);
   param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", _bumper_repulsion_horizontal_offset_);
@@ -1281,7 +1287,7 @@ void ControlManager::onInit() {
   common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
 
   common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
-  common_handlers_->bumper.enabled             = _bumper_enabled_;
+  common_handlers_->bumper.enabled             = bumper_enabled_;
 
   // --------------------------------------------------------------
   // |                          profiler_                          |
@@ -1323,7 +1329,7 @@ void ControlManager::onInit() {
   subscriber_mavros_gps_       = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height_       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_joystick_         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper_           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+  subscriber_bumper_           = nh_.subscribe("bumper_sectors_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state_     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_rc_               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
   subscriber_odometry_innovation_ =
@@ -1333,22 +1339,24 @@ void ControlManager::onInit() {
 
   // | -------------------- general services -------------------- |
 
-  service_server_switch_tracker_      = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-  service_server_switch_controller_   = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_server_hover_               = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
-  service_server_ehover_              = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
-  service_server_failsafe_            = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-  service_server_failsafe_escalating_ = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_motors_              = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
-  service_server_arm_                 = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-  service_server_enable_callbacks_    = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-  service_server_set_constraints_     = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-  service_server_use_joystick_        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-  service_server_eland_               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_partial_landing_     = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
-  service_server_transform_reference_ = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_pose_      = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
-  service_server_transform_vector3_   = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_switch_tracker_           = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+  service_server_switch_controller_        = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_server_hover_                    = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
+  service_server_ehover_                   = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
+  service_server_failsafe_                 = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
+  service_server_failsafe_escalating_      = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
+  service_server_motors_                   = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+  service_server_arm_                      = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+  service_server_enable_callbacks_         = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+  service_server_set_constraints_          = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+  service_server_use_joystick_             = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+  service_server_eland_                    = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_partial_landing_          = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
+  service_server_transform_reference_      = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_pose_           = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
+  service_server_transform_vector3_        = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
+  service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
 
   service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -2690,7 +2698,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto bumper_data        = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
-  if (!_bumper_enabled_ || !_bumper_repulsion_enabled_) {
+  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
   }
 
@@ -3811,7 +3819,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     return true;
   }
 
-  if (_bumper_enabled_) {
+  if (bumper_enabled_) {
     if (!got_bumper_) {
       sprintf((char*)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
@@ -4112,7 +4120,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 //}
 
-/* //{ transformPoseSrv() */
+/* //{ callbackTransformPose() */
 
 bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
 
@@ -4141,7 +4149,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
 
 //}
 
-/* //{ transformVector3Srv() */
+/* //{ callbackTransformVector3() */
 
 bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res) {
 
@@ -4164,6 +4172,52 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
     res.success = true;
     return true;
   }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackBumperEnableService() */
+
+bool ControlManager::callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  bumper_enabled_ = req.data;
+
+  char message[200];
+
+  sprintf((char*)&message, "bumper %s", bumper_enabled_ ? "ENALBED" : "DISABLED");
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  res.success = true;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackBumperEnableRepulsionService() */
+
+bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  bumper_repulsion_enabled_ = req.data;
+
+  char message[200];
+
+  sprintf((char*)&message, "bumper repulsion %s", bumper_repulsion_enabled_ ? "ENALBED" : "DISABLED");
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  res.success = true;
+  res.message = message;
 
   return true;
 }
@@ -5191,7 +5245,7 @@ double ControlManager::getMinHeight(void) {
 // everything here happens in FCU
 bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
-  if (!_bumper_enabled_) {
+  if (!bumper_enabled_) {
     return true;
   }
 
@@ -5367,11 +5421,11 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
 bool ControlManager::bumperPushFromObstacle(void) {
 
-  if (!_bumper_enabled_) {
+  if (!bumper_enabled_) {
     return true;
   }
 
-  if (!_bumper_repulsion_enabled_) {
+  if (!bumper_repulsion_enabled_) {
     return true;
   }
 

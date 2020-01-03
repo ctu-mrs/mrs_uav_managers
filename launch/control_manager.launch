@@ -235,7 +235,7 @@
       <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
-      <remap from="~bumper_in" to="bumper/obstacle_sectors" />
+      <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~rc_in" to="mavros/rc/in" />
 
@@ -290,6 +290,8 @@
       <remap from="~land_out" to="~landoff_tracker/land" />
       <remap from="~shutdown_out" to="~shutdown_out" />
       <remap from="~pirouette_in" to="~pirouette" />
+      <remap from="~bumper_in" to="~bumper" />
+      <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
 
     </node>
 
