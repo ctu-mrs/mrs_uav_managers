@@ -20,6 +20,7 @@ gain_management:
     GPS: ["supersoft", 'soft', 'tight']
     OPTFLOW: ["supersoft", "soft"]
     OTHER: ["supersoft"]
+    PAVEL: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -36,3 +37,4 @@ gain_management:
     GPS: "soft"
     OPTFLOW: "supersoft"
     OTHER: "supersoft"
+    PAVEL: "supersoft"
