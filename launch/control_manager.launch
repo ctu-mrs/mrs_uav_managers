@@ -272,6 +272,7 @@
       <!-- Services -->
       <remap from="~switch_tracker_in" to="~switch_tracker" />
       <remap from="~switch_controller_in" to="~switch_controller" />
+      <remap from="~reset_tracker_in" to="~reset_tracker" />
       <remap from="~hover_in" to="~hover" />
       <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />

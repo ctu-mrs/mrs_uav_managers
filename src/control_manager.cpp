@@ -326,6 +326,7 @@ private:
   // service servers
   ros::ServiceServer service_server_switch_tracker_;
   ros::ServiceServer service_server_switch_controller_;
+  ros::ServiceServer service_server_reset_tracker_;
   ros::ServiceServer service_server_hover_;
   ros::ServiceServer service_server_ehover_;
   ros::ServiceServer service_server_failsafe_;
@@ -473,6 +474,7 @@ private:
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool callbackResetTracker(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
@@ -1341,6 +1343,7 @@ void ControlManager::onInit() {
 
   service_server_switch_tracker_           = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
   service_server_switch_controller_        = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_server_reset_tracker_            = nh_.advertiseService("reset_tracker_in", &ControlManager::callbackResetTracker, this);
   service_server_hover_                    = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
   service_server_ehover_                   = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
   service_server_failsafe_                 = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
@@ -3701,6 +3704,45 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
   setConstraints(sanitized_constraints);
 
   res.message = message;
+  return true;
+}
+
+//}
+
+/* //{ callbackSwitchTracker() */
+
+bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  char message[200];
+
+  // reactivate the current tracker
+  bool succ;
+  std::string tracker_name;
+  {
+    std::scoped_lock lock(mutex_tracker_list_, mutex_controller_tracker_switch_time_);
+
+    tracker_name = _tracker_names_[active_tracker_idx_];
+
+    tracker_list_[active_tracker_idx_]->deactivate();
+    succ = tracker_list_[active_tracker_idx_]->activate(mrs_msgs::PositionCommand::Ptr());
+
+    controller_tracker_switch_time_ = ros::Time::now();
+  }
+
+  if (succ) {
+    sprintf((char*)&message, "The tracker '%s' was reset", tracker_name.c_str());
+    ROS_INFO("[ControlManager]: %s", message);
+  } else {
+    sprintf((char*)&message, "The tracker '%s' reset failed!", tracker_name.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+  }
+
+  res.message = message;
+  res.success = false;
+
   return true;
 }
 
