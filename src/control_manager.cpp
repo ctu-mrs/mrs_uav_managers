@@ -2558,6 +2558,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in is %d)",
                          uint(rc_channels.channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: tip: this could be caused by the RC failsafe not being configured!");
 
     } else {
 
@@ -3719,7 +3720,7 @@ bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Re
   char message[200];
 
   // reactivate the current tracker
-  bool succ;
+  bool        succ;
   std::string tracker_name;
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_tracker_switch_time_);
