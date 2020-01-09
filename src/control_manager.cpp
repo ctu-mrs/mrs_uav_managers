@@ -267,6 +267,10 @@ private:
   // resolves simplified frame names
   std::string resolveFrameName(const std::string in);
 
+  // check for invalid values in the result from trackers
+  bool validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command);
+  bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
+
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
   std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers_;
@@ -1987,10 +1991,10 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   // calculate the quaternion
   if (last_attitude_cmd->quater_attitude_set) {
 
-    attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
-    attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
-    attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
-    attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+    attitude_cmd_quaternion.setX(last_attitude_cmd->quater_attitude.x);
+    attitude_cmd_quaternion.setY(last_attitude_cmd->quater_attitude.y);
+    attitude_cmd_quaternion.setZ(last_attitude_cmd->quater_attitude.z);
+    attitude_cmd_quaternion.setW(last_attitude_cmd->quater_attitude.w);
 
   } else if (last_attitude_cmd->euler_attitude_set) {
 
@@ -2025,7 +2029,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
     // calculate the euler angles
     tf::Quaternion quater_attitude_cmd;
-    quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+    quaternionMsgToTF(last_attitude_cmd->quater_attitude, quater_attitude_cmd);
     tf::Matrix3x3 m(quater_attitude_cmd);
     double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
     m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
@@ -6459,7 +6463,7 @@ void ControlManager::updateTrackers(void) {
       }
     }
 
-    if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
+    if (tracker_output_cmd != mrs_msgs::PositionCommand::Ptr() && validatePositionCommand(tracker_output_cmd)) {
 
       std::scoped_lock lock(mutex_last_position_cmd_);
 
@@ -6471,13 +6475,13 @@ void ControlManager::updateTrackers(void) {
 
         if (active_tracker_idx == _ehover_tracker_idx_) {
 
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty command!", _tracker_names_[active_tracker_idx].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
           failsafe();
 
         } else {
 
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", _tracker_names_[active_tracker_idx].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
           std::string ehover_message;
 
@@ -6540,7 +6544,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
       }
 
       // normally the active controller returns a valid command
-      if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+      if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr() && validateAttitudeCommand(controller_output_cmd)) {
 
         std::scoped_lock lock(mutex_last_attitude_cmd_);
 
@@ -6564,7 +6568,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
         if (controller_status) {
 
-          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned null");
+          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned empty or invalid command");
 
           failsafe();
         }
@@ -6619,10 +6623,10 @@ void ControlManager::publish(void) {
       // when controlling with quaternion or attitude rates, the quaternion should be filled in
       if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE || last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
 
-        desired_orientation.setX(last_attitude_cmd->quter_attitude.x);
-        desired_orientation.setY(last_attitude_cmd->quter_attitude.y);
-        desired_orientation.setZ(last_attitude_cmd->quter_attitude.z);
-        desired_orientation.setW(last_attitude_cmd->quter_attitude.w);
+        desired_orientation.setX(last_attitude_cmd->quater_attitude.x);
+        desired_orientation.setY(last_attitude_cmd->quater_attitude.y);
+        desired_orientation.setZ(last_attitude_cmd->quater_attitude.z);
+        desired_orientation.setW(last_attitude_cmd->quater_attitude.w);
 
       } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {  // when controlling with euler attitude, convert it to quaternion
 
@@ -6733,7 +6737,7 @@ void ControlManager::publish(void) {
 
     } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE) {
 
-      attitude_target.orientation = last_attitude_cmd->quter_attitude;
+      attitude_target.orientation = last_attitude_cmd->quater_attitude;
 
       attitude_target.body_rate.x = 0.0;
       attitude_target.body_rate.y = 0.0;
@@ -6747,7 +6751,7 @@ void ControlManager::publish(void) {
       attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
       attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
 
-      attitude_target.orientation = last_attitude_cmd->quter_attitude;
+      attitude_target.orientation = last_attitude_cmd->quater_attitude;
 
       attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
 
@@ -6886,6 +6890,280 @@ std::string ControlManager::resolveFrameName(const std::string in) {
   }
 
   return in;
+}
+
+//}
+
+/* validateTrackerCommand() //{ */
+
+bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command) {
+
+  // check attitude
+
+  if (!std::isfinite(position_command->attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.w)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.w\"!!!");
+    return false;
+  }
+
+  // check positions
+
+  if (!std::isfinite(position_command->position.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->position.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->position.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.z\"!!!");
+    return false;
+  }
+
+  // check velocities
+
+  if (!std::isfinite(position_command->velocity.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->velocity.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->velocity.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.z\"!!!");
+    return false;
+  }
+
+  // check accelerations
+
+  if (!std::isfinite(position_command->acceleration.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->acceleration.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->acceleration.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.z\"!!!");
+    return false;
+  }
+
+  // check jerk
+
+  if (!std::isfinite(position_command->jerk.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->jerk.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->jerk.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.z\"!!!");
+    return false;
+  }
+
+  // check snap
+
+  if (!std::isfinite(position_command->snap.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->snap.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->snap.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.z\"!!!");
+    return false;
+  }
+
+  // check attitude rate
+
+  if (!std::isfinite(position_command->attitude_rate.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude_rate.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude_rate.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.z\"!!!");
+    return false;
+  }
+
+  // check yaws
+
+  if (!std::isfinite(position_command->yaw)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_dot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_dot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_ddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_ddot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_dddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_dddot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_ddddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_ddddot\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateAttitudeCommand() //{ */
+
+bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command) {
+
+  // check euler attitude
+
+  if (!std::isfinite(attitude_command->euler_attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->euler_attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->euler_attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.z\"!!!");
+    return false;
+  }
+
+  // check quater attitude
+
+  if (!std::isfinite(attitude_command->quater_attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.w)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.w\"!!!");
+    return false;
+  }
+
+  // check attitude rate
+
+  if (!std::isfinite(attitude_command->attitude_rate.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->attitude_rate.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->attitude_rate.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.z\"!!!");
+    return false;
+  }
+
+  // check desired_acceleration
+
+  if (!std::isfinite(attitude_command->desired_acceleration.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->desired_acceleration.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->desired_acceleration.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.z\"!!!");
+    return false;
+  }
+
+  // check the constraints
+
+  if (!std::isfinite(attitude_command->horizontal_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->horizontal_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->horizontal_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->horizontal_acc_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_asc_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_asc_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_asc_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_asc_acc_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_desc_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_desc_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_desc_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_desc_acc_constraint\"!!!");
+    return false;
+  }
+
+  return true;
 }
 
 //}
