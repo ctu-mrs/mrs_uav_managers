@@ -6249,6 +6249,7 @@ bool ControlManager::failsafe() {
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
     {
+      // TODO: I dont like this locking here, push it downstream pls
       std::scoped_lock lock(mutex_controller_list_);
 
       try {
@@ -6426,29 +6427,32 @@ void ControlManager::switchMotors(bool input) {
 void ControlManager::updateTrackers(void) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
-
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
-  mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_));
+  mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
   try {
 
     // for each tracker
     for (unsigned int i = 0; i < tracker_list_.size(); i++) {
 
-      if ((int)i == active_tracker_idx_) {
+      if ((int)i == active_tracker_idx) {
+
+        std::scoped_lock lock(mutex_tracker_list_);
 
         // if it is the active one, update and retrieve the command
         tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
 
       } else {
+
+        std::scoped_lock lock(mutex_tracker_list_);
 
         // if it is not the active one, just update without retrieving the command
         tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
@@ -6463,17 +6467,17 @@ void ControlManager::updateTrackers(void) {
 
     } else {
 
-      if (active_tracker_idx_ != _null_tracker_idx_) {
+      if (active_tracker_idx != _null_tracker_idx_) {
 
-        if (active_tracker_idx_ == _ehover_tracker_idx_) {
+        if (active_tracker_idx == _ehover_tracker_idx_) {
 
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty command!", _tracker_names_[active_tracker_idx_].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty command!", _tracker_names_[active_tracker_idx].c_str());
 
           failsafe();
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", _tracker_names_[active_tracker_idx_].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", _tracker_names_[active_tracker_idx].c_str());
 
           std::string ehover_message;
 
@@ -6501,13 +6505,12 @@ void ControlManager::updateTrackers(void) {
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
   // copy member variables
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
   // --------------------------------------------------------------
-
-  std::scoped_lock lock(mutex_controller_list_);
 
   mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_for_control));
 
@@ -6520,26 +6523,30 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
       // for each controller
       for (unsigned int i = 0; i < controller_list_.size(); i++) {
 
-        if ((int)i == active_controller_idx_) {
+        if ((int)i == active_controller_idx) {
+
+          std::scoped_lock lock(mutex_controller_list_);
 
           // if it is the active one, update and retrieve the command
-          controller_output_cmd = controller_list_[active_controller_idx_]->update(uav_state_const_ptr, last_position_cmd);
+          controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_position_cmd);
 
         } else {
+
+          std::scoped_lock lock(mutex_controller_list_);
 
           // if it is not the active one, just update without retrieving the command
           controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
         }
       }
 
-      // in normal sitation, the controller returns a valid command
+      // normally the active controller returns a valid command
       if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
         std::scoped_lock lock(mutex_last_attitude_cmd_);
 
         last_attitude_cmd_ = controller_output_cmd;
 
-        // but it can return an empty command
+        // but it can return an empty command, due to some critical internal error
         // which means we should trigger the failsafe landing
       } else {
 
@@ -6547,7 +6554,15 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
         // if not active, we don't care, we should not ask the controller for
         // the result anyway -> this could mean a race condition occured
         // like it once happend during landing
-        if (controller_list_[active_controller_idx_]->getStatus().active) {
+        bool controller_status = false;
+
+        {
+          std::scoped_lock lock(mutex_controller_list_);
+
+          controller_status = controller_list_[active_controller_idx]->getStatus().active;
+        }
+
+        if (controller_status) {
 
           ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned null");
 
