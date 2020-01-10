@@ -270,6 +270,8 @@ private:
   // check for invalid values in the result from trackers
   bool validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command);
   bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
+  bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
+  bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
@@ -2863,6 +2865,15 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
+  // | --------------------- check for nans --------------------- |
+
+  if (!validateOdometry(msg)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: odometry contains invalid values, throwing it away");
+    return;
+  }
+
+  // | ---------------------- frame switch ---------------------- |
+
   /* Odometry frame switch //{ */
 
   // | -- prepare an OdometryConstPtr for trackers & controllers -- |
@@ -2961,6 +2972,15 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
+
+  // | --------------------- check for nans --------------------- |
+
+  if (!validateUavState(msg)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: uav_state contains invalid values, throwing it away");
+    return;
+  }
+
+  // | ---------------------- frame switch ---------------------- |
 
   /* frame switch //{ */
 
@@ -7160,6 +7180,221 @@ bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::Co
 
   if (!std::isfinite(attitude_command->vertical_desc_acc_constraint)) {
     ROS_ERROR("NaN detected in variable \"attitude_command->vertical_desc_acc_constraint\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateOdometry() //{ */
+
+bool ControlManager::validateOdometry(const nav_msgs::OdometryConstPtr odometry) {
+
+  // check position
+
+  if (!std::isfinite(odometry->pose.pose.position.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.position.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.position.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.z\"!!!");
+    return false;
+  }
+
+  // check orientation
+
+  if (!std::isfinite(odometry->pose.pose.orientation.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.w)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.w\"!!!");
+    return false;
+  }
+
+  // check velocity
+
+  if (!std::isfinite(odometry->twist.twist.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->twist.twist.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->twist.twist.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.z\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateUavState() //{ */
+
+bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state) {
+
+  // check position
+
+  if (!std::isfinite(uav_state->pose.position.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.position.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.position.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.z\"!!!");
+    return false;
+  }
+
+  // check orientation
+
+  if (!std::isfinite(uav_state->pose.orientation.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.w)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.w\"!!!");
+    return false;
+  }
+
+  // check linear velocity
+
+  if (!std::isfinite(uav_state->velocity.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.z\"!!!");
+    return false;
+  }
+
+  // check angular velocity
+
+  if (!std::isfinite(uav_state->velocity.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.z\"!!!");
+    return false;
+  }
+
+  // check linear acceleration
+
+  if (!std::isfinite(uav_state->acceleration.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.z\"!!!");
+    return false;
+  }
+
+  // check angular acceleration
+
+  if (!std::isfinite(uav_state->acceleration.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.z\"!!!");
+    return false;
+  }
+
+  // check acceleration angular disturbance
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.z\"!!!");
+    return false;
+  }
+
+  // check acceleration linear disturbance
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.z\"!!!");
     return false;
   }
 
