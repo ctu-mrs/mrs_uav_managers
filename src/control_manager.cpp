@@ -252,9 +252,11 @@ private:
 
   // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
-  double          max_height_;
+  double          max_height_external_;
+  double          max_height_safety_area_;
+  double          _max_height_;
   bool            got_max_height_ = false;
-  std::mutex      mutex_max_height_;
+  std::mutex      mutex_max_height_external_;
   std::mutex      mutex_min_height_;
 
   // odometry innovation is published by the odometry node
@@ -1245,7 +1247,7 @@ void ControlManager::onInit() {
   param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
   param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
   param_loader.load_param("safety_area/min_height", _min_height_);
-  param_loader.load_param("safety_area/max_height", max_height_);
+  param_loader.load_param("safety_area/max_height", _max_height_);
 
   if (_use_safety_area_) {
     Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
@@ -1431,9 +1433,11 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     return;
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto max_height        = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
+
+  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
   double uav_x, uav_y, uav_z;
   uav_x = uav_state.pose.position.x;
@@ -3128,9 +3132,9 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& m
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMaxHeight");
 
   {
-    std::scoped_lock lock(mutex_max_height_);
+    std::scoped_lock lock(mutex_max_height_external_);
 
-    max_height_ = msg->value;
+    max_height_external_ = msg->value;
 
     got_max_height_ = true;
   }
@@ -5212,8 +5216,8 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
-  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
+  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
@@ -5223,6 +5227,9 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
     return false;
   }
+
+  // what is lower, the max height from the safety area, or the max height from odometry?
+  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
   if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y) &&
       point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= max_height) {
@@ -5291,7 +5298,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  return mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 }
 
 //}
