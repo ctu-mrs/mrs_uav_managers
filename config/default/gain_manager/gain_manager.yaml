@@ -14,6 +14,7 @@ estimator_types: [
   "GPS",
   "OPTFLOW",
   "OTHER",
+  "ALOAM",
 ]
 
 gains: [
@@ -28,6 +29,7 @@ gain_management:
     VSLAM: ["default"]
     BRICKFLOW: ["default"]
     HECTOR: ["default"]
+    ALOAM: ["default"]
     T265: ["default"]
     BRICK: ["default"]
     VIO: ["default"]
@@ -45,6 +47,7 @@ gain_management:
     VSLAM: "default"
     BRICKFLOW: "default"
     HECTOR: "default"
+    ALOAM: "default"
     T265: "default"
     BRICK: "default"
     VIO: "default"
