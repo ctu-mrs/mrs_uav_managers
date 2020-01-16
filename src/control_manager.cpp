@@ -883,7 +883,9 @@ void ControlManager::onInit() {
 
   output_command->thrust = _min_thrust_null_tracker_;
 
-  // | ------------- initialize the common handlers ------------- |
+  // --------------------------------------------------------------
+  // |         common handler for trackers and controllers        |
+  // --------------------------------------------------------------
 
   common_handlers_ = std::make_shared<mrs_uav_manager::CommonHandlers_t>();
 
@@ -893,6 +895,63 @@ void ControlManager::onInit() {
 
   // bind transformer so trackers and controllers can use
   common_handlers_->transformer = transformer_;
+
+  // | ----------------------- safety area ---------------------- |
+
+  param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
+  param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
+  param_loader.load_param("safety_area/min_height", _min_height_);
+  param_loader.load_param("safety_area/max_height", _max_height_);
+
+  if (_use_safety_area_) {
+    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+
+    param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
+    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+    if (_obstacle_polygons_enabled_) {
+      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
+    }
+
+    param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
+    std::vector<Eigen::MatrixXd> point_obstacle_points;
+    if (_obstacle_points_enabled_) {
+      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      point_obstacle_points = std::vector<Eigen::MatrixXd>();
+    }
+
+    // TODO: remove this when param loader supports proper loading
+    for (auto& matrix : polygon_obstacle_points) {
+      matrix.transposeInPlace();
+    }
+
+    try {
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
+    }
+    catch (mrs_lib::SafetyZone::BorderError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PointObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
+      ros::shutdown();
+    }
+  }
+
+  common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
+  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
+  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
+  common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
+  common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+
+  common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
+  common_handlers_->bumper.enabled             = bumper_enabled_;
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1239,65 +1298,6 @@ void ControlManager::onInit() {
   }
 
   motors_ = false;
-
-  // --------------------------------------------------------------
-  // |                         safety area                        |
-  // --------------------------------------------------------------
-
-  param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
-  param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
-  param_loader.load_param("safety_area/min_height", _min_height_);
-  param_loader.load_param("safety_area/max_height", _max_height_);
-
-  if (_use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-
-    param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-    if (_obstacle_polygons_enabled_) {
-      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
-    std::vector<Eigen::MatrixXd> point_obstacle_points;
-    if (_obstacle_points_enabled_) {
-      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      point_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    // TODO: remove this when param loader supports proper loading
-    for (auto& matrix : polygon_obstacle_points) {
-      matrix.transposeInPlace();
-    }
-
-    try {
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
-    }
-    catch (mrs_lib::SafetyZone::BorderError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PointObstacleError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
-      ros::shutdown();
-    }
-  }
-
-  common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
-  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
-  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
-  common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
-
-  common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
-  common_handlers_->bumper.enabled             = bumper_enabled_;
 
   // --------------------------------------------------------------
   // |                          profiler_                          |
