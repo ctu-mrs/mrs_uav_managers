@@ -1538,13 +1538,47 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     std::vector<geometry_msgs::Point> border_points_bot = border.getPointMessageVector(_min_height_);
     std::vector<geometry_msgs::Point> border_points_top = border.getPointMessageVector(max_height);
 
+    mrs_msgs::ReferenceStamped temp_ref;
+    temp_ref.header.frame_id = _safety_area_frame_;
+
+    // get the transform
+    mrs_lib::TransformStamped tf;
+    transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
+
+    // transform border points to local origin
+    for (size_t i = 0; i < border_points_bot.size(); ++i) {
+
+      temp_ref.reference.position.x = border_points_bot[i].x;
+      temp_ref.reference.position.y = border_points_bot[i].y;
+      temp_ref.reference.position.z = border_points_bot[i].z;
+
+      transformer_->transformReference(tf, temp_ref);
+
+      border_points_bot[i].x = temp_ref.reference.position.x;
+      border_points_bot[i].y = temp_ref.reference.position.y;
+      border_points_bot[i].z = temp_ref.reference.position.z;
+    }
+
+    for (size_t i = 0; i < border_points_top.size(); ++i) {
+
+      temp_ref.reference.position.x = border_points_top[i].x;
+      temp_ref.reference.position.y = border_points_top[i].y;
+      temp_ref.reference.position.z = border_points_top[i].z;
+
+      transformer_->transformReference(tf, temp_ref);
+
+      border_points_top[i].x = temp_ref.reference.position.x;
+      border_points_top[i].y = temp_ref.reference.position.y;
+      border_points_top[i].z = temp_ref.reference.position.z;
+    }
+
     std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
 
     std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
 
     visualization_msgs::Marker marker;
 
-    marker.header.frame_id = _uav_name_ + "/" + _safety_area_frame_;
+    marker.header.frame_id = _uav_name_ + "/local_origin";
     marker.type            = visualization_msgs::Marker::LINE_LIST;
     marker.color.a         = 1;
     marker.scale.x         = 0.2;
@@ -1572,6 +1606,34 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
       std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
       std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
 
+      // transform border points to local origin
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+
+        temp_ref.reference.position.x = points_bot[i].x;
+        temp_ref.reference.position.y = points_bot[i].y;
+        temp_ref.reference.position.z = points_bot[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_bot[i].x = temp_ref.reference.position.x;
+        points_bot[i].y = temp_ref.reference.position.y;
+        points_bot[i].z = temp_ref.reference.position.z;
+      }
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_top.size(); ++i) {
+
+        temp_ref.reference.position.x = points_top[i].x;
+        temp_ref.reference.position.y = points_top[i].y;
+        temp_ref.reference.position.z = points_top[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_top[i].x = temp_ref.reference.position.x;
+        points_top[i].y = temp_ref.reference.position.y;
+        points_top[i].z = temp_ref.reference.position.z;
+      }
+
       // bottom points
       for (size_t i = 0; i < points_bot.size(); ++i) {
         marker.points.push_back(points_bot[i]);
@@ -1592,6 +1654,34 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
       std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+
+        temp_ref.reference.position.x = points_bot[i].x;
+        temp_ref.reference.position.y = points_bot[i].y;
+        temp_ref.reference.position.z = points_bot[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_bot[i].x = temp_ref.reference.position.x;
+        points_bot[i].y = temp_ref.reference.position.y;
+        points_bot[i].z = temp_ref.reference.position.z;
+      }
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_top.size(); ++i) {
+
+        temp_ref.reference.position.x = points_top[i].x;
+        temp_ref.reference.position.y = points_top[i].y;
+        temp_ref.reference.position.z = points_top[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_top[i].x = temp_ref.reference.position.x;
+        points_top[i].y = temp_ref.reference.position.y;
+        points_top[i].z = temp_ref.reference.position.z;
+      }
 
       // botom points
       for (size_t i = 0; i < points_bot.size(); ++i) {
