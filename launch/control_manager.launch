@@ -225,6 +225,7 @@
       <remap from="~mpc_tracker/debug_set_trajectory_out" to="~mpc_tracker/debug_set_trajectory" />
       <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
+      <remap from="~mpc_tracker/debug_trajectory_marker_out" to="~mpc_tracker/debug_trajectory_marker" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
@@ -234,7 +235,7 @@
       <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
-      <remap from="~bumper_in" to="bumper/obstacle_sectors" />
+      <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~rc_in" to="mavros/rc/in" />
 
@@ -271,6 +272,7 @@
       <!-- Services -->
       <remap from="~switch_tracker_in" to="~switch_tracker" />
       <remap from="~switch_controller_in" to="~switch_controller" />
+      <remap from="~reset_tracker_in" to="~reset_tracker" />
       <remap from="~hover_in" to="~hover" />
       <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />
@@ -289,6 +291,8 @@
       <remap from="~land_out" to="~landoff_tracker/land" />
       <remap from="~shutdown_out" to="~shutdown_out" />
       <remap from="~pirouette_in" to="~pirouette" />
+      <remap from="~bumper_in" to="~bumper" />
+      <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
 
     </node>
 

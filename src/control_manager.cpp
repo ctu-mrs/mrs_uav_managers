@@ -252,9 +252,11 @@ private:
 
   // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
-  double          max_height_;
+  double          max_height_external_;
+  double          max_height_safety_area_;
+  double          _max_height_;
   bool            got_max_height_ = false;
-  std::mutex      mutex_max_height_;
+  std::mutex      mutex_max_height_external_;
   std::mutex      mutex_min_height_;
 
   // odometry innovation is published by the odometry node
@@ -266,6 +268,12 @@ private:
 
   // resolves simplified frame names
   std::string resolveFrameName(const std::string in);
+
+  // check for invalid values in the result from trackers
+  bool validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command);
+  bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
+  bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
+  bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
@@ -326,6 +334,7 @@ private:
   // service servers
   ros::ServiceServer service_server_switch_tracker_;
   ros::ServiceServer service_server_switch_controller_;
+  ros::ServiceServer service_server_reset_tracker_;
   ros::ServiceServer service_server_hover_;
   ros::ServiceServer service_server_ehover_;
   ros::ServiceServer service_server_failsafe_;
@@ -356,6 +365,10 @@ private:
   ros::ServiceServer service_server_transform_reference_;
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
+
+  // bumper service servers
+  ros::ServiceServer service_server_bumper_enabler_;
+  ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
   ros::ServiceClient service_client_arm_;
@@ -469,6 +482,7 @@ private:
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool callbackResetTracker(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
@@ -490,6 +504,8 @@ private:
   bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -564,10 +580,10 @@ private:
   mrs_msgs::ObstacleSectors bumper_data_;
   std::mutex                mutex_bumper_data_;
 
-  bool _bumper_enabled_           = false;
-  bool _bumper_hugging_enabled_   = false;
-  bool _bumper_repulsion_enabled_ = false;
-  bool repulsing_                 = false;
+  bool bumper_enabled_           = false;
+  bool _bumper_hugging_enabled_  = false;
+  bool bumper_repulsion_enabled_ = false;
+  bool repulsing_                = false;
   uint repulsing_from_;
 
   double _bumper_horizontal_distance_;
@@ -803,14 +819,14 @@ void ControlManager::onInit() {
   param_loader.load_param("joystick/channel_multipliers/yaw", _channel_mult_yaw_);
   param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
-  param_loader.load_param("obstacle_bumper/enabled", _bumper_enabled_);
+  param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", _bumper_timer_rate_);
   param_loader.load_param("obstacle_bumper/horizontal_distance", _bumper_horizontal_distance_);
   param_loader.load_param("obstacle_bumper/vertical_distance", _bumper_vertical_distance_);
 
   param_loader.load_param("obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
 
-  param_loader.load_param("obstacle_bumper/repulsion/enabled", _bumper_repulsion_enabled_);
+  param_loader.load_param("obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
 
   param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", _bumper_repulsion_horizontal_distance_);
   param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", _bumper_repulsion_horizontal_offset_);
@@ -867,7 +883,11 @@ void ControlManager::onInit() {
 
   output_command->thrust = _min_thrust_null_tracker_;
 
-  // | ------------- initialize the common handlers ------------- |
+  output_command->controller = "none";
+
+  // --------------------------------------------------------------
+  // |         common handler for trackers and controllers        |
+  // --------------------------------------------------------------
 
   common_handlers_ = std::make_shared<mrs_uav_manager::CommonHandlers_t>();
 
@@ -877,6 +897,63 @@ void ControlManager::onInit() {
 
   // bind transformer so trackers and controllers can use
   common_handlers_->transformer = transformer_;
+
+  // | ----------------------- safety area ---------------------- |
+
+  param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
+  param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
+  param_loader.load_param("safety_area/min_height", _min_height_);
+  param_loader.load_param("safety_area/max_height", _max_height_);
+
+  if (_use_safety_area_) {
+    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+
+    param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
+    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+    if (_obstacle_polygons_enabled_) {
+      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
+    }
+
+    param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
+    std::vector<Eigen::MatrixXd> point_obstacle_points;
+    if (_obstacle_points_enabled_) {
+      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+    } else {
+      point_obstacle_points = std::vector<Eigen::MatrixXd>();
+    }
+
+    // TODO: remove this when param loader supports proper loading
+    for (auto& matrix : polygon_obstacle_points) {
+      matrix.transposeInPlace();
+    }
+
+    try {
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
+    }
+    catch (mrs_lib::SafetyZone::BorderError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
+      ros::shutdown();
+    }
+    catch (mrs_lib::SafetyZone::PointObstacleError) {
+      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
+      ros::shutdown();
+    }
+  }
+
+  common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
+  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
+  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
+  common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
+  common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+
+  common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
+  common_handlers_->bumper.enabled             = bumper_enabled_;
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1225,65 +1302,6 @@ void ControlManager::onInit() {
   motors_ = false;
 
   // --------------------------------------------------------------
-  // |                         safety area                        |
-  // --------------------------------------------------------------
-
-  param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
-  param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
-  param_loader.load_param("safety_area/min_height", _min_height_);
-  param_loader.load_param("safety_area/max_height", max_height_);
-
-  if (_use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
-
-    param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-    if (_obstacle_polygons_enabled_) {
-      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
-    std::vector<Eigen::MatrixXd> point_obstacle_points;
-    if (_obstacle_points_enabled_) {
-      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      point_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    // TODO: remove this when param loader supports proper loading
-    for (auto& matrix : polygon_obstacle_points) {
-      matrix.transposeInPlace();
-    }
-
-    try {
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
-    }
-    catch (mrs_lib::SafetyZone::BorderError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configruation for the safety zone border polygon.");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone polygon obstacles.");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PointObstacleError) {
-      ROS_ERROR("[ControlManager]: Exception caught. Wrong configuration for one of the safety zone point obstacles.");
-      ros::shutdown();
-    }
-  }
-
-  common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
-  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
-  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
-  common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
-
-  common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
-  common_handlers_->bumper.enabled             = _bumper_enabled_;
-
-  // --------------------------------------------------------------
   // |                          profiler_                          |
   // --------------------------------------------------------------
 
@@ -1323,7 +1341,7 @@ void ControlManager::onInit() {
   subscriber_mavros_gps_       = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height_       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_joystick_         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper_           = nh_.subscribe("bumper_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
+  subscriber_bumper_           = nh_.subscribe("bumper_sectors_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state_     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
   subscriber_rc_               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
   subscriber_odometry_innovation_ =
@@ -1333,22 +1351,25 @@ void ControlManager::onInit() {
 
   // | -------------------- general services -------------------- |
 
-  service_server_switch_tracker_      = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-  service_server_switch_controller_   = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_server_hover_               = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
-  service_server_ehover_              = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
-  service_server_failsafe_            = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-  service_server_failsafe_escalating_ = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_motors_              = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
-  service_server_arm_                 = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-  service_server_enable_callbacks_    = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-  service_server_set_constraints_     = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-  service_server_use_joystick_        = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-  service_server_eland_               = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_partial_landing_     = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
-  service_server_transform_reference_ = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_pose_      = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
-  service_server_transform_vector3_   = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_switch_tracker_           = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+  service_server_switch_controller_        = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_server_reset_tracker_            = nh_.advertiseService("reset_tracker_in", &ControlManager::callbackResetTracker, this);
+  service_server_hover_                    = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
+  service_server_ehover_                   = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
+  service_server_failsafe_                 = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
+  service_server_failsafe_escalating_      = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
+  service_server_motors_                   = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+  service_server_arm_                      = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+  service_server_enable_callbacks_         = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+  service_server_set_constraints_          = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+  service_server_use_joystick_             = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+  service_server_eland_                    = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_partial_landing_          = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
+  service_server_transform_reference_      = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_pose_           = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
+  service_server_transform_vector3_        = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
+  service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
 
   service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -1414,9 +1435,11 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     return;
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto max_height        = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
+
+  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
   double uav_x, uav_y, uav_z;
   uav_x = uav_state.pose.position.x;
@@ -1517,13 +1540,47 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     std::vector<geometry_msgs::Point> border_points_bot = border.getPointMessageVector(_min_height_);
     std::vector<geometry_msgs::Point> border_points_top = border.getPointMessageVector(max_height);
 
+    mrs_msgs::ReferenceStamped temp_ref;
+    temp_ref.header.frame_id = _safety_area_frame_;
+
+    // get the transform
+    mrs_lib::TransformStamped tf;
+    transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
+
+    // transform border points to local origin
+    for (size_t i = 0; i < border_points_bot.size(); ++i) {
+
+      temp_ref.reference.position.x = border_points_bot[i].x;
+      temp_ref.reference.position.y = border_points_bot[i].y;
+      temp_ref.reference.position.z = border_points_bot[i].z;
+
+      transformer_->transformReference(tf, temp_ref);
+
+      border_points_bot[i].x = temp_ref.reference.position.x;
+      border_points_bot[i].y = temp_ref.reference.position.y;
+      border_points_bot[i].z = temp_ref.reference.position.z;
+    }
+
+    for (size_t i = 0; i < border_points_top.size(); ++i) {
+
+      temp_ref.reference.position.x = border_points_top[i].x;
+      temp_ref.reference.position.y = border_points_top[i].y;
+      temp_ref.reference.position.z = border_points_top[i].z;
+
+      transformer_->transformReference(tf, temp_ref);
+
+      border_points_top[i].x = temp_ref.reference.position.x;
+      border_points_top[i].y = temp_ref.reference.position.y;
+      border_points_top[i].z = temp_ref.reference.position.z;
+    }
+
     std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
 
     std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
 
     visualization_msgs::Marker marker;
 
-    marker.header.frame_id = _uav_name_ + "/" + _safety_area_frame_;
+    marker.header.frame_id = _uav_name_ + "/local_origin";
     marker.type            = visualization_msgs::Marker::LINE_LIST;
     marker.color.a         = 1;
     marker.scale.x         = 0.2;
@@ -1551,6 +1608,34 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
       std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
       std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
 
+      // transform border points to local origin
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+
+        temp_ref.reference.position.x = points_bot[i].x;
+        temp_ref.reference.position.y = points_bot[i].y;
+        temp_ref.reference.position.z = points_bot[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_bot[i].x = temp_ref.reference.position.x;
+        points_bot[i].y = temp_ref.reference.position.y;
+        points_bot[i].z = temp_ref.reference.position.z;
+      }
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_top.size(); ++i) {
+
+        temp_ref.reference.position.x = points_top[i].x;
+        temp_ref.reference.position.y = points_top[i].y;
+        temp_ref.reference.position.z = points_top[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_top[i].x = temp_ref.reference.position.x;
+        points_top[i].y = temp_ref.reference.position.y;
+        points_top[i].z = temp_ref.reference.position.z;
+      }
+
       // bottom points
       for (size_t i = 0; i < points_bot.size(); ++i) {
         marker.points.push_back(points_bot[i]);
@@ -1571,6 +1656,34 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
       std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_bot.size(); ++i) {
+
+        temp_ref.reference.position.x = points_bot[i].x;
+        temp_ref.reference.position.y = points_bot[i].y;
+        temp_ref.reference.position.z = points_bot[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_bot[i].x = temp_ref.reference.position.x;
+        points_bot[i].y = temp_ref.reference.position.y;
+        points_bot[i].z = temp_ref.reference.position.z;
+      }
+
+      // transform border points to local origin
+      for (size_t i = 0; i < points_top.size(); ++i) {
+
+        temp_ref.reference.position.x = points_top[i].x;
+        temp_ref.reference.position.y = points_top[i].y;
+        temp_ref.reference.position.z = points_top[i].z;
+
+        transformer_->transformReference(tf, temp_ref);
+
+        points_top[i].x = temp_ref.reference.position.x;
+        points_top[i].y = temp_ref.reference.position.y;
+        points_top[i].z = temp_ref.reference.position.z;
+      }
 
       // botom points
       for (size_t i = 0; i < points_bot.size(); ++i) {
@@ -1976,10 +2089,10 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   // calculate the quaternion
   if (last_attitude_cmd->quater_attitude_set) {
 
-    attitude_cmd_quaternion.setX(last_attitude_cmd->quter_attitude.x);
-    attitude_cmd_quaternion.setY(last_attitude_cmd->quter_attitude.y);
-    attitude_cmd_quaternion.setZ(last_attitude_cmd->quter_attitude.z);
-    attitude_cmd_quaternion.setW(last_attitude_cmd->quter_attitude.w);
+    attitude_cmd_quaternion.setX(last_attitude_cmd->quater_attitude.x);
+    attitude_cmd_quaternion.setY(last_attitude_cmd->quater_attitude.y);
+    attitude_cmd_quaternion.setZ(last_attitude_cmd->quater_attitude.z);
+    attitude_cmd_quaternion.setW(last_attitude_cmd->quater_attitude.w);
 
   } else if (last_attitude_cmd->euler_attitude_set) {
 
@@ -2014,7 +2127,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
     // calculate the euler angles
     tf::Quaternion quater_attitude_cmd;
-    quaternionMsgToTF(last_attitude_cmd->quter_attitude, quater_attitude_cmd);
+    quaternionMsgToTF(last_attitude_cmd->quater_attitude, quater_attitude_cmd);
     tf::Matrix3x3 m(quater_attitude_cmd);
     double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
     m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
@@ -2547,6 +2660,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in is %d)",
                          uint(rc_channels.channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: tip: this could be caused by the RC failsafe not being configured!");
 
     } else {
 
@@ -2690,7 +2804,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto bumper_data        = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
-  if (!_bumper_enabled_ || !_bumper_repulsion_enabled_) {
+  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
   }
 
@@ -2847,6 +2961,15 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
+  // | --------------------- check for nans --------------------- |
+
+  if (!validateOdometry(msg)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: odometry contains invalid values, throwing it away");
+    return;
+  }
+
+  // | ---------------------- frame switch ---------------------- |
+
   /* Odometry frame switch //{ */
 
   // | -- prepare an OdometryConstPtr for trackers & controllers -- |
@@ -2945,6 +3068,15 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
+
+  // | --------------------- check for nans --------------------- |
+
+  if (!validateUavState(msg)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: uav_state contains invalid values, throwing it away");
+    return;
+  }
+
+  // | ---------------------- frame switch ---------------------- |
 
   /* frame switch //{ */
 
@@ -3092,9 +3224,9 @@ void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& m
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMaxHeight");
 
   {
-    std::scoped_lock lock(mutex_max_height_);
+    std::scoped_lock lock(mutex_max_height_external_);
 
-    max_height_ = msg->value;
+    max_height_external_ = msg->value;
 
     got_max_height_ = true;
   }
@@ -3698,6 +3830,45 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
 
 //}
 
+/* //{ callbackSwitchTracker() */
+
+bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  char message[200];
+
+  // reactivate the current tracker
+  bool        succ;
+  std::string tracker_name;
+  {
+    std::scoped_lock lock(mutex_tracker_list_, mutex_controller_tracker_switch_time_);
+
+    tracker_name = _tracker_names_[active_tracker_idx_];
+
+    tracker_list_[active_tracker_idx_]->deactivate();
+    succ = tracker_list_[active_tracker_idx_]->activate(mrs_msgs::PositionCommand::Ptr());
+
+    controller_tracker_switch_time_ = ros::Time::now();
+  }
+
+  if (succ) {
+    sprintf((char*)&message, "The tracker '%s' was reset", tracker_name.c_str());
+    ROS_INFO("[ControlManager]: %s", message);
+  } else {
+    sprintf((char*)&message, "The tracker '%s' reset failed!", tracker_name.c_str());
+    ROS_ERROR("[ControlManager]: %s", message);
+  }
+
+  res.message = message;
+  res.success = false;
+
+  return true;
+}
+
+//}
+
 /* //{ callbackEHover() */
 
 bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
@@ -3811,7 +3982,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     return true;
   }
 
-  if (_bumper_enabled_) {
+  if (bumper_enabled_) {
     if (!got_bumper_) {
       sprintf((char*)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
@@ -4112,7 +4283,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 //}
 
-/* //{ transformPoseSrv() */
+/* //{ callbackTransformPose() */
 
 bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
 
@@ -4141,7 +4312,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
 
 //}
 
-/* //{ transformVector3Srv() */
+/* //{ callbackTransformVector3() */
 
 bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res) {
 
@@ -4164,6 +4335,52 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
     res.success = true;
     return true;
   }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackBumperEnableService() */
+
+bool ControlManager::callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  bumper_enabled_ = req.data;
+
+  char message[200];
+
+  sprintf((char*)&message, "bumper %s", bumper_enabled_ ? "ENALBED" : "DISABLED");
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  res.success = true;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackBumperEnableRepulsionService() */
+
+bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  bumper_repulsion_enabled_ = req.data;
+
+  char message[200];
+
+  sprintf((char*)&message, "bumper repulsion %s", bumper_repulsion_enabled_ ? "ENALBED" : "DISABLED");
+
+  ROS_INFO("[ControlManager]: %s", message);
+
+  res.success = true;
+  res.message = message;
 
   return true;
 }
@@ -5091,8 +5308,8 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
-  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
+  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 
   mrs_msgs::ReferenceStamped point_transformed = point;
 
@@ -5102,6 +5319,9 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
     return false;
   }
+
+  // what is lower, the max height from the safety area, or the max height from odometry?
+  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
   if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y) &&
       point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= max_height) {
@@ -5170,7 +5390,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_max_height_, max_height_);
+  return mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 }
 
 //}
@@ -5191,7 +5411,7 @@ double ControlManager::getMinHeight(void) {
 // everything here happens in FCU
 bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
-  if (!_bumper_enabled_) {
+  if (!bumper_enabled_) {
     return true;
   }
 
@@ -5367,11 +5587,11 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
 bool ControlManager::bumperPushFromObstacle(void) {
 
-  if (!_bumper_enabled_) {
+  if (!bumper_enabled_) {
     return true;
   }
 
-  if (!_bumper_repulsion_enabled_) {
+  if (!bumper_repulsion_enabled_) {
     return true;
   }
 
@@ -6152,6 +6372,7 @@ bool ControlManager::failsafe() {
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
     {
+      // TODO: I dont like this locking here, push it downstream pls
       std::scoped_lock lock(mutex_controller_list_);
 
       try {
@@ -6329,36 +6550,39 @@ void ControlManager::switchMotors(bool input) {
 void ControlManager::updateTrackers(void) {
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
-
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
-  mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_));
+  mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
   try {
 
     // for each tracker
     for (unsigned int i = 0; i < tracker_list_.size(); i++) {
 
-      if ((int)i == active_tracker_idx_) {
+      if ((int)i == active_tracker_idx) {
+
+        std::scoped_lock lock(mutex_tracker_list_);
 
         // if it is the active one, update and retrieve the command
         tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
 
       } else {
 
+        std::scoped_lock lock(mutex_tracker_list_);
+
         // if it is not the active one, just update without retrieving the command
         tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
       }
     }
 
-    if (mrs_msgs::PositionCommand::Ptr() != tracker_output_cmd) {
+    if (tracker_output_cmd != mrs_msgs::PositionCommand::Ptr() && validatePositionCommand(tracker_output_cmd)) {
 
       std::scoped_lock lock(mutex_last_position_cmd_);
 
@@ -6366,17 +6590,17 @@ void ControlManager::updateTrackers(void) {
 
     } else {
 
-      if (active_tracker_idx_ != _null_tracker_idx_) {
+      if (active_tracker_idx != _null_tracker_idx_) {
 
-        if (active_tracker_idx_ == _ehover_tracker_idx_) {
+        if (active_tracker_idx == _ehover_tracker_idx_) {
 
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty command!", _tracker_names_[active_tracker_idx_].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The ehover tracker (%s) returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
           failsafe();
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty command!", _tracker_names_[active_tracker_idx_].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker %s returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
           std::string ehover_message;
 
@@ -6404,45 +6628,72 @@ void ControlManager::updateTrackers(void) {
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
   // copy member variables
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   // --------------------------------------------------------------
   // |                   Update the controller                    |
   // --------------------------------------------------------------
 
-  std::scoped_lock lock(mutex_controller_list_);
-
   mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_for_control));
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+
+    mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
+
+    output_command->total_mass      = _uav_mass_;
+    output_command->mass_difference = 0.0;
+
+    output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+    output_command->disturbance_by_b = _initial_body_disturbance_y_;
+    output_command->disturbance_wx_w = 0.0;
+    output_command->disturbance_wy_w = 0.0;
+    output_command->disturbance_bx_w = 0.0;
+    output_command->disturbance_by_w = 0.0;
+
+    output_command->thrust = _min_thrust_null_tracker_;
+
+    output_command->controller = "none";
+
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd_);
+
+      last_attitude_cmd_ = output_command;
+    }
+
+  } else {
 
     try {
 
       // for each controller
       for (unsigned int i = 0; i < controller_list_.size(); i++) {
 
-        if ((int)i == active_controller_idx_) {
+        if ((int)i == active_controller_idx) {
+
+          std::scoped_lock lock(mutex_controller_list_);
 
           // if it is the active one, update and retrieve the command
-          controller_output_cmd = controller_list_[active_controller_idx_]->update(uav_state_const_ptr, last_position_cmd);
+          controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_position_cmd);
 
         } else {
+
+          std::scoped_lock lock(mutex_controller_list_);
 
           // if it is not the active one, just update without retrieving the command
           controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
         }
       }
 
-      // in normal sitation, the controller returns a valid command
-      if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+      // normally the active controller returns a valid command
+      if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr() && validateAttitudeCommand(controller_output_cmd)) {
 
         std::scoped_lock lock(mutex_last_attitude_cmd_);
 
         last_attitude_cmd_ = controller_output_cmd;
 
-        // but it can return an empty command
+        // but it can return an empty command, due to some critical internal error
         // which means we should trigger the failsafe landing
       } else {
 
@@ -6450,9 +6701,17 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
         // if not active, we don't care, we should not ask the controller for
         // the result anyway -> this could mean a race condition occured
         // like it once happend during landing
-        if (controller_list_[active_controller_idx_]->getStatus().active) {
+        bool controller_status = false;
 
-          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned null");
+        {
+          std::scoped_lock lock(mutex_controller_list_);
+
+          controller_status = controller_list_[active_controller_idx]->getStatus().active;
+        }
+
+        if (controller_status) {
+
+          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned empty or invalid command");
 
           failsafe();
         }
@@ -6507,10 +6766,10 @@ void ControlManager::publish(void) {
       // when controlling with quaternion or attitude rates, the quaternion should be filled in
       if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE || last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
 
-        desired_orientation.setX(last_attitude_cmd->quter_attitude.x);
-        desired_orientation.setY(last_attitude_cmd->quter_attitude.y);
-        desired_orientation.setZ(last_attitude_cmd->quter_attitude.z);
-        desired_orientation.setW(last_attitude_cmd->quter_attitude.w);
+        desired_orientation.setX(last_attitude_cmd->quater_attitude.x);
+        desired_orientation.setY(last_attitude_cmd->quater_attitude.y);
+        desired_orientation.setZ(last_attitude_cmd->quater_attitude.z);
+        desired_orientation.setW(last_attitude_cmd->quater_attitude.w);
 
       } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {  // when controlling with euler attitude, convert it to quaternion
 
@@ -6621,7 +6880,7 @@ void ControlManager::publish(void) {
 
     } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE) {
 
-      attitude_target.orientation = last_attitude_cmd->quter_attitude;
+      attitude_target.orientation = last_attitude_cmd->quater_attitude;
 
       attitude_target.body_rate.x = 0.0;
       attitude_target.body_rate.y = 0.0;
@@ -6635,7 +6894,7 @@ void ControlManager::publish(void) {
       attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
       attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
 
-      attitude_target.orientation = last_attitude_cmd->quter_attitude;
+      attitude_target.orientation = last_attitude_cmd->quater_attitude;
 
       attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
 
@@ -6774,6 +7033,495 @@ std::string ControlManager::resolveFrameName(const std::string in) {
   }
 
   return in;
+}
+
+//}
+
+/* validateTrackerCommand() //{ */
+
+bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command) {
+
+  // check attitude
+
+  if (!std::isfinite(position_command->attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude.w)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude.w\"!!!");
+    return false;
+  }
+
+  // check positions
+
+  if (!std::isfinite(position_command->position.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->position.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->position.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->position.z\"!!!");
+    return false;
+  }
+
+  // check velocities
+
+  if (!std::isfinite(position_command->velocity.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->velocity.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->velocity.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->velocity.z\"!!!");
+    return false;
+  }
+
+  // check accelerations
+
+  if (!std::isfinite(position_command->acceleration.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->acceleration.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->acceleration.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->acceleration.z\"!!!");
+    return false;
+  }
+
+  // check jerk
+
+  if (!std::isfinite(position_command->jerk.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->jerk.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->jerk.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->jerk.z\"!!!");
+    return false;
+  }
+
+  // check snap
+
+  if (!std::isfinite(position_command->snap.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->snap.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->snap.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->snap.z\"!!!");
+    return false;
+  }
+
+  // check attitude rate
+
+  if (!std::isfinite(position_command->attitude_rate.x)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude_rate.y)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->attitude_rate.z)) {
+    ROS_ERROR("NaN detected in variable \"position_command->attitude_rate.z\"!!!");
+    return false;
+  }
+
+  // check yaws
+
+  if (!std::isfinite(position_command->yaw)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_dot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_dot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_ddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_ddot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_dddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_dddot\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(position_command->yaw_ddddot)) {
+    ROS_ERROR("NaN detected in variable \"position_command->yaw_ddddot\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateAttitudeCommand() //{ */
+
+bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command) {
+
+  // check euler attitude
+
+  if (!std::isfinite(attitude_command->euler_attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->euler_attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->euler_attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->euler_attitude.z\"!!!");
+    return false;
+  }
+
+  // check quater attitude
+
+  if (!std::isfinite(attitude_command->quater_attitude.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->quater_attitude.w)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->quater_attitude.w\"!!!");
+    return false;
+  }
+
+  // check attitude rate
+
+  if (!std::isfinite(attitude_command->attitude_rate.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->attitude_rate.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->attitude_rate.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->attitude_rate.z\"!!!");
+    return false;
+  }
+
+  // check desired_acceleration
+
+  if (!std::isfinite(attitude_command->desired_acceleration.x)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->desired_acceleration.y)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->desired_acceleration.z)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->desired_acceleration.z\"!!!");
+    return false;
+  }
+
+  // check the constraints
+
+  if (!std::isfinite(attitude_command->horizontal_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->horizontal_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->horizontal_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->horizontal_acc_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_asc_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_asc_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_asc_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_asc_acc_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_desc_speed_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_desc_speed_constraint\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_command->vertical_desc_acc_constraint)) {
+    ROS_ERROR("NaN detected in variable \"attitude_command->vertical_desc_acc_constraint\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateOdometry() //{ */
+
+bool ControlManager::validateOdometry(const nav_msgs::OdometryConstPtr odometry) {
+
+  // check position
+
+  if (!std::isfinite(odometry->pose.pose.position.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.position.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.position.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.position.z\"!!!");
+    return false;
+  }
+
+  // check orientation
+
+  if (!std::isfinite(odometry->pose.pose.orientation.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->pose.pose.orientation.w)) {
+    ROS_ERROR("NaN detected in variable \"odometry->pose.pose.orientation.w\"!!!");
+    return false;
+  }
+
+  // check velocity
+
+  if (!std::isfinite(odometry->twist.twist.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->twist.twist.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry->twist.twist.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"odometry->twist.twist.linear.z\"!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateUavState() //{ */
+
+bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state) {
+
+  // check position
+
+  if (!std::isfinite(uav_state->pose.position.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.position.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.position.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.position.z\"!!!");
+    return false;
+  }
+
+  // check orientation
+
+  if (!std::isfinite(uav_state->pose.orientation.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.z\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->pose.orientation.w)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->pose.orientation.w\"!!!");
+    return false;
+  }
+
+  // check linear velocity
+
+  if (!std::isfinite(uav_state->velocity.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.linear.z\"!!!");
+    return false;
+  }
+
+  // check angular velocity
+
+  if (!std::isfinite(uav_state->velocity.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->velocity.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->velocity.angular.z\"!!!");
+    return false;
+  }
+
+  // check linear acceleration
+
+  if (!std::isfinite(uav_state->acceleration.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.linear.z\"!!!");
+    return false;
+  }
+
+  // check angular acceleration
+
+  if (!std::isfinite(uav_state->acceleration.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration.angular.z\"!!!");
+    return false;
+  }
+
+  // check acceleration angular disturbance
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.angular.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.angular.z\"!!!");
+    return false;
+  }
+
+  // check acceleration linear disturbance
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.x)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.x\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.y)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.y\"!!!");
+    return false;
+  }
+
+  if (!std::isfinite(uav_state->acceleration_disturbance.linear.z)) {
+    ROS_ERROR("NaN detected in variable \"uav_state->acceleration_disturbance.linear.z\"!!!");
+    return false;
+  }
+
+  return true;
 }
 
 //}

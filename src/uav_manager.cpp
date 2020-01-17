@@ -660,6 +660,11 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
   odometry_y = odometry.pose.pose.position.y;
   odometry_z = odometry.pose.pose.position.z;
 
+  double odometry_x_speed, odometry_y_speed, odometry_z_speed;
+  odometry_x_speed = odometry.twist.twist.linear.x;
+  odometry_y_speed = odometry.twist.twist.linear.y;
+  odometry_z_speed = odometry.twist.twist.linear.z;
+
   if (!got_max_height_ || !got_odometry_) {
     return;
   }
@@ -671,15 +676,18 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
       ROS_WARN("[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", odometry_z, max_height);
 
       // get the current odometry
-      double current_horizontal_speed = sqrt(pow(odometry_x, 2) + pow(odometry_y, 2));
-      double current_heading          = atan2(odometry_y, odometry_x);
+      double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
+      double current_heading          = atan2(odometry_y_speed, odometry_x_speed);
 
       double horizontal_t_stop    = current_horizontal_speed / 1.0;
-      double horizontal_stop_dist = (horizontal_t_stop * current_horizontal_speed) / 2;
+      double horizontal_stop_dist = (horizontal_t_stop * current_horizontal_speed) / 2.0;
       double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
       double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
 
       mrs_msgs::ReferenceStampedSrv reference_out;
+      reference_out.request.header.frame_id = odometry.header.frame_id;
+      reference_out.request.header.stamp = ros::Time::now();
+
       reference_out.request.reference.position.x = odometry_x + stop_dist_x;
       reference_out.request.reference.position.y = odometry_y + stop_dist_y;
       reference_out.request.reference.position.z = max_height - fabs(_max_height_offset_);
