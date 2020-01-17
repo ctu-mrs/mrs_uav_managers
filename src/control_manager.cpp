@@ -6657,7 +6657,11 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
     output_command->controller = "none";
 
-    mrs_lib::set_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_, output_command);
+    {
+      std::scoped_lock lock(mutex_last_attitude_cmd_);
+
+      last_attitude_cmd_ = output_command;
+    }
 
   } else {
 
