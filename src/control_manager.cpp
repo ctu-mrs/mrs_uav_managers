@@ -883,6 +883,8 @@ void ControlManager::onInit() {
 
   output_command->thrust = _min_thrust_null_tracker_;
 
+  output_command->controller = "none";
+
   // --------------------------------------------------------------
   // |         common handler for trackers and controllers        |
   // --------------------------------------------------------------
@@ -6637,7 +6639,27 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+
+    mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
+
+    output_command->total_mass      = _uav_mass_;
+    output_command->mass_difference = 0.0;
+
+    output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+    output_command->disturbance_by_b = _initial_body_disturbance_y_;
+    output_command->disturbance_wx_w = 0.0;
+    output_command->disturbance_wy_w = 0.0;
+    output_command->disturbance_bx_w = 0.0;
+    output_command->disturbance_by_w = 0.0;
+
+    output_command->thrust = _min_thrust_null_tracker_;
+
+    output_command->controller = "none";
+
+    mrs_lib::set_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_, output_command);
+
+  } else {
 
     try {
 
