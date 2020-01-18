@@ -57,10 +57,10 @@ medium:
 fast:
 
   horizontal:
-    speed: 8.3
-    acceleration: 3.0
-    jerk: 3.0
-    snap: 10.0
+    speed: 9.0
+    acceleration: 3.3
+    jerk: 10.0
+    snap: 5.0
 
   vertical:
 
