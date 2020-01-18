@@ -1545,169 +1545,189 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
     // get the transform
     mrs_lib::TransformStamped tf;
-    transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
+    bool                      got_tf = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
 
-    // transform border points to local origin
-    for (size_t i = 0; i < border_points_bot.size(); ++i) {
+    if (got_tf) {
 
-      temp_ref.reference.position.x = border_points_bot[i].x;
-      temp_ref.reference.position.y = border_points_bot[i].y;
-      temp_ref.reference.position.z = border_points_bot[i].z;
+      // transform border bottom points to local origin
+      for (size_t i = 0; i < border_points_bot.size(); i++) {
 
-      transformer_->transformReference(tf, temp_ref);
 
-      border_points_bot[i].x = temp_ref.reference.position.x;
-      border_points_bot[i].y = temp_ref.reference.position.y;
-      border_points_bot[i].z = temp_ref.reference.position.z;
-    }
-
-    for (size_t i = 0; i < border_points_top.size(); ++i) {
-
-      temp_ref.reference.position.x = border_points_top[i].x;
-      temp_ref.reference.position.y = border_points_top[i].y;
-      temp_ref.reference.position.z = border_points_top[i].z;
-
-      transformer_->transformReference(tf, temp_ref);
-
-      border_points_top[i].x = temp_ref.reference.position.x;
-      border_points_top[i].y = temp_ref.reference.position.y;
-      border_points_top[i].z = temp_ref.reference.position.z;
-    }
-
-    std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
-
-    std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
-
-    visualization_msgs::Marker marker;
-
-    marker.header.frame_id = _uav_name_ + "/local_origin";
-    marker.type            = visualization_msgs::Marker::LINE_LIST;
-    marker.color.a         = 1;
-    marker.scale.x         = 0.2;
-    marker.color.r         = 1;
-    marker.color.g         = 0;
-    marker.color.b         = 0;
-
-    // bottom border
-    for (size_t i = 0; i < border_points_bot.size(); ++i) {
-      marker.points.push_back(border_points_bot[i]);
-      marker.points.push_back(border_points_bot[(i + 1) % border_points_bot.size()]);
-    }
-
-    // top border + top/bot edges
-    for (size_t i = 0; i < border_points_top.size(); ++i) {
-      marker.points.push_back(border_points_top[i]);
-      marker.points.push_back(border_points_top[(i + 1) % border_points_top.size()]);
-
-      marker.points.push_back(border_points_bot[i]);
-      marker.points.push_back(border_points_top[i]);
-    }
-
-    for (auto polygon : polygon_obstacles) {
-
-      std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
-      std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
-
-      // transform border points to local origin
-      for (size_t i = 0; i < points_bot.size(); ++i) {
-
-        temp_ref.reference.position.x = points_bot[i].x;
-        temp_ref.reference.position.y = points_bot[i].y;
-        temp_ref.reference.position.z = points_bot[i].z;
+        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.stamp         = ros::Time(0);
+        temp_ref.reference.position.x = border_points_bot[i].x;
+        temp_ref.reference.position.y = border_points_bot[i].y;
+        temp_ref.reference.position.z = border_points_bot[i].z;
 
         transformer_->transformReference(tf, temp_ref);
 
-        points_bot[i].x = temp_ref.reference.position.x;
-        points_bot[i].y = temp_ref.reference.position.y;
-        points_bot[i].z = temp_ref.reference.position.z;
+        border_points_bot[i].x = temp_ref.reference.position.x;
+        border_points_bot[i].y = temp_ref.reference.position.y;
+        border_points_bot[i].z = temp_ref.reference.position.z;
       }
 
-      // transform border points to local origin
-      for (size_t i = 0; i < points_top.size(); ++i) {
+      // transform border top points to local origin
+      for (size_t i = 0; i < border_points_top.size(); i++) {
 
-        temp_ref.reference.position.x = points_top[i].x;
-        temp_ref.reference.position.y = points_top[i].y;
-        temp_ref.reference.position.z = points_top[i].z;
+        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.stamp         = ros::Time(0);
+        temp_ref.reference.position.x = border_points_top[i].x;
+        temp_ref.reference.position.y = border_points_top[i].y;
+        temp_ref.reference.position.z = border_points_top[i].z;
 
         transformer_->transformReference(tf, temp_ref);
 
-        points_top[i].x = temp_ref.reference.position.x;
-        points_top[i].y = temp_ref.reference.position.y;
-        points_top[i].z = temp_ref.reference.position.z;
+        border_points_top[i].x = temp_ref.reference.position.x;
+        border_points_top[i].y = temp_ref.reference.position.y;
+        border_points_top[i].z = temp_ref.reference.position.z;
       }
 
-      // bottom points
-      for (size_t i = 0; i < points_bot.size(); ++i) {
-        marker.points.push_back(points_bot[i]);
-        marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
+
+      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
+
+      visualization_msgs::Marker marker;
+
+      marker.header.frame_id = _uav_name_ + "/local_origin";
+      marker.type            = visualization_msgs::Marker::LINE_LIST;
+      marker.color.a         = 1;
+      marker.scale.x         = 0.2;
+      marker.color.r         = 1;
+      marker.color.g         = 0;
+      marker.color.b         = 0;
+
+      // bottom border
+      for (size_t i = 0; i < border_points_bot.size(); i++) {
+        marker.points.push_back(border_points_bot[i]);
+        marker.points.push_back(border_points_bot[(i + 1) % border_points_bot.size()]);
       }
 
-      // top points + top/bot edges
-      for (size_t i = 0; i < points_bot.size(); ++i) {
-        marker.points.push_back(points_top[i]);
-        marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+      // top border + top/bot edges
+      for (size_t i = 0; i < border_points_top.size(); i++) {
+        marker.points.push_back(border_points_top[i]);
+        marker.points.push_back(border_points_top[(i + 1) % border_points_top.size()]);
 
-        marker.points.push_back(points_bot[i]);
-        marker.points.push_back(points_top[i]);
-      }
-    }
-
-    for (auto point : point_obstacles) {
-
-      std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
-      std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
-
-      // transform border points to local origin
-      for (size_t i = 0; i < points_bot.size(); ++i) {
-
-        temp_ref.reference.position.x = points_bot[i].x;
-        temp_ref.reference.position.y = points_bot[i].y;
-        temp_ref.reference.position.z = points_bot[i].z;
-
-        transformer_->transformReference(tf, temp_ref);
-
-        points_bot[i].x = temp_ref.reference.position.x;
-        points_bot[i].y = temp_ref.reference.position.y;
-        points_bot[i].z = temp_ref.reference.position.z;
+        marker.points.push_back(border_points_bot[i]);
+        marker.points.push_back(border_points_top[i]);
       }
 
-      // transform border points to local origin
-      for (size_t i = 0; i < points_top.size(); ++i) {
+      for (auto polygon : polygon_obstacles) {
 
-        temp_ref.reference.position.x = points_top[i].x;
-        temp_ref.reference.position.y = points_top[i].y;
-        temp_ref.reference.position.z = points_top[i].z;
+        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
+        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
 
-        transformer_->transformReference(tf, temp_ref);
+        // transform border bottom points to local origin
+        for (size_t i = 0; i < points_bot.size(); i++) {
 
-        points_top[i].x = temp_ref.reference.position.x;
-        points_top[i].y = temp_ref.reference.position.y;
-        points_top[i].z = temp_ref.reference.position.z;
+          temp_ref.header.frame_id      = _safety_area_frame_;
+          temp_ref.header.stamp         = ros::Time(0);
+          temp_ref.reference.position.x = points_bot[i].x;
+          temp_ref.reference.position.y = points_bot[i].y;
+          temp_ref.reference.position.z = points_bot[i].z;
+
+          transformer_->transformReference(tf, temp_ref);
+
+          points_bot[i].x = temp_ref.reference.position.x;
+          points_bot[i].y = temp_ref.reference.position.y;
+          points_bot[i].z = temp_ref.reference.position.z;
+        }
+
+        // transform border top points to local origin
+        for (size_t i = 0; i < points_top.size(); i++) {
+
+          temp_ref.header.frame_id      = _safety_area_frame_;
+          temp_ref.header.stamp         = ros::Time(0);
+          temp_ref.reference.position.x = points_top[i].x;
+          temp_ref.reference.position.y = points_top[i].y;
+          temp_ref.reference.position.z = points_top[i].z;
+
+          transformer_->transformReference(tf, temp_ref);
+
+          points_top[i].x = temp_ref.reference.position.x;
+          points_top[i].y = temp_ref.reference.position.y;
+          points_top[i].z = temp_ref.reference.position.z;
+        }
+
+        // bottom points
+        for (size_t i = 0; i < points_bot.size(); i++) {
+          marker.points.push_back(points_bot[i]);
+          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+        }
+
+        // top points + top/bot edges
+        for (size_t i = 0; i < points_bot.size(); i++) {
+          marker.points.push_back(points_top[i]);
+          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          marker.points.push_back(points_bot[i]);
+          marker.points.push_back(points_top[i]);
+        }
       }
 
-      // botom points
-      for (size_t i = 0; i < points_bot.size(); ++i) {
-        marker.points.push_back(points_bot[i]);
-        marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+      for (auto point : point_obstacles) {
+
+        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
+        std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
+
+        // transform bottom points to local origin
+        for (size_t i = 0; i < points_bot.size(); i++) {
+
+          temp_ref.header.frame_id      = _safety_area_frame_;
+          temp_ref.header.stamp         = ros::Time(0);
+          temp_ref.reference.position.x = points_bot[i].x;
+          temp_ref.reference.position.y = points_bot[i].y;
+          temp_ref.reference.position.z = points_bot[i].z;
+
+          transformer_->transformReference(tf, temp_ref);
+
+          points_bot[i].x = temp_ref.reference.position.x;
+          points_bot[i].y = temp_ref.reference.position.y;
+          points_bot[i].z = temp_ref.reference.position.z;
+        }
+
+        // transform top points to local origin
+        for (size_t i = 0; i < points_top.size(); i++) {
+
+          temp_ref.header.frame_id      = _safety_area_frame_;
+          temp_ref.header.stamp         = ros::Time(0);
+          temp_ref.reference.position.x = points_top[i].x;
+          temp_ref.reference.position.y = points_top[i].y;
+          temp_ref.reference.position.z = points_top[i].z;
+
+          transformer_->transformReference(tf, temp_ref);
+
+          points_top[i].x = temp_ref.reference.position.x;
+          points_top[i].y = temp_ref.reference.position.y;
+          points_top[i].z = temp_ref.reference.position.z;
+        }
+
+        // botom points
+        for (size_t i = 0; i < points_bot.size(); i++) {
+          marker.points.push_back(points_bot[i]);
+          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+        }
+
+        // top points + bot/top edges
+        for (size_t i = 0; i < points_top.size(); i++) {
+          marker.points.push_back(points_top[i]);
+          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          marker.points.push_back(points_bot[i]);
+          marker.points.push_back(points_top[i]);
+        }
       }
 
-      // top points + bot/top edges
-      for (size_t i = 0; i < points_top.size(); ++i) {
-        marker.points.push_back(points_top[i]);
-        marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+      msg_out.markers.push_back(marker);
 
-        marker.points.push_back(points_bot[i]);
-        marker.points.push_back(points_top[i]);
+      try {
+        publisher_safety_area_markers_.publish(msg_out);
       }
-    }
+      catch (...) {
+        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+      }
 
-    msg_out.markers.push_back(marker);
-
-    try {
-      publisher_safety_area_markers_.publish(msg_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: missing TFs, cannot publish safety area markers");
     }
   }
 
@@ -5715,7 +5735,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
   // if potential collision was detected and we should start the repulsing_
   if (horizontal_collision_detected || vertical_collision_detected) {
 
-    ROS_INFO("[ControlManager]: repulsing was initiated");
+    ROS_INFO("[ControlManager]: repulsion was initiated");
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = true;
@@ -5788,7 +5808,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
   // if repulsing_ and the distance is safe once again
   if ((repulsing_ && !horizontal_collision_detected && !vertical_collision_detected)) {
 
-    ROS_INFO("[ControlManager]: repulsing was stopped");
+    ROS_INFO("[ControlManager]: repulsion was stopped");
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
