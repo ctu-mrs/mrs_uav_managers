@@ -94,6 +94,9 @@
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
+#define PWM_MIN 1000.0
+#define PWM_MAX 2000.0
+#define PWM_RANGE PWM_MAX - PWM_MIN
 #define REF_X 0
 #define REF_Y 1
 #define REF_Z 2
@@ -274,6 +277,8 @@ private:
   bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
   bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
   bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
+
+  double RCChannelToRange(double rc_value, double range, double deadband);
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
@@ -2684,23 +2689,28 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     } else {
 
-      if (abs(rc_channels.channels[_rc_channel_roll_] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[_rc_channel_roll_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      double tmp_x   = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.2);
+      double tmp_y   = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.2);
+      double tmp_z   = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
+      double tmp_yaw = -RCChannelToRange(rc_channels.channels[_rc_channel_yaw_], _rc_joystick_carrot_distance_, 0.2);
+
+      if (abs(tmp_x) > 1e-3) {
+        des_x         = tmp_x;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_thrust_] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[_rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      if (abs(tmp_y) > 1e-3) {
+        des_y         = tmp_y;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_pitch_] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[_rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      if (abs(tmp_z) > 1e-3) {
+        des_z         = tmp_z;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_yaw_] - PWM_MIDDLE) > 100) {
-        des_yaw       = (-(rc_channels.channels[_rc_channel_yaw_] - PWM_MIDDLE) / 500.0) * 1.0;
+      if (abs(tmp_yaw) > 1e-3) {
+        des_yaw       = tmp_yaw;
         nothing_to_do = false;
       }
     }
@@ -7542,6 +7552,42 @@ bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state
   }
 
   return true;
+}
+
+//}
+
+/* RCChannelToRange() //{ */
+
+double ControlManager::RCChannelToRange(double rc_value, double range, double deadband) {
+
+  double tmp_0_to_1    = (rc_value - PWM_MIN) / (PWM_RANGE);
+  double tmp_neg1_to_1 = (tmp_0_to_1 - 0.5) * 2.0;
+
+  if (tmp_neg1_to_1 > 1.0) {
+    tmp_neg1_to_1 = 1.0;
+  } else if (tmp_neg1_to_1 < -1.0) {
+    tmp_neg1_to_1 = -1.0;
+  }
+
+  // check the deadband
+  if (tmp_neg1_to_1 < deadband && tmp_neg1_to_1 > -deadband) {
+    return 0.0;
+  }
+
+  if (tmp_neg1_to_1 > 0) {
+
+    double tmp = (tmp_neg1_to_1 - deadband) / (1.0 - deadband);
+
+    return range * tmp;
+
+  } else {
+
+    double tmp = (-tmp_neg1_to_1 - deadband) / (1.0 - deadband);
+
+    return -range * tmp;
+  }
+
+  return 0.0;
 }
 
 //}
