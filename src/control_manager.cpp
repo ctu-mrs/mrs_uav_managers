@@ -2689,10 +2689,10 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     } else {
 
-      double tmp_x   = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.2);
-      double tmp_y   = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.2);
+      double tmp_x   = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_y   = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
       double tmp_z   = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
-      double tmp_yaw = -RCChannelToRange(rc_channels.channels[_rc_channel_yaw_], _rc_joystick_carrot_distance_, 0.2);
+      double tmp_yaw = -RCChannelToRange(rc_channels.channels[_rc_channel_yaw_], 1.0, 0.1);
 
       if (abs(tmp_x) > 1e-3) {
         des_x         = tmp_x;
