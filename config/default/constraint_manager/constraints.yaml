@@ -29,36 +29,8 @@ slow:
 medium:
 
   horizontal:
-    speed: 4.5
+    speed: 5.0
     acceleration: 2.5
-    jerk: 3.0
-    snap: 10.0
-
-  vertical:
-
-    ascending:
-      speed: 1.0
-      acceleration: 1.0
-      jerk: 3.0
-      snap: 5.0
-
-    descending:
-      speed: 1.0
-      acceleration: 1.0
-      jerk: 3.0
-      snap: 5.0
-
-  yaw:
-    speed: 1.0
-    acceleration: 1.0
-    jerk: 3.0
-    snap: 5.0
-
-fast:
-
-  horizontal:
-    speed: 9.0
-    acceleration: 3.3
     jerk: 10.0
     snap: 5.0
 
@@ -75,6 +47,34 @@ fast:
       acceleration: 1.0
       jerk: 3.0
       snap: 5.0
+
+  yaw:
+    speed: 1.0
+    acceleration: 1.0
+    jerk: 3.0
+    snap: 5.0
+
+fast:
+
+  horizontal:
+    speed: 9.0
+    acceleration: 3.3
+    jerk: 10.0
+    snap: 10.0
+
+  vertical:
+
+    ascending:
+      speed: 2.0
+      acceleration: 2.0
+      jerk: 5.0
+      snap: 3.0
+
+    descending:
+      speed: 2.0
+      acceleration: 2.0
+      jerk: 5.0
+      snap: 3.0
 
   yaw:
     speed: 2.0
