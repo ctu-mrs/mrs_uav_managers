@@ -2309,6 +2309,16 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
       }
     }
   }
+
+  // | --------- dropping out of OFFBOARD in mid flight --------- |
+
+  // if we are not in offboard and the drone is in mid air (NullTracker is not active)
+  if (!offboard_mode_ && active_tracker_idx != _null_tracker_idx_) {
+
+    ROS_ERROR("[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
+
+    switchMotors(false);
+  }
 }
 
 //}
