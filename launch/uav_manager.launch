@@ -7,6 +7,7 @@
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="ODOMETRY_TYPE" default="$(env ODOMETRY_TYPE)" />
+  <arg name="WORLD_FILE" default="" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
@@ -17,10 +18,6 @@
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.3" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
-
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('ODOMETRY_TYPE') == 'gps')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('ODOMETRY_TYPE') != 'gps')" name="world_file" value="$(find mrs_general)/config/world_simulation_local.yaml" />
-  <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_current.yaml" />
 
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
@@ -44,7 +41,7 @@
         <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
-      <rosparam file="$(arg world_file)" />
+      <rosparam file="$(arg WORLD_FILE)" />
       <rosparam file="$(arg motor_params_file)" />
 
         <!-- Load a user param file -->
