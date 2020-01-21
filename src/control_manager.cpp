@@ -15,6 +15,7 @@
 #include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/UavState.h>
+#include <mrs_msgs/TrackerConstraints.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -335,6 +336,7 @@ private:
   ros::Publisher publisher_disturbances_markers_;
   ros::Publisher publisher_bumper_status_;
   ros::Publisher publisher_mpc_trajectory_;
+  ros::Publisher publisher_current_constraints_;
 
   // service servers
   ros::ServiceServer service_server_switch_tracker_;
@@ -518,7 +520,7 @@ private:
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res);
+  bool callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res);
 
   // land and sit while applying thrust
   bool callbackPartialLanding(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -526,11 +528,11 @@ private:
   // constraints management
   bool       got_constraints_ = false;
   std::mutex mutex_constraints_;
-  void       setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
-  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints);
+  void       setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints);
+  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints);
 
-  mrs_msgs::TrackerConstraintsRequest current_constraints_;
-  mrs_msgs::TrackerConstraintsRequest sanitized_constraints_;
+  mrs_msgs::TrackerConstraintsSrvRequest current_constraints_;
+  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints_;
 
   // yaw manipulation
   double sanitizeYaw(const double yaw_in);
@@ -1331,6 +1333,7 @@ void ControlManager::onInit() {
   publisher_disturbances_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status_        = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
   publisher_mpc_trajectory_       = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
+  publisher_current_constraints_  = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -2036,6 +2039,24 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_disturbances_markers_.getTopic().c_str());
+    }
+  }
+
+  // --------------------------------------------------------------
+  // |               publish the current constraints              |
+  // --------------------------------------------------------------
+
+  if (got_constraints_) {
+
+    auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
+
+    mrs_msgs::TrackerConstraints constraints = sanitized_constraints.constraints;
+
+    try {
+      publisher_current_constraints_.publish(constraints);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints_.getTopic().c_str());
     }
   }
 }
@@ -3866,7 +3887,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
     }
   }
 
-  mrs_msgs::TrackerConstraintsRequest sanitized_constraints;
+  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints;
   {
     std::scoped_lock lock(mutex_constraints_);
 
@@ -4116,7 +4137,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
 /* callbackSetConstraints() //{ */
 
-bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res) {
+bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5273,9 +5294,9 @@ void ControlManager::publishDiagnostics(void) {
 
 /* setConstraints() //{ */
 
-void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constraints) {
+void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints) {
 
-  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+  mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr tracker_response;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -5284,8 +5305,8 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
     for (unsigned int i = 0; i < tracker_list_.size(); i++) {
 
       // if it is the active one, update and retrieve the command
-      tracker_response =
-          tracker_list_[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(std::make_unique<mrs_msgs::TrackerConstraintsRequest>(constraints)));
+      tracker_response = tracker_list_[i]->setConstraints(
+          mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrackerConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -5294,7 +5315,7 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
 
 /* enforceControllerConstraints() //{ */
 
-bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints) {
+bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -5308,43 +5329,43 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsR
       std::scoped_lock lock(mutex_tracker_list_);
 
       // enforce horizontal speed
-      if (last_attitude_cmd->horizontal_speed_constraint < constraints.horizontal_speed) {
-        constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
+      if (last_attitude_cmd->horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
+        constraints.constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce horizontal acceleration
-      if (last_attitude_cmd->horizontal_acc_constraint < constraints.horizontal_acceleration) {
-        constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
+      if (last_attitude_cmd->horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
+        constraints.constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending speed
-      if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.vertical_ascending_speed) {
-        constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
+      if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
+        constraints.constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending acceleration
-      if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.vertical_ascending_acceleration) {
-        constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
+      if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
+        constraints.constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending speed
-      if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.vertical_descending_speed) {
-        constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
+      if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
+        constraints.constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending acceleration
-      if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.vertical_descending_acceleration) {
-        constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
+      if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
+        constraints.constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
 
         enforcing = true;
       }

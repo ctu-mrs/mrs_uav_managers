@@ -33,7 +33,7 @@ public:
 
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
-  virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &cmd);
+  virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &cmd);
 
 private:
   ros::NodeHandle nh_;
@@ -239,9 +239,10 @@ const std_srvs::TriggerResponse::ConstPtr NullTracker::hover([[maybe_unused]] co
 
 /* //{ setConstraints() service */
 
-const mrs_msgs::TrackerConstraintsResponse::ConstPtr NullTracker::setConstraints([[maybe_unused]] const mrs_msgs::TrackerConstraintsRequest::ConstPtr &cmd) {
+const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr NullTracker::setConstraints([
+    [maybe_unused]] const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &cmd) {
 
-  return mrs_msgs::TrackerConstraintsResponse::Ptr();
+  return mrs_msgs::TrackerConstraintsSrvResponse::Ptr();
 }
 
 //}

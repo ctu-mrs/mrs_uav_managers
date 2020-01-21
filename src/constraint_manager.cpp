@@ -8,8 +8,8 @@
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/OdometryDiag.h>
 #include <mrs_msgs/EstimatorType.h>
-#include <mrs_msgs/TrackerConstraints.h>
-#include <mrs_msgs/TrackerConstraintsRequest.h>
+#include <mrs_msgs/TrackerConstraintsSrv.h>
+#include <mrs_msgs/TrackerConstraintsSrvRequest.h>
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
@@ -39,8 +39,8 @@ private:
 private:
   std::vector<std::string> estimator_type_names_;
 
-  std::vector<std::string>                                   constraint_names_;
-  std::map<std::string, mrs_msgs::TrackerConstraintsRequest> constraints;
+  std::vector<std::string>                                      constraint_names_;
+  std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest> constraints;
 
 private:
   std::map<std::string, std::vector<std::string>> map_type_allowed_constraints;
@@ -118,29 +118,29 @@ void ConstraintManager::onInit() {
   for (it = constraint_names_.begin(); it != constraint_names_.end(); ++it) {
     ROS_INFO_STREAM("[ConstraintManager]: loading constraints \"" << *it << "\"");
 
-    mrs_msgs::TrackerConstraintsRequest new_constraints;
+    mrs_msgs::TrackerConstraintsSrvRequest new_constraints;
 
-    param_loader.load_param(*it + "/horizontal/speed", new_constraints.horizontal_speed);
-    param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.horizontal_acceleration);
-    param_loader.load_param(*it + "/horizontal/jerk", new_constraints.horizontal_jerk);
-    param_loader.load_param(*it + "/horizontal/snap", new_constraints.horizontal_snap);
+    param_loader.load_param(*it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
+    param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
+    param_loader.load_param(*it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
+    param_loader.load_param(*it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
 
-    param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.vertical_ascending_speed);
-    param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.vertical_ascending_acceleration);
-    param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.vertical_ascending_jerk);
-    param_loader.load_param(*it + "/vertical/ascending/snap", new_constraints.vertical_ascending_snap);
+    param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
+    param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
+    param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
+    param_loader.load_param(*it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
 
-    param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.vertical_descending_speed);
-    param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.vertical_descending_acceleration);
-    param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.vertical_descending_jerk);
-    param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.vertical_descending_snap);
+    param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
+    param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
+    param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
+    param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
 
-    param_loader.load_param(*it + "/yaw/speed", new_constraints.yaw_speed);
-    param_loader.load_param(*it + "/yaw/acceleration", new_constraints.yaw_acceleration);
-    param_loader.load_param(*it + "/yaw/jerk", new_constraints.yaw_jerk);
-    param_loader.load_param(*it + "/yaw/snap", new_constraints.yaw_snap);
+    param_loader.load_param(*it + "/yaw/speed", new_constraints.constraints.yaw_speed);
+    param_loader.load_param(*it + "/yaw/acceleration", new_constraints.constraints.yaw_acceleration);
+    param_loader.load_param(*it + "/yaw/jerk", new_constraints.constraints.yaw_jerk);
+    param_loader.load_param(*it + "/yaw/snap", new_constraints.constraints.yaw_snap);
 
-    constraints.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsRequest>(*it, new_constraints));
+    constraints.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsSrvRequest>(*it, new_constraints));
   }
 
   // loading the allowed constraints lists
@@ -183,7 +183,7 @@ void ConstraintManager::onInit() {
 
   service_server_set_constraints = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
 
-  service_client_set_constraints = nh_.serviceClient<mrs_msgs::TrackerConstraints>("set_constraints_out");
+  service_client_set_constraints = nh_.serviceClient<mrs_msgs::TrackerConstraintsSrv>("set_constraints_out");
 
   // | ----------------------- subscribers ---------------------- |
   subscriber_odometry_diagnostics =
@@ -225,7 +225,7 @@ void ConstraintManager::onInit() {
 
 bool ConstraintManager::setConstraints(std::string constraints_name) {
 
-  std::map<std::string, mrs_msgs::TrackerConstraintsRequest>::iterator it;
+  std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest>::iterator it;
   it = constraints.find(constraints_name);
 
   if (it == constraints.end()) {
@@ -233,7 +233,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
     return false;
   }
 
-  mrs_msgs::TrackerConstraints new_constraints;
+  mrs_msgs::TrackerConstraintsSrv new_constraints;
 
   new_constraints.request = it->second;
 

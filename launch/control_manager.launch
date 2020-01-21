@@ -262,6 +262,7 @@
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~bumper_status_out" to="~bumper_status" />
       <remap from="~mpc_trajectory_out" to="~mpc_tracker/set_trajectory" />
+      <remap from="~current_constraints_out" to="~current_constraints" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
