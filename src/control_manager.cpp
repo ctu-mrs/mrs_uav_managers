@@ -5715,7 +5715,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double vertical_collision_detected = false;
 
-  for (uint i = 0; i < bumper_data.n_horizontal_sectors; i++) {
+  for (int i = 0; i < int(bumper_data.n_horizontal_sectors); i++) {
 
     if (bumper_data.sectors[i] < 0) {
       continue;
@@ -5840,10 +5840,18 @@ bool ControlManager::bumperPushFromObstacle(void) {
     // create the reference in the fcu_untilted frame
     mrs_msgs::ReferenceStamped reference_fcu_untilted;
 
-    reference_fcu_untilted.header.frame_id      = "fcu_untilted";
-    reference_fcu_untilted.reference.position.x = cos(direction) * repulsion_distance;
-    reference_fcu_untilted.reference.position.y = sin(direction) * repulsion_distance;
-    reference_fcu_untilted.reference.yaw        = 0;
+    reference_fcu_untilted.header.frame_id = "fcu_untilted";
+
+    if (horizontal_collision_detected) {
+      reference_fcu_untilted.reference.position.x = cos(direction) * repulsion_distance;
+      reference_fcu_untilted.reference.position.y = sin(direction) * repulsion_distance;
+    } else {
+      reference_fcu_untilted.reference.position.x = 0;
+      reference_fcu_untilted.reference.position.y = 0;
+    }
+
+    reference_fcu_untilted.reference.yaw = 0;
+
     if (vertical_collision_detected) {
       reference_fcu_untilted.reference.position.z = vertical_repulsion_distance;
     } else {
