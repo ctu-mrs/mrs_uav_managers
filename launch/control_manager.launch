@@ -9,7 +9,8 @@
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="BODY_DISTURBANCE_X" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
-  <arg name="WORLD_FILE" default="" />
+  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
+  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
@@ -36,6 +37,10 @@
   <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_so3_controller" default="" />
   <arg name="custom_config_partial_landing_controller" default="" />
+
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
@@ -68,7 +73,7 @@
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
 
-      <rosparam file="$(arg WORLD_FILE)" />
+      <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
 
       <!-- Load a user param file -->
