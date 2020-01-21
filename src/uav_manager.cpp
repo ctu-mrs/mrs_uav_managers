@@ -686,7 +686,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
 
       mrs_msgs::ReferenceStampedSrv reference_out;
       reference_out.request.header.frame_id = odometry.header.frame_id;
-      reference_out.request.header.stamp = ros::Time::now();
+      reference_out.request.header.stamp    = ros::Time::now();
 
       reference_out.request.reference.position.x = odometry_x + stop_dist_x;
       reference_out.request.reference.position.y = odometry_y + stop_dist_y;

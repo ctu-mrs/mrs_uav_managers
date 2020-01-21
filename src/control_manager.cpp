@@ -1548,11 +1548,11 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
     mrs_msgs::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_frame_;
 
-    // get the transform
     mrs_lib::TransformStamped tf;
-    bool                      got_tf = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
 
-    if (got_tf) {
+    if (auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0))) {
+
+      mrs_lib::TransformStamped tf = ret.value();
 
       // transform border bottom points to local origin
       for (size_t i = 0; i < border_points_bot.size(); i++) {
@@ -1564,7 +1564,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
         temp_ref.reference.position.y = border_points_bot[i].y;
         temp_ref.reference.position.z = border_points_bot[i].z;
 
-        transformer_->transformReference(tf, temp_ref);
+        if (auto ret = transformer_->transform(tf, temp_ref)) {
+          temp_ref = ret.value();
+        }
 
         border_points_bot[i].x = temp_ref.reference.position.x;
         border_points_bot[i].y = temp_ref.reference.position.y;
@@ -1580,7 +1582,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
         temp_ref.reference.position.y = border_points_top[i].y;
         temp_ref.reference.position.z = border_points_top[i].z;
 
-        transformer_->transformReference(tf, temp_ref);
+        if (auto ret = transformer_->transform(tf, temp_ref)) {
+          temp_ref = ret.value();
+        }
 
         border_points_top[i].x = temp_ref.reference.position.x;
         border_points_top[i].y = temp_ref.reference.position.y;
@@ -1630,7 +1634,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
+            temp_ref = ret.value();
+          }
 
           points_bot[i].x = temp_ref.reference.position.x;
           points_bot[i].y = temp_ref.reference.position.y;
@@ -1646,7 +1652,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
+            temp_ref = ret.value();
+          }
 
           points_top[i].x = temp_ref.reference.position.x;
           points_top[i].y = temp_ref.reference.position.y;
@@ -1683,7 +1691,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
+            temp_ref = ret.value();
+          }
 
           points_bot[i].x = temp_ref.reference.position.x;
           points_bot[i].y = temp_ref.reference.position.y;
@@ -1699,7 +1709,9 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
+            temp_ref = ret.value();
+          }
 
           points_top[i].x = temp_ref.reference.position.x;
           points_top[i].y = temp_ref.reference.position.y;
@@ -4305,16 +4317,17 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(req.frame_id, transformed_reference)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_reference)) {
+
+    res.reference = ret.value();
+    res.message   = "transformation successful";
+    res.success   = true;
+    return true;
+
+  } else {
 
     res.message = "the reference could not be transformed";
     res.success = false;
-    return true;
-  } else {
-
-    res.reference = transformed_reference;
-    res.message   = "transformation successful";
-    res.success   = true;
     return true;
   }
 
@@ -4333,17 +4346,17 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
 
-  if (!transformer_->transformPoseSingle(req.frame_id, transformed_pose)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_pose)) {
 
-    res.message = "the pose could not be transformed";
-    res.success = false;
+    res.pose    = ret.value();
+    res.message = "transformation successful";
+    res.success = true;
     return true;
 
   } else {
 
-    res.pose    = transformed_pose;
-    res.message = "transformation successful";
-    res.success = true;
+    res.message = "the pose could not be transformed";
+    res.success = false;
     return true;
   }
 
@@ -4362,17 +4375,17 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
 
-  if (!transformer_->transformVector3Single(req.frame_id, transformed_vector3)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_vector3)) {
 
-    res.message = "the twist could not be transformed";
-    res.success = false;
+    res.vector  = ret.value();
+    res.message = "transformation successful";
+    res.success = true;
     return true;
 
   } else {
 
-    res.vector  = transformed_vector3;
-    res.message = "transformation successful";
-    res.success = true;
+    res.message = "the twist could not be transformed";
+    res.success = false;
     return true;
   }
 
@@ -4479,17 +4492,21 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped transformed_reference;
-  transformed_reference.header    = req.header;
-  transformed_reference.reference = req.reference;
+  mrs_msgs::ReferenceStamped original_reference;
+  original_reference.header    = req.header;
+  original_reference.reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
   }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
@@ -4587,13 +4604,15 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
   // copy the original message so we can modify it
 
-  mrs_msgs::ReferenceStamped transformed_reference = *msg;
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, *msg);
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     return;
   }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   if (!bumperValidatePoint(transformed_reference)) {
     ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
@@ -4784,7 +4803,9 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, des_reference);
+
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -4792,8 +4813,10 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+
   // check the safety area
-  if (!isPointInSafetyArea3d(des_reference)) {
+  if (!isPointInSafetyArea3d(transformed_reference)) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -4807,7 +4830,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     current_coord.reference.position.x = last_position_cmd->position.x;
     current_coord.reference.position.y = last_position_cmd->position.y;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, des_reference)) {
+    if (!isPathToPointInSafetyArea2d(current_coord, transformed_reference)) {
       ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -4819,7 +4842,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   char                                     message[200];
 
   mrs_msgs::ReferenceSrvRequest request_out;
-  request_out.reference = des_reference.reference;
+  request_out.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -5351,14 +5374,16 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
   auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 
-  mrs_msgs::ReferenceStamped point_transformed = point;
+  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!ret) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   // what is lower, the max height from the safety area, or the max height from odometry?
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
@@ -5381,14 +5406,16 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
     return true;
   }
 
-  mrs_msgs::ReferenceStamped point_transformed = point;
+  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!ret) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   return safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y);
 }
@@ -5403,21 +5430,32 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
     return true;
   }
 
-  mrs_msgs::ReferenceStamped start_transformed = start;
-  mrs_msgs::ReferenceStamped end_transformed   = end;
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, start_transformed)) {
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, start);
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+    if (!ret) {
 
-    return false;
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    start_transformed = ret.value();
   }
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, end_transformed)) {
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, end);
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+    if (!ret) {
 
-    return false;
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
   }
 
   return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
@@ -5466,14 +5504,16 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  mrs_msgs::ReferenceStamped point_fcu = point;
+  auto ret = transformer_->transformSingle("fcu_untilted", point);
 
-  if (!transformer_->transformReferenceSingle("fcu_untilted", point_fcu)) {
+  if (!ret) {
 
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_fcu = ret.value();
 
   double fcu_x = point_fcu.reference.position.x;
   double fcu_y = point_fcu.reference.position.y;
@@ -5604,14 +5644,16 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    if (!transformer_->transformReferenceSingle(point.header.frame_id, point_fcu)) {
+    auto ret = transformer_->transformSingle(point.header.frame_id, point);
+
+    if (!ret) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
 
       return false;
     }
 
-    point = point_fcu;
+    point = ret.value();
 
     return true;
 
@@ -5793,11 +5835,16 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // transform the reference into the currently used frame
       // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
       // to the tracker before we actually call the goto service
-      if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
+
+      auto ret = transformer_->transformSingle(uav_state.header.frame_id, reference_fcu_untilted);
+
+      if (!ret) {
 
         ROS_WARN("[ControlManager]: the reference could not be transformed.");
         return false;
       }
+
+      reference_fcu_untilted = ret.value();
 
       // copy the reference into the service type message
       mrs_msgs::ReferenceSrvRequest req_goto_out;
