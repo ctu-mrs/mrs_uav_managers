@@ -4066,7 +4066,7 @@ bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Re
   }
 
   res.message = message;
-  res.success = false;
+  res.success = true;
 
   return true;
 }
