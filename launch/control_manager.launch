@@ -263,6 +263,7 @@
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~safety_area_markers_out" to="~safety_area_markers" />
+      <remap from="~safety_area_coordinates_markers_out" to="~safety_area_coordinates_markers" />
       <remap from="~disturbances_markers_out" to="~disturbances_markers" />
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~bumper_status_out" to="~bumper_status" />

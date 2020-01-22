@@ -333,6 +333,7 @@ private:
   ros::Publisher publisher_mass_estimate_;
   ros::Publisher publisher_control_error_;
   ros::Publisher publisher_safety_area_markers_;
+  ros::Publisher publisher_safety_area_coordinates_markers_;
   ros::Publisher publisher_disturbances_markers_;
   ros::Publisher publisher_bumper_status_;
   ros::Publisher publisher_mpc_trajectory_;
@@ -1318,22 +1319,23 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output_       = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd_         = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd_         = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force_         = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom_             = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude_      = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_diagnostics_          = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
-  publisher_motors_               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error_           = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate_        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error_        = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
-  publisher_safety_area_markers_  = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
-  publisher_disturbances_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
-  publisher_bumper_status_        = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
-  publisher_mpc_trajectory_       = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
-  publisher_current_constraints_  = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
+  publisher_control_output_                  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd_                    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude_                 = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
+  publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error_                   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_safety_area_markers_             = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
+  publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
+  publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
+  publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
+  publisher_mpc_trajectory_                  = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
+  publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1542,11 +1544,16 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
   if (_use_safety_area_) {
 
-    visualization_msgs::MarkerArray msg_out;
+    visualization_msgs::MarkerArray safety_area_marker_array;
+    visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
 
-    mrs_lib::Polygon                  border            = safety_zone_->getBorder();
-    std::vector<geometry_msgs::Point> border_points_bot = border.getPointMessageVector(_min_height_);
-    std::vector<geometry_msgs::Point> border_points_top = border.getPointMessageVector(max_height);
+    mrs_lib::Polygon border = safety_zone_->getBorder();
+
+    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(_min_height_);
+    std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(max_height);
+
+    std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
+    std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
 
     mrs_msgs::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_frame_;
@@ -1555,73 +1562,160 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
     if (auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0))) {
 
+      // if we fail in transforming the area at some point
+      // do not publish it at all
+      bool tf_success = true;
+
       mrs_lib::TransformStamped tf = ret.value();
 
-      // transform border bottom points to local origin
-      for (size_t i = 0; i < border_points_bot.size(); i++) {
+      /* transform area points to local origin //{ */
 
+      // transform border bottom points to local origin
+      for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_frame_;
         temp_ref.header.stamp         = ros::Time(0);
-        temp_ref.reference.position.x = border_points_bot[i].x;
-        temp_ref.reference.position.y = border_points_bot[i].y;
-        temp_ref.reference.position.z = border_points_bot[i].z;
+        temp_ref.reference.position.x = border_points_bot_original[i].x;
+        temp_ref.reference.position.y = border_points_bot_original[i].y;
+        temp_ref.reference.position.z = border_points_bot_original[i].z;
 
         if (auto ret = transformer_->transform(tf, temp_ref)) {
-          temp_ref = ret.value();
-        }
 
-        border_points_bot[i].x = temp_ref.reference.position.x;
-        border_points_bot[i].y = temp_ref.reference.position.y;
-        border_points_bot[i].z = temp_ref.reference.position.z;
+          temp_ref = ret.value();
+
+          border_points_bot_transformed[i].x = temp_ref.reference.position.x;
+          border_points_bot_transformed[i].y = temp_ref.reference.position.y;
+          border_points_bot_transformed[i].z = temp_ref.reference.position.z;
+
+        } else {
+          tf_success = false;
+        }
       }
 
       // transform border top points to local origin
-      for (size_t i = 0; i < border_points_top.size(); i++) {
+      for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_frame_;
         temp_ref.header.stamp         = ros::Time(0);
-        temp_ref.reference.position.x = border_points_top[i].x;
-        temp_ref.reference.position.y = border_points_top[i].y;
-        temp_ref.reference.position.z = border_points_top[i].z;
+        temp_ref.reference.position.x = border_points_top_original[i].x;
+        temp_ref.reference.position.y = border_points_top_original[i].y;
+        temp_ref.reference.position.z = border_points_top_original[i].z;
 
         if (auto ret = transformer_->transform(tf, temp_ref)) {
-          temp_ref = ret.value();
-        }
 
-        border_points_top[i].x = temp_ref.reference.position.x;
-        border_points_top[i].y = temp_ref.reference.position.y;
-        border_points_top[i].z = temp_ref.reference.position.z;
+          temp_ref = ret.value();
+
+          border_points_top_transformed[i].x = temp_ref.reference.position.x;
+          border_points_top_transformed[i].y = temp_ref.reference.position.y;
+          border_points_top_transformed[i].z = temp_ref.reference.position.z;
+
+        } else {
+          tf_success = false;
+        }
       }
 
-      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
+      //}
 
-      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
+      visualization_msgs::Marker safety_area_marker;
 
-      visualization_msgs::Marker marker;
+      safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_marker.type            = visualization_msgs::Marker::LINE_LIST;
+      safety_area_marker.color.a         = 1;
+      safety_area_marker.scale.x         = 0.2;
+      safety_area_marker.color.r         = 1;
+      safety_area_marker.color.g         = 0;
+      safety_area_marker.color.b         = 0;
 
-      marker.header.frame_id = _uav_name_ + "/local_origin";
-      marker.type            = visualization_msgs::Marker::LINE_LIST;
-      marker.color.a         = 1;
-      marker.scale.x         = 0.2;
-      marker.color.r         = 1;
-      marker.color.g         = 0;
-      marker.color.b         = 0;
+      safety_area_marker.pose.orientation.x = 0;
+      safety_area_marker.pose.orientation.y = 0;
+      safety_area_marker.pose.orientation.z = 0;
+      safety_area_marker.pose.orientation.w = 1;
+
+      visualization_msgs::Marker safety_area_coordinates_marker;
+
+      safety_area_coordinates_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_coordinates_marker.type            = visualization_msgs::Marker::TEXT_VIEW_FACING;
+      safety_area_coordinates_marker.color.a         = 1;
+      safety_area_coordinates_marker.scale.z         = 3.0;
+      safety_area_coordinates_marker.color.r         = 0;
+      safety_area_coordinates_marker.color.g         = 0;
+      safety_area_coordinates_marker.color.b         = 0;
+
+      safety_area_coordinates_marker.id = 0;
+
+      safety_area_coordinates_marker.pose.orientation.x = 0;
+      safety_area_coordinates_marker.pose.orientation.y = 0;
+      safety_area_coordinates_marker.pose.orientation.z = 0;
+      safety_area_coordinates_marker.pose.orientation.w = 1;
+
+      /* adding safety area points //{ */
 
       // bottom border
-      for (size_t i = 0; i < border_points_bot.size(); i++) {
-        marker.points.push_back(border_points_bot[i]);
-        marker.points.push_back(border_points_bot[(i + 1) % border_points_bot.size()]);
+      for (size_t i = 0; i < border_points_bot_transformed.size(); i++) {
+
+        safety_area_marker.points.push_back(border_points_bot_transformed[i]);
+        safety_area_marker.points.push_back(border_points_bot_transformed[(i + 1) % border_points_bot_transformed.size()]);
+
+        std::stringstream ss;
+
+        if (_safety_area_frame_ == "latlon_origin") {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        } else {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        }
+
+        safety_area_coordinates_marker.color.r = 0;
+        safety_area_coordinates_marker.color.g = 0;
+        safety_area_coordinates_marker.color.b = 0;
+
+        safety_area_coordinates_marker.pose.position = border_points_bot_transformed[i];
+        safety_area_coordinates_marker.text          = ss.str();
+        safety_area_coordinates_marker.id++;
+
+        safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
       }
 
       // top border + top/bot edges
-      for (size_t i = 0; i < border_points_top.size(); i++) {
-        marker.points.push_back(border_points_top[i]);
-        marker.points.push_back(border_points_top[(i + 1) % border_points_top.size()]);
+      for (size_t i = 0; i < border_points_top_transformed.size(); i++) {
 
-        marker.points.push_back(border_points_bot[i]);
-        marker.points.push_back(border_points_top[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[(i + 1) % border_points_top_transformed.size()]);
+
+        safety_area_marker.points.push_back(border_points_bot_transformed[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[i]);
+
+        std::stringstream ss;
+
+        if (_safety_area_frame_ == "latlon_origin") {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        } else {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        }
+
+        safety_area_coordinates_marker.color.r = 1;
+        safety_area_coordinates_marker.color.g = 1;
+        safety_area_coordinates_marker.color.b = 1;
+
+        safety_area_coordinates_marker.pose.position = border_points_top_transformed[i];
+        safety_area_coordinates_marker.text          = ss.str();
+        safety_area_coordinates_marker.id++;
+
+        safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
       }
+
+      //}
+
+      /* adding polygon obstacles points //{ */
+
+      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
 
       for (auto polygon : polygon_obstacles) {
 
@@ -1638,12 +1732,16 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.z = points_bot[i].z;
 
           if (auto ret = transformer_->transform(tf, temp_ref)) {
-            temp_ref = ret.value();
-          }
 
-          points_bot[i].x = temp_ref.reference.position.x;
-          points_bot[i].y = temp_ref.reference.position.y;
-          points_bot[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_bot[i].x = temp_ref.reference.position.x;
+            points_bot[i].y = temp_ref.reference.position.y;
+            points_bot[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // transform border top points to local origin
@@ -1656,29 +1754,41 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.z = points_top[i].z;
 
           if (auto ret = transformer_->transform(tf, temp_ref)) {
-            temp_ref = ret.value();
-          }
 
-          points_top[i].x = temp_ref.reference.position.x;
-          points_top[i].y = temp_ref.reference.position.y;
-          points_top[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_top[i].x = temp_ref.reference.position.x;
+            points_top[i].y = temp_ref.reference.position.y;
+            points_top[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // bottom points
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
         }
 
         // top points + top/bot edges
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_top[i]);
-          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
 
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_top[i]);
         }
       }
+
+      //}
+
+      /* adding point-obstacle points //{ */
+
+      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
 
       for (auto point : point_obstacles) {
 
@@ -1695,12 +1805,15 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.z = points_bot[i].z;
 
           if (auto ret = transformer_->transform(tf, temp_ref)) {
-            temp_ref = ret.value();
-          }
 
-          points_bot[i].x = temp_ref.reference.position.x;
-          points_bot[i].y = temp_ref.reference.position.y;
-          points_bot[i].z = temp_ref.reference.position.z;
+            temp_ref        = ret.value();
+            points_bot[i].x = temp_ref.reference.position.x;
+            points_bot[i].y = temp_ref.reference.position.y;
+            points_bot[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // transform top points to local origin
@@ -1713,37 +1826,55 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.z = points_top[i].z;
 
           if (auto ret = transformer_->transform(tf, temp_ref)) {
-            temp_ref = ret.value();
-          }
 
-          points_top[i].x = temp_ref.reference.position.x;
-          points_top[i].y = temp_ref.reference.position.y;
-          points_top[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_top[i].x = temp_ref.reference.position.x;
+            points_top[i].y = temp_ref.reference.position.y;
+            points_top[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // botom points
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
         }
 
         // top points + bot/top edges
         for (size_t i = 0; i < points_top.size(); i++) {
-          marker.points.push_back(points_top[i]);
-          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
 
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_top[i]);
         }
       }
 
-      msg_out.markers.push_back(marker);
+      //}
 
-      try {
-        publisher_safety_area_markers_.publish(msg_out);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+      if (tf_success) {
+
+        safety_area_marker_array.markers.push_back(safety_area_marker);
+
+        try {
+          publisher_safety_area_markers_.publish(safety_area_marker_array);
+        }
+        catch (...) {
+          ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+        }
+
+        try {
+          publisher_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
+        }
+        catch (...) {
+          ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+        }
       }
 
     } else {
