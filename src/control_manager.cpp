@@ -3104,7 +3104,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
     while (running_safety_timer_) {
-      ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+      ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
       ros::Duration wait(0.001);
       wait.sleep();
     }
@@ -3205,14 +3205,14 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
       safety_timer_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
-        ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
 
       // we have to also for the oneshot control timer to finish
       while (running_control_timer_) {
-        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
@@ -3307,14 +3307,14 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       safety_timer_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
-        ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
 
       // we have to also for the oneshot control timer to finish
       while (running_control_timer_) {
-        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
