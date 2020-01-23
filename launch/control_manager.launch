@@ -205,7 +205,8 @@
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
-      <rosparam ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'uav')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names_simulation.yaml" />
       <rosparam if="$(eval not arg('custom_config_mpc_tracker') == '')" ns="mpc_tracker" file="$(arg custom_config_mpc_tracker)" />
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
