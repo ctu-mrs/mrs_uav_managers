@@ -15,6 +15,7 @@
 #include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/UavState.h>
+#include <mrs_msgs/TrackerConstraints.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -94,6 +95,9 @@
 #define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
+#define PWM_MIN 1000.0
+#define PWM_MAX 2000.0
+#define PWM_RANGE PWM_MAX - PWM_MIN
 #define REF_X 0
 #define REF_Y 1
 #define REF_Z 2
@@ -275,6 +279,8 @@ private:
   bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
   bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
 
+  double RCChannelToRange(double rc_value, double range, double deadband);
+
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
   std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers_;
@@ -327,9 +333,11 @@ private:
   ros::Publisher publisher_mass_estimate_;
   ros::Publisher publisher_control_error_;
   ros::Publisher publisher_safety_area_markers_;
+  ros::Publisher publisher_safety_area_coordinates_markers_;
   ros::Publisher publisher_disturbances_markers_;
   ros::Publisher publisher_bumper_status_;
   ros::Publisher publisher_mpc_trajectory_;
+  ros::Publisher publisher_current_constraints_;
 
   // service servers
   ros::ServiceServer service_server_switch_tracker_;
@@ -513,7 +521,7 @@ private:
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res);
+  bool callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res);
 
   // land and sit while applying thrust
   bool callbackPartialLanding(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -521,11 +529,11 @@ private:
   // constraints management
   bool       got_constraints_ = false;
   std::mutex mutex_constraints_;
-  void       setConstraints(mrs_msgs::TrackerConstraintsRequest constraints);
-  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints);
+  void       setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints);
+  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints);
 
-  mrs_msgs::TrackerConstraintsRequest current_constraints_;
-  mrs_msgs::TrackerConstraintsRequest sanitized_constraints_;
+  mrs_msgs::TrackerConstraintsSrvRequest current_constraints_;
+  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints_;
 
   // yaw manipulation
   double sanitizeYaw(const double yaw_in);
@@ -1311,21 +1319,23 @@ void ControlManager::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_control_output_       = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd_         = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd_         = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force_         = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom_             = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude_      = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
-  publisher_diagnostics_          = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
-  publisher_motors_               = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_tilt_error_           = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
-  publisher_mass_estimate_        = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error_        = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
-  publisher_safety_area_markers_  = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
-  publisher_disturbances_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
-  publisher_bumper_status_        = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
-  publisher_mpc_trajectory_       = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
+  publisher_control_output_                  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_position_cmd_                    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
+  publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
+  publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
+  publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_target_attitude_                 = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
+  publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
+  publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
+  publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
+  publisher_control_error_                   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_safety_area_markers_             = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
+  publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
+  publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
+  publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
+  publisher_mpc_trajectory_                  = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
+  publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -1534,82 +1544,178 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
   if (_use_safety_area_) {
 
-    visualization_msgs::MarkerArray msg_out;
+    visualization_msgs::MarkerArray safety_area_marker_array;
+    visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
 
-    mrs_lib::Polygon                  border            = safety_zone_->getBorder();
-    std::vector<geometry_msgs::Point> border_points_bot = border.getPointMessageVector(_min_height_);
-    std::vector<geometry_msgs::Point> border_points_top = border.getPointMessageVector(max_height);
+    mrs_lib::Polygon border = safety_zone_->getBorder();
+
+    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(_min_height_);
+    std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(max_height);
+
+    std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
+    std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
 
     mrs_msgs::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_frame_;
 
-    // get the transform
     mrs_lib::TransformStamped tf;
-    bool                      got_tf = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0), tf);
 
-    if (got_tf) {
+    if (auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0))) {
+
+      // if we fail in transforming the area at some point
+      // do not publish it at all
+      bool tf_success = true;
+
+      mrs_lib::TransformStamped tf = ret.value();
+
+      /* transform area points to local origin //{ */
 
       // transform border bottom points to local origin
-      for (size_t i = 0; i < border_points_bot.size(); i++) {
-
+      for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_frame_;
         temp_ref.header.stamp         = ros::Time(0);
-        temp_ref.reference.position.x = border_points_bot[i].x;
-        temp_ref.reference.position.y = border_points_bot[i].y;
-        temp_ref.reference.position.z = border_points_bot[i].z;
+        temp_ref.reference.position.x = border_points_bot_original[i].x;
+        temp_ref.reference.position.y = border_points_bot_original[i].y;
+        temp_ref.reference.position.z = border_points_bot_original[i].z;
 
-        transformer_->transformReference(tf, temp_ref);
+        if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-        border_points_bot[i].x = temp_ref.reference.position.x;
-        border_points_bot[i].y = temp_ref.reference.position.y;
-        border_points_bot[i].z = temp_ref.reference.position.z;
+          temp_ref = ret.value();
+
+          border_points_bot_transformed[i].x = temp_ref.reference.position.x;
+          border_points_bot_transformed[i].y = temp_ref.reference.position.y;
+          border_points_bot_transformed[i].z = temp_ref.reference.position.z;
+
+        } else {
+          tf_success = false;
+        }
       }
 
       // transform border top points to local origin
-      for (size_t i = 0; i < border_points_top.size(); i++) {
+      for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_frame_;
         temp_ref.header.stamp         = ros::Time(0);
-        temp_ref.reference.position.x = border_points_top[i].x;
-        temp_ref.reference.position.y = border_points_top[i].y;
-        temp_ref.reference.position.z = border_points_top[i].z;
+        temp_ref.reference.position.x = border_points_top_original[i].x;
+        temp_ref.reference.position.y = border_points_top_original[i].y;
+        temp_ref.reference.position.z = border_points_top_original[i].z;
 
-        transformer_->transformReference(tf, temp_ref);
+        if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-        border_points_top[i].x = temp_ref.reference.position.x;
-        border_points_top[i].y = temp_ref.reference.position.y;
-        border_points_top[i].z = temp_ref.reference.position.z;
+          temp_ref = ret.value();
+
+          border_points_top_transformed[i].x = temp_ref.reference.position.x;
+          border_points_top_transformed[i].y = temp_ref.reference.position.y;
+          border_points_top_transformed[i].z = temp_ref.reference.position.z;
+
+        } else {
+          tf_success = false;
+        }
       }
 
-      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
+      //}
 
-      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
+      visualization_msgs::Marker safety_area_marker;
 
-      visualization_msgs::Marker marker;
+      safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_marker.type            = visualization_msgs::Marker::LINE_LIST;
+      safety_area_marker.color.a         = 1;
+      safety_area_marker.scale.x         = 0.2;
+      safety_area_marker.color.r         = 1;
+      safety_area_marker.color.g         = 0;
+      safety_area_marker.color.b         = 0;
 
-      marker.header.frame_id = _uav_name_ + "/local_origin";
-      marker.type            = visualization_msgs::Marker::LINE_LIST;
-      marker.color.a         = 1;
-      marker.scale.x         = 0.2;
-      marker.color.r         = 1;
-      marker.color.g         = 0;
-      marker.color.b         = 0;
+      safety_area_marker.pose.orientation.x = 0;
+      safety_area_marker.pose.orientation.y = 0;
+      safety_area_marker.pose.orientation.z = 0;
+      safety_area_marker.pose.orientation.w = 1;
+
+      visualization_msgs::Marker safety_area_coordinates_marker;
+
+      safety_area_coordinates_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_coordinates_marker.type            = visualization_msgs::Marker::TEXT_VIEW_FACING;
+      safety_area_coordinates_marker.color.a         = 1;
+      safety_area_coordinates_marker.scale.z         = 1.0;
+      safety_area_coordinates_marker.color.r         = 0;
+      safety_area_coordinates_marker.color.g         = 0;
+      safety_area_coordinates_marker.color.b         = 0;
+
+      safety_area_coordinates_marker.id = 0;
+
+      safety_area_coordinates_marker.pose.orientation.x = 0;
+      safety_area_coordinates_marker.pose.orientation.y = 0;
+      safety_area_coordinates_marker.pose.orientation.z = 0;
+      safety_area_coordinates_marker.pose.orientation.w = 1;
+
+      /* adding safety area points //{ */
 
       // bottom border
-      for (size_t i = 0; i < border_points_bot.size(); i++) {
-        marker.points.push_back(border_points_bot[i]);
-        marker.points.push_back(border_points_bot[(i + 1) % border_points_bot.size()]);
+      for (size_t i = 0; i < border_points_bot_transformed.size(); i++) {
+
+        safety_area_marker.points.push_back(border_points_bot_transformed[i]);
+        safety_area_marker.points.push_back(border_points_bot_transformed[(i + 1) % border_points_bot_transformed.size()]);
+
+        std::stringstream ss;
+
+        if (_safety_area_frame_ == "latlon_origin") {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        } else {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        }
+
+        safety_area_coordinates_marker.color.r = 0;
+        safety_area_coordinates_marker.color.g = 0;
+        safety_area_coordinates_marker.color.b = 0;
+
+        safety_area_coordinates_marker.pose.position = border_points_bot_transformed[i];
+        safety_area_coordinates_marker.text          = ss.str();
+        safety_area_coordinates_marker.id++;
+
+        safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
       }
 
       // top border + top/bot edges
-      for (size_t i = 0; i < border_points_top.size(); i++) {
-        marker.points.push_back(border_points_top[i]);
-        marker.points.push_back(border_points_top[(i + 1) % border_points_top.size()]);
+      for (size_t i = 0; i < border_points_top_transformed.size(); i++) {
 
-        marker.points.push_back(border_points_bot[i]);
-        marker.points.push_back(border_points_top[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[(i + 1) % border_points_top_transformed.size()]);
+
+        safety_area_marker.points.push_back(border_points_bot_transformed[i]);
+        safety_area_marker.points.push_back(border_points_top_transformed[i]);
+
+        std::stringstream ss;
+
+        if (_safety_area_frame_ == "latlon_origin") {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        } else {
+          ss << "idx: " << i << std::endl
+             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
+             << "lon: " << border_points_bot_original[i].y;
+        }
+
+        safety_area_coordinates_marker.color.r = 1;
+        safety_area_coordinates_marker.color.g = 1;
+        safety_area_coordinates_marker.color.b = 1;
+
+        safety_area_coordinates_marker.pose.position = border_points_top_transformed[i];
+        safety_area_coordinates_marker.text          = ss.str();
+        safety_area_coordinates_marker.id++;
+
+        safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
       }
+
+      //}
+
+      /* adding polygon obstacles points //{ */
+
+      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
 
       for (auto polygon : polygon_obstacles) {
 
@@ -1625,11 +1731,17 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-          points_bot[i].x = temp_ref.reference.position.x;
-          points_bot[i].y = temp_ref.reference.position.y;
-          points_bot[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_bot[i].x = temp_ref.reference.position.x;
+            points_bot[i].y = temp_ref.reference.position.y;
+            points_bot[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // transform border top points to local origin
@@ -1641,28 +1753,42 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-          points_top[i].x = temp_ref.reference.position.x;
-          points_top[i].y = temp_ref.reference.position.y;
-          points_top[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_top[i].x = temp_ref.reference.position.x;
+            points_top[i].y = temp_ref.reference.position.y;
+            points_top[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // bottom points
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
         }
 
         // top points + top/bot edges
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_top[i]);
-          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
 
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_top[i]);
         }
       }
+
+      //}
+
+      /* adding point-obstacle points //{ */
+
+      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
 
       for (auto point : point_obstacles) {
 
@@ -1678,11 +1804,16 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-          points_bot[i].x = temp_ref.reference.position.x;
-          points_bot[i].y = temp_ref.reference.position.y;
-          points_bot[i].z = temp_ref.reference.position.z;
+            temp_ref        = ret.value();
+            points_bot[i].x = temp_ref.reference.position.x;
+            points_bot[i].y = temp_ref.reference.position.y;
+            points_bot[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // transform top points to local origin
@@ -1694,36 +1825,56 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          transformer_->transformReference(tf, temp_ref);
+          if (auto ret = transformer_->transform(tf, temp_ref)) {
 
-          points_top[i].x = temp_ref.reference.position.x;
-          points_top[i].y = temp_ref.reference.position.y;
-          points_top[i].z = temp_ref.reference.position.z;
+            temp_ref = ret.value();
+
+            points_top[i].x = temp_ref.reference.position.x;
+            points_top[i].y = temp_ref.reference.position.y;
+            points_top[i].z = temp_ref.reference.position.z;
+
+          } else {
+            tf_success = false;
+          }
         }
 
         // botom points
         for (size_t i = 0; i < points_bot.size(); i++) {
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
         }
 
         // top points + bot/top edges
         for (size_t i = 0; i < points_top.size(); i++) {
-          marker.points.push_back(points_top[i]);
-          marker.points.push_back(points_top[(i + 1) % points_top.size()]);
 
-          marker.points.push_back(points_bot[i]);
-          marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[i]);
+          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
+
+          safety_area_marker.points.push_back(points_bot[i]);
+          safety_area_marker.points.push_back(points_top[i]);
         }
       }
 
-      msg_out.markers.push_back(marker);
+      //}
 
-      try {
-        publisher_safety_area_markers_.publish(msg_out);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+      if (tf_success) {
+
+        safety_area_marker_array.markers.push_back(safety_area_marker);
+
+        try {
+          publisher_safety_area_markers_.publish(safety_area_marker_array);
+        }
+        catch (...) {
+          ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+        }
+
+        try {
+          publisher_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
+        }
+        catch (...) {
+          ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_safety_area_markers_.getTopic().c_str());
+        }
       }
 
     } else {
@@ -2021,6 +2172,24 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_disturbances_markers_.getTopic().c_str());
     }
   }
+
+  // --------------------------------------------------------------
+  // |               publish the current constraints              |
+  // --------------------------------------------------------------
+
+  if (got_constraints_) {
+
+    auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
+
+    mrs_msgs::TrackerConstraints constraints = sanitized_constraints.constraints;
+
+    try {
+      publisher_current_constraints_.publish(constraints);
+    }
+    catch (...) {
+      ROS_ERROR("Exception caught during publishing topic %s.", publisher_current_constraints_.getTopic().c_str());
+    }
+  }
 }
 
 //}
@@ -2303,6 +2472,16 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
                   (180.0 / M_PI) * tilt_error_, (180.0 / M_PI) * _tilt_error_threshold_);
       }
     }
+  }
+
+  // | --------- dropping out of OFFBOARD in mid flight --------- |
+
+  // if we are not in offboard and the drone is in mid air (NullTracker is not active)
+  if (!offboard_mode_ && active_tracker_idx != _null_tracker_idx_) {
+
+    ROS_ERROR("[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
+
+    switchMotors(false);
   }
 }
 
@@ -2684,23 +2863,28 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     } else {
 
-      if (abs(rc_channels.channels[_rc_channel_roll_] - PWM_MIDDLE) > 100) {
-        des_y         = (-(rc_channels.channels[_rc_channel_roll_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      double tmp_x   = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_y   = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_z   = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
+      double tmp_yaw = -RCChannelToRange(rc_channels.channels[_rc_channel_yaw_], 1.0, 0.1);
+
+      if (abs(tmp_x) > 1e-3) {
+        des_x         = tmp_x;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_thrust_] - PWM_MIDDLE) > 100) {
-        des_z         = ((rc_channels.channels[_rc_channel_thrust_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      if (abs(tmp_y) > 1e-3) {
+        des_y         = tmp_y;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_pitch_] - PWM_MIDDLE) > 200) {
-        des_x         = ((rc_channels.channels[_rc_channel_pitch_] - PWM_MIDDLE) / 500.0) * _rc_joystick_carrot_distance_;
+      if (abs(tmp_z) > 1e-3) {
+        des_z         = tmp_z;
         nothing_to_do = false;
       }
 
-      if (abs(rc_channels.channels[_rc_channel_yaw_] - PWM_MIDDLE) > 100) {
-        des_yaw       = (-(rc_channels.channels[_rc_channel_yaw_] - PWM_MIDDLE) / 500.0) * 1.0;
+      if (abs(tmp_yaw) > 1e-3) {
+        des_yaw       = tmp_yaw;
         nothing_to_do = false;
       }
     }
@@ -3834,7 +4018,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
     }
   }
 
-  mrs_msgs::TrackerConstraintsRequest sanitized_constraints;
+  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints;
   {
     std::scoped_lock lock(mutex_constraints_);
 
@@ -3882,7 +4066,7 @@ bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Re
   }
 
   res.message = message;
-  res.success = false;
+  res.success = true;
 
   return true;
 }
@@ -4084,7 +4268,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
 /* callbackSetConstraints() //{ */
 
-bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraints::Request& req, mrs_msgs::TrackerConstraints::Response& res) {
+bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4285,16 +4469,17 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(req.frame_id, transformed_reference)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_reference)) {
+
+    res.reference = ret.value();
+    res.message   = "transformation successful";
+    res.success   = true;
+    return true;
+
+  } else {
 
     res.message = "the reference could not be transformed";
     res.success = false;
-    return true;
-  } else {
-
-    res.reference = transformed_reference;
-    res.message   = "transformation successful";
-    res.success   = true;
     return true;
   }
 
@@ -4313,17 +4498,17 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
 
-  if (!transformer_->transformPoseSingle(req.frame_id, transformed_pose)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_pose)) {
 
-    res.message = "the pose could not be transformed";
-    res.success = false;
+    res.pose    = ret.value();
+    res.message = "transformation successful";
+    res.success = true;
     return true;
 
   } else {
 
-    res.pose    = transformed_pose;
-    res.message = "transformation successful";
-    res.success = true;
+    res.message = "the pose could not be transformed";
+    res.success = false;
     return true;
   }
 
@@ -4342,17 +4527,17 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
 
-  if (!transformer_->transformVector3Single(req.frame_id, transformed_vector3)) {
+  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_vector3)) {
 
-    res.message = "the twist could not be transformed";
-    res.success = false;
+    res.vector  = ret.value();
+    res.message = "transformation successful";
+    res.success = true;
     return true;
 
   } else {
 
-    res.vector  = transformed_vector3;
-    res.message = "transformation successful";
-    res.success = true;
+    res.message = "the twist could not be transformed";
+    res.success = false;
     return true;
   }
 
@@ -4459,17 +4644,21 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped transformed_reference;
-  transformed_reference.header    = req.header;
-  transformed_reference.reference = req.reference;
+  mrs_msgs::ReferenceStamped original_reference;
+  original_reference.header    = req.header;
+  original_reference.reference = req.reference;
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
   }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
@@ -4567,13 +4756,15 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
   // copy the original message so we can modify it
 
-  mrs_msgs::ReferenceStamped transformed_reference = *msg;
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, *msg);
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, transformed_reference)) {
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     return;
   }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   if (!bumperValidatePoint(transformed_reference)) {
     ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
@@ -4764,7 +4955,9 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
-  if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, des_reference)) {
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, des_reference);
+
+  if (!ret) {
 
     ROS_WARN("[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
@@ -4772,8 +4965,10 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     return true;
   }
 
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+
   // check the safety area
-  if (!isPointInSafetyArea3d(des_reference)) {
+  if (!isPointInSafetyArea3d(transformed_reference)) {
     ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
@@ -4787,7 +4982,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     current_coord.reference.position.x = last_position_cmd->position.x;
     current_coord.reference.position.y = last_position_cmd->position.y;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, des_reference)) {
+    if (!isPathToPointInSafetyArea2d(current_coord, transformed_reference)) {
       ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -4799,7 +4994,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   char                                     message[200];
 
   mrs_msgs::ReferenceSrvRequest request_out;
-  request_out.reference = des_reference.reference;
+  request_out.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -5230,9 +5425,9 @@ void ControlManager::publishDiagnostics(void) {
 
 /* setConstraints() //{ */
 
-void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constraints) {
+void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints) {
 
-  mrs_msgs::TrackerConstraintsResponse::ConstPtr tracker_response;
+  mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr tracker_response;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -5241,8 +5436,8 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
     for (unsigned int i = 0; i < tracker_list_.size(); i++) {
 
       // if it is the active one, update and retrieve the command
-      tracker_response =
-          tracker_list_[i]->setConstraints(mrs_msgs::TrackerConstraintsRequest::ConstPtr(std::make_unique<mrs_msgs::TrackerConstraintsRequest>(constraints)));
+      tracker_response = tracker_list_[i]->setConstraints(
+          mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrackerConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -5251,7 +5446,7 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsRequest constrai
 
 /* enforceControllerConstraints() //{ */
 
-bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsRequest& constraints) {
+bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -5265,43 +5460,43 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsR
       std::scoped_lock lock(mutex_tracker_list_);
 
       // enforce horizontal speed
-      if (last_attitude_cmd->horizontal_speed_constraint < constraints.horizontal_speed) {
-        constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
+      if (last_attitude_cmd->horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
+        constraints.constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce horizontal acceleration
-      if (last_attitude_cmd->horizontal_acc_constraint < constraints.horizontal_acceleration) {
-        constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
+      if (last_attitude_cmd->horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
+        constraints.constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending speed
-      if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.vertical_ascending_speed) {
-        constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
+      if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
+        constraints.constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending acceleration
-      if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.vertical_ascending_acceleration) {
-        constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
+      if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
+        constraints.constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending speed
-      if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.vertical_descending_speed) {
-        constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
+      if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
+        constraints.constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending acceleration
-      if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.vertical_descending_acceleration) {
-        constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
+      if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
+        constraints.constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
 
         enforcing = true;
       }
@@ -5331,14 +5526,16 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
   auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 
-  mrs_msgs::ReferenceStamped point_transformed = point;
+  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!ret) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   // what is lower, the max height from the safety area, or the max height from odometry?
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
@@ -5361,14 +5558,16 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
     return true;
   }
 
-  mrs_msgs::ReferenceStamped point_transformed = point;
+  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, point_transformed)) {
+  if (!ret) {
 
     ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   return safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y);
 }
@@ -5383,21 +5582,32 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
     return true;
   }
 
-  mrs_msgs::ReferenceStamped start_transformed = start;
-  mrs_msgs::ReferenceStamped end_transformed   = end;
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, start_transformed)) {
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, start);
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+    if (!ret) {
 
-    return false;
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    start_transformed = ret.value();
   }
 
-  if (!transformer_->transformReferenceSingle(_safety_area_frame_, end_transformed)) {
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, end);
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+    if (!ret) {
 
-    return false;
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
   }
 
   return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
@@ -5446,14 +5656,16 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  mrs_msgs::ReferenceStamped point_fcu = point;
+  auto ret = transformer_->transformSingle("fcu_untilted", point);
 
-  if (!transformer_->transformReferenceSingle("fcu_untilted", point_fcu)) {
+  if (!ret) {
 
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
 
     return false;
   }
+
+  mrs_msgs::ReferenceStamped point_fcu = ret.value();
 
   double fcu_x = point_fcu.reference.position.x;
   double fcu_y = point_fcu.reference.position.y;
@@ -5584,14 +5796,16 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    if (!transformer_->transformReferenceSingle(point.header.frame_id, point_fcu)) {
+    auto ret = transformer_->transformSingle(point.header.frame_id, point);
+
+    if (!ret) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
 
       return false;
     }
 
-    point = point_fcu;
+    point = ret.value();
 
     return true;
 
@@ -5632,7 +5846,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double vertical_collision_detected = false;
 
-  for (uint i = 0; i < bumper_data.n_horizontal_sectors; i++) {
+  for (int i = 0; i < int(bumper_data.n_horizontal_sectors); i++) {
 
     if (bumper_data.sectors[i] < 0) {
       continue;
@@ -5757,10 +5971,18 @@ bool ControlManager::bumperPushFromObstacle(void) {
     // create the reference in the fcu_untilted frame
     mrs_msgs::ReferenceStamped reference_fcu_untilted;
 
-    reference_fcu_untilted.header.frame_id      = "fcu_untilted";
-    reference_fcu_untilted.reference.position.x = cos(direction) * repulsion_distance;
-    reference_fcu_untilted.reference.position.y = sin(direction) * repulsion_distance;
-    reference_fcu_untilted.reference.yaw        = 0;
+    reference_fcu_untilted.header.frame_id = "fcu_untilted";
+
+    if (horizontal_collision_detected) {
+      reference_fcu_untilted.reference.position.x = cos(direction) * repulsion_distance;
+      reference_fcu_untilted.reference.position.y = sin(direction) * repulsion_distance;
+    } else {
+      reference_fcu_untilted.reference.position.x = 0;
+      reference_fcu_untilted.reference.position.y = 0;
+    }
+
+    reference_fcu_untilted.reference.yaw = 0;
+
     if (vertical_collision_detected) {
       reference_fcu_untilted.reference.position.z = vertical_repulsion_distance;
     } else {
@@ -5773,11 +5995,16 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // transform the reference into the currently used frame
       // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
       // to the tracker before we actually call the goto service
-      if (!transformer_->transformReferenceSingle(uav_state.header.frame_id, reference_fcu_untilted)) {
+
+      auto ret = transformer_->transformSingle(uav_state.header.frame_id, reference_fcu_untilted);
+
+      if (!ret) {
 
         ROS_WARN("[ControlManager]: the reference could not be transformed.");
         return false;
       }
+
+      reference_fcu_untilted = ret.value();
 
       // copy the reference into the service type message
       mrs_msgs::ReferenceSrvRequest req_goto_out;
@@ -7542,6 +7769,42 @@ bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state
   }
 
   return true;
+}
+
+//}
+
+/* RCChannelToRange() //{ */
+
+double ControlManager::RCChannelToRange(double rc_value, double range, double deadband) {
+
+  double tmp_0_to_1    = (rc_value - PWM_MIN) / (PWM_RANGE);
+  double tmp_neg1_to_1 = (tmp_0_to_1 - 0.5) * 2.0;
+
+  if (tmp_neg1_to_1 > 1.0) {
+    tmp_neg1_to_1 = 1.0;
+  } else if (tmp_neg1_to_1 < -1.0) {
+    tmp_neg1_to_1 = -1.0;
+  }
+
+  // check the deadband
+  if (tmp_neg1_to_1 < deadband && tmp_neg1_to_1 > -deadband) {
+    return 0.0;
+  }
+
+  if (tmp_neg1_to_1 > 0) {
+
+    double tmp = (tmp_neg1_to_1 - deadband) / (1.0 - deadband);
+
+    return range * tmp;
+
+  } else {
+
+    double tmp = (-tmp_neg1_to_1 - deadband) / (1.0 - deadband);
+
+    return -range * tmp;
+  }
+
+  return 0.0;
 }
 
 //}

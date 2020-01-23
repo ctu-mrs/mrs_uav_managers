@@ -7,23 +7,25 @@
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="ODOMETRY_TYPE" default="$(env ODOMETRY_TYPE)" />
+  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
+  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="3.5" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.3" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('ODOMETRY_TYPE') == 'gps')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('ODOMETRY_TYPE') != 'gps')" name="world_file" value="$(find mrs_general)/config/world_simulation_local.yaml" />
-  <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_current.yaml" />
-
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
+
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />

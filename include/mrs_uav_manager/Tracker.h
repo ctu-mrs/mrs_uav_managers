@@ -28,9 +28,9 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Vector3Stamped.h>
 
-#include <mrs_msgs/TrackerConstraints.h>
-#include <mrs_msgs/TrackerConstraintsRequest.h>
-#include <mrs_msgs/TrackerConstraintsResponse.h>
+#include <mrs_msgs/TrackerConstraintsSrv.h>
+#include <mrs_msgs/TrackerConstraintsSrvRequest.h>
+#include <mrs_msgs/TrackerConstraintsSrvResponse.h>
 
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
@@ -111,7 +111,7 @@ public:
 
   virtual bool goTo(const mrs_msgs::ReferenceConstPtr &msg) = 0;
 
-  virtual const mrs_msgs::TrackerConstraintsResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsRequest::ConstPtr &constraints) = 0;
+  virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 }  // namespace mrs_uav_manager
 
