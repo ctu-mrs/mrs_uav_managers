@@ -211,6 +211,7 @@
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
+      <param name="mpc_tracker/diagnostics_topic" value="control_manager/mpc_tracker/diagnostics" />
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
