@@ -16,6 +16,7 @@
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/TrackerConstraints.h>
+#include <mrs_msgs/ControlError.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -926,8 +927,20 @@ void ControlManager::onInit() {
 
     param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
     std::vector<Eigen::MatrixXd> point_obstacle_points;
+
     if (_obstacle_points_enabled_) {
+
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+
+      if (_safety_area_frame_ == "latlon_origin") {
+        for (unsigned int i = 0; i < point_obstacle_points.size(); i++) {
+
+          Eigen::MatrixXd temp = point_obstacle_points[i];
+          temp(0, 2) *= 8.9832e-06;
+          point_obstacle_points[i] = temp;
+        }
+      }
+
     } else {
       point_obstacle_points = std::vector<Eigen::MatrixXd>();
     }
@@ -955,6 +968,7 @@ void ControlManager::onInit() {
   }
 
   common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
+  common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
   common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
@@ -1329,7 +1343,7 @@ void ControlManager::onInit() {
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error_                   = nh_.advertise<nav_msgs::Odometry>("control_error_out", 1);
+  publisher_control_error_                   = nh_.advertise<mrs_msgs::ControlError>("control_error_out", 1);
   publisher_safety_area_markers_             = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
   publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
   publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
@@ -1448,6 +1462,10 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
+  auto yaw_error           = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
+  auto [position_error_x, position_error_y, position_error_z] =
+      mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
@@ -1501,20 +1519,24 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   {
-    std::scoped_lock lock(mutex_control_error_);
+    mrs_msgs::ControlError msg_out;
 
-    nav_msgs::Odometry odom_out;
+    msg_out.header.stamp    = ros::Time::now();
+    msg_out.header.frame_id = uav_state.header.frame_id;
 
-    odom_out.pose.pose.position.x = position_error_x_;
-    odom_out.pose.pose.position.y = position_error_y_;
-    odom_out.pose.pose.position.z = position_error_z_;
+    msg_out.position_errors.x    = position_error_x;
+    msg_out.position_errors.y    = position_error_y;
+    msg_out.position_errors.z    = position_error_z;
+    msg_out.total_position_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
+    msg_out.yaw_error            = yaw_error;
 
-    odom_out.twist.twist.linear.x = velocity_error_x_;
-    odom_out.twist.twist.linear.y = velocity_error_y_;
-    odom_out.twist.twist.linear.z = velocity_error_z_;
+    std::map<std::string, ControllerParams>::iterator it;
+    it                                  = controllers_.find(_controller_names_[active_controller_idx]);
+    msg_out.position_eland_threshold    = it->second.eland_threshold;
+    msg_out.position_failsafe_threshold = it->second.failsafe_threshold;
 
     try {
-      publisher_control_error_.publish(odom_out);
+      publisher_control_error_.publish(msg_out);
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_error_.getTopic().c_str());
@@ -2341,7 +2363,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%0.2f/%0.2f", control_error, _failsafe_threshold_);
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%0.2f/%0.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _failsafe_threshold_,
+                  position_error_x_, position_error_y_, position_error_z_);
 
         failsafe();
       }
@@ -2361,8 +2384,9 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating emergency land: odometry innovation too large: %.2f exceeded %.2f", last_innovation,
-                  _odometry_innovation_threshold_);
+        ROS_ERROR("[ControlManager]: Activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f)", last_innovation,
+                  _odometry_innovation_threshold_, odometry_innovation.pose.pose.position.x, odometry_innovation.pose.pose.position.y,
+                  odometry_innovation.pose.pose.position.z);
 
         std::string message_out;
         eland(message_out);
@@ -2381,7 +2405,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * tilt_angle,
+        ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
         std::string message_out;
         eland(message_out);
@@ -2396,7 +2420,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f m exceeded %.2f m", control_error, _eland_threshold_);
+        ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
+                  position_error_x_, position_error_y_, position_error_z_);
         std::string message_out;
         eland(message_out);
       }
@@ -2411,7 +2436,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f deg exceeded %.2f deg", (180.0 / M_PI) * yaw_error_,
+        ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
         std::string message_out;
         eland(message_out);
@@ -3104,7 +3129,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
     while (running_safety_timer_) {
-      ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+      ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
       ros::Duration wait(0.001);
       wait.sleep();
     }
@@ -3205,14 +3230,14 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
       safety_timer_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
-        ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
 
       // we have to also for the oneshot control timer to finish
       while (running_control_timer_) {
-        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
@@ -3307,14 +3332,14 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       safety_timer_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
-        ROS_INFO("[ControlManager]: waiting for safety timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
 
       // we have to also for the oneshot control timer to finish
       while (running_control_timer_) {
-        ROS_INFO("[ControlManager]: waiting for control timer to finish");
+        ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
       }
@@ -5530,7 +5555,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   if (!ret) {
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
@@ -5562,7 +5587,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   if (!ret) {
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
@@ -5756,9 +5781,13 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
       new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
 
+      // horizontal_point_distance                  = uav distance to the reference
+      // bumper_data.sectors[horizontal_vector_idx] = bumper data
+      // bumper_horizontal_distance                 = the bumper limit
+
       ROS_WARN_THROTTLE(
           1.0,
-          "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f (sector %d) is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it "
+          "[ControlManager]: Bumper: the fcu reference [%0.2f, %0.2f] (sector %d) is not valid, distance %0.2f >= (%0.2f - %0.2f)., HUGGING IT it "
           "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], _bumper_horizontal_distance_, new_x,
           new_y);
@@ -5780,7 +5809,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
       new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_);
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f > (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
                         fcu_z, vertical_point_distance, bumper_data.sectors[vertical_vector_idx], _bumper_vertical_distance_, new_z);
 
       point_fcu.reference.position.z = new_z;

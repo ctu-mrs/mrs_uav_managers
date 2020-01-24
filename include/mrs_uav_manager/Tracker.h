@@ -62,6 +62,7 @@ struct SafetyArea_t
   mrs_uav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
   mrs_uav_manager::getMaxHeight_t          getMaxHeight;
   mrs_uav_manager::getMinHeight_t          getMinHeight;
+  std::string                              frame_id;
   bool                                     use_safety_area;
 };
 

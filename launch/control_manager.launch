@@ -211,6 +211,7 @@
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
+      <param name="mpc_tracker/diagnostics_topic" value="control_manager/mpc_tracker/diagnostics" />
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
@@ -223,10 +224,12 @@
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
       <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
-      <remap from="~mpc_tracker/debug_set_trajectory_out" to="~mpc_tracker/debug_set_trajectory" />
       <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
-      <remap from="~mpc_tracker/debug_trajectory_marker_out" to="~mpc_tracker/debug_trajectory_marker" />
+      <remap from="~mpc_tracker/trajectory_original/poses_out" to="~mpc_tracker/trajectory_original/poses" />
+      <remap from="~mpc_tracker/trajectory_original/markers_out" to="~mpc_tracker/trajectory_original/markers" />
+      <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
+      <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
