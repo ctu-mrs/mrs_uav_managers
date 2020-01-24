@@ -2490,8 +2490,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         arming(false);
 
-        service_server_switch_tracker_.shutdown();
-        service_server_switch_controller_.shutdown();
         failsafe_triggered_ = true;
 
       } else {
@@ -3704,17 +3702,12 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
           ROS_WARN("[ControlManager]: triggering eland by RC");
 
-          service_server_switch_tracker_.shutdown();
-          service_server_switch_controller_.shutdown();
           rc_eland_triggered_ = true;
 
           std::string message_out;
           eland(message_out);
         }
       } else if (_rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) == STRING_EQUAL) {
-
-        service_server_switch_tracker_.shutdown();
-        service_server_switch_controller_.shutdown();
 
         std::string message_out;
         escalatingFailsafe(message_out);
@@ -3724,9 +3717,6 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
         if (!failsafe_triggered_) {
 
           ROS_WARN("[ControlManager]: triggering failsafe by RC");
-
-          service_server_switch_tracker_.shutdown();
-          service_server_switch_controller_.shutdown();
 
           failsafe();
         }
@@ -3746,10 +3736,24 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
   if (!is_initialized_)
     return false;
 
-  auto [success, message] = switchTracker(req.value);
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot switch tracker, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
+
+  auto [success, response] = switchTracker(req.value);
 
   res.success = success;
-  res.message = message;
+  res.message = response;
 
   return true;
 }
@@ -3763,10 +3767,24 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
   if (!is_initialized_)
     return false;
 
-  auto [success, message] = switchController(req.value);
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot switch controller, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
+
+  auto [success, response] = switchController(req.value);
 
   res.success = success;
-  res.message = message;
+  res.message = response;
 
   return true;
 }
@@ -3780,7 +3798,19 @@ bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Re
   if (!is_initialized_)
     return false;
 
-  char message[200];
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot switch controller, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
 
   // reactivate the current tracker
   bool        succ;
@@ -3797,14 +3827,14 @@ bool ControlManager::callbackResetTracker([[maybe_unused]] std_srvs::Trigger::Re
   }
 
   if (succ) {
-    sprintf((char*)&message, "The tracker '%s' was reset", tracker_name.c_str());
-    ROS_INFO("[ControlManager]: %s", message);
+    message << "The tracker " << tracker_name << " was reset";
+    ROS_INFO_STREAM("[ControlManager]: " << message.str());
   } else {
-    sprintf((char*)&message, "The tracker '%s' reset failed!", tracker_name.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
+    message << "The tracker " << tracker_name << " reset failed!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
   }
 
-  res.message = message;
+  res.message = message.str();
   res.success = true;
 
   return true;
@@ -3819,6 +3849,20 @@ bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::R
   if (!is_initialized_)
     return false;
 
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot switch controller, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
+
   res.success = ehover(res.message);
 
   return true;
@@ -3832,6 +3876,20 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
 
   if (!is_initialized_)
     return false;
+
+  std::stringstream message;
+
+  if (failsafe_triggered_) {
+
+    message << "Cannot activate failsafe, it is already active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
 
   res.success = failsafe();
 
@@ -3875,6 +3933,20 @@ bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::
   if (!is_initialized_)
     return false;
 
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot activate partial landing, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
+
   res.success = partialLanding(res.message);
 
   return true;
@@ -3893,7 +3965,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
   auto uav_state    = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
 
-  char message[200];
+  char message[400];
 
   mrs_msgs::ReferenceStamped current_coord;
   current_coord.header.frame_id      = uav_state.header.frame_id;
@@ -3952,32 +4024,43 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
 
 bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  char message[200];
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot " << (req.data ? "arm" : "disarm") << ", eland or failsafe active";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+
+    return true;
+  }
 
   if (req.data) {
 
-    sprintf((char*)&message, "Not allowed to arm the drone.");
-    res.message = message;
+    message << "Not allowed to arm the drone.";
     res.success = false;
-    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
 
   } else {
 
     if (arming(false)) {
 
-      sprintf((char*)&message, "Disarmed");
-      res.message = message;
+      message << "Disarmed";
       res.success = true;
-      ROS_INFO("[ControlManager]: %s", message);
+      ROS_INFO_STREAM("[ControlManager]: " << message.str());
 
     } else {
 
-      sprintf((char*)&message, "Could not disarm");
-      res.message = message;
+      message << "Could not disarm";
       res.success = false;
-      ROS_ERROR("[ControlManager]: %s", message);
+      ROS_ERROR_STREAM("[ControlManager]: " << message.str());
     }
   }
+
+  res.message = message.str();
 
   return true;
 }
@@ -3993,7 +4076,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
   setCallbacks(req.data);
 
-  char message[200];
+  char message[400];
   sprintf((char*)&message, "Callbacks: %s", motors_ ? "enabled" : "disabled");
   res.message = message;
   res.success = true;
@@ -4050,7 +4133,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
   callbacks_enabled_ = false;
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[200];
+  char                                     message[400];
 
   std_srvs::SetBoolRequest req_enable_callbacks;
 
@@ -4097,15 +4180,29 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
 
 bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  // copy member variables
-  auto uav_yaw = mrs_lib::get_mutexed(mutex_uav_state_, uav_yaw_);
-
   if (!is_initialized_)
     return false;
+
+  // copy member variables
+  auto uav_yaw = mrs_lib::get_mutexed(mutex_uav_state_, uav_yaw_);
 
   if (_pirouette_enabled_) {
     res.success = false;
     res.message = "already active";
+    return true;
+  }
+
+  std::stringstream message;
+
+  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+
+    message << "Cannot activate pirouette, eland or failsafe active.";
+
+    res.message = message.str();
+    res.success = false;
+
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+
     return true;
   }
 
@@ -4293,7 +4390,7 @@ bool ControlManager::callbackBumperEnableService(std_srvs::SetBool::Request& req
 
   bumper_enabled_ = req.data;
 
-  char message[200];
+  char message[400];
 
   sprintf((char*)&message, "bumper %s", bumper_enabled_ ? "ENALBED" : "DISABLED");
 
@@ -4316,7 +4413,7 @@ bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Req
 
   bumper_repulsion_enabled_ = req.data;
 
-  char message[200];
+  char message[400];
 
   sprintf((char*)&message, "bumper repulsion %s", bumper_repulsion_enabled_ ? "ENALBED" : "DISABLED");
 
@@ -4429,7 +4526,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   }
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[200];
+  char                                     message[400];
 
   // prepare the message for current tracker
   mrs_msgs::ReferenceSrvRequest req_goto_out;
@@ -4618,7 +4715,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
   }
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[200];
+  char                                     message[400];
 
   // prepare the message for current tracker
   mrs_msgs::ReferenceSrvRequest req_goto_out;
@@ -4729,7 +4826,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   }
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[200];
+  char                                     message[400];
 
   mrs_msgs::ReferenceSrvRequest request_out;
   request_out.reference = transformed_reference.reference;
@@ -4832,7 +4929,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   }
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[200];
+  char                                     message[400];
 
   // prepare the message for current tracker
   mrs_msgs::ReferenceSrvRequest req_goto_out;
@@ -4915,7 +5012,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
   }
 
   mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
-  char                                   message[200];
+  char                                   message[400];
 
   // prepare the message for current tracker
   mrs_msgs::Float64SrvRequest req_goto_out;
@@ -4968,7 +5065,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
   }
 
   mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
-  char                                   message[200];
+  char                                   message[400];
 
   // prepare the message for current tracker
   mrs_msgs::Float64SrvRequest req_goto_out;
@@ -5021,7 +5118,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
   }
 
   mrs_msgs::Float64SrvResponse::ConstPtr tracker_response;
-  char                                   message[200];
+  char                                   message[400];
 
   // prepare the message for current tracker
   mrs_msgs::Float64SrvRequest req_goto_out;
@@ -5857,8 +5954,6 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       break;
     case LANDING_STATE: {
 
-      service_server_switch_tracker_.shutdown();
-      service_server_switch_controller_.shutdown();
       elanding_timer_.start();
       eland_triggered_ = true;
 
@@ -5931,7 +6026,7 @@ bool ControlManager::hover(std::string& message_out) {
     std::scoped_lock lock(mutex_tracker_list_);
 
     std_srvs::TriggerResponse::ConstPtr tracker_response;
-    char                                message[200];
+    char                                message[400];
 
     std_srvs::TriggerRequest hover_out;
 
@@ -5964,7 +6059,7 @@ bool ControlManager::ehover(std::string& message_out) {
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
-  char message[200];
+  char message[400];
   bool success = false;
 
   {
@@ -6101,7 +6196,7 @@ bool ControlManager::eland(std::string& message_out) {
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
 
-  char message[200];
+  char message[400];
   bool success = false;
 
   {
@@ -6260,7 +6355,7 @@ bool ControlManager::partialLanding(std::string& message_out) {
     return false;
   }
 
-  char message[200];
+  char message[400];
   bool success = false;
 
   partial_landing_previous_tracker_idx_ = active_tracker_idx;
@@ -6376,8 +6471,6 @@ bool ControlManager::failsafe() {
           controller_tracker_switch_time_ = ros::Time::now();
         }
 
-        service_server_switch_tracker_.shutdown();
-        service_server_switch_controller_.shutdown();
         failsafe_triggered_ = true;
         elanding_timer_.stop();
 
@@ -6575,7 +6668,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
   if (new_tracker_idx == active_tracker_idx) {
 
     message << "Not switching, the tracker " << tracker_name << " is already active!";
-    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    ROS_INFO_STREAM("[ControlManager]: " << message.str());
     return std::tuple(false, message.str());
   }
 
@@ -6722,7 +6815,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   if (new_controller_idx == active_controller_idx) {
 
     message << "Not switching, the controller " << controller_name << " is already active!";
-    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    ROS_INFO_STREAM("[ControlManager]: " << message.str());
     return std::tuple(false, message.str());
   }
 
