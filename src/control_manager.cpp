@@ -927,8 +927,20 @@ void ControlManager::onInit() {
 
     param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
     std::vector<Eigen::MatrixXd> point_obstacle_points;
+
     if (_obstacle_points_enabled_) {
+
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+
+      if (_safety_area_frame_ == "latlon_origin") {
+        for (unsigned int i = 0; i < point_obstacle_points.size(); i++) {
+
+          Eigen::MatrixXd temp = point_obstacle_points[i];
+          temp(0, 2) *= 8.9832e-06;
+          point_obstacle_points[i] = temp;
+        }
+      }
+
     } else {
       point_obstacle_points = std::vector<Eigen::MatrixXd>();
     }
@@ -956,6 +968,7 @@ void ControlManager::onInit() {
   }
 
   common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
+  common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
   common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
