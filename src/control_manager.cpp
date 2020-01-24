@@ -208,6 +208,9 @@ private:
   std::vector<boost::shared_ptr<mrs_uav_manager::Controller>>          controller_list_;    // list of controllers, routines are callable from this
   std::mutex                                                           mutex_controller_list_;
 
+  std::tuple<bool, std::string> switchController(const std::string controller_name);
+  std::tuple<bool, std::string> switchTracker(const std::string tracker_name);
+
   // transfomer
   std::shared_ptr<mrs_lib::Transformer> transformer_;
 
@@ -2639,13 +2642,6 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
 
       changePartialLandingState(IDLE_STATE);
 
-      // request
-      mrs_msgs::StringRequest  request;
-      mrs_msgs::StringResponse response;
-
-      // request
-      request.value = _partial_landing_controller_name_;
-
       mrs_msgs::AttitudeCommand::Ptr new_attitude_cmd(std::make_unique<mrs_msgs::AttitudeCommand>());
       new_attitude_cmd->mass_difference = landing_uav_mass_ - _uav_mass_;
       new_attitude_cmd->total_mass      = landing_uav_mass_;
@@ -2665,7 +2661,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
 
       partial_landing_previous_controller_idx_ = active_controller_idx_;
 
-      callbackSwitchController(request, response);
+      switchController(_partial_landing_controller_name_);
 
       ROS_WARN("[ControlManager]: partial landing finished");
 
@@ -2760,16 +2756,8 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     joystick_start_pressed_ = false;
 
-    mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = _joystick_controller_name_;
-
-    mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = _joystick_tracker_name_;
-
-    mrs_msgs::StringResponse response;
-
-    callbackSwitchTracker(tracker_srv, response);
-    callbackSwitchController(controller_srv, response);
+    switchTracker(_joystick_tracker_name_);
+    switchController(_joystick_controller_name_);
   }
 
   // if RT+LT were pressed and held for > 0.1 s
@@ -3488,16 +3476,8 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
 
-    mrs_msgs::StringRequest controller_srv;
-    controller_srv.value = _joystick_fallback_controller_name_;
-
-    mrs_msgs::StringRequest tracker_srv;
-    tracker_srv.value = _joystick_fallback_tracker_name_;
-
-    mrs_msgs::StringResponse response;
-
-    callbackSwitchTracker(tracker_srv, response);
-    callbackSwitchController(controller_srv, response);
+    switchTracker(_joystick_fallback_tracker_name_);
+    switchController(_joystick_fallback_controller_name_);
 
     joystick_goto_enabled_ = false;
   }
@@ -3766,155 +3746,9 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
   if (!is_initialized_)
     return false;
 
-  // copy member variables
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto [success, message] = switchTracker(req.value);
 
-  char message[200];
-
-  if (!got_uav_state_) {
-
-    sprintf((char*)&message, "Can't switch tracker, missing odometry!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  if (!got_odometry_innovation_) {
-
-    sprintf((char*)&message, "Can't switch tracker, missing odometry innovation!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  if (!got_pixhawk_odometry_) {
-
-    sprintf((char*)&message, "Can't switch tracker, missing PixHawk odometry!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  int new_tracker_idx = -1;
-
-  for (unsigned int i = 0; i < _tracker_names_.size(); i++) {
-    if (req.value.compare(_tracker_names_[i]) == 0) {
-      new_tracker_idx = i;
-    }
-  }
-
-  // check if the tracker exists
-  if (new_tracker_idx < 0) {
-
-    sprintf((char*)&message, "The tracker %s does not exist!", req.value.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  // check if the tracker is already active
-  if (new_tracker_idx == active_tracker_idx) {
-
-    sprintf((char*)&message, "Not switching, the tracker %s is already active!", req.value.c_str());
-    ROS_WARN("[ControlManager]: %s", message);
-    res.success = true;
-    res.message = message;
-    return true;
-  }
-
-  {
-    std::scoped_lock lock(mutex_tracker_list_);
-
-    try {
-
-      ROS_INFO("[ControlManager]: Activating tracker %s", _tracker_names_[new_tracker_idx].c_str());
-
-      if (!tracker_list_[new_tracker_idx]->activate(last_position_cmd)) {
-
-        sprintf((char*)&message, "Tracker %s was not activated", req.value.c_str());
-        ROS_WARN("[ControlManager]: %s", message);
-        res.success = false;
-
-      } else {
-
-        sprintf((char*)&message, "Tracker %s has been activated", req.value.c_str());
-        ROS_INFO("[ControlManager]: %s", message);
-        res.success = true;
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        // super important, switch which the active tracker idx
-        try {
-
-          ROS_INFO("[ControlManager]: deactivating %s", _tracker_names_[active_tracker_idx_].c_str());
-          tracker_list_[active_tracker_idx_]->deactivate();
-
-          // if switching from null tracker, activate the active the controller
-          if (_tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
-
-            ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
-            {
-              std::scoped_lock lock(mutex_controller_list_);
-
-              mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
-
-              output_command->total_mass       = _uav_mass_;
-              output_command->disturbance_bx_b = _initial_body_disturbance_x_;
-              output_command->disturbance_by_b = _initial_body_disturbance_y_;
-              output_command->mass_difference  = 0.0;
-
-              {
-                std::scoped_lock lock(mutex_last_attitude_cmd_);
-
-                last_attitude_cmd_ = output_command;
-                last_attitude_cmd  = last_attitude_cmd_;
-              }
-
-              controller_list_[active_controller_idx_]->activate(last_attitude_cmd);
-
-              {
-                std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-                // update the time (used in failsafe)
-                controller_tracker_switch_time_ = ros::Time::now();
-              }
-            }
-
-            // if switching to null tracker, deactivate the active controller
-          } else if (_tracker_names_[new_tracker_idx].compare(_null_tracker_name_) == 0) {
-
-            ROS_INFO("[ControlManager]: deactivating %s due to switching to NullTracker", _controller_names_[active_controller_idx_].c_str());
-            {
-              std::scoped_lock lock(mutex_controller_list_);
-
-              controller_list_[active_controller_idx_]->deactivate();
-            }
-          }
-
-          active_tracker_idx_ = new_tracker_idx;
-        }
-        catch (std::runtime_error& exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-      ROS_ERROR("[ControlManager]: Error during activation of tracker %s", req.value.c_str());
-      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-    }
-  }
-
+  res.success = success;
   res.message = message;
 
   return true;
@@ -3926,134 +3760,14 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
 
 bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
-  char message[200];
+  if (!is_initialized_)
+    return false;
 
-  // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto [success, message] = switchController(req.value);
 
-  if (!got_uav_state_) {
-
-    sprintf((char*)&message, "Can't switch controller, missing odometry!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  if (!got_odometry_innovation_) {
-
-    sprintf((char*)&message, "Can't switch controller, missing odometry innovation!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  if (!got_pixhawk_odometry_) {
-
-    sprintf((char*)&message, "Can't switch controller, missing PixHawk odometry!");
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  int new_controller_idx = -1;
-
-  for (unsigned int i = 0; i < _controller_names_.size(); i++) {
-    if (req.value.compare(_controller_names_[i]) == STRING_EQUAL) {
-      new_controller_idx = i;
-    }
-  }
-
-  // check if the controller exists
-  if (new_controller_idx < 0) {
-
-    sprintf((char*)&message, "The controller %s does not exist!", req.value.c_str());
-    ROS_ERROR("[ControlManager]: %s", message);
-    res.success = false;
-    res.message = message;
-    return true;
-  }
-
-  // check if the controller is not active
-  if (new_controller_idx == active_controller_idx) {
-
-    sprintf((char*)&message, "Not switching, the controller %s is already active!", req.value.c_str());
-    ROS_WARN("[ControlManager]: %s", message);
-    res.success = true;
-    res.message = message;
-    return true;
-  }
-
-  {
-    std::scoped_lock lock(mutex_controller_list_);
-
-    try {
-
-      ROS_INFO("[ControlManager]: Activating controller %s", _controller_names_[new_controller_idx].c_str());
-      if (!controller_list_[new_controller_idx]->activate(last_attitude_cmd)) {
-
-        sprintf((char*)&message, "Controller %s was not activated", req.value.c_str());
-        ROS_WARN("[ControlManager]: %s", message);
-        res.success = false;
-
-      } else {
-
-        sprintf((char*)&message, "Controller %s has been activated", req.value.c_str());
-        ROS_INFO("[ControlManager]: %s", message);
-        res.success = true;
-
-        ROS_INFO("[ControlManager]: triggering hover after switching to %s, re-activating %s.", _controller_names_[new_controller_idx].c_str(),
-                 _tracker_names_[active_tracker_idx_].c_str());
-
-        // reactivate the current tracker
-        // TODO this is not the most elegant way to handle the tracker after a controller switch
-        // but it serves the purpose
-        {
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          tracker_list_[active_tracker_idx_]->deactivate();
-          tracker_list_[active_tracker_idx_]->activate(mrs_msgs::PositionCommand::Ptr());
-        }
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        // super important, switch which the active controller idx
-        try {
-
-          controller_list_[active_controller_idx_]->deactivate();
-          active_controller_idx_ = new_controller_idx;
-        }
-        catch (std::runtime_error& exrun) {
-          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-      ROS_ERROR("[ControlManager]: Error during activation of controller %s", req.value.c_str());
-      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
-    }
-  }
-
-  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints;
-  {
-    std::scoped_lock lock(mutex_constraints_);
-
-    sanitized_constraints_ = current_constraints_;
-    sanitized_constraints  = sanitized_constraints_;
-  }
-
-  setConstraints(sanitized_constraints);
-
+  res.success = success;
   res.message = message;
+
   return true;
 }
 
@@ -4415,55 +4129,54 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
 bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  char message[400];
-
-  mrs_msgs::StringRequest controller_srv;
-  controller_srv.value = _joystick_controller_name_;
-
-  mrs_msgs::StringRequest tracker_srv;
-  tracker_srv.value = _joystick_tracker_name_;
-
-  mrs_msgs::StringResponse response;
-
-  callbackSwitchTracker(tracker_srv, response);
-
-  if (!response.success) {
-
-    sprintf((char*)&message, "Switching to %s was unsuccessfull: %s", _joystick_tracker_name_.c_str(), response.message.c_str());
-    res.success = false;
-    res.message = message;
-
-    ROS_ERROR("[ControlManager]: %s", message);
-
-    return true;
+  if (!is_initialized_) {
+    return false;
   }
 
-  callbackSwitchController(controller_srv, response);
+  std::stringstream message;
 
-  if (!response.success) {
+  {
+    auto [success, response] = switchTracker(_joystick_tracker_name_);
 
-    sprintf((char*)&message, "Switching to %s was unsuccessfull: %s", _joystick_controller_name_.c_str(), response.message.c_str());
+    if (!success) {
+
+      message << "Switching to " << _joystick_tracker_name_ << " was unsuccessfull: " << response;
+      ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+
+      res.success = false;
+      res.message = message.str();
+
+      return true;
+    }
+  }
+
+  auto [success, response] = switchController(_joystick_controller_name_);
+
+  if (!success) {
+
+    message << "Switching to " << _joystick_controller_name_ << " was unsuccessfull: " << response;
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+
     res.success = false;
-    res.message = message;
+    res.message = message.str();
 
     // switch back to hover tracker
-    tracker_srv.value = _ehover_tracker_name_;
-    callbackSwitchTracker(tracker_srv, response);
+    switchTracker(_ehover_tracker_name_);
 
     // switch back to safety controller
-    controller_srv.value = _controller_names_[0];
-    callbackSwitchController(controller_srv, response);
+    switchController(_eland_controller_name_);
 
-    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
 
     return true;
   }
 
-  sprintf((char*)&message, "Switched to joystick control");
-  res.success = true;
-  res.message = message;
+  message << "Switched to joystick control";
 
-  ROS_INFO("[ControlManager]: %s", message);
+  res.success = true;
+  res.message = message.str();
+
+  ROS_INFO_STREAM("[ControlManager]: " << message.str());
 
   return true;
 }
@@ -6793,30 +6506,291 @@ void ControlManager::switchMotors(bool input) {
 
   ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
 
-  // set 'enable motors_' to the desired value
   motors_ = input;
 
-  // if switching motors_ off, switch to NullTracker
+  // if switching motors off, switch to NullTracker
   if (!motors_) {
-
-    // request
-    mrs_msgs::StringRequest request;
-    request.value = _null_tracker_name_;
-
-    // response (not used)
-    mrs_msgs::StringResponse response;
 
     ROS_INFO("[ControlManager]: switching to NullTracker after switching motors off");
 
-    callbackSwitchTracker(request, response);
+    switchTracker(_null_tracker_name_);
 
-    // request
-    request.value = _controller_names_[_eland_controller_idx_];
+    ROS_INFO_STREAM("[ControlManager]: switching to " << _eland_controller_name_ << " after switching motors off");
 
-    ROS_INFO("[ControlManager]: switching to %s after switching motors off", request.value.c_str());
-
-    callbackSwitchController(request, response);
+    switchController(_eland_controller_name_);
   }
+}
+
+//}
+
+/* switchTracker() //{ */
+
+std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
+
+  // copy member variables
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+
+  std::stringstream message;
+
+  if (!got_uav_state_) {
+
+    message << "Can't switch tracker, missing odometry!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  if (!got_odometry_innovation_) {
+
+    message << "Can't switch tracker, missing odometry innovation!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  if (!got_pixhawk_odometry_) {
+
+    message << "Can't switch tracker, missing PixHawk odometry!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  int new_tracker_idx = -1;
+
+  for (unsigned int i = 0; i < _tracker_names_.size(); i++) {
+    if (tracker_name == _tracker_names_[i]) {
+      new_tracker_idx = i;
+    }
+  }
+
+  // check if the tracker exists
+  if (new_tracker_idx < 0) {
+
+    message << "The tracker " << tracker_name << " does not exist!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  // check if the tracker is already active
+  if (new_tracker_idx == active_tracker_idx) {
+
+    message << "Not switching, the tracker " << tracker_name << " is already active!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    try {
+
+      ROS_INFO("[ControlManager]: Activating tracker %s", _tracker_names_[new_tracker_idx].c_str());
+
+      if (!tracker_list_[new_tracker_idx]->activate(last_position_cmd)) {
+
+        message << "Tracker " << tracker_name << " was not activated";
+        ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+        return std::tuple(false, message.str());
+
+      } else {
+
+        message << "Tracker " << tracker_name << " was activated";
+        ROS_INFO_STREAM("[ControlManager]: " << message.str());
+
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time_ = ros::Time::now();
+        }
+
+        // super important, switch the active tracker idx
+        try {
+
+          ROS_INFO("[ControlManager]: deactivating %s", _tracker_names_[active_tracker_idx_].c_str());
+          tracker_list_[active_tracker_idx_]->deactivate();
+
+          // if switching from null tracker, activate the active the controller
+          if (_tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
+
+            ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
+            {
+              std::scoped_lock lock(mutex_controller_list_);
+
+              mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
+
+              output_command->total_mass       = _uav_mass_;
+              output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+              output_command->disturbance_by_b = _initial_body_disturbance_y_;
+              output_command->mass_difference  = 0.0;
+
+              {
+                std::scoped_lock lock(mutex_last_attitude_cmd_);
+
+                last_attitude_cmd_ = output_command;
+                last_attitude_cmd  = last_attitude_cmd_;
+              }
+
+              controller_list_[active_controller_idx_]->activate(last_attitude_cmd);
+
+              {
+                std::scoped_lock lock(mutex_controller_tracker_switch_time_);
+
+                // update the time (used in failsafe)
+                controller_tracker_switch_time_ = ros::Time::now();
+              }
+            }
+
+            // if switching to null tracker, deactivate the active controller
+          } else if (_tracker_names_[new_tracker_idx].compare(_null_tracker_name_) == 0) {
+
+            ROS_INFO("[ControlManager]: deactivating %s due to switching to NullTracker", _controller_names_[active_controller_idx_].c_str());
+            {
+              std::scoped_lock lock(mutex_controller_list_);
+
+              controller_list_[active_controller_idx_]->deactivate();
+            }
+          }
+
+          active_tracker_idx_ = new_tracker_idx;
+        }
+        catch (std::runtime_error& exrun) {
+          ROS_ERROR("[ControlManager]: Could not deactivate tracker %s", _tracker_names_[active_tracker_idx_].c_str());
+        }
+      }
+    }
+    catch (std::runtime_error& exrun) {
+      ROS_ERROR("[ControlManager]: Error during activation of tracker %s", tracker_name.c_str());
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    }
+  }
+
+  return std::tuple(true, message.str());
+}
+
+//}
+
+/* switchController() //{ */
+
+std::tuple<bool, std::string> ControlManager::switchController(const std::string controller_name) {
+
+  // copy member variables
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+
+  std::stringstream message;
+
+  if (!got_uav_state_) {
+
+    message << "Can't switch controller, missing odometry!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  if (!got_odometry_innovation_) {
+
+    message << "Can't switch controller, missing odometry innovation!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  if (!got_pixhawk_odometry_) {
+
+    message << "Can't switch controller, missing PixHawk odometry!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  int new_controller_idx = -1;
+
+  for (unsigned int i = 0; i < _controller_names_.size(); i++) {
+    if (controller_name == _controller_names_[i]) {
+      new_controller_idx = i;
+    }
+  }
+
+  // check if the controller exists
+  if (new_controller_idx < 0) {
+
+    message << "The controller " << controller_name << " does not exist!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  // check if the controller is not active
+  if (new_controller_idx == active_controller_idx) {
+
+    message << "Not switching, the controller " << controller_name << " is already active!";
+    ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+    return std::tuple(false, message.str());
+  }
+
+  {
+    std::scoped_lock lock(mutex_controller_list_);
+
+    try {
+
+      ROS_INFO("[ControlManager]: Activating controller %s", _controller_names_[new_controller_idx].c_str());
+      if (!controller_list_[new_controller_idx]->activate(last_attitude_cmd)) {
+
+        message << "Controller " << controller_name << " was not activated";
+        ROS_ERROR_STREAM("[ControlManager]: " << message.str());
+        return std::tuple(false, message.str());
+
+      } else {
+
+        message << "Controller " << controller_name << " has been activated";
+        ROS_INFO_STREAM("[ControlManager]: " << message.str());
+
+        ROS_INFO("[ControlManager]: triggering hover after switching to %s, re-activating %s.", _controller_names_[new_controller_idx].c_str(),
+                 _tracker_names_[active_tracker_idx_].c_str());
+
+        // reactivate the current tracker
+        // TODO this is not the most elegant way to handle the tracker after a controller switch
+        // but it serves the purpose
+        {
+          std::scoped_lock lock(mutex_tracker_list_);
+
+          tracker_list_[active_tracker_idx_]->deactivate();
+          tracker_list_[active_tracker_idx_]->activate(mrs_msgs::PositionCommand::Ptr());
+        }
+
+        {
+          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
+
+          // update the time (used in failsafe)
+          controller_tracker_switch_time_ = ros::Time::now();
+        }
+
+        // super important, switch which the active controller idx
+        try {
+
+          controller_list_[active_controller_idx_]->deactivate();
+          active_controller_idx_ = new_controller_idx;
+        }
+        catch (std::runtime_error& exrun) {
+          ROS_ERROR("[ControlManager]: Could not deactivate controller %s", _controller_names_[active_controller_idx_].c_str());
+        }
+      }
+    }
+    catch (std::runtime_error& exrun) {
+      ROS_ERROR("[ControlManager]: Error during activation of controller %s", controller_name.c_str());
+      ROS_ERROR("[ControlManager]: Exception: %s", exrun.what());
+    }
+  }
+
+  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints;
+  {
+    std::scoped_lock lock(mutex_constraints_);
+
+    sanitized_constraints_ = current_constraints_;
+    sanitized_constraints  = sanitized_constraints_;
+  }
+
+  setConstraints(sanitized_constraints);
+
+  return std::tuple(true, message.str());
 }
 
 //}
