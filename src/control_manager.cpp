@@ -5542,7 +5542,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   if (!ret) {
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
@@ -5574,7 +5574,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   if (!ret) {
 
-    ROS_ERROR("[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
 
     return false;
   }
@@ -5768,9 +5768,13 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
       new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
 
+      // horizontal_point_distance                  = uav distance to the reference
+      // bumper_data.sectors[horizontal_vector_idx] = bumper data
+      // bumper_horizontal_distance                 = the bumper limit
+
       ROS_WARN_THROTTLE(
           1.0,
-          "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f (sector %d) is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it "
+          "[ControlManager]: Bumper: the fcu reference [%0.2f, %0.2f] (sector %d) is not valid, distance %0.2f >= (%0.2f - %0.2f)., HUGGING IT it "
           "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], _bumper_horizontal_distance_, new_x,
           new_y);
@@ -5792,7 +5796,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
       new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_);
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f < (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f > (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
                         fcu_z, vertical_point_distance, bumper_data.sectors[vertical_vector_idx], _bumper_vertical_distance_, new_z);
 
       point_fcu.reference.position.z = new_z;
