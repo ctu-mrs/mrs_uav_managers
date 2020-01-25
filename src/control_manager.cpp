@@ -17,6 +17,7 @@
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/TrackerConstraints.h>
 #include <mrs_msgs/ControlError.h>
+#include <mrs_msgs/Float64Srv.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -387,6 +388,7 @@ private:
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
+  ros::ServiceServer service_server_set_min_height_;
 
   // the last result of an active tracker
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
@@ -469,7 +471,7 @@ private:
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
   bool                                 _use_safety_area_ = false;
   std::string                          _safety_area_frame_;
-  double                               _min_height_;
+  double                               min_height_;
   bool                                 _obstacle_points_enabled_   = false;
   bool                                 _obstacle_polygons_enabled_ = false;
 
@@ -518,6 +520,8 @@ private:
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+
+  bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -914,7 +918,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
   param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
-  param_loader.load_param("safety_area/min_height", _min_height_);
+  param_loader.load_param("safety_area/min_height", min_height_);
   param_loader.load_param("safety_area/max_height", _max_height_);
 
   if (_use_safety_area_) {
@@ -1397,6 +1401,7 @@ void ControlManager::onInit() {
   service_server_transform_vector3_        = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
   service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
+  service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
 
   service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -1469,6 +1474,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   auto [position_error_x, position_error_y, position_error_z] =
       mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto min_height            = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
 
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
@@ -1574,7 +1580,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
     mrs_lib::Polygon border = safety_zone_->getBorder();
 
-    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(_min_height_);
+    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(min_height);
     std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(max_height);
 
     std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
@@ -1744,7 +1750,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       for (auto polygon : polygon_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(_min_height_);
+        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(min_height);
         std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
 
         // transform border bottom points to local origin
@@ -1817,7 +1823,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       for (auto point : point_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(_min_height_);
+        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(min_height);
         std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
 
         // transform bottom points to local origin
@@ -4427,6 +4433,31 @@ bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Req
 
 //}
 
+/* //{ callbackSetMinHeight() */
+
+bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  double min_height = req.value;
+
+  std::stringstream message;
+
+  message << "The minimal height set to " << min_height_ << ".";
+
+  ROS_INFO_STREAM("[ControlManager]: " << message.str());
+
+  mrs_lib::set_mutexed(mutex_min_height_, min_height, min_height_);
+
+  res.success = true;
+  res.message = message.str();
+
+  return true;
+}
+
+//}
+
 // | -------------- setpoint topics and services -------------- |
 
 /* //{ callbackReferenceService() */
@@ -5358,7 +5389,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
+  auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
   auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
 
   auto ret = transformer_->transformSingle(_safety_area_frame_, point);
@@ -5464,7 +5495,7 @@ double ControlManager::getMaxHeight(void) {
 
 double ControlManager::getMinHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_min_height_, _min_height_);
+  return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
 }
 
 //}

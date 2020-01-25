@@ -299,6 +299,7 @@
       <remap from="~pirouette_in" to="~pirouette" />
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
+      <remap from="~set_min_height_in" to="~set_min_height" />
 
     </node>
 
