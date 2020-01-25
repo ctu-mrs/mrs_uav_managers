@@ -2982,9 +2982,10 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
             tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
           }
         }
+
       } else if (rc_goto_active_ == true) {
 
-        ROS_INFO("[ControlManager]: deactivating rc joystic");
+        ROS_INFO("[ControlManager]: deactivating rc joystick");
 
         callbacks_enabled_ = true;
 
