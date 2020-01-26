@@ -6719,7 +6719,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
     message << "Not switching, the tracker " << tracker_name << " is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << message.str());
-    return std::tuple(false, message.str());
+    return std::tuple(true, message.str());
   }
 
   {
@@ -6866,7 +6866,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     message << "Not switching, the controller " << controller_name << " is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << message.str());
-    return std::tuple(false, message.str());
+    return std::tuple(true, message.str());
   }
 
   {
