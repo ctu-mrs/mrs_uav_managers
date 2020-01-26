@@ -315,6 +315,8 @@ private:
   void switchMotors(bool in);
   bool motors_ = false;
 
+  void setOdometryCallbacks(const bool input);
+
   // what thrust should be output when null tracker is active?
   double _min_thrust_null_tracker_ = 0.0;
 
@@ -389,6 +391,7 @@ private:
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
+  ros::ServiceClient service_client_set_odometry_callbacks_;
 
   // min client
   ros::ServiceServer service_server_set_min_height_;
@@ -1409,10 +1412,11 @@ void ControlManager::onInit() {
   service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
   service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
 
-  service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
-  service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_land_     = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_shutdown_ = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
+  service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
+  service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
+  service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -6369,6 +6373,8 @@ bool ControlManager::eland(std::string& message_out) {
     changePartialLandingState(IDLE_STATE);
     partial_landing_timer_.stop();
 
+    setOdometryCallbacks(false);
+
     sprintf((char*)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
 
@@ -6536,6 +6542,8 @@ bool ControlManager::failsafe() {
         eland_triggered_ = false;
         failsafe_timer_.start();
 
+        setOdometryCallbacks(false);
+
         ROS_INFO("[ControlManager]: Controller %s has been activated", _failsafe_controller_name_.c_str());
 
         // super important, switch the active controller idx
@@ -6664,6 +6672,31 @@ void ControlManager::switchMotors(bool input) {
     ROS_INFO_STREAM("[ControlManager]: switching to " << _eland_controller_name_ << " after switching motors off");
 
     switchController(_eland_controller_name_);
+  }
+}
+
+//}
+
+/* setOdometryCallbacks() //{ */
+
+void ControlManager::setOdometryCallbacks(const bool input) {
+
+  ROS_INFO("[ControlManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+
+  std_srvs::SetBool srv;
+
+  srv.request.data = input;
+
+  bool res = service_client_set_odometry_callbacks_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[ControlManager]: service call for toggle odometry callbacks returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_ERROR("[ControlManager]: service call for toggle odometry callbacks failed!");
   }
 }
 
