@@ -2422,6 +2422,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -2437,6 +2438,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
                   position_error_x_, position_error_y_, position_error_z_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -2453,6 +2455,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -3711,7 +3714,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
       if (_rc_eland_action_.compare(ELAND_STR) == STRING_EQUAL) {
 
-        if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_) {
+        if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
           ROS_WARN("[ControlManager]: triggering eland by RC");
 
@@ -6756,16 +6759,22 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
           // if switching from null tracker, activate the active the controller
           if (_tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
 
-            ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
+            ROS_INFO("[ControlManager]: reactivating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
 
               mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
               output_command->total_mass       = _uav_mass_;
+              output_command->mass_difference  = 0.0;
               output_command->disturbance_bx_b = _initial_body_disturbance_x_;
               output_command->disturbance_by_b = _initial_body_disturbance_y_;
-              output_command->mass_difference  = 0.0;
+              output_command->disturbance_wx_w = 0.0;
+              output_command->disturbance_wy_w = 0.0;
+              output_command->disturbance_bx_w = 0.0;
+              output_command->disturbance_by_w = 0.0;
+              output_command->thrust           = _min_thrust_null_tracker_;
+              output_command->controller       = "none";
 
               {
                 std::scoped_lock lock(mutex_last_attitude_cmd_);
