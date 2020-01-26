@@ -18,6 +18,7 @@
 #include <mrs_msgs/TrackerConstraints.h>
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/Float64Srv.h>
+#include <mrs_msgs/GetFloat64.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -388,7 +389,10 @@ private:
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
+
+  // min client
   ros::ServiceServer service_server_set_min_height_;
+  ros::ServiceServer service_server_get_min_height_;
 
   // the last result of an active tracker
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
@@ -522,6 +526,7 @@ private:
   bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
+  bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -1402,6 +1407,7 @@ void ControlManager::onInit() {
   service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
   service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
   service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
+  service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
 
   service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -4448,6 +4454,23 @@ bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mr
 
   res.success = true;
   res.message = message.str();
+
+  return true;
+}
+
+//}
+
+/* //{ callbackGetMinHeight() */
+
+bool ControlManager::callbackGetMinHeight([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+
+  res.success = true;
+  res.value   = min_height;
 
   return true;
 }
