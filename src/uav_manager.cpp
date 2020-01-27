@@ -18,7 +18,6 @@
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
 
-#include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/State.h>
 
 #include <mrs_lib/Profiler.h>
@@ -65,9 +64,9 @@ public:
   bool callbackLandHome(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr& msg);
   void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr& msg);
-  void callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr& msg);
-  void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr& msg);
+  void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
+  void callbackAttitudeCmd(const mrs_msgs::AttitudeCommandConstPtr& msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
   void callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg);
   void callbackGains(const std_msgs::StringConstPtr& msg);
@@ -140,22 +139,16 @@ public:
   std::mutex                          mutex_control_manager_diagnostics_;
 
   // subscriber for target attitude
-  ros::Subscriber             subscriber_target_attitude_;
-  bool                        got_target_attitude_ = false;
-  mavros_msgs::AttitudeTarget target_attitude_;
-  std::mutex                  mutex_target_attitude_;
+  ros::Subscriber           subscriber_attitude_cmd_;
+  bool                      got_attitude_cmd_ = false;
+  mrs_msgs::AttitudeCommand attitude_cmd_;
+  std::mutex                mutex_attitude_cmd_;
 
   // subscriber for mavros state
   ros::Subscriber    subscriber_mavros_state_;
   mavros_msgs::State mavros_state_;
   std::mutex         mutex_mavros_state_;
   bool               got_mavros_state_ = false;
-
-  // subscriber for attitude command
-  ros::Subscriber           subscriber_attitude_command_;
-  bool                      got_attitude_command_ = false;
-  mrs_msgs::AttitudeCommand attitude_command_;
-  std::mutex                mutex_attitude_command_;
 
   // service servers
   ros::ServiceServer service_server_takeoff_;
@@ -318,13 +311,12 @@ void UavManager::onInit() {
   // |             Initialize subscribers and services            |
   // --------------------------------------------------------------
 
-  subscriber_odometry_         = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_target_attitude_  = nh_.subscribe("target_attitude_in", 1, &UavManager::callbackTargetAttitude, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_state_     = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
-  subscriber_attitude_command_ = nh_.subscribe("attitude_command_in", 1, &UavManager::callbackAttitudeCommand, this, ros::TransportHints().tcpNoDelay());
-  subscriber_max_height_       = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_height_           = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_motors_           = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
+  subscriber_odometry_     = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+  subscriber_attitude_cmd_ = nh_.subscribe("attitude_cmd_in", 1, &UavManager::callbackAttitudeCmd, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_state_ = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_max_height_   = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_height_       = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
+  subscriber_motors_       = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
   subscriber_landoff_diagnostics_ =
       nh_.subscribe("landoff_diagnostics_in", 1, &UavManager::callbackLandoffDiagnostics, this, ros::TransportHints().tcpNoDelay());
   subscriber_control_manager_diagnostics_ =
@@ -393,7 +385,7 @@ void UavManager::onInit() {
 void UavManager::changeLandingState(LandingStates_t new_state) {
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
+  auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
 
   previous_state_landing_ = current_state_landing_;
   current_state_landing_  = new_state;
@@ -406,7 +398,7 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
       break;
     case LANDING_STATE: {
 
-      landing_uav_mass_ = _uav_mass_ + attitude_command.mass_difference;
+      landing_uav_mass_ = _uav_mass_ + attitude_cmd.mass_difference;
     } break;
   }
 
@@ -431,7 +423,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
 
   // copy member variables
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
-  auto target_attitude             = mrs_lib::get_mutexed(mutex_target_attitude_, target_attitude_);
+  auto attitude_cmd                = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
   auto odometry                    = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
   double odometry_x, odometry_y;
@@ -494,11 +486,11 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
     if (_landing_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) == 0) {
 
       // recalculate the mass based on the thrust
-      thrust_mass_estimate_ = pow((target_attitude.thrust - _hover_thrust_b_) / _hover_thrust_a_, 2) / _g_;
+      thrust_mass_estimate_ = pow((attitude_cmd.thrust - _hover_thrust_b_) / _hover_thrust_a_, 2) / _g_;
       ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
       // condition for automatic motor turn off
-      if (((thrust_mass_estimate_ < _landing_cutoff_mass_factor_ * landing_uav_mass_) || target_attitude.thrust < 0.01)) {
+      if (((thrust_mass_estimate_ < _landing_cutoff_mass_factor_ * landing_uav_mass_) || attitude_cmd.thrust < 0.01)) {
 
         if (!thrust_under_threshold_) {
 
@@ -787,19 +779,19 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
+  auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
 
-  if (attitude_command.thrust >= _maxthrust_max_thrust_) {
+  if (attitude_cmd.thrust >= _maxthrust_max_thrust_) {
 
     if (!maxthrust_above_threshold_) {
 
       maxthrust_first_time_      = ros::Time::now();
       maxthrust_above_threshold_ = true;
-      ROS_WARN("[UavManager]: max thrust exceeded threshold (%.2f/%.2f)", attitude_command.thrust, _maxthrust_max_thrust_);
+      ROS_WARN("[UavManager]: max thrust exceeded threshold (%.2f/%.2f)", attitude_cmd.thrust, _maxthrust_max_thrust_);
 
     } else {
 
-      ROS_WARN_THROTTLE(0.1, "[UavManager]: thrust over threshold (%.2f/%.2f) for %.2f s", attitude_command.thrust, _maxthrust_max_thrust_,
+      ROS_WARN_THROTTLE(0.1, "[UavManager]: thrust over threshold (%.2f/%.2f) for %.2f s", attitude_cmd.thrust, _maxthrust_max_thrust_,
                         (ros::Time::now() - maxthrust_first_time_).toSec());
     }
 
@@ -812,8 +804,8 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
 
     maxthrust_timer_.stop();
 
-    ROS_ERROR("[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, calling emergency landing", attitude_command.thrust,
-              _maxthrust_max_thrust_, _maxthrust_timeout_);
+    ROS_ERROR("[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, calling emergency landing", attitude_cmd.thrust, _maxthrust_max_thrust_,
+              _maxthrust_timeout_);
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = _landing_tracker_name_;
@@ -866,26 +858,6 @@ void UavManager::callbackControlManagerDiagnostics(const mrs_msgs::ControlManage
 
 //}
 
-/* //{ callbackTargetAttitude() */
-
-void UavManager::callbackTargetAttitude(const mavros_msgs::AttitudeTargetConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTargetAttitude");
-
-  {
-    std::scoped_lock lock(mutex_target_attitude_);
-
-    target_attitude_ = *msg;
-
-    got_target_attitude_ = true;
-  }
-}
-
-//}
-
 /* //{ callbackMavrosState() */
 
 void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
@@ -906,21 +878,21 @@ void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
 
 //}
 
-/* //{ callbackAttitudeCommand() */
+/* //{ callbackAttitudeCmd() */
 
-void UavManager::callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr& msg) {
+void UavManager::callbackAttitudeCmd(const mrs_msgs::AttitudeCommandConstPtr& msg) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackAttitudeCommand");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackAttitudeCmd");
 
   {
-    std::scoped_lock lock(mutex_attitude_command_);
+    std::scoped_lock lock(mutex_attitude_cmd_);
 
-    attitude_command_ = *msg;
+    attitude_cmd_ = *msg;
 
-    got_attitude_command_ = true;
+    got_attitude_cmd_ = true;
   }
 }
 
@@ -1132,7 +1104,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     return true;
   }
 
-  if (!got_target_attitude_) {
+  if (!got_attitude_cmd_) {
     sprintf((char*)&message, "Can't takeoff, missing target attitude!");
     res.message = message;
     res.success = false;
@@ -1199,7 +1171,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
   if (number_of_takeoffs_ > 0) {
 
-    if (!got_attitude_command_) {
+    if (!got_attitude_cmd_) {
 
       sprintf((char*)&message, "Can't takeoff, missing attitude command!");
       res.message = message;
@@ -1306,7 +1278,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
     return false;
 
   // copy member variables
-  auto attitude_command = mrs_lib::get_mutexed(mutex_attitude_command_, attitude_command_);
+  auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
 
   char message[100];
 
@@ -1326,7 +1298,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
     return true;
   }
 
-  if (!got_attitude_command_) {
+  if (!got_attitude_cmd_) {
     sprintf((char*)&message, "Can't land, missing attitude command!");
     res.message = message;
     res.success = false;
@@ -1342,7 +1314,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   {
     std::scoped_lock lock(mutex_last_mass_difference_);
 
-    last_mass_difference_ = attitude_command.mass_difference;
+    last_mass_difference_ = attitude_cmd.mass_difference;
   }
 
   ROS_INFO("[UavManager]: landing");
@@ -1443,7 +1415,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     return true;
   }
 
-  if (!got_attitude_command_) {
+  if (!got_attitude_cmd_) {
     sprintf((char*)&message, "Can't land, missing attitude command!");
     res.message = message;
     res.success = false;

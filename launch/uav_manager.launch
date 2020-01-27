@@ -60,8 +60,7 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
-      <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
-      <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
+      <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
