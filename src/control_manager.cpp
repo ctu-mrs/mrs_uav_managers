@@ -334,7 +334,6 @@ private:
   ros::Publisher publisher_attitude_cmd_;
   ros::Publisher publisher_thrust_force_;
   ros::Publisher publisher_cmd_odom_;
-  ros::Publisher publisher_target_attitude_;
   ros::Publisher publisher_diagnostics_;
   ros::Publisher publisher_motors_;
   ros::Publisher publisher_tilt_error_;
@@ -1353,7 +1352,6 @@ void ControlManager::onInit() {
   publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
   publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
   publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_target_attitude_                 = nh_.advertise<mavros_msgs::AttitudeTarget>("target_attitude_out", 1);
   publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
@@ -7332,15 +7330,6 @@ void ControlManager::publish(void) {
       attitude_target.orientation = last_attitude_cmd->quater_attitude;
 
       attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
-
-      // when controlling with angular rates, PixHawk does not publish the
-      // target_attitude topic anymore, thus we need do it here
-      try {
-        publisher_target_attitude_.publish(attitude_target);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_control_output_.getTopic().c_str());
-      }
     }
 
     should_publish = true;
