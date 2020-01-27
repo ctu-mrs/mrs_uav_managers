@@ -18,6 +18,7 @@
 #include <mrs_msgs/TrackerConstraints.h>
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/Float64Srv.h>
+#include <mrs_msgs/GetFloat64.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -314,6 +315,8 @@ private:
   void switchMotors(bool in);
   bool motors_ = false;
 
+  void setOdometryCallbacks(const bool input);
+
   // what thrust should be output when null tracker is active?
   double _min_thrust_null_tracker_ = 0.0;
 
@@ -388,7 +391,11 @@ private:
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
+  ros::ServiceClient service_client_set_odometry_callbacks_;
+
+  // min client
   ros::ServiceServer service_server_set_min_height_;
+  ros::ServiceServer service_server_get_min_height_;
 
   // the last result of an active tracker
   mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
@@ -522,6 +529,7 @@ private:
   bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
+  bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -1402,11 +1410,13 @@ void ControlManager::onInit() {
   service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
   service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
   service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
+  service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
 
-  service_client_arm_      = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
-  service_client_eland_    = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_land_     = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_shutdown_ = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
+  service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
+  service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
+  service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -2416,6 +2426,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -2431,6 +2442,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
                   position_error_x_, position_error_y_, position_error_z_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -2447,6 +2459,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: Activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
+
         std::string message_out;
         eland(message_out);
       }
@@ -2619,7 +2632,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
 
     // recalculate the mass based on the thrust
     thrust_mass_estimate_ = pow((last_attitude_cmd->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_;
-    ROS_INFO("[ControlManager]: landing_uav_mass_: %.2f thrust_mass_estimate_: %.2f", landing_uav_mass_, thrust_mass_estimate_);
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing_uav_mass_: %.2f thrust_mass_estimate_: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
     // condition for automatic motor turn off
     if (((thrust_mass_estimate_ < _partial_landing_mass_factor_ * _uav_mass_) || last_attitude_cmd->thrust < 0.01)) {
@@ -3705,7 +3718,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
       if (_rc_eland_action_.compare(ELAND_STR) == STRING_EQUAL) {
 
-        if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_) {
+        if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
           ROS_WARN("[ControlManager]: triggering eland by RC");
 
@@ -4448,6 +4461,23 @@ bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mr
 
   res.success = true;
   res.message = message.str();
+
+  return true;
+}
+
+//}
+
+/* //{ callbackGetMinHeight() */
+
+bool ControlManager::callbackGetMinHeight([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+
+  res.success = true;
+  res.value   = min_height;
 
   return true;
 }
@@ -6343,6 +6373,8 @@ bool ControlManager::eland(std::string& message_out) {
     changePartialLandingState(IDLE_STATE);
     partial_landing_timer_.stop();
 
+    setOdometryCallbacks(false);
+
     sprintf((char*)&message, "[ControlManager]: eland activated.");
     message_out = std::string(message);
 
@@ -6510,6 +6542,8 @@ bool ControlManager::failsafe() {
         eland_triggered_ = false;
         failsafe_timer_.start();
 
+        setOdometryCallbacks(false);
+
         ROS_INFO("[ControlManager]: Controller %s has been activated", _failsafe_controller_name_.c_str());
 
         // super important, switch the active controller idx
@@ -6643,6 +6677,31 @@ void ControlManager::switchMotors(bool input) {
 
 //}
 
+/* setOdometryCallbacks() //{ */
+
+void ControlManager::setOdometryCallbacks(const bool input) {
+
+  ROS_INFO("[ControlManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+
+  std_srvs::SetBool srv;
+
+  srv.request.data = input;
+
+  bool res = service_client_set_odometry_callbacks_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[ControlManager]: service call for toggle odometry callbacks returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_ERROR("[ControlManager]: service call for toggle odometry callbacks failed!");
+  }
+}
+
+//}
+
 /* switchTracker() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
@@ -6696,7 +6755,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
     message << "Not switching, the tracker " << tracker_name << " is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << message.str());
-    return std::tuple(false, message.str());
+    return std::tuple(true, message.str());
   }
 
   {
@@ -6733,16 +6792,22 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
           // if switching from null tracker, activate the active the controller
           if (_tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
 
-            ROS_INFO("[ControlManager]: activating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
+            ROS_INFO("[ControlManager]: reactivating %s due to switching from NullTracker", _controller_names_[active_controller_idx_].c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
 
               mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
               output_command->total_mass       = _uav_mass_;
+              output_command->mass_difference  = 0.0;
               output_command->disturbance_bx_b = _initial_body_disturbance_x_;
               output_command->disturbance_by_b = _initial_body_disturbance_y_;
-              output_command->mass_difference  = 0.0;
+              output_command->disturbance_wx_w = 0.0;
+              output_command->disturbance_wy_w = 0.0;
+              output_command->disturbance_bx_w = 0.0;
+              output_command->disturbance_by_w = 0.0;
+              output_command->thrust           = _min_thrust_null_tracker_;
+              output_command->controller       = "none";
 
               {
                 std::scoped_lock lock(mutex_last_attitude_cmd_);
@@ -6843,7 +6908,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     message << "Not switching, the controller " << controller_name << " is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << message.str());
-    return std::tuple(false, message.str());
+    return std::tuple(true, message.str());
   }
 
   {

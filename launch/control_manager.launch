@@ -300,6 +300,8 @@
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
       <remap from="~set_min_height_in" to="~set_min_height" />
+      <remap from="~get_min_height_in" to="~get_min_height" />
+      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
 
     </node>
 
