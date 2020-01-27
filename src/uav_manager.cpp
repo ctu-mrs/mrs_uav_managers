@@ -173,6 +173,7 @@ public:
   ros::ServiceClient service_client_emergency_reference_;
   ros::ServiceClient service_client_arm_;
   ros::ServiceClient service_client_pirouette_;
+  ros::ServiceClient service_client_set_odometry_callbacks_;
 
   std::mutex mutex_services_;
 
@@ -247,6 +248,8 @@ public:
   // profiler
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
+
+  void setOdometryCallbacks(const bool input);
 };
 
 //}
@@ -337,16 +340,17 @@ void UavManager::onInit() {
   service_server_land_      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
   service_server_land_home_ = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
 
-  service_client_takeoff_             = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
-  service_client_land_                = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_eland_               = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_switch_tracker_      = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
-  service_client_switch_controller_   = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
-  service_client_motors_              = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_emergency_reference_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_reference_out");
-  service_client_enabled_callbacks_   = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
-  service_client_arm_                 = nh_.serviceClient<std_srvs::SetBool>("arm_out");
-  service_client_pirouette_           = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
+  service_client_takeoff_                = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
+  service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
+  service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
+  service_client_switch_tracker_         = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
+  service_client_switch_controller_      = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
+  service_client_motors_                 = nh_.serviceClient<std_srvs::SetBool>("motors_out");
+  service_client_emergency_reference_    = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_reference_out");
+  service_client_enabled_callbacks_      = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
+  service_client_arm_                    = nh_.serviceClient<std_srvs::SetBool>("arm_out");
+  service_client_pirouette_              = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
+  service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
@@ -620,6 +624,8 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
 
         ROS_ERROR("[UavManager]: could not switch to %s: %s", _after_takeoff_controller_name_.c_str(), switch_controller_out.response.message.c_str());
       }
+
+      setOdometryCallbacks(true);
 
       if (_after_takeoff_pirouette_) {
 
@@ -1214,6 +1220,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
   ROS_INFO("[UavManager]: taking off");
 
+  setOdometryCallbacks(false);
+
   mrs_msgs::String switch_controller_out;
   switch_controller_out.request.value = _takeoff_controller_name_;
   service_client_switch_controller_.call(switch_controller_out);
@@ -1338,6 +1346,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   }
 
   ROS_INFO("[UavManager]: landing");
+
+  setOdometryCallbacks(false);
 
   flighttime_timer_.stop();
 
@@ -1494,6 +1504,36 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 }
 
 //}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
+
+/* setOdometryCallbacks() //{ */
+
+void UavManager::setOdometryCallbacks(const bool input) {
+
+  ROS_INFO("[UavManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+
+  std_srvs::SetBool srv;
+
+  srv.request.data = input;
+
+  bool res = service_client_set_odometry_callbacks_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[UavManager]: service call for toggle odometry callbacks returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_ERROR("[UavManager]: service call for toggle odometry callbacks failed!");
+  }
+}
+
+//}
+
 }  // namespace uav_manager
 
 }  // namespace mrs_uav_manager
