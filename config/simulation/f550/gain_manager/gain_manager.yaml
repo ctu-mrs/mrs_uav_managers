@@ -12,6 +12,7 @@ gain_management:
     VSLAM: ["supersoft", "soft"]
     BRICKFLOW: ["soft"]
     HECTOR: ["soft"]
+    ALOAM: ["soft"]
     T265: ["soft"]
     BRICK: ["supersoft"]
     VIO: ["supersoft"]
@@ -29,6 +30,7 @@ gain_management:
     VSLAM: "supersoft"
     BRICKFLOW: "soft"
     HECTOR: "soft"
+    ALOAM: "soft"
     T265: "soft"
     BRICK: "supersoft"
     VIO: "supersoft"

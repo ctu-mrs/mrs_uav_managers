@@ -22,6 +22,7 @@ gain_management:
     OPTFLOW: ["supersoft", "soft"]
     OTHER: ["supersoft"]
     HECTOR: ["supersoft"]
+    ALOAM: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -39,4 +40,5 @@ gain_management:
     GPS: "soft"
     OPTFLOW: "supersoft"
     HECTOR: "supersoft"
+    ALOAM: "supersoft"
     OTHER: "supersoft"
