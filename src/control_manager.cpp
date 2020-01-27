@@ -485,7 +485,7 @@ private:
   // those and passed to trackers using the common_handlers object
   bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
   bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
-  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   double getMinHeight(void);
   double getMaxHeight(void);
 
@@ -1659,7 +1659,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
       safety_area_marker.type            = visualization_msgs::Marker::LINE_LIST;
-      safety_area_marker.color.a         = 1;
+      safety_area_marker.color.a         = 0.5;
       safety_area_marker.scale.x         = 0.2;
       safety_area_marker.color.r         = 1;
       safety_area_marker.color.g         = 0;
@@ -1832,7 +1832,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
       for (auto point : point_obstacles) {
 
         std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(min_height);
-        std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(max_height);
+        std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
 
         // transform bottom points to local origin
         for (size_t i = 0; i < points_bot.size(); i++) {
@@ -4571,8 +4571,9 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     from_point.header.frame_id      = uav_state.header.frame_id;
     from_point.reference.position.x = last_position_cmd->position.x;
     from_point.reference.position.y = last_position_cmd->position.y;
+    from_point.reference.position.z = last_position_cmd->position.z;
 
-    if (!isPathToPointInSafetyArea2d(from_point, transformed_reference)) {
+    if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
       ROS_ERROR("[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -4672,8 +4673,9 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     current_coord.header.frame_id      = uav_state.header.frame_id;
     current_coord.reference.position.x = last_position_cmd->position.x;
     current_coord.reference.position.y = last_position_cmd->position.y;
+    current_coord.reference.position.z = last_position_cmd->position.z;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, transformed_reference)) {
+    if (!isPathToPointInSafetyArea3d(current_coord, transformed_reference)) {
       ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
       return;
     }
@@ -4761,7 +4763,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
     current_coord.reference.position.y = last_position_cmd->position.y;
     current_coord.reference.position.z = last_position_cmd->position.z;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, des_reference)) {
+    if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
       ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -4871,8 +4873,9 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     current_coord.header.frame_id      = uav_state.header.frame_id;
     current_coord.reference.position.x = last_position_cmd->position.x;
     current_coord.reference.position.y = last_position_cmd->position.y;
+    current_coord.reference.position.z = last_position_cmd->position.z;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, transformed_reference)) {
+    if (!isPathToPointInSafetyArea3d(current_coord, transformed_reference)) {
       ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -4967,8 +4970,9 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
     current_coord.header.frame_id      = uav_state.header.frame_id;
     current_coord.reference.position.x = last_position_cmd->position.x;
     current_coord.reference.position.y = last_position_cmd->position.y;
+    current_coord.reference.position.z = last_position_cmd->position.z;
 
-    if (!isPathToPointInSafetyArea2d(current_coord, des_reference)) {
+    if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
       ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
@@ -5430,7 +5434,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   // what is lower, the max height from the safety area, or the max height from odometry?
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
-  if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y) &&
+  if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
       point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= max_height) {
     return true;
   }
@@ -5459,14 +5463,14 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
-  return safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y);
+  return safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z);
 }
 
 //}
 
-/* //{ isPathToPointInSafetyArea2d() */
+/* //{ isPathToPointInSafetyArea3d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
 
   if (!_use_safety_area_) {
     return true;
@@ -5500,8 +5504,8 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-                                   end_transformed.reference.position.y);
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
+                                   end_transformed.reference.position.x, end_transformed.reference.position.y, end_transformed.reference.position.z);
 }
 
 //}
