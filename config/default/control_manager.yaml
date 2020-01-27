@@ -9,8 +9,8 @@ trackers : [
 
 # - list of names of dynamically loaded controllers
 controllers : [
-  "MpcController",
   "So3Controller",
+  "MpcController",
   "AttitudeController",
   "FailsafeController",
   "EmergencyController",
