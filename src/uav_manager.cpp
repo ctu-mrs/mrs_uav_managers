@@ -17,6 +17,8 @@
 #include <mrs_msgs/LandoffDiagnostics.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
+#include <mrs_msgs/ConstraintManagerDiagnostics.h>
+#include <mrs_msgs/GainManagerDiagnostics.h>
 
 #include <mavros_msgs/State.h>
 
@@ -69,8 +71,8 @@ public:
   void callbackAttitudeCmd(const mrs_msgs::AttitudeCommandConstPtr& msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
   void callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg);
-  void callbackGains(const std_msgs::StringConstPtr& msg);
-  void callbackConstraints(const std_msgs::StringConstPtr& msg);
+  void callbackGains(const mrs_msgs::GainManagerDiagnosticsConstPtr& msg);
+  void callbackConstraints(const mrs_msgs::ConstraintManagerDiagnosticsConstPtr& msg);
   void callbackMotors(const mrs_msgs::BoolStampedConstPtr& msg);
 
   void changeLandingState(LandingStates_t new_state);
@@ -121,16 +123,18 @@ public:
   bool                  got_motors_ = false;
 
   // subscriber for gains from gain manager
-  ros::Subscriber subscriber_gains_;
-  ros::Time       gains_last_time_;
-  std::mutex      mutex_gains_;
-  bool            _gain_manager_required_ = false;
+  ros::Subscriber                  subscriber_gain_diagnostics_;
+  ros::Time                        gains_last_time_;
+  mrs_msgs::GainManagerDiagnostics gains_;
+  std::mutex                       mutex_gains_;
+  bool                             _gain_manager_required_ = false;
 
   // subscriber for constraints from constraint manager
-  ros::Subscriber subscriber_constraints_;
-  ros::Time       constraints_last_time_;
-  std::mutex      mutex_constraints_;
-  bool            _constraint_manager_required_ = false;
+  ros::Subscriber                        subscriber_constraint_manager_diagnostics_;
+  ros::Time                              constraints_last_time_;
+  mrs_msgs::ConstraintManagerDiagnostics constraints_;
+  std::mutex                             mutex_constraints_;
+  bool                                   _constraint_manager_required_ = false;
 
   // subscriber for control manager diagnostics
   ros::Subscriber                     subscriber_control_manager_diagnostics_;
@@ -322,11 +326,12 @@ void UavManager::onInit() {
   subscriber_control_manager_diagnostics_ =
       nh_.subscribe("control_manager_diagnostics_in", 1, &UavManager::callbackControlManagerDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
-  subscriber_gains_ = nh_.subscribe("gains_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
-  gains_last_time_  = ros::Time(0);
+  subscriber_gain_diagnostics_ = nh_.subscribe("gain_manager_diagnostics_in", 1, &UavManager::callbackGains, this, ros::TransportHints().tcpNoDelay());
+  gains_last_time_             = ros::Time(0);
 
-  subscriber_constraints_ = nh_.subscribe("constraints_in", 1, &UavManager::callbackConstraints, this, ros::TransportHints().tcpNoDelay());
-  constraints_last_time_  = ros::Time(0);
+  subscriber_constraint_manager_diagnostics_ =
+      nh_.subscribe("constraint_manager_diagnostics_in", 1, &UavManager::callbackConstraints, this, ros::TransportHints().tcpNoDelay());
+  constraints_last_time_ = ros::Time(0);
 
   service_server_takeoff_   = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
   service_server_land_      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
@@ -940,7 +945,7 @@ void UavManager::callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
 
 /* //{ callbackGains() */
 
-void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr& msg) {
+void UavManager::callbackGains(const mrs_msgs::GainManagerDiagnosticsConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -950,6 +955,7 @@ void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr& 
   {
     std::scoped_lock lock(mutex_gains_);
 
+    gains_           = *msg;
     gains_last_time_ = ros::Time::now();
   }
 }
@@ -958,7 +964,7 @@ void UavManager::callbackGains([[maybe_unused]] const std_msgs::StringConstPtr& 
 
 /* //{ callbackConstraints() */
 
-void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringConstPtr& msg) {
+void UavManager::callbackConstraints(const mrs_msgs::ConstraintManagerDiagnosticsConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -968,6 +974,7 @@ void UavManager::callbackConstraints([[maybe_unused]] const std_msgs::StringCons
   {
     std::scoped_lock lock(mutex_constraints_);
 
+    constraints_           = *msg;
     constraints_last_time_ = ros::Time::now();
   }
 }

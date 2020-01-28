@@ -1,4 +1,5 @@
 rate: 25
+diagnostics_rate: 1
 
 estimator_types: [
   "ICP",
