@@ -7190,11 +7190,29 @@ void ControlManager::publish(void) {
     // publish the odom topic (position command for debugging, e.g. rviz)
     nav_msgs::Odometry cmd_odom;
 
-    cmd_odom.header               = last_position_cmd->header;
-    cmd_odom.pose.pose.position   = last_position_cmd->position;
-    cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
-    cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
-    cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
+    cmd_odom.header = last_position_cmd->header;
+
+    if (last_position_cmd->use_position_horizontal) {
+      cmd_odom.pose.pose.position.x = last_position_cmd->position.x;
+      cmd_odom.pose.pose.position.y = last_position_cmd->position.y;
+    }
+
+    if (last_position_cmd->use_position_vertical) {
+      cmd_odom.pose.pose.position.z = last_position_cmd->position.z;
+    }
+
+    if (last_position_cmd->use_velocity_horizontal) {
+      cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
+      cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
+    }
+
+    if (last_position_cmd->use_velocity_vertical) {
+      cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
+    }
+
+    if (last_position_cmd->use_yaw_dot) {
+      cmd_odom.twist.twist.angular.z = last_position_cmd->yaw_dot;
+    }
 
     // | -------------- prepared desired orientation -------------- |
 
