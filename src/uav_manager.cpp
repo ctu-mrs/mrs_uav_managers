@@ -1545,7 +1545,7 @@ void UavManager::ungrip(void) {
     }
 
   } else {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
   }
 }
 
