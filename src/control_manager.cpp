@@ -2701,13 +2701,9 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto pixhawk_odometry  = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  mrs_msgs::UavState pixhawk_odom_uav_state;
-  pixhawk_odom_uav_state.header   = pixhawk_odometry.header;
-  pixhawk_odom_uav_state.pose     = pixhawk_odometry.pose.pose;
-  pixhawk_odom_uav_state.velocity = pixhawk_odometry.twist.twist;
-
-  updateControllers(pixhawk_odom_uav_state);
+  updateControllers(uav_state);
 
   publish();
 
@@ -6015,6 +6011,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 
       elanding_timer_.start();
       eland_triggered_ = true;
+      bumper_enabled_  = false;
 
       if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
         landing_uav_mass_ = _uav_mass_;
@@ -6506,6 +6503,7 @@ bool ControlManager::failsafe() {
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto pixhawk_odometry      = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
 
   if (!is_initialized_)
     return false;
@@ -6520,10 +6518,27 @@ bool ControlManager::failsafe() {
       // TODO: I dont like this locking here, push it downstream pls
       std::scoped_lock lock(mutex_controller_list_);
 
+      mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
+
+      failsafe_attitude_cmd = *last_attitude_cmd;
+
+      {
+        // calculate the euler angles
+        tf::Quaternion pixhawk_attitude;
+        quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, pixhawk_attitude);
+        tf::Matrix3x3 m(pixhawk_attitude);
+        double        roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
+
+        failsafe_attitude_cmd.euler_attitude.z = yaw;
+      }
+
+      mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
+
       try {
 
         ROS_INFO("[ControlManager]: Activating controller %s", _failsafe_controller_name_.c_str());
-        controller_list_[_failsafe_controller_idx_]->activate(last_attitude_cmd);
+        controller_list_[_failsafe_controller_idx_]->activate(failsafe_attitude_cmd_ptr);
 
         {
           std::scoped_lock lock(mutex_controller_tracker_switch_time_);
@@ -6543,6 +6558,8 @@ bool ControlManager::failsafe() {
 
         eland_triggered_ = false;
         failsafe_timer_.start();
+
+        bumper_enabled_ = false;
 
         setOdometryCallbacks(false);
 
