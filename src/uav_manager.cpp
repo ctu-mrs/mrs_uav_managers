@@ -194,6 +194,7 @@ public:
   double     last_mass_difference_ = 0;
   std::mutex mutex_last_mass_difference_;
   bool       waiting_for_takeoff_ = false;
+
   // after takeoff
   std::string _after_takeoff_tracker_name_;
   std::string _after_takeoff_controller_name_;
@@ -238,7 +239,8 @@ public:
   bool       _maxthrust_timer_enabled_ = false;
   double     _maxthrust_timer_rate_;
   double     _maxthrust_max_thrust_;
-  double     _maxthrust_timeout_;
+  double     _maxthrust_eland_timeout_;
+  double     _maxthrust_ungrip_timeout_;
   bool       maxthrust_above_threshold_ = false;
   ros::Time  maxthrust_first_time_;
 
@@ -247,6 +249,9 @@ public:
   bool              _profiler_enabled_ = false;
 
   void setOdometryCallbacks(const bool input);
+
+  void               ungrip(void);
+  ros::ServiceClient service_client_ungrip_;
 };
 
 //}
@@ -304,7 +309,8 @@ void UavManager::onInit() {
   param_loader.load_param("max_thrust/enabled", _maxthrust_timer_enabled_);
   param_loader.load_param("max_thrust/rate", _maxthrust_timer_rate_);
   param_loader.load_param("max_thrust/max_thrust", _maxthrust_max_thrust_);
-  param_loader.load_param("max_thrust/timeout", _maxthrust_timeout_);
+  param_loader.load_param("max_thrust/eland_timeout", _maxthrust_eland_timeout_);
+  param_loader.load_param("max_thrust/ungrip_timeout", _maxthrust_ungrip_timeout_);
 
   if (!param_loader.loaded_successfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
@@ -348,6 +354,7 @@ void UavManager::onInit() {
   service_client_arm_                    = nh_.serviceClient<std_srvs::SetBool>("arm_out");
   service_client_pirouette_              = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
+  service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
 
   // --------------------------------------------------------------
   // |                    landing state machine                   |
@@ -805,12 +812,20 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
     maxthrust_above_threshold_ = false;
   }
 
-  if (maxthrust_above_threshold_ && (ros::Time::now() - maxthrust_first_time_).toSec() > _maxthrust_timeout_) {
+  if (maxthrust_above_threshold_ && (ros::Time::now() - maxthrust_first_time_).toSec() > _maxthrust_ungrip_timeout_) {
+
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, ungripping payload", attitude_cmd.thrust,
+                      _maxthrust_max_thrust_, _maxthrust_ungrip_timeout_);
+
+    ungrip();
+  }
+
+  if (maxthrust_above_threshold_ && (ros::Time::now() - maxthrust_first_time_).toSec() > _maxthrust_eland_timeout_) {
 
     maxthrust_timer_.stop();
 
     ROS_ERROR("[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, calling emergency landing", attitude_cmd.thrust, _maxthrust_max_thrust_,
-              _maxthrust_timeout_);
+              _maxthrust_eland_timeout_);
 
     mrs_msgs::String switch_tracker_out;
     switch_tracker_out.request.value = _landing_tracker_name_;
@@ -1508,6 +1523,29 @@ void UavManager::setOdometryCallbacks(const bool input) {
 
   } else {
     ROS_ERROR("[UavManager]: service call for toggle odometry callbacks failed!");
+  }
+}
+
+//}
+
+/* ungrip() //{ */
+
+void UavManager::ungrip(void) {
+
+  ROS_INFO("[ControlManager]: ungripping payload");
+
+  std_srvs::SetBool srv;
+
+  bool res = service_client_ungrip_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[ControlManager]: service call for ungripping payload returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_ERROR("[ControlManager]: service call for ungripping payload failed!");
   }
 }
 

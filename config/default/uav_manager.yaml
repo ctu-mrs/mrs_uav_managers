@@ -52,4 +52,5 @@ max_thrust:
   enabled: true
   rate: 30 # [Hz]
   max_thrust: 0.80 # [-]
-  timeout: 1.0 # [s]
+  eland_timeout: 2.0 # [s]
+  ungrip_timeout: 1.0 # [s]
