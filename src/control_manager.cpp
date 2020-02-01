@@ -2804,7 +2804,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
     // activate/deactivate the joystick goto functionality
     joystick_goto_enabled_ = !joystick_goto_enabled_;
 
-    ROS_INFO("[ControlManager]: joystick controll %s", joystick_goto_enabled_ ? "activated" : "deactivated");
+    ROS_INFO("[ControlManager]: joystick control %s", joystick_goto_enabled_ ? "activated" : "deactivated");
   }
 
   // if the GOTO functionality is enabled...
@@ -5646,12 +5646,11 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
       new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
 
-      // horizontal_point_distance                  = uav distance to the reference
-      // bumper_data.sectors[horizontal_vector_idx] = bumper data
-      // bumper_horizontal_distance                 = the bumper limit
+      // horizontal_point_distance                    = uav distance to the reference
+      // bumper_data.sectors[horizontal_vector_idx]   = uav distance to the obstacle
+      // _bumper_horizontal_distance_                 = the bumper limit
 
-      ROS_WARN_THROTTLE(
-          1.0,
+      ROS_WARN(
           "[ControlManager]: Bumper: the fcu reference [%0.2f, %0.2f] (sector %d) is not valid, distance %0.2f >= (%0.2f - %0.2f)., HUGGING IT it "
           "to x: %0.2f, y: %0.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], _bumper_horizontal_distance_, new_x,
@@ -5681,6 +5680,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
+
       try {
         publisher_bumper_status_.publish(bumper_status);
       }
