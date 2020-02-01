@@ -5690,7 +5690,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    auto ret = transformer_->transformSingle(point.header.frame_id, point);
+    auto ret = transformer_->transformSingle(point.header.frame_id, point_fcu);
 
     if (!ret) {
 
