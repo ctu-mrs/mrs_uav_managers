@@ -45,7 +45,7 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 1.0 # [s]
+  odometry_max_missing_time: 0.1 # [s]
 
   # emergency landing (still feedback)
   eland:
