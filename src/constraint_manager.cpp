@@ -88,6 +88,7 @@ private:
   // | ------------------ constraint management ----------------- |
 
   std::string current_constraints_;
+  std::mutex  mutex_current_constraints_;
 
   // | ------------------------ profiler_ ------------------------ |
 private:
@@ -249,7 +250,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
   service_client_set_constraints_.call(new_constraints);
 
-  current_constraints_ = constraints_name;
+  mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
 
   return new_constraints.response.success;
 }
@@ -343,14 +344,15 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("constraintsManagementTimer", _rate_, 0.01, event);
 
+  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+  auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
+
   if (!got_odometry_diagnostics_) {
     ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constraint management, missing odometry diagnostics!");
     return;
   }
 
-  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
-
-  // | --- automatically set constraints when odometry.type schanges -- |
+  // | --- automatically set constraints when odometry.type changes -- |
   if (odometry_diagnostics_.estimator_type.type != last_estimator_type_) {
 
     ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type_, odometry_diagnostics.estimator_type.type);
@@ -359,14 +361,30 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
     it = _map_type_fallback_constraints_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_fallback_constraints_.end()) {
+
       ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry.type \"%s\" was not specified in the constraint_manager's config!",
                         odometry_diagnostics.estimator_type.name.c_str());
+
     } else {
-      if (setConstraints(it->second)) {
-        last_estimator_type_ = odometry_diagnostics.estimator_type.type;
-        ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints updated!");
-      } else {
-        ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
+
+      last_estimator_type_ = odometry_diagnostics.estimator_type.type;
+
+      if (!stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
+
+        ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints \"%s\" are not within the allowed constraints for \"%s\"",
+                          current_constraints.c_str(), odometry_diagnostics.estimator_type.name.c_str());
+
+        // else, set the fallbacks
+        if (setConstraints(it->second)) {
+
+          mrs_lib::set_mutexed(mutex_current_constraints_, it->second, current_constraints_);
+
+          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: \"%s\"", it->second.c_str());
+
+        } else {
+
+          ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
+        }
       }
     }
   }
@@ -388,11 +406,12 @@ void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("diagnosticsTimer", _diagnostics_rate_, 0.01, event);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+  auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
 
   mrs_msgs::ConstraintManagerDiagnostics diagnostics;
 
   diagnostics.stamp        = ros::Time::now();
-  diagnostics.current_name = current_constraints_;
+  diagnostics.current_name = current_constraints;
   diagnostics.loaded       = _constraint_names_;
 
   // get the available constraints
@@ -408,10 +427,10 @@ void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
     }
   }
 
-  // get the current gain values
+  // get the current constraint values
   {
     std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest>::iterator it;
-    it = _constraints_.find(current_constraints_);
+    it = _constraints_.find(current_constraints);
 
     diagnostics.current_values = it->second.constraints;
   }

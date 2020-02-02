@@ -105,6 +105,7 @@ private:
   std::mutex                          mutex_control_manager_diagnostics_;
 
   std::string current_gains_;
+  std::mutex  mutex_current_gains_;
 
   // | ------------------------ profiler_ ------------------------ |
 private:
@@ -338,7 +339,7 @@ bool GainManager::setGains(std::string gains_name) {
 
   service_client_set_gains_.call(reconf);
 
-  current_gains_ = gains_name;
+  mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
 
   ROS_INFO("[GainManager]: setting up gains for '%s'", gains_name.c_str());
 
@@ -465,6 +466,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
 
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
   auto odometry_diagnostics        = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+  auto current_gains               = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
   // | --- automatically set _gains_ when odometry.type changes -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type_) {
@@ -475,14 +477,27 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     it = _map_type_fallback_gains_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_fallback_gains_.end()) {
+
       ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type \"%s\" was not specified in the gain_manager's config!",
+
                         odometry_diagnostics.estimator_type.name.c_str());
     } else {
-      if (setGains(it->second)) {
-        last_estimator_type_ = odometry_diagnostics.estimator_type.type;
-        ROS_INFO_THROTTLE(1.0, "[GainManager]: gains updated!");
-      } else {
-        ROS_WARN_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
+
+      last_estimator_type_ = odometry_diagnostics.estimator_type.type;
+
+      if (!stringInVector(current_gains, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
+
+        ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains \"%s\" are not within the allowed gains for \"%s\"", current_gains.c_str(),
+                          odometry_diagnostics.estimator_type.name.c_str());
+
+        if (setGains(it->second)) {
+
+          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: \"%s\"", it->second.c_str());
+
+        } else {
+
+          ROS_WARN_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
+        }
       }
     }
   }
@@ -498,13 +513,14 @@ void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
     return;
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+  auto current_gains        = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("diagnosticsTimer", _diagnostics_rate_, 0.01, event);
 
   mrs_msgs::GainManagerDiagnostics diagnostics;
 
   diagnostics.stamp        = ros::Time::now();
-  diagnostics.current_name = current_gains_;
+  diagnostics.current_name = current_gains;
   diagnostics.loaded       = _gain_names_;
 
   // get the available gains
@@ -523,7 +539,7 @@ void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
   // get the current gain values
   {
     std::map<std::string, Gains_t>::iterator it;
-    it = _gains_.find(current_gains_);
+    it = _gains_.find(current_gains);
 
     diagnostics.current_values.kpxy = it->second.kpxy;
     diagnostics.current_values.kvxy = it->second.kvxy;
