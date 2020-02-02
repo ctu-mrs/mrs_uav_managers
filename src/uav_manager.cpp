@@ -670,10 +670,9 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
   odometry_y = odometry.pose.pose.position.y;
   odometry_z = odometry.pose.pose.position.z;
 
-  double odometry_x_speed, odometry_y_speed, odometry_z_speed;
+  double odometry_x_speed, odometry_y_speed;
   odometry_x_speed = odometry.twist.twist.linear.x;
   odometry_y_speed = odometry.twist.twist.linear.y;
-  odometry_z_speed = odometry.twist.twist.linear.z;
 
   if (!got_max_height_ || !got_odometry_) {
     return;
