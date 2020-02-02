@@ -1481,6 +1481,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd   = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
   auto yaw_error           = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto [position_error_x, position_error_y, position_error_z] =
@@ -1539,7 +1540,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // |                  publish the control error                 |
   // --------------------------------------------------------------
 
-  {
+  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
     mrs_msgs::ControlError msg_out;
 
     msg_out.header.stamp    = ros::Time::now();
