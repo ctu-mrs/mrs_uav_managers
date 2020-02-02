@@ -5739,10 +5739,12 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
-  double direction;
-  double min_distance                  = 10e9;
-  double repulsion_distance            = 10e9;
+  double direction                     = 0;
+  double repulsion_distance            = std::numeric_limits<double>::max();
   double horizontal_collision_detected = false;
+
+  // TODO why is this not used?
+  /* double min_distance                  = std::numeric_limits<double>::max(); */
 
   double vertical_collision_detected = false;
 
@@ -5794,7 +5796,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
         repulsion_distance = _bumper_repulsion_horizontal_distance_ + _bumper_repulsion_horizontal_offset_ - bumper_data.sectors[i];
       }
 
-      min_distance = bumper_data.sectors[i];
+      // TODO why is this not used?
+      // min_distance = bumper_data.sectors[i];
 
       repulsing_from_ = i;
 
@@ -5804,8 +5807,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   bool   collision_above             = false;
   bool   collision_below             = false;
-  bool   wall_locked_vertical        = false;
   double vertical_repulsion_distance = 0;
+
+  // TODO: why is this not used?
+  /* bool   wall_locked_vertical        = false; */
 
   // check for vertical collision down
   if (bumper_data.sectors[bumper_data.n_horizontal_sectors] > 0 &&
@@ -5833,7 +5838,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
     if (((bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
          (2 * _bumper_repulsion_vertical_distance_ + 2 * _bumper_repulsion_vertical_offset_))) {
 
-      wall_locked_vertical = true;
+      // TODO: why is this not used?
+      /* wall_locked_vertical = true; */
 
       vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) / 2.0;
 
