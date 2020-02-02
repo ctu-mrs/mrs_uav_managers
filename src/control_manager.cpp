@@ -244,11 +244,11 @@ private:
   ros::Subscriber    subscriber_uav_state_;
   mrs_msgs::UavState uav_state_;
   bool               got_uav_state_ = false;
-  ros::Time          uav_state_last_time_;          // when was the last time we got the state estimate?
-  double             _uav_state_max_missing_time_;  // how long should we tolerate missing state estimate?
-  double             uav_roll_;
-  double             uav_pitch_;
-  double             uav_yaw_;
+  ros::Time          uav_state_last_time_;              // when was the last time we got the state estimate?
+  double             _uav_state_max_missing_time_ = 0;  // how long should we tolerate missing state estimate?
+  double             uav_roll_                    = 0;
+  double             uav_pitch_                   = 0;
+  double             uav_yaw_                     = 0;
   std::mutex         mutex_uav_state_;
 
   // pixhawk odom is used to initialize the failsafe routine
@@ -262,10 +262,10 @@ private:
 
   // max height is a dynamically set safety area height
   ros::Subscriber subscriber_max_height_;
-  double          max_height_external_;
-  double          max_height_safety_area_;
-  double          _max_height_;
-  bool            got_max_height_ = false;
+  double          max_height_external_    = 0;
+  double          max_height_safety_area_ = 0;
+  double          _max_height_            = 0;
+  bool            got_max_height_         = false;
   std::mutex      mutex_max_height_external_;
   std::mutex      mutex_min_height_;
 
@@ -438,46 +438,50 @@ private:
 
   // parameters of the motor model, magnitude of gravity
   mrs_uav_manager::MotorParams _motor_params_;
-  double                       _g_;
+  double                       _g_ = 9.8;
 
   // thrust mass estimation during eland
-  double    thrust_mass_estimate_;
+  double    thrust_mass_estimate_   = 0;
   bool      thrust_under_threshold_ = false;
   ros::Time thrust_mass_estimate_first_time_;
 
   // failsafe when tilt error is too large
   bool   _tilt_error_failsafe_enabled_ = false;
-  double _tilt_error_threshold_;
+  double _tilt_error_threshold_        = 0;
 
   // elanding when tilt error is too large
-  double _tilt_limit_eland_;  // tilt error for triggering eland
+  double _tilt_limit_eland_ = 0;  // tilt error for triggering eland
 
   // disarming when tilt error is too large
-  double _tilt_limit_disarm_;  // tilt error for triggering disarm
+  double _tilt_limit_disarm_ = 0;  // tilt error for triggering disarm
 
   // elanding when yaw error is too large
-  bool   _yaw_error_eland_enabled_ = false;
-  double _yaw_error_eland_threshold_;
+  bool   _yaw_error_eland_enabled_   = false;
+  double _yaw_error_eland_threshold_ = 0;
 
   // keeping track of control errors
-  double     tilt_error_;
-  double     yaw_error_;
-  double     position_error_x_, position_error_y_, position_error_z_;
-  double     velocity_error_x_, velocity_error_y_, velocity_error_z_;
+  double     tilt_error_       = 0;
+  double     yaw_error_        = 0;
+  double     position_error_x_ = 0;
+  double     position_error_y_ = 0;
+  double     position_error_z_ = 0;
+  double     velocity_error_x_ = 0;
+  double     velocity_error_y_ = 0;
+  double     velocity_error_z_ = 0;
   std::mutex mutex_attitude_error_;
   std::mutex mutex_control_error_;
 
   // control error for triggering failsafe, eland, etc.
   // this filled with the current controllers failsafe threshold
-  double _failsafe_threshold_;             // control error for triggering failsafe
-  double _eland_threshold_;                // control error for triggering eland
-  double _odometry_innovation_threshold_;  // innovation size for triggering eland
+  double _failsafe_threshold_            = 0;  // control error for triggering failsafe
+  double _eland_threshold_               = 0;  // control error for triggering eland
+  double _odometry_innovation_threshold_ = 0;  // innovation size for triggering eland
 
   // safety area
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
   bool                                 _use_safety_area_ = false;
   std::string                          _safety_area_frame_;
-  double                               min_height_;
+  double                               min_height_                 = 0;
   bool                                 _obstacle_points_enabled_   = false;
   bool                                 _obstacle_polygons_enabled_ = false;
 
@@ -603,26 +607,26 @@ private:
   mrs_msgs::ObstacleSectors bumper_data_;
   std::mutex                mutex_bumper_data_;
 
-  bool bumper_enabled_           = false;
-  bool _bumper_hugging_enabled_  = false;
-  bool bumper_repulsion_enabled_ = false;
-  bool repulsing_                = false;
-  uint repulsing_from_;
+  bool         bumper_enabled_           = false;
+  bool         _bumper_hugging_enabled_  = false;
+  bool         bumper_repulsion_enabled_ = false;
+  bool         repulsing_                = false;
+  unsigned int repulsing_from_           = 0;
 
-  double _bumper_horizontal_distance_;
-  double _bumper_vertical_distance_;
+  double _bumper_horizontal_distance_ = 0;
+  double _bumper_vertical_distance_   = 0;
 
-  double _bumper_repulsion_horizontal_distance_;
-  double _bumper_repulsion_horizontal_offset_;
-  double _bumper_repulsion_vertical_distance_;
-  double _bumper_repulsion_vertical_offset_;
+  double _bumper_repulsion_horizontal_distance_ = 0;
+  double _bumper_repulsion_horizontal_offset_   = 0;
+  double _bumper_repulsion_vertical_distance_   = 0;
+  double _bumper_repulsion_vertical_offset_     = 0;
 
   bool bumperValidatePoint(mrs_msgs::ReferenceStamped& point);
   int  bumperGetSectorId(const double x, const double y, const double z);
   bool bumperPushFromObstacle(void);
 
   // escalating failsafe (eland -> failsafe -> disarm)
-  double    _escalating_failsafe_timeout_;
+  double    _escalating_failsafe_timeout_ = 0;
   ros::Time escalating_failsafe_time_;
 
   // rc control
@@ -649,9 +653,9 @@ private:
 
   ros::Timer joystick_timer_;
   void       joystickTimer(const ros::TimerEvent& event);
-  double     _joystick_timer_rate_;
+  double     _joystick_timer_rate_ = 0;
 
-  double _joystick_carrot_distance_;
+  double _joystick_carrot_distance_ = 0;
 
   ros::Time joystick_start_press_time_;
   bool      joystick_start_pressed_ = false;
@@ -671,7 +675,7 @@ private:
   int    rc_joystick_channel_last_value_ = 0;
   int    _rc_joystick_channel_;
   int    _rc_joystick_n_switches_;
-  double _rc_joystick_carrot_distance_;
+  double _rc_joystick_carrot_distance_ = 0;
   int    _rc_joystick_timeout_;
 
   // emergancy landing state machine
@@ -679,7 +683,7 @@ private:
   LandingStates_t previous_state_landing_ = IDLE_STATE;
   std::mutex      mutex_landing_state_machine_;
   void            changeLandingState(LandingStates_t new_state);
-  double          _uav_mass_;
+  double          _uav_mass_ = 0;
   double          _elanding_cutoff_mass_factor_;
   double          _elanding_cutoff_timeout_;
   double          landing_uav_mass_ = 0;
@@ -695,8 +699,8 @@ private:
   std::mutex      mutex_partial_landing_state_machine_;
 
   // initial body disturbance loaded from params
-  double _initial_body_disturbance_x_;
-  double _initial_body_disturbance_y_;
+  double _initial_body_disturbance_x_ = 0;
+  double _initial_body_disturbance_y_ = 0;
 
   // profiling
   mrs_lib::Profiler profiler_;
