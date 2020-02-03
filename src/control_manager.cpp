@@ -447,7 +447,11 @@ private:
 
   // failsafe when tilt error is too large
   bool   _tilt_error_failsafe_enabled_ = false;
-  double _tilt_error_threshold_        = 0;
+  double _tilt_error_failsafe_timeout_;
+  double _tilt_error_threshold_ = 0;
+
+  ros::Time tilt_error_failsafe_time_;
+  bool      tilt_error_failsafe_over_thr_ = false;
 
   // elanding when tilt error is too large
   double _tilt_limit_eland_ = 0;  // tilt error for triggering eland
@@ -811,6 +815,7 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
 
   param_loader.load_param("safety/tilt_error_failsafe/enabled", _tilt_error_failsafe_enabled_);
+  param_loader.load_param("safety/tilt_error_failsafe/timeout", _tilt_error_failsafe_timeout_);
   param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", _tilt_error_threshold_);
   _tilt_error_threshold_ = (_tilt_error_threshold_ / 180.0) * M_PI;
 
@@ -2386,7 +2391,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%0.2f/%0.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _failsafe_threshold_,
+        ROS_ERROR("[ControlManager]: Activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _failsafe_threshold_,
                   position_error_x_, position_error_y_, position_error_z_);
 
         failsafe();
@@ -2491,8 +2496,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   if (tilt_angle > _tilt_limit_disarm_) {
 
-    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%0.2f/%0.2f deg", (180.0 / M_PI) * tilt_angle,
-              (180.0 / M_PI) * _tilt_limit_eland_);
+    ROS_ERROR("[ControlManager]: Tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
 
     arming(false);
   }
@@ -2503,22 +2507,55 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
   if (_tilt_error_failsafe_enabled_) {
 
-    // do not have to mutex the tilt error, since I am filling it in this function
-    if (fabs(tilt_error_) > _tilt_error_threshold_) {
+    double time_from_ctrl_tracker_switch = (ros::Time::now() - controller_tracker_switch_time).toSec();
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+    // if the tile error is over the threshold
+    if (fabs(tilt_error_) > _tilt_error_threshold_ && !last_attitude_cmd->ramping_up) {
 
-        ROS_ERROR("[ControlManager]: Tilt error too large, disarming: tilt error=%0.2f/%0.2f deg", (180.0 / M_PI) * tilt_error_,
-                  (180.0 / M_PI) * _tilt_error_threshold_);
+      // only check the error if some time passed from a trakcer/controller switch
+      if (time_from_ctrl_tracker_switch > 1.0) {
 
-        arming(false);
+        // if the threshold was not exceeded before
+        if (!tilt_error_failsafe_over_thr_) {
 
-        failsafe_triggered_ = true;
+          tilt_error_failsafe_over_thr_ = true;
+          tilt_error_failsafe_time_     = ros::Time::now();
 
+          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error_, (180.0 / M_PI) * _tilt_error_threshold_);
+
+          // if it was exceeded before, just keep it
+        } else {
+
+          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error over threshold for %.2f s", (ros::Time::now() - tilt_error_failsafe_time_).toSec());
+        }
+
+        // if the tile error is baed, but the controller just switched, nullify our memory
       } else {
 
-        ROS_ERROR("[ControlManager]: Tilt error too large (tilt error=%0.2f/%0.2f deg), however, controller/tracker just switched so its ok.",
-                  (180.0 / M_PI) * tilt_error_, (180.0 / M_PI) * _tilt_error_threshold_);
+        tilt_error_failsafe_over_thr_ = false;
+      }
+
+      // if the tilt error is fine
+    } else {
+
+      // make it fine
+      tilt_error_failsafe_over_thr_ = false;
+      tilt_error_failsafe_time_     = ros::Time::now();
+    }
+
+    // calculate the time over the threshold
+    double tot = (ros::Time::now() - tilt_error_failsafe_time_).toSec();
+
+    // if the tot exceeds the limit (and if we are actually over the threshold)
+    if (tilt_error_failsafe_over_thr_ && (tot > _tilt_error_failsafe_timeout_)) {
+
+      // only when flying and not in failsafe
+      if (offboard_mode_ && !failsafe_triggered_) {
+
+        ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
+
+        switchMotors(false);
+        arming(false);
       }
     }
   }
@@ -5579,7 +5616,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
 
     ROS_WARN_THROTTLE(1.0,
-                      "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, we do not measure in that direction",
+                      "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, we do not measure in that direction",
                       fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
     return false;
   }
@@ -5601,7 +5638,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= _bumper_horizontal_distance_)) {
 
     ROS_WARN_THROTTLE(1.0,
-                      "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f (sector %d) is not valid, obstacle is too close (horizontally)",
+                      "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, obstacle is too close (horizontally)",
                       fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
 
     mrs_msgs::BumperStatus bumper_status;
@@ -5620,7 +5657,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   if (vertical_point_distance > 0.1 &&
       (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= _bumper_vertical_distance_)) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %0.2f, y: %0.2f, z: %0.2f is not valid, obstacle is too close (vertically)", fcu_x,
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f is not valid, obstacle is too close (vertically)", fcu_x,
                       fcu_y, fcu_z);
 
     mrs_msgs::BumperStatus bumper_status;
@@ -5657,8 +5694,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       // _bumper_horizontal_distance_                 = the bumper limit
 
       ROS_WARN(
-          "[ControlManager]: Bumper: the fcu reference [%0.2f, %0.2f] (sector %d) is not valid, distance %0.2f >= (%0.2f - %0.2f)., HUGGING IT it "
-          "to x: %0.2f, y: %0.2f",
+          "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
+          "to x: %.2f, y: %.2f",
           fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], _bumper_horizontal_distance_, new_x,
           new_y);
 
@@ -5679,8 +5716,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
       new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_);
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %0.2f is not valid, distance %0.2f > (%0.2f - %0.2f)., HUGGING IT it z: %0.2f",
-                        fcu_z, vertical_point_distance, bumper_data.sectors[vertical_vector_idx], _bumper_vertical_distance_, new_z);
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %.2f is not valid, distance %.2f > (%.2f - %.2f)., HUGGING IT it z: %.2f", fcu_z,
+                        vertical_point_distance, bumper_data.sectors[vertical_vector_idx], _bumper_vertical_distance_, new_z);
 
       point_fcu.reference.position.z = new_z;
 
@@ -5781,10 +5818,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       /* int oposite_sector_idx = (i + bumper_data.n_horizontal_sectors / 2) % bumper_data.n_horizontal_sectors; */
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: found potential collision (sector %d vs. %d), obstacle distance: %0.2f, repulsing", i, oposite_sector_idx,
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: found potential collision (sector %d vs. %d), obstacle distance: %.2f, repulsing", i, oposite_sector_idx,
                         bumper_data.sectors[i]);
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: oposite direction: %0.2f", oposite_direction);
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: oposite direction: %.2f", oposite_direction);
 
       if (wall_locked_horizontal) {
         if (bumper_data.sectors[i] < bumper_data.sectors[oposite_sector_idx]) {

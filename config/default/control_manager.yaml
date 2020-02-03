@@ -63,8 +63,9 @@ safety:
 
   tilt_error_failsafe:
 
-    enabled: false
-    tilt_error_threshold: 30 # [deg]
+    enabled: true
+    tilt_error_threshold: 20 # [deg]
+    timeout: 0.5 # [s]
 
   rc_eland:
 
