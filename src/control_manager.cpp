@@ -2947,8 +2947,8 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
       callbacks_enabled_ = false;
 
-      ROS_INFO("[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z],
-               request.goal[REF_YAW]);
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: goto by rc by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z],
+                        request.goal[REF_YAW]);
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
@@ -4816,7 +4816,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   }
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -4843,7 +4843,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
   // check the obstacle bumper
   if (!bumperValidatePoint(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_fcu' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
@@ -4863,7 +4863,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
   // check the safety area
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_fcu' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -4878,7 +4878,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_fcu' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
