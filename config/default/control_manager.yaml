@@ -59,13 +59,14 @@ safety:
 
   escalating_failsafe:
 
+    # how often does it allow to escalate
     timeout: 2.0 # [s]
 
-  tilt_error_failsafe:
+  tilt_error_disarm:
 
     enabled: true
-    tilt_error_threshold: 20 # [deg]
-    timeout: 0.5 # [s]
+    timeout: 0.5 # [s] # for how long the error has to be present to disarm
+    error_threshold: 20 # [deg]
 
   rc_eland:
 

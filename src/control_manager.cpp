@@ -446,12 +446,12 @@ private:
   ros::Time thrust_mass_estimate_first_time_;
 
   // failsafe when tilt error is too large
-  bool   _tilt_error_failsafe_enabled_ = false;
-  double _tilt_error_failsafe_timeout_;
-  double _tilt_error_threshold_ = 0;
+  bool   _tilt_error_disarm_enabled_ = false;
+  double _tilt_error_disarm_timeout_;
+  double _tilt_error_disarm_threshold_ = 0;
 
-  ros::Time tilt_error_failsafe_time_;
-  bool      tilt_error_failsafe_over_thr_ = false;
+  ros::Time tilt_error_disarm_time_;
+  bool      tilt_error_disarm_over_thr_ = false;
 
   // elanding when tilt error is too large
   double _tilt_limit_eland_ = 0;  // tilt error for triggering eland
@@ -814,10 +814,10 @@ void ControlManager::onInit() {
 
   param_loader.load_param("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
 
-  param_loader.load_param("safety/tilt_error_failsafe/enabled", _tilt_error_failsafe_enabled_);
-  param_loader.load_param("safety/tilt_error_failsafe/timeout", _tilt_error_failsafe_timeout_);
-  param_loader.load_param("safety/tilt_error_failsafe/tilt_error_threshold", _tilt_error_threshold_);
-  _tilt_error_threshold_ = (_tilt_error_threshold_ / 180.0) * M_PI;
+  param_loader.load_param("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
+  param_loader.load_param("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
+  param_loader.load_param("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+  _tilt_error_disarm_threshold_ = (_tilt_error_disarm_threshold_ / 180.0) * M_PI;
 
   param_loader.load_param("joystick/enabled", _joystick_enabled_);
   param_loader.load_param("joystick/mode", _joystick_mode_);
@@ -2505,52 +2505,61 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
 
-  if (_tilt_error_failsafe_enabled_) {
+  if (_tilt_error_disarm_enabled_) {
 
+    // the time from the last controller/tracker switch
+    // fyi: we should not
     double time_from_ctrl_tracker_switch = (ros::Time::now() - controller_tracker_switch_time).toSec();
 
     // if the tile error is over the threshold
-    if (fabs(tilt_error_) > _tilt_error_threshold_ && !last_attitude_cmd->ramping_up) {
+    // && we are not ramping up during takeoff
+    if (fabs(tilt_error_) > _tilt_error_disarm_threshold_ && !last_attitude_cmd->ramping_up) {
 
-      // only check the error if some time passed from a trakcer/controller switch
+      // only account for the error if some time passed from the last tracker/controller switch
       if (time_from_ctrl_tracker_switch > 1.0) {
 
         // if the threshold was not exceeded before
-        if (!tilt_error_failsafe_over_thr_) {
+        if (!tilt_error_disarm_over_thr_) {
 
-          tilt_error_failsafe_over_thr_ = true;
-          tilt_error_failsafe_time_     = ros::Time::now();
+          tilt_error_disarm_over_thr_ = true;
+          tilt_error_disarm_time_     = ros::Time::now();
 
-          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error_, (180.0 / M_PI) * _tilt_error_threshold_);
+          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error_,
+                   (180.0 / M_PI) * _tilt_error_disarm_threshold_);
 
           // if it was exceeded before, just keep it
         } else {
 
-          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error over threshold for %.2f s", (ros::Time::now() - tilt_error_failsafe_time_).toSec());
+          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error_,
+                            (ros::Time::now() - tilt_error_disarm_time_).toSec());
         }
 
-        // if the tile error is baed, but the controller just switched, nullify our memory
+        // if the tile error is bad, but the controller just switched,
+        // don't think its bad anymore
       } else {
 
-        tilt_error_failsafe_over_thr_ = false;
+        tilt_error_disarm_over_thr_ = false;
+        tilt_error_disarm_time_     = ros::Time::now();
       }
 
       // if the tilt error is fine
     } else {
 
       // make it fine
-      tilt_error_failsafe_over_thr_ = false;
-      tilt_error_failsafe_time_     = ros::Time::now();
+      tilt_error_disarm_over_thr_ = false;
+      tilt_error_disarm_time_     = ros::Time::now();
     }
 
     // calculate the time over the threshold
-    double tot = (ros::Time::now() - tilt_error_failsafe_time_).toSec();
+    double tot = (ros::Time::now() - tilt_error_disarm_time_).toSec();
 
     // if the tot exceeds the limit (and if we are actually over the threshold)
-    if (tilt_error_failsafe_over_thr_ && (tot > _tilt_error_failsafe_timeout_)) {
+    if (tilt_error_disarm_over_thr_ && (tot > _tilt_error_disarm_timeout_)) {
+
+      bool is_flying = offboard_mode_ && active_tracker_idx != _null_tracker_idx_;
 
       // only when flying and not in failsafe
-      if (offboard_mode_ && !failsafe_triggered_) {
+      if (is_flying && !failsafe_triggered_) {
 
         ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
 
