@@ -5702,11 +5702,11 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       // bumper_data.sectors[horizontal_vector_idx]   = uav distance to the obstacle
       // _bumper_horizontal_distance_                 = the bumper limit
 
-      ROS_WARN(
-          "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
-          "to x: %.2f, y: %.2f",
-          fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], _bumper_horizontal_distance_, new_x,
-          new_y);
+      ROS_WARN_THROTTLE(1.0,
+                        "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
+                        "to x: %.2f, y: %.2f",
+                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx],
+                        _bumper_horizontal_distance_, new_x, new_y);
 
       point_fcu.reference.position.x = new_x;
       point_fcu.reference.position.y = new_y;
