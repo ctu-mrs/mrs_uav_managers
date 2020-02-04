@@ -367,17 +367,15 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
     } else {
 
-      last_estimator_type_ = odometry_diagnostics.estimator_type.type;
-
       if (!stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
         ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints \"%s\" are not within the allowed constraints for \"%s\"",
                           current_constraints.c_str(), odometry_diagnostics.estimator_type.name.c_str());
 
-        // else, set the fallbacks
         if (setConstraints(it->second)) {
 
           mrs_lib::set_mutexed(mutex_current_constraints_, it->second, current_constraints_);
+          last_estimator_type_ = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: \"%s\"", it->second.c_str());
 

@@ -479,11 +479,9 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
     if (it == _map_type_fallback_gains_.end()) {
 
       ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type \"%s\" was not specified in the gain_manager's config!",
-
                         odometry_diagnostics.estimator_type.name.c_str());
-    } else {
 
-      last_estimator_type_ = odometry_diagnostics.estimator_type.type;
+    } else {
 
       if (!stringInVector(current_gains, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
 
@@ -491,6 +489,9 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
                           odometry_diagnostics.estimator_type.name.c_str());
 
         if (setGains(it->second)) {
+
+          mrs_lib::set_mutexed(mutex_current_gains_, it->second, current_gains_);
+          last_estimator_type_ = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: \"%s\"", it->second.c_str());
 
