@@ -2433,7 +2433,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle error %.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
+        ROS_ERROR("[ControlManager]: Activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
 
         std::string message_out;
