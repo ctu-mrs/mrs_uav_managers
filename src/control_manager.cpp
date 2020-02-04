@@ -1670,7 +1670,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
       safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
       safety_area_marker.type            = visualization_msgs::Marker::LINE_LIST;
-      safety_area_marker.color.a         = 0.3;
+      safety_area_marker.color.a         = 0.15;
       safety_area_marker.scale.x         = 0.2;
       safety_area_marker.color.r         = 1;
       safety_area_marker.color.g         = 0;
