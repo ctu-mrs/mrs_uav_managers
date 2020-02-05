@@ -136,7 +136,7 @@ joystick:
     fallback:
 
       tracker: "MpcTracker"
-      controller: "MpcController"
+      controller: "EmergencyController"
 
   # channel numbers, indeces in array
   channels:
