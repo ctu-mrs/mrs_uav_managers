@@ -244,15 +244,30 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
     return false;
   }
 
-  mrs_msgs::TrackerConstraintsSrv new_constraints;
+  mrs_msgs::TrackerConstraintsSrv srv_call;
 
-  new_constraints.request = it->second;
+  srv_call.request = it->second;
 
-  service_client_set_constraints_.call(new_constraints);
+  bool res = service_client_set_constraints_.call(srv_call);
 
-  mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
+  if (!res) {
 
-  return new_constraints.response.success;
+    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the service for setting constraints has failed!");
+    return false;
+
+  } else {
+
+    if (srv_call.response.success) {
+
+      mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
+      return true;
+
+    } else {
+
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: set service for setting constraints returned: %s", srv_call.response.message.c_str());
+      return false;
+    }
+  }
 }
 
 //}
@@ -374,14 +389,13 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
         if (setConstraints(it->second)) {
 
-          mrs_lib::set_mutexed(mutex_current_constraints_, it->second, current_constraints_);
           last_estimator_type_ = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: \"%s\"", it->second.c_str());
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: service call to set constraints failed!");
+          ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: could not set constraints!");
         }
       }
     }

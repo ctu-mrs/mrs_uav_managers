@@ -337,13 +337,21 @@ bool GainManager::setGains(std::string gains_name) {
   dynamic_reconfigure::Reconfigure reconf;
   reconf.request = srv_req;
 
-  service_client_set_gains_.call(reconf);
-
-  mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
-
   ROS_INFO("[GainManager]: setting up gains for '%s'", gains_name.c_str());
 
-  return true;
+  bool res = service_client_set_gains_.call(reconf);
+
+  if (!res) {
+
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: the service for setting gains has failed!");
+    return false;
+
+  } else {
+
+    mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
+
+    return true;
+  }
 }
 
 //}
@@ -490,14 +498,13 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
 
         if (setGains(it->second)) {
 
-          mrs_lib::set_mutexed(mutex_current_gains_, it->second, current_gains_);
           last_estimator_type_ = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: \"%s\"", it->second.c_str());
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[GainManager]: service call to set gains failed!");
+          ROS_WARN_THROTTLE(1.0, "[GainManager]: could not set gains!");
         }
       }
     }
