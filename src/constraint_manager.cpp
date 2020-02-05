@@ -22,8 +22,6 @@
 
 //}
 
-#define STRING_EQUAL 0
-
 namespace mrs_uav_manager
 {
 
@@ -75,6 +73,7 @@ private:
 
 private:
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
+  std::mutex                          mutex_last_estimator_type_;
 
   void       constraintsManagementTimer(const ros::TimerEvent &event);
   ros::Timer constraints_management_timer_;
@@ -307,6 +306,8 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
   if (!is_initialized_)
     return false;
 
+  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+
   char message[200];
 
   if (!stringInVector(req.value, _constraint_names_)) {
@@ -318,7 +319,7 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_constraints_.at(odometry_diagnostics_.estimator_type.name))) {
+  if (!stringInVector(req.value, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
     sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
     res.message = message;
@@ -361,6 +362,7 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
+  auto last_estimator_type  = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
 
   if (!got_odometry_diagnostics_) {
     ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constraint management, missing odometry diagnostics!");
@@ -368,9 +370,9 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
   }
 
   // | --- automatically set constraints when odometry.type changes -- |
-  if (odometry_diagnostics_.estimator_type.type != last_estimator_type_) {
+  if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type_, odometry_diagnostics.estimator_type.type);
+    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_fallback_constraints_.find(odometry_diagnostics.estimator_type.name);
@@ -382,14 +384,20 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
     } else {
 
-      if (!stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
+      // if the current constraints are within the allowed odometry types, do nothing
+      if (stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
+
+        last_estimator_type = odometry_diagnostics.estimator_type.type;
+
+        // else, try to set the fallback constraints
+      } else {
 
         ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints \"%s\" are not within the allowed constraints for \"%s\"",
                           current_constraints.c_str(), odometry_diagnostics.estimator_type.name.c_str());
 
         if (setConstraints(it->second)) {
 
-          last_estimator_type_ = odometry_diagnostics.estimator_type.type;
+          last_estimator_type = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: \"%s\"", it->second.c_str());
 
@@ -400,6 +408,8 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
       }
     }
   }
+
+  mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_type, last_estimator_type_);
 }
 
 //}

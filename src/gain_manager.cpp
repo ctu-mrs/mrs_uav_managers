@@ -21,8 +21,6 @@
 
 //}
 
-#define STRING_EQUAL 0
-
 namespace mrs_uav_manager
 {
 
@@ -86,6 +84,7 @@ private:
 
 private:
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
+  std::mutex                          mutex_last_estimator_type_;
 
   void       gainsManagementTimer(const ros::TimerEvent &event);
   ros::Timer gains_management_timer_;
@@ -475,11 +474,12 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
   auto odometry_diagnostics        = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_gains               = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
+  auto last_estimator_type         = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
 
   // | --- automatically set _gains_ when odometry.type changes -- |
-  if (odometry_diagnostics.estimator_type.type != last_estimator_type_) {
+  if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type_, odometry_diagnostics.estimator_type.type);
+    ROS_INFO_THROTTLE(1.0, "[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_fallback_gains_.find(odometry_diagnostics.estimator_type.name);
@@ -491,14 +491,20 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
 
     } else {
 
-      if (!stringInVector(current_gains, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
+      // if the current gains are within the allowed odometry types, do nothing
+      if (stringInVector(current_gains, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
+
+        last_estimator_type = odometry_diagnostics.estimator_type.type;
+
+        // else, try to set the fallback gains
+      } else {
 
         ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains \"%s\" are not within the allowed gains for \"%s\"", current_gains.c_str(),
                           odometry_diagnostics.estimator_type.name.c_str());
 
         if (setGains(it->second)) {
 
-          last_estimator_type_ = odometry_diagnostics.estimator_type.type;
+          last_estimator_type = odometry_diagnostics.estimator_type.type;
 
           ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: \"%s\"", it->second.c_str());
 
@@ -509,6 +515,8 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
       }
     }
   }
+
+  mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_type, last_estimator_type_);
 }
 
 //}
