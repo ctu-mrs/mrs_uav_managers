@@ -2682,7 +2682,7 @@ void ControlManager::partialLandingTimer(const ros::TimerEvent& event) {
 
     // recalculate the mass based on the thrust
     thrust_mass_estimate_ = pow((last_attitude_cmd->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_;
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing_uav_mass_: %.2f thrust_mass_estimate_: %.2f", landing_uav_mass_, thrust_mass_estimate_);
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing_uav_mass_: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
     // condition for automatic motor turn off
     if (((thrust_mass_estimate_ < _partial_landing_mass_factor_ * _uav_mass_) || last_attitude_cmd->thrust < 0.01)) {
@@ -2766,7 +2766,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
   }
 
   double thrust_mass_estimate_ = pow((last_attitude_cmd_->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_;
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate_: %.2f", landing_uav_mass_, thrust_mass_estimate_);
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
   // condition for automatic motor turn off
   if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_))) {
