@@ -5327,6 +5327,8 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.stamp = ros::Time::now();
 
+  diagnostics_msg.motors = motors_;
+
   // | ----------------- fill the tracker status ---------------- |
 
   {
