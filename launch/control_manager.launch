@@ -3,17 +3,18 @@
   <!-- args corresponding to environment variables -->
   <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
   <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+  <arg name="ODOMETRY_TYPE" default="$(env ODOMETRY_TYPE)" />
   <arg name="PROPULSION_TYPE" default="$(env PROPULSION_TYPE)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="BODY_DISTURBANCE_X" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
+  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
+  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
-
-    <!-- custom config -->
   <arg name="custom_config" default="" />
 
     <!-- custom configs for trackers -->
@@ -23,6 +24,7 @@
   <arg name="custom_config_landoff_tracker" default="" />
   <arg name="custom_config_line_tracker" default="" />
   <arg name="custom_config_matlab_tracker" default="" />
+  <arg name="custom_config_speed_tracker" default="" />
   <arg name="custom_config_mpc_tracker" default="" />
   <arg name="custom_config_uav_names" default="" />
 
@@ -31,16 +33,20 @@
   <arg name="custom_config_attitude_controller" default="" />
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
-  <arg name="custom_config_emergancy_controller" default="" />
+  <arg name="custom_config_emergency_controller" default="" />
   <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_so3_controller" default="" />
+  <arg name="custom_config_partial_landing_controller" default="" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="3.5" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.3" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
-  <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
 
@@ -67,11 +73,12 @@
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
 
+      <rosparam file="$(arg world_file)" />
+      <rosparam file="$(arg motor_params_file)" />
+
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
-      <rosparam file="$(arg world_file)" />
-      <rosparam file="$(arg motor_params_file)" />
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="g" value="$(arg g)" />
@@ -117,6 +124,13 @@
       <param name="attitude_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~attitude_controller/profiler" to="profiler" />
 
+      <!-- Partial landing controller -->
+      <rosparam ns="partial_landing_controller" file="$(find mrs_controllers)/config/default/partial_landing.yaml" />
+      <rosparam ns="partial_landing_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/partial_landing.yaml" />
+      <rosparam if="$(eval not arg('custom_config_attitude_controller') == '')" ns="partial_landing_controller" file="$(arg custom_config_partial_landing_controller)" />
+      <param name="partial_landing_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~partial_landing_controller/profiler" to="profiler" />
+
       <!-- Failsafe controller -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
@@ -125,14 +139,14 @@
       <remap from="~failsafe_controller/profiler" to="profiler" />
       <remap from="~failsafe_controller/arm_out" to="~/arm" />
 
-      <!-- Emergancy controller -->
-      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
-      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/default/emergancy.yaml" />
-      <rosparam ns="emergancy_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergancy.yaml" />
-      <rosparam if="$(eval not arg('custom_config_mpc_controller') == '')" ns="emergancy_controller" file="$(arg custom_config_emergancy_controller)" />
-      <param name="emergancy_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~emergancy_controller/profiler" to="profiler" />
-      <remap from="~emergancy_controller/set_integral_terms_in" to="~emergancy_controller/set_integral_terms" />
+      <!-- Emergency controller -->
+      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/emergency.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergency.yaml" />
+      <rosparam if="$(eval not arg('custom_config_emergency_controller') == '')" ns="emergency_controller" file="$(arg custom_config_emergency_controller)" />
+      <param name="emergency_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~emergency_controller/profiler" to="profiler" />
+      <remap from="~emergency_controller/set_integral_terms_in" to="~emergency_controller/set_integral_terms" />
 
       <!-- Trackers' configs -->
 
@@ -186,6 +200,14 @@
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
 
+      <!-- SpeedTracker -->
+      <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/default/speed_tracker.yaml" />
+      <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/speed_tracker.yaml" />
+      <rosparam if="$(eval not arg('custom_config_speed_tracker') == '')" ns="speed_tracker" file="$(arg custom_config_speed_tracker)" />
+      <param name="speed_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~speed_tracker/profiler" to="profiler" />
+      <remap from="~speed_tracker/command_in" to="~speed_tracker/command" />
+
       <!-- LandoffTracker -->
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/default/landoff_tracker.yaml" />
       <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
@@ -201,12 +223,13 @@
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
-      <rosparam ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'uav')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names_simulation.yaml" />
       <rosparam if="$(eval not arg('custom_config_mpc_tracker') == '')" ns="mpc_tracker" file="$(arg custom_config_mpc_tracker)" />
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <param name="mpc_tracker/uav_name" value="$(arg UAV_NAME)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
+      <param name="mpc_tracker/diagnostics_topic" value="control_manager/mpc_tracker/diagnostics" />
       <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
@@ -219,24 +242,38 @@
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
       <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
-      <remap from="~mpc_tracker/debug_set_trajectory_out" to="~mpc_tracker/debug_set_trajectory" />
       <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
+      <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
+      <remap from="~mpc_tracker/trajectory_original/poses_out" to="~mpc_tracker/trajectory_original/poses" />
+      <remap from="~mpc_tracker/trajectory_original/markers_out" to="~mpc_tracker/trajectory_original/markers" />
+      <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
+      <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~uav_state_in" to="odometry/uav_state" />
+      <remap from="~odometry_innovation_in" to="odometry/odom_main_innovation" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
+      <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="/joy" />
-      <remap from="~bumper_in" to="bumper/obstacle_sectors" />
+      <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~mavros_state_in" to="mavros/state" />
+      <remap from="~rc_in" to="mavros/rc/in" />
 
       <!-- Subscribers and Services -->
+      <remap from="~reference_in" to="~reference" />
       <remap from="~goto_in" to="~goto" />
       <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
       <remap from="~set_yaw_in" to="~set_yaw" />
       <remap from="~set_yaw_relative_in" to="~set_yaw_relative" />
+      <remap from="~transform_reference_in" to="~transform_reference" />
+      <remap from="~transform_pose_in" to="~transform_pose" />
+      <remap from="~transform_vector3_in" to="~transform_vector3" />
+      <remap from="~validate_reference_in" to="~validate_reference" />
+      <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
@@ -246,33 +283,44 @@
       <remap from="~control_error_out" to="~control_error" />
       <remap from="~tilt_error_out" to="~tilt_error" />
       <remap from="~thrust_force_out" to="~thrust_force" />
-      <remap from="~target_attitude_out" to="mavros/setpoint_raw/target_attitude" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
-      <remap from="~visualization_marker_array_out" to="/visualization_marker_array" />
+      <remap from="~safety_area_markers_out" to="~safety_area_markers" />
+      <remap from="~safety_area_coordinates_markers_out" to="~safety_area_coordinates_markers" />
+      <remap from="~disturbances_markers_out" to="~disturbances_markers" />
       <remap from="~diagnostics_out" to="~diagnostics" />
+      <remap from="~bumper_status_out" to="~bumper_status" />
+      <remap from="~mpc_trajectory_out" to="~mpc_tracker/set_trajectory" />
+      <remap from="~current_constraints_out" to="~current_constraints" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
       <remap from="~switch_tracker_in" to="~switch_tracker" />
       <remap from="~switch_controller_in" to="~switch_controller" />
+      <remap from="~tracker_reset_static_in" to="~tracker_reset_static" />
       <remap from="~hover_in" to="~hover" />
       <remap from="~ehover_in" to="~ehover" />
       <remap from="~motors_in" to="~motors" />
-      <remap from="~emergency_goto_in" to="~emergency_goto" />
+      <remap from="~emergency_reference_in" to="~emergency_reference" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
-      <remap from="~set_constraints_in" to="control_manager/set_constraints" />
-      <remap from="~use_joystick_in" to="control_manager/use_joystick" />
+      <remap from="~set_constraints_in" to="~set_constraints" />
+      <remap from="~use_joystick_in" to="~use_joystick" />
       <remap from="~arm_out" to="mavros/cmd/arming" />
       <remap from="~arm_in" to="~arm" />
       <remap from="~eland_in" to="~eland" />
+      <remap from="~partial_land_in" to="~partial_land" />
       <remap from="~failsafe_in" to="~failsafe" />
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
-      <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
-      <remap from="~rc_in" to="mavros/rc/in" />
+      <remap from="~eland_out" to="~landoff_tracker/eland" />
+      <remap from="~land_out" to="~landoff_tracker/land" />
       <remap from="~shutdown_out" to="~shutdown_out" />
       <remap from="~pirouette_in" to="~pirouette" />
+      <remap from="~bumper_in" to="~bumper" />
+      <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
+      <remap from="~set_min_height_in" to="~set_min_height" />
+      <remap from="~get_min_height_in" to="~get_min_height" />
+      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
 
     </node>
 

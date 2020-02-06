@@ -6,20 +6,26 @@
   <arg name="PROPULSION_TYPE" default="$(env PROPULSION_TYPE)" />
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
+  <arg name="ODOMETRY_TYPE" default="$(env ODOMETRY_TYPE)" />
+  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
+  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="5.0" />
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="3.5" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="3.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.3" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
-  <arg name="world_file" default="$(find mrs_general)/config/world_simulation.yaml" />
   <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
+
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
@@ -40,11 +46,11 @@
         <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
-        <!-- Load a user param file -->
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
-
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
+
+        <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
@@ -54,13 +60,12 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~mavros_odometry_in" to="mavros_interface/converted_mavros_odom" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
-      <remap from="~target_attitude_in" to="mavros/setpoint_raw/target_attitude" />
-      <remap from="~attitude_command_in" to="control_manager/attitude_cmd" />
+      <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
-      <remap from="~gains_in" to="gain_manager/current_gains" />
-      <remap from="~constraints_in" to="constraint_manager/current_constraints" />
+      <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
+      <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
       <remap from="~landoff_diagnostics_in" to="control_manager/landoff_tracker/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />
 
@@ -78,10 +83,12 @@
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />
-      <remap from="~emergency_goto_out" to="control_manager/emergency_goto" />
+      <remap from="~emergency_reference_out" to="control_manager/emergency_reference" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
       <remap from="~pirouette_out" to="control_manager/pirouette" />
+      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
+      <remap from="~ungrip_out" to="gripper/ungrip" />
 
     </node>
 

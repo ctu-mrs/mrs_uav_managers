@@ -45,7 +45,7 @@
       <remap from="~set_constraints_out" to="control_manager/set_constraints" />
 
       <!-- Publishers -->
-      <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~profiler" to="profiler" />
 
     </node>

@@ -1,4 +1,5 @@
 null_tracker: "NullTracker"
+partial_landing_controller: "PartialLandingController" # has an exception for allowing takeoff
 
 # require gain or constraint manager running to takeoff?
 require_gain_manager: true
@@ -35,6 +36,7 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
+  landing_cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
 
   disarm: true
 
@@ -47,6 +49,8 @@ flight_timer:
 # detecting if desired thrust cross max threshold, triggers landing after that
 max_thrust:
 
-  enabled: false
+  enabled: true
   rate: 30 # [Hz]
-  max_thrust: 0.85 # [-]
+  max_thrust: 0.80 # [-]
+  eland_timeout: 2.0 # [s]
+  ungrip_timeout: 1.0 # [s]

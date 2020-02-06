@@ -13,11 +13,14 @@ find_package(catkin REQUIRED COMPONENTS
   mrs_lib
   cmake_modules
   nodelet
+  tf2_geometry_msgs
+  tf2
+  tf2_ros
   )
 
 find_package(mavros_msgs 0.30.0 EXACT REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color -Wall -Wextra")
 
 ###################################
 ## catkin specific configuration ##
@@ -26,7 +29,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES GainManager ConstraintManager ControlManager UavManager
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib 
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
   DEPENDS mavros_msgs
   )
 

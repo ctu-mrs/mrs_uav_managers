@@ -13,7 +13,8 @@ controllers : [
   "MpcController",
   "AttitudeController",
   "FailsafeController",
-  "EmergancyController",
+  "EmergencyController",
+  "PartialLandingController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -24,13 +25,14 @@ landing_takeoff_tracker: "LandoffTracker"
 
 status_timer_rate:  10 # [Hz]
 
+state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
+
 safety:
 
   min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
 
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
-  escalating_failsafe_timeout: 1.0 # [s]
 
   tilt_limit_eland: 60 # [deg]
   yaw_limit_eland: 90 # [deg]
@@ -43,34 +45,43 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 1.0 # [s]
+  odometry_max_missing_time: 0.1 # [s]
 
-  # emergancy landing (still feedback)
-  eland: 
-    controller: "EmergancyController"
+  # emergency landing (still feedback)
+  eland:
+
+    controller: "EmergencyController"
     cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
+    cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
+
     disarm: true
     timer_rate: 10
 
-  tilt_error_failsafe:
+  escalating_failsafe:
 
-    enabled: false
-    tilt_error_threshold: 30 # [deg]
+    # how often does it allow to escalate
+    timeout: 2.0 # [s]
+
+  tilt_error_disarm:
+
+    enabled: true
+    timeout: 0.5 # [s] # for how long the error has to be present to disarm
+    error_threshold: 20 # [deg]
 
   rc_eland:
 
     enabled: true
-    # activation channel
-    channel_number: 7 # [-]
+    channel_number: 7 # [-],  activation RC channel
     threshold: 1500 # [us]
+    action: "eland" # {eland, escalating_failsafe, failsafe}
 
 obstacle_bumper:
 
   enabled: false
   timer_rate: 20 # [Hz]
 
-  horizontal_distance: 1.0 # [m]
-  vertical_distance: 1.0 # [m]
+  horizontal_distance: 1.2 # [m]
+  vertical_distance: 1.2 # [m]
 
   obstacle_hugging:
 
@@ -92,22 +103,40 @@ automatic_pc_shutdown:
   enabled: false
   distance_threshold: 5 # [m]
 
+partial_land:
+
+  enabled: true
+  timer_rate: 100 # [Hz]
+  mass_factor_trigger: 0.90 # [-]
+  cutoff_timeout: 0.30 # [s]
+  controller: "PartialLandingController"
+
 joystick:
 
   enabled: true
 
+  # the trajectory mode is for debugging trajectory control ONLY
+  mode: 0 # {0 = goto, 1 = trajectory}
+
+  # carrot on a stick distance for the goto mode
+  carrot_distance: 1.00 # [m]
+
   joystick_timer_rate: 30 # [Hz]
 
-  # tracker and controller used to control the drone using a joystick
-  tracker: "JoyTracker"
-  controller: "AttitudeController"
+  # mainly for tuning low-level attitude controllers
+  # is initiated by pressing "start" for > 3 secs
+  attitude_control:
 
-  # what tracker and controller should be activate when
-  # switching back from joystick control?
-  fallback:
+    # tracker and controller used to control the drone using a joystick
+    tracker: "JoyTracker"
+    controller: "AttitudeController"
 
-    tracker: "MpcTracker"
-    controller: "MpcController"
+    # what tracker and controller should be activate when
+    # switching back from joystick control?
+    fallback:
+
+      tracker: "MpcTracker"
+      controller: "EmergencyController"
 
   # channel numbers, indeces in array
   channels:
@@ -122,8 +151,8 @@ joystick:
     Y: 3 # []
 
     # if the "start" button is pressed and held down for > 3 sec, the UAV switches
-    # to a tracker and controller specified above. Autonomy in this mode is not
-    # guaranteed, it depends on the specified tracker and controller.
+    # to a tracker and controller specified above in the "attitude_control" section.
+    # Autonomy in this mode is not guaranteed, it depends on the specified tracker and controller.
     start: 7 # []
 
     # If "back" button is pressed, the UAV switches to a GOTO mode, where

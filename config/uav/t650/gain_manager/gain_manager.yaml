@@ -8,6 +8,7 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
+    ICP: ["supersoft", "soft"]
     VSLAM: ["supersoft", "soft"]
     BRICKFLOW: ["supersoft", "soft"]
     BRICK: ["supersoft", "soft"]
@@ -21,10 +22,12 @@ gain_management:
     OPTFLOW: ["supersoft", "soft"]
     OTHER: ["supersoft"]
     HECTOR: ["supersoft"]
+    ALOAM: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
+    ICP: "supersoft"
     VSLAM: "supersoft"
     BRICKFLOW: "supersoft"
     BRICK: "supersoft"
@@ -35,6 +38,7 @@ gain_management:
     RTK: "soft"
     OPTFLOWGPS: "supersoft"
     GPS: "soft"
-    OPTFLOW: "soft"
+    OPTFLOW: "supersoft"
     HECTOR: "supersoft"
+    ALOAM: "supersoft"
     OTHER: "supersoft"

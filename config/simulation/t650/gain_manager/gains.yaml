@@ -1,6 +1,66 @@
 supersoft:
 
   horizontal:
+    kp: 3.0
+    kv: 2.0
+    ka: 1.0
+
+    attitude:
+      kq: 8.0
+      kw: 0.0
+
+    kib: 0.5
+    kib_lim: 10.0
+
+    kiw: 0.5
+    kiw_lim: 10.0
+
+  vertical:
+    kp: 10.0
+    kv: 5.0
+    ka: 1.0
+
+    attitude:
+      kq: 8.0
+      kw: 1.0
+
+  weight_estimator:
+    km: 1.0
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+
+soft:
+
+  horizontal:
+    kp: 4.0
+    kv: 3.0
+    ka: 1.0
+
+    attitude:
+      kq: 8.0
+      kw: 0.0
+
+    kib: 0.7
+    kib_lim: 10.0
+
+    kiw: 0.7
+    kiw_lim: 10.0
+
+  vertical:
+    kp: 10.0
+    kv: 5.0
+    ka: 1.0
+
+    attitude:
+      kq: 8.0
+      kw: 1.0
+
+  weight_estimator:
+    km: 1.0
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+
+tight:
+
+  horizontal:
     kp: 6.0
     kv: 4.0
     ka: 1.0
@@ -16,74 +76,14 @@ supersoft:
     kiw_lim: 10.0
 
   vertical:
-    kp: 15.0
-    kv: 8.0
-    ka: 1.0
-
-    attitude:
-      kq: 10.0
-      kw: 1.0
-
-  weight_estimator:
-    km: 1.0
-    km_lim: 4.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
-
-soft:
-
-  horizontal:
-    kp: 8.0
-    kv: 6.0
+    kp: 10.0
+    kv: 5.0
     ka: 1.0
 
     attitude:
       kq: 8.0
-      kw: 0.0
-
-    kib: 0.1
-    kib_lim: 10.0
-
-    kiw: 0.1
-    kiw_lim: 10.0
-
-  vertical:
-    kp: 15.0
-    kv: 8.0
-    ka: 1.0
-
-    attitude:
-      kq: 10.0
       kw: 1.0
 
   weight_estimator:
     km: 1.0
-    km_lim: 4.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
-
-tight:
-
-  horizontal:
-    kp: 12.0
-    kv: 8.0
-    ka: 1.0
-
-    attitude:
-      kq: 8.0
-      kw: 0.0
-
-    kib: 0.1
-    kib_lim: 10.0
-
-    kiw: 0.1
-    kiw_lim: 10.0
-
-  vertical:
-    kp: 15.0
-    kv: 8.0
-    ka: 1.0
-
-    attitude:
-      kq: 10.0
-      kw: 1.0
-
-  weight_estimator:
-    km: 1.0
-    km_lim: 4.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+    km_lim: 6.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]

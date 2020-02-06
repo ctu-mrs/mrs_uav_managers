@@ -5,6 +5,7 @@ trackers : [
   "LandoffTracker",
   "JoyTracker",
   "MatlabTracker",
+  "SpeedTracker",
   "NullTracker",
   "JoyBumperTracker",
 ]
@@ -17,15 +18,10 @@ controllers : [
   "AttitudeController",
   "AccelerationController",
   "FailsafeController",
-  "EmergancyController",
+  "EmergencyController",
+  "PartialLandingController",
 ]
 
 safety:
 
   min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
-
-  safety_timer_rate: 10 # [Hz]
-  failsafe_timer_rate: 10 # [Hz]
-
-  # after not receiving odometry for more than this, the failsafe landing will trigger
-  odometry_max_missing_time: 2.0 # [s]
