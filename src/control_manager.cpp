@@ -6969,7 +6969,7 @@ void ControlManager::switchMotors(bool input) {
 
 void ControlManager::setOdometryCallbacks(const bool input) {
 
-  ROS_INFO("[ControlManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+  ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 
