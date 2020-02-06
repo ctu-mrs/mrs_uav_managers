@@ -5329,6 +5329,13 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.motors = motors_;
 
+  {
+    std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
+
+    diagnostics_msg.flying_normally = (motors_) && (offboard_mode_) && (armed_) && (active_controller_idx_ != _eland_controller_idx_) &&
+                                      (active_controller_idx_ != _failsafe_controller_idx_) && (active_tracker_idx_ != _null_tracker_idx_);
+  }
+
   // | ----------------- fill the tracker status ---------------- |
 
   {
