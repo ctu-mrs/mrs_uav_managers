@@ -336,7 +336,7 @@ bool GainManager::setGains(std::string gains_name) {
   dynamic_reconfigure::Reconfigure reconf;
   reconf.request = srv_req;
 
-  ROS_INFO("[GainManager]: setting up gains for '%s'", gains_name.c_str());
+  ROS_INFO_THROTTLE(1.0, "[GainManager]: setting up gains for '%s'", gains_name.c_str());
 
   bool res = service_client_set_gains_.call(reconf);
 
