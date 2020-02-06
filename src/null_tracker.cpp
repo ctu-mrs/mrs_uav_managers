@@ -132,7 +132,7 @@ const mrs_msgs::TrackerStatus NullTracker::getStatus() {
 
 const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) {
 
-  char                      message[100];
+  char                      message[400];
   std_srvs::SetBoolResponse res;
 
   if (cmd->data != callbacks_enabled) {
@@ -141,7 +141,7 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
 
     sprintf((char *)&message, "Callbacks %s", callbacks_enabled ? "enabled" : "disabled");
 
-    ROS_INFO("[NullTracker]: %s", message);
+    ROS_DEBUG("[NullTracker]: %s", message);
 
   } else {
 
