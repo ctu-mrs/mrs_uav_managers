@@ -431,7 +431,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("landingTimer", _landing_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("landingTimer", _landing_timer_rate_, 0.1, event);
 
   // copy member variables
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
@@ -571,7 +571,7 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.004, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.1, event);
 
   auto landoff_diagnostics = mrs_lib::get_mutexed(mutex_landoff_diagnostics_, landoff_diagnostics_);
 
@@ -655,7 +655,7 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.004, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.1, event);
 
   auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
   auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
@@ -782,7 +782,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.002, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.03, event);
 
   // copy member variables
   auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);

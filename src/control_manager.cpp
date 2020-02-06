@@ -1519,7 +1519,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   uav_y = uav_state.pose.position.y;
   uav_z = uav_state.pose.position.z;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.1, event);
 
   // --------------------------------------------------------------
   // |                   publish the diagnostics                  |
@@ -2280,7 +2280,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.05, event);
 
   if (!got_uav_state_ || !got_odometry_innovation_ || !got_pixhawk_odometry_ || active_tracker_idx == _null_tracker_idx_) {
     return;
@@ -2821,7 +2821,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.05, event);
 
   // copy member variables
   auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
@@ -3097,7 +3097,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.05, event);
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
