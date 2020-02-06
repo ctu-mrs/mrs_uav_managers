@@ -448,12 +448,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == FLY_HOME_STATE) {
 
-    // TODO: parametrize the radius
     if (sqrt(pow(odometry_x - takeoff_x_, 2) + pow(odometry_y - takeoff_y_, 2)) < 0.5) {
-
-      // TODO: parametrize the timeout
-      ros::Duration wait(5.0);
-      wait.sleep();
 
       ROS_INFO("[UavManager]: landing");
 
@@ -1478,9 +1473,6 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
     res.success = reference_out.response.success;
     res.message = "Flying home for landing";
-
-    ros::Duration wait(1.0);
-    wait.sleep();
 
     changeLandingState(FLY_HOME_STATE);
 
