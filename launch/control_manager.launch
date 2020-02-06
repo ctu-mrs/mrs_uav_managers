@@ -254,6 +254,8 @@
       <remap from="~transform_reference_in" to="~transform_reference" />
       <remap from="~transform_pose_in" to="~transform_pose" />
       <remap from="~transform_vector3_in" to="~transform_vector3" />
+      <remap from="~validate_reference_in" to="~validate_reference" />
+      <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->
       <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />

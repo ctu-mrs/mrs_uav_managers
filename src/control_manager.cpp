@@ -19,6 +19,8 @@
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/Float64Srv.h>
 #include <mrs_msgs/GetFloat64.h>
+#include <mrs_msgs/ValidateReference.h>
+#include <mrs_msgs/ValidateReferenceList.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -59,7 +61,9 @@
 #include <tf/transform_datatypes.h>
 #include <tf_conversions/tf_eigen.h>
 
+#include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
+#include <mrs_msgs/ReferenceList.h>
 
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/ReferenceStampedSrvRequest.h>
@@ -381,6 +385,10 @@ private:
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
+  // safety area services
+  ros::ServiceServer service_server_validate_reference_;
+  ros::ServiceServer service_server_validate_reference_list_;
+
   // bumper service servers
   ros::ServiceServer service_server_bumper_enabler_;
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
@@ -537,6 +545,9 @@ private:
 
   bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
   bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
+
+  bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
+  bool callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
@@ -1418,6 +1429,8 @@ void ControlManager::onInit() {
   service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
   service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
   service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
+  service_server_validate_reference_       = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
+  service_server_validate_reference_list_  = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
 
   service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -4525,6 +4538,195 @@ bool ControlManager::callbackGetMinHeight([[maybe_unused]] mrs_msgs::GetFloat64:
   res.success = true;
   res.value   = min_height;
 
+  return true;
+}
+
+//}
+
+/* //{ callbackValidateReference() */
+
+bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.x)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.y)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.z)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.yaw)) {
+    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  // transform the reference to the current frame
+  mrs_msgs::ReferenceStamped original_reference;
+  original_reference.header    = req.reference.header;
+  original_reference.reference = req.reference.reference;
+
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+  if (!ret) {
+
+    ROS_WARN("[ControlManager]: the reference could not be transformed.");
+    res.message = "the reference could not be transformed";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+
+  // check the obstacle bumper
+  if (!bumperValidatePoint(transformed_reference)) {
+    ROS_ERROR("[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
+    res.message = "potential collision with an obstacle";
+    res.success = false;
+    return true;
+  }
+
+  if (!isPointInSafetyArea3d(transformed_reference)) {
+    ROS_ERROR("[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+
+  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+    mrs_msgs::ReferenceStamped from_point;
+    from_point.header.frame_id      = uav_state.header.frame_id;
+    from_point.reference.position.x = last_position_cmd->position.x;
+    from_point.reference.position.y = last_position_cmd->position.y;
+    from_point.reference.position.z = last_position_cmd->position.z;
+
+    if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
+      ROS_ERROR("[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
+      res.message = "the path is going outside the safety area";
+      res.success = false;
+      return true;
+    }
+  }
+
+  res.message = "the reference is ok";
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* //{ callbackValidateReferenceList() */
+
+bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    return false;
+  }
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  // get the transformer
+  auto ret = transformer_->getTransform(uav_state.header.frame_id, req.list.header.frame_id, req.list.header.stamp);
+
+  if (!ret) {
+
+    ROS_DEBUG("[ControlManager]: could not find transform for the reference.");
+    res.message = "could not find transform";
+    return false;
+  }
+
+  mrs_lib::TransformStamped tf = ret.value();
+
+  for (int i = 0; i < int(req.list.list.size()); i++) {
+
+    res.success.push_back(true);
+
+    mrs_msgs::ReferenceStamped original_reference;
+    original_reference.header    = req.list.header;
+    original_reference.reference = req.list.list[i];
+
+    if (!std::isfinite(original_reference.reference.position.x)) {
+      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.x\"!!!");
+      res.success[i] = false;
+    }
+
+    if (!std::isfinite(original_reference.reference.position.y)) {
+      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.y\"!!!");
+      res.success[i] = false;
+    }
+
+    if (!std::isfinite(original_reference.reference.position.z)) {
+      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.z\"!!!");
+      res.success[i] = false;
+    }
+
+    if (!std::isfinite(original_reference.reference.yaw)) {
+      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.yaw\"!!!");
+      res.success[i] = false;
+    }
+
+    auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+    if (!ret) {
+
+      ROS_DEBUG("[ControlManager]: the reference could not be transformed.");
+      res.success[i] = false;
+    }
+
+    mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+
+    // check the obstacle bumper
+    if (!bumperValidatePoint(transformed_reference)) {
+      res.success[i] = false;
+    }
+
+    if (!isPointInSafetyArea3d(transformed_reference)) {
+      res.success[i] = false;
+    }
+
+    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+      mrs_msgs::ReferenceStamped from_point;
+      from_point.header.frame_id      = uav_state.header.frame_id;
+      from_point.reference.position.x = last_position_cmd->position.x;
+      from_point.reference.position.y = last_position_cmd->position.y;
+      from_point.reference.position.z = last_position_cmd->position.z;
+
+      if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
+        res.success[i] = false;
+      }
+    }
+  }
+
+  res.message = "references were checked";
   return true;
 }
 
