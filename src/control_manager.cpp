@@ -255,6 +255,11 @@ private:
   double             uav_yaw_                     = 0;
   std::mutex         mutex_uav_state_;
 
+  // odometry hiccup detection
+  double uav_state_avg_dt_        = 1;
+  double uav_state_hiccup_factor_ = 1;
+  int    uav_state_count_         = 0;
+
   // pixhawk odom is used to initialize the failsafe routine
   ros::Subscriber    subscriber_pixhawk_odometry_;
   nav_msgs::Odometry pixhawk_odometry_;
@@ -3363,12 +3368,66 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
 
+  auto uav_state_last_time = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_last_time_);
+
   // | --------------------- check for nans --------------------- |
 
   if (!validateUavState(msg)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: uav_state contains invalid values, throwing it away");
     return;
   }
+
+  // | -------------------- check for hiccups ------------------- |
+
+  /* hickup detection //{ */
+
+  double alpha               = 0.99;
+  double alpha2              = 0.666;
+  double uav_state_count_lim = 1000;
+
+  double uav_state_dt = (ros::Time::now() - uav_state_last_time).toSec();
+
+  // belive only reasonable numbers
+  if (uav_state_dt <= 1.0) {
+
+    uav_state_avg_dt_ = alpha * uav_state_avg_dt_ + (1 - alpha) * uav_state_dt;
+
+    if (uav_state_count_ < uav_state_count_lim) {
+      uav_state_count_++;
+    }
+  }
+
+  if (uav_state_count_ == uav_state_count_lim) {
+
+    /* ROS_INFO_STREAM("[ControlManager]: uav_state_dt = " << uav_state_dt); */
+
+    if (uav_state_dt < uav_state_avg_dt_ && uav_state_dt > 0.0001) {
+
+      uav_state_hiccup_factor_ = alpha2 * uav_state_hiccup_factor_ + (1 - alpha2) * (uav_state_avg_dt_ / uav_state_dt);
+
+    } else if (uav_state_avg_dt_ > 0.0001) {
+
+      uav_state_hiccup_factor_ = alpha2 * uav_state_hiccup_factor_ + (1 - alpha2) * (uav_state_dt / uav_state_avg_dt_);
+    }
+
+    if (uav_state_hiccup_factor_ > 3.141592653) {
+
+      /* ROS_ERROR_STREAM_THROTTLE(0.1, "[ControlManager]: hiccup factor = " << uav_state_hiccup_factor_); */
+
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: ");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // | ------------------------- WARNING ------------------------ |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |                                                            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |            UAV_STATE has a large hiccup factor!            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |           hint, hint: you are probably rosbagging          |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |           lot of data or publishing lot of large           |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |          messages without mutual nodelet managers.         |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |                                                            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // | ------------------------- WARNING ------------------------ |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: ");
+    }
+  }
+
+  //}
 
   // | ---------------------- frame switch ---------------------- |
 
