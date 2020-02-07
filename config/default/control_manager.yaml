@@ -119,7 +119,7 @@ joystick:
   mode: 0 # {0 = goto, 1 = trajectory}
 
   # carrot on a stick distance for the goto mode
-  carrot_distance: 1.00 # [m]
+  carrot_distance: 4.00 # [m]
 
   joystick_timer_rate: 30 # [Hz]
 
