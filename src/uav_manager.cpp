@@ -1370,10 +1370,6 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
         res.success = false;
         ROS_ERROR("[UavManager]: %s", message);
 
-        ROS_INFO("[UavManager]: switching back to NullTracker");
-        switch_tracker_out.request.value = _null_tracker_name_;
-        service_client_switch_tracker_.call(switch_tracker_out);
-
         return true;
       }
 
@@ -1382,10 +1378,6 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
       ROS_ERROR("[UavManager]: service call for landing failed");
       res.success = false;
       res.message = "service call for landing failed";
-
-      ROS_INFO("[UavManager]: switching back to NullTracker");
-      switch_tracker_out.request.value = _null_tracker_name_;
-      service_client_switch_tracker_.call(switch_tracker_out);
     }
 
   } else {
