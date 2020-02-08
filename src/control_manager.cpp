@@ -1501,6 +1501,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.1, event);
+
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -1518,8 +1520,6 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   uav_x = uav_state.pose.position.x;
   uav_y = uav_state.pose.position.y;
   uav_z = uav_state.pose.position.z;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.1, event);
 
   // --------------------------------------------------------------
   // |                   publish the diagnostics                  |
@@ -2271,6 +2271,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.05, event);
+
   // copy member variables
   auto last_attitude_cmd                         = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd                         = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -2279,8 +2281,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   auto controller_tracker_switch_time            = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
   auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.05, event);
 
   if (!got_uav_state_ || !got_odometry_innovation_ || !got_pixhawk_odometry_ || active_tracker_idx == _null_tracker_idx_) {
     return;
@@ -3562,6 +3562,8 @@ void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+
   transformer_->setCurrentLatLon(msg->latitude, msg->longitude);
 }
 
@@ -3594,11 +3596,11 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
+
   // copy member variables
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
 
   std::scoped_lock lock(mutex_joystick_);
 
@@ -4803,6 +4805,8 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceService");
+
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
@@ -4925,6 +4929,8 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
+
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
     return;
@@ -5013,15 +5019,17 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
@@ -5112,15 +5120,17 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
 
 bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToFcuService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
@@ -5223,15 +5233,17 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
 bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToRelativeService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
@@ -5331,15 +5343,17 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
 bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToAltitudeService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
@@ -5417,6 +5431,8 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawService");
+
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
@@ -5469,6 +5485,8 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawRelativeService");
 
   if (!callbacks_enabled_) {
     ROS_WARN("[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
@@ -5582,6 +5600,8 @@ void ControlManager::setCallbacks(bool in) {
 
 void ControlManager::publishDiagnostics(void) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
+
   std::scoped_lock lock(mutex_diagnostics_);
 
   mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
@@ -5638,6 +5658,8 @@ void ControlManager::publishDiagnostics(void) {
 /* setConstraints() //{ */
 
 void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("setConstraints");
 
   mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr tracker_response;
 
@@ -7053,6 +7075,8 @@ void ControlManager::setOdometryCallbacks(const bool input) {
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchTracker");
+
   // copy member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7206,6 +7230,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string controller_name) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchController");
+
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7331,6 +7357,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
 void ControlManager::updateTrackers(void) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateTrackers");
+
   // copy member variables
   auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -7408,6 +7436,8 @@ void ControlManager::updateTrackers(void) {
 /* updateControllers() //{ */
 
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateControllers");
 
   // copy member variables
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7516,6 +7546,8 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 /* publish() //{ */
 
 void ControlManager::publish(void) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publish");
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
