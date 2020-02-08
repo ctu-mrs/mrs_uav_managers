@@ -33,6 +33,7 @@ landing:
 
   rate: 10 # [Hz]
   landing_tracker: "LandoffTracker"
+  landing_controller: "MpcController"
 
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?

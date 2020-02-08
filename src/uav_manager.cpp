@@ -205,6 +205,7 @@ public:
   // Landing timer
   ros::Timer  landing_timer_;
   std::string _landing_tracker_name_;
+  std::string _landing_controller_name_;
   double      _landing_cutoff_mass_factor_;
   double      _landing_cutoff_mass_timeout_;
   double      _landing_timer_rate_;
@@ -283,6 +284,7 @@ void UavManager::onInit() {
 
   param_loader.load_param("landing/rate", _landing_timer_rate_);
   param_loader.load_param("landing/landing_tracker", _landing_tracker_name_);
+  param_loader.load_param("landing/landing_controller", _landing_controller_name_);
   param_loader.load_param("landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
   param_loader.load_param("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
   param_loader.load_param("landing/disarm", _landing_disarm_);
@@ -451,6 +453,16 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
     if (sqrt(pow(odometry_x - takeoff_x_, 2) + pow(odometry_y - takeoff_y_, 2)) < 0.5) {
 
       ROS_INFO("[UavManager]: landing");
+
+      mrs_msgs::String switch_controller_out;
+      switch_controller_out.request.value = _landing_controller_name_;
+      if (!service_client_switch_controller_.call(switch_controller_out)) {
+        ROS_ERROR("[UavManager]: service call for switching to the controller failed");
+      } else {
+        if (!switch_controller_out.response.success) {
+          ROS_ERROR("[UavManager]: switch to landing controller failed");
+        }
+      }
 
       mrs_msgs::String switch_tracker_out;
       switch_tracker_out.request.value = _landing_tracker_name_;
@@ -1339,6 +1351,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
   flighttime_timer_.stop();
 
+  bool suc = true;
+
   mrs_msgs::String switch_tracker_out;
   switch_tracker_out.request.value = _landing_tracker_name_;
   if (!service_client_switch_tracker_.call(switch_tracker_out)) {
@@ -1346,10 +1360,22 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
     res.message = message;
     res.success = false;
     ROS_ERROR("[UavManager]: %s", message);
+    suc = false;
     return true;
   }
 
-  if (switch_tracker_out.response.success == true) {
+  mrs_msgs::String switch_controller_out;
+  switch_controller_out.request.value = _landing_controller_name_;
+  if (!service_client_switch_controller_.call(switch_controller_out)) {
+    sprintf((char*)&message, "Service call for switching to controller %s failed.", _landing_controller_name_.c_str());
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    suc = false;
+    return true;
+  }
+
+  if (suc) {
 
     std_srvs::Trigger land_out;
     if (service_client_land_.call(land_out)) {
@@ -1382,7 +1408,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
   } else {
 
-    ROS_ERROR("[UavManager]: could not switch to tracker %s: %s", _landing_tracker_name_.c_str(), switch_tracker_out.response.message.c_str());
+    ROS_ERROR("[UavManager]: could not switch to landing tracker or controller");
     res.success = switch_tracker_out.response.success;
     res.message = switch_tracker_out.response.message;
   }
