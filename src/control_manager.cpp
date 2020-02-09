@@ -4808,35 +4808,35 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceService");
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4855,7 +4855,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
   if (!ret) {
 
-    ROS_WARN("[ControlManager]: the reference could not be transformed.");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
@@ -4865,14 +4865,14 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -4887,7 +4887,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     from_point.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -4932,27 +4932,27 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto topic through, the callbacks are disabled");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
     return;
   }
 
@@ -4973,12 +4973,12 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
     return;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
     return;
   }
 
@@ -4991,7 +4991,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
       return;
     }
   }
@@ -5006,7 +5006,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     tracker_response = tracker_list_[active_tracker_idx_]->goTo(mrs_msgs::Reference::ConstPtr(std::make_unique<mrs_msgs::Reference>(reference_out)));
 
     if (!tracker_response) {
-      ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", _tracker_names_[active_tracker_idx_].c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker '%s' does not implement 'goto' topic!", _tracker_names_[active_tracker_idx_].c_str());
     }
   }
 }
@@ -5032,7 +5032,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5043,7 +5043,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5059,14 +5059,14 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
 
   // check the obstacle bumper
   if (!bumperValidatePoint(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -5081,7 +5081,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -5144,7 +5144,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5170,7 +5170,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
   if (!ret) {
 
-    ROS_WARN("[ControlManager]: the reference could not be transformed.");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
@@ -5246,7 +5246,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5257,7 +5257,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5272,7 +5272,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
   // check the obstacle bumper
   if (!bumperValidatePoint(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
@@ -5281,7 +5281,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     if (!isPointInSafetyArea3d(des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
       res.message = "the point is outside of the safety area";
       res.success = false;
       return true;
@@ -5294,7 +5294,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -5302,7 +5302,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
   } else {
 
-    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
     res.message = "last_position_cmd is not valid";
     res.success = false;
     return true;
@@ -5356,7 +5356,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5364,7 +5364,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5379,7 +5379,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
     des_reference.reference.position.z = req.goal;
 
     if (!isPointInSafetyArea3d(des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
       res.message = "the point is outside of the safety area";
       res.success = false;
       return true;
@@ -5387,7 +5387,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
 
   } else {
 
-    ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
     res.message = "last_position_cmd is not valid";
     res.success = false;
     return true;
@@ -5434,7 +5434,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawService");
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5442,7 +5442,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5489,7 +5489,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawRelativeService");
 
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5497,7 +5497,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.value\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.value\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
