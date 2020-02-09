@@ -6,6 +6,7 @@ estimator_types: [
   "VSLAM",
   "BRICKFLOW",
   "HECTOR",
+  "TOWER",
   "T265",
   "BRICK",
   "VIO",
@@ -34,6 +35,7 @@ constraint_management:
     OPTFLOW: ["slow", "medium"]
     HECTOR: ["slow"]
     ALOAM: ["slow"]
+    TOWER: ["slow"]
     T265: ["slow"]
     BRICK: ["slow"]
     VIO: ["slow", "medium"]
@@ -52,6 +54,7 @@ constraint_management:
     BRICKFLOW: "slow"
     HECTOR: "slow"
     ALOAM: "slow"
+    TOWER: "slow"
     T265: "slow"
     BRICK: "slow"
     VIO: "slow"
