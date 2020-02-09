@@ -255,6 +255,11 @@ private:
   double             uav_yaw_                     = 0;
   std::mutex         mutex_uav_state_;
 
+  // odometry hiccup detection
+  double uav_state_avg_dt_        = 1;
+  double uav_state_hiccup_factor_ = 1;
+  int    uav_state_count_         = 0;
+
   // pixhawk odom is used to initialize the failsafe routine
   ros::Subscriber    subscriber_pixhawk_odometry_;
   nav_msgs::Odometry pixhawk_odometry_;
@@ -1496,6 +1501,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.1, event);
+
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -1513,8 +1520,6 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   uav_x = uav_state.pose.position.x;
   uav_y = uav_state.pose.position.y;
   uav_z = uav_state.pose.position.z;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.01, event);
 
   // --------------------------------------------------------------
   // |                   publish the diagnostics                  |
@@ -2266,6 +2271,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.05, event);
+
   // copy member variables
   auto last_attitude_cmd                         = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd                         = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -2274,8 +2281,6 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   auto controller_tracker_switch_time            = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
   auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.04, event);
 
   if (!got_uav_state_ || !got_odometry_innovation_ || !got_pixhawk_odometry_ || active_tracker_idx == _null_tracker_idx_) {
     return;
@@ -2816,7 +2821,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.05, event);
 
   // copy member variables
   auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
@@ -3092,7 +3097,7 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.05, event);
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -3363,12 +3368,66 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
 
+  auto uav_state_last_time = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_last_time_);
+
   // | --------------------- check for nans --------------------- |
 
   if (!validateUavState(msg)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: uav_state contains invalid values, throwing it away");
     return;
   }
+
+  // | -------------------- check for hiccups ------------------- |
+
+  /* hickup detection //{ */
+
+  double alpha               = 0.99;
+  double alpha2              = 0.666;
+  double uav_state_count_lim = 1000;
+
+  double uav_state_dt = (ros::Time::now() - uav_state_last_time).toSec();
+
+  // belive only reasonable numbers
+  if (uav_state_dt <= 1.0) {
+
+    uav_state_avg_dt_ = alpha * uav_state_avg_dt_ + (1 - alpha) * uav_state_dt;
+
+    if (uav_state_count_ < uav_state_count_lim) {
+      uav_state_count_++;
+    }
+  }
+
+  if (uav_state_count_ == uav_state_count_lim) {
+
+    /* ROS_INFO_STREAM("[ControlManager]: uav_state_dt = " << uav_state_dt); */
+
+    if (uav_state_dt < uav_state_avg_dt_ && uav_state_dt > 0.0001) {
+
+      uav_state_hiccup_factor_ = alpha2 * uav_state_hiccup_factor_ + (1 - alpha2) * (uav_state_avg_dt_ / uav_state_dt);
+
+    } else if (uav_state_avg_dt_ > 0.0001) {
+
+      uav_state_hiccup_factor_ = alpha2 * uav_state_hiccup_factor_ + (1 - alpha2) * (uav_state_dt / uav_state_avg_dt_);
+    }
+
+    if (uav_state_hiccup_factor_ > 3.141592653) {
+
+      /* ROS_ERROR_STREAM_THROTTLE(0.1, "[ControlManager]: hiccup factor = " << uav_state_hiccup_factor_); */
+
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: ");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // | ------------------------- WARNING ------------------------ |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |                                                            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |            UAV_STATE has a large hiccup factor!            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |           hint, hint: you are probably rosbagging          |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |           lot of data or publishing lot of large           |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |          messages without mutual nodelet managers.         |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // |                                                            |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: // | ------------------------- WARNING ------------------------ |");
+      ROS_WARN_THROTTLE(2.0, "[ControlManager]: ");
+    }
+  }
+
+  //}
 
   // | ---------------------- frame switch ---------------------- |
 
@@ -3503,6 +3562,8 @@ void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+
   transformer_->setCurrentLatLon(msg->latitude, msg->longitude);
 }
 
@@ -3535,11 +3596,11 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
+
   // copy member variables
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
 
   std::scoped_lock lock(mutex_joystick_);
 
@@ -4744,36 +4805,38 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceService");
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4792,7 +4855,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
   if (!ret) {
 
-    ROS_WARN("[ControlManager]: the reference could not be transformed.");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
@@ -4802,14 +4865,14 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -4824,7 +4887,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     from_point.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -4866,28 +4929,30 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   if (!is_initialized_)
     return;
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto topic through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto topic through, the callbacks are disabled");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
     return;
   }
 
@@ -4908,12 +4973,12 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, potential collision with an obstacle!");
     return;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, the point is outside of the safety area!");
     return;
   }
 
@@ -4926,7 +4991,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, the path is going outside the safety area!");
       return;
     }
   }
@@ -4941,7 +5006,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     tracker_response = tracker_list_[active_tracker_idx_]->goTo(mrs_msgs::Reference::ConstPtr(std::make_unique<mrs_msgs::Reference>(reference_out)));
 
     if (!tracker_response) {
-      ROS_ERROR("[ControlManager]: The tracker '%s' does not implement 'goto' topic!", _tracker_names_[active_tracker_idx_].c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: The tracker '%s' does not implement 'goto' topic!", _tracker_names_[active_tracker_idx_].c_str());
     }
   }
 }
@@ -4954,18 +5019,20 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -4976,7 +5043,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -4992,14 +5059,14 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
 
   // check the obstacle bumper
   if (!bumperValidatePoint(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -5014,7 +5081,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -5053,15 +5120,17 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
 
 bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToFcuService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   if (!callbacks_enabled_) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto service through, the callbacks are disabled");
@@ -5075,7 +5144,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5101,7 +5170,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
   if (!ret) {
 
-    ROS_WARN("[ControlManager]: the reference could not be transformed.");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed.");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
@@ -5164,18 +5233,20 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
 
 bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToRelativeService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto_relative service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5186,7 +5257,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5201,7 +5272,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
   // check the obstacle bumper
   if (!bumperValidatePoint(des_reference)) {
-    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
@@ -5210,7 +5281,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
 
     if (!isPointInSafetyArea3d(des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, the point is outside of the safety area!");
       res.message = "the point is outside of the safety area";
       res.success = false;
       return true;
@@ -5223,7 +5294,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
     current_coord.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(current_coord, des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
@@ -5231,7 +5302,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
   } else {
 
-    ROS_ERROR("[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_relative' service failed, last_position_cmd is not valid!");
     res.message = "last_position_cmd is not valid";
     res.success = false;
     return true;
@@ -5272,18 +5343,20 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
 
 bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
-  // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-
   if (!is_initialized_) {
     res.message = "not initialized";
     res.success = false;
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoToAltitudeService");
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the goto_altitude service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5291,7 +5364,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5306,7 +5379,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
     des_reference.reference.position.z = req.goal;
 
     if (!isPointInSafetyArea3d(des_reference)) {
-      ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_altitude' service failed, the point is outside of the safety area!");
       res.message = "the point is outside of the safety area";
       res.success = false;
       return true;
@@ -5314,7 +5387,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
 
   } else {
 
-    ROS_ERROR("[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'goto_altitude' service failed, last_position_cmd is not valid!");
     res.message = "last_position_cmd is not valid";
     res.success = false;
     return true;
@@ -5358,8 +5431,10 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawService");
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the set_yaw service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5367,7 +5442,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5411,8 +5486,10 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYawRelativeService");
+
   if (!callbacks_enabled_) {
-    ROS_WARN("[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: not passing the set_yaw_relative service through, the callbacks are disabled");
     res.message = "callbacks are disabled";
     res.success = false;
     return true;
@@ -5420,7 +5497,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.value\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.value\"!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5523,6 +5600,8 @@ void ControlManager::setCallbacks(bool in) {
 
 void ControlManager::publishDiagnostics(void) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
+
   std::scoped_lock lock(mutex_diagnostics_);
 
   mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
@@ -5579,6 +5658,8 @@ void ControlManager::publishDiagnostics(void) {
 /* setConstraints() //{ */
 
 void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("setConstraints");
 
   mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr tracker_response;
 
@@ -6969,7 +7050,7 @@ void ControlManager::switchMotors(bool input) {
 
 void ControlManager::setOdometryCallbacks(const bool input) {
 
-  ROS_INFO("[ControlManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+  ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 
@@ -6993,6 +7074,8 @@ void ControlManager::setOdometryCallbacks(const bool input) {
 /* switchTracker() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchTracker");
 
   // copy member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -7147,6 +7230,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string controller_name) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchController");
+
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7272,6 +7357,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
 void ControlManager::updateTrackers(void) {
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateTrackers");
+
   // copy member variables
   auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -7349,6 +7436,8 @@ void ControlManager::updateTrackers(void) {
 /* updateControllers() //{ */
 
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateControllers");
 
   // copy member variables
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7457,6 +7546,8 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 /* publish() //{ */
 
 void ControlManager::publish(void) {
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publish");
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
