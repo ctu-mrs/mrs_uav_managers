@@ -4112,7 +4112,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     sprintf((char*)&message, "Can't switch motors on, the UAV is outside of the safety area!");
     res.message = message;
     res.success = false;
-    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: %s", message);
     return true;
   }
 
@@ -4120,7 +4120,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     sprintf((char*)&message, "cannot switch motors ON, we landed in emergency.");
     res.message = message;
     res.success = false;
-    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: %s", message);
     return true;
   }
 
@@ -4128,7 +4128,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     sprintf((char*)&message, "Can't switch motors ON, missing mavros state!");
     res.message = message;
     res.success = false;
-    ROS_ERROR("[ControlManager]: %s", message);
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: %s", message);
     return true;
   }
 
@@ -4137,7 +4137,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
       sprintf((char*)&message, "Can't switch motors on, missing bumper data!");
       res.message = message;
       res.success = false;
-      ROS_ERROR("[ControlManager]: %s", message);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: %s", message);
       return true;
     }
   }
@@ -4148,7 +4148,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
   res.message = message;
   res.success = true;
 
-  ROS_INFO("[ControlManager]: %s", message);
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: %s", message);
 
   return true;
 }
