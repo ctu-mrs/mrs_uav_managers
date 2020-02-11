@@ -9,6 +9,8 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/UavState.h>
 
+#include <mrs_uav_manager/common_handlers.h>
+
 namespace mrs_uav_manager
 {
 
@@ -30,7 +32,7 @@ public:
   // initialize() is called once for every controller
   // * the run time is not limited
   virtual void initialize(const ros::NodeHandle &parent_nh, std::string name, std::string name_space, const mrs_uav_manager::MotorParams motor_params,
-                          const double uav_mass, const double g) = 0;
+                          const double uav_mass, const double g, std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) = 0;
 
   // activate() is called before the controllers output will be used
   // * the last command of previously used controller is passed, so mass ans disturbance estimates can be shared

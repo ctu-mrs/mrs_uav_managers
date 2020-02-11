@@ -1134,7 +1134,7 @@ void ControlManager::onInit() {
       it = controllers_.find(_controller_names_[i]);
 
       ROS_INFO("[ControlManager]: Initializing controller %d: %s", (int)i, it->second.address.c_str());
-      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _motor_params_, _uav_mass_, _g_);
+      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _motor_params_, _uav_mass_, _g_, common_handlers_);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: Exception caught during controller initialization: %s", ex.what());
