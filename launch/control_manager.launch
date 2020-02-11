@@ -266,6 +266,7 @@
       <remap from="~tilt_error_out" to="~tilt_error" />
       <remap from="~thrust_force_out" to="~thrust_force" />
       <remap from="~motors_out" to="~motors" />
+      <remap from="~motors_on_out" to="~motors_on" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~safety_area_markers_out" to="~safety_area_markers" />
       <remap from="~safety_area_coordinates_markers_out" to="~safety_area_coordinates_markers" />

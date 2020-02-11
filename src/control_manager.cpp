@@ -345,6 +345,7 @@ private:
   ros::Publisher publisher_cmd_odom_;
   ros::Publisher publisher_diagnostics_;
   ros::Publisher publisher_motors_;
+  ros::Publisher publisher_motors_on_;
   ros::Publisher publisher_tilt_error_;
   ros::Publisher publisher_mass_estimate_;
   ros::Publisher publisher_control_error_;
@@ -1379,6 +1380,7 @@ void ControlManager::onInit() {
   publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
   publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
+  publisher_motors_on_                       = nh_.advertise<std_msgs::Empty>("motors_on_out", 1);
   publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
   publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
   publisher_control_error_                   = nh_.advertise<mrs_msgs::ControlError>("control_error_out", 1);
@@ -1528,7 +1530,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   publishDiagnostics();
 
   // --------------------------------------------------------------
-  // |                 publishing the motors_ state                |
+  // |                 publishing the motors state                |
   // --------------------------------------------------------------
 
   mrs_msgs::BoolStamped motors_out;
@@ -1540,6 +1542,18 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   }
   catch (...) {
     ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_motors_.getTopic().c_str());
+  }
+
+  if (motors_) {
+
+    std_msgs::Empty motors_on_out;
+
+    try {
+      publisher_motors_on_.publish(motors_on_out);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: Exception caught during publishing topic %s.", publisher_motors_on_.getTopic().c_str());
+    }
   }
 
   // --------------------------------------------------------------
