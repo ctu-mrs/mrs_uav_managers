@@ -6207,7 +6207,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
   // if potential collision was detected and we should start the repulsing_
   if (horizontal_collision_detected || vertical_collision_detected) {
 
-    ROS_INFO("[ControlManager]: repulsion was initiated");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: repulsion was initiated");
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = true;
@@ -6251,14 +6251,14 @@ bool ControlManager::bumperPushFromObstacle(void) {
       std::scoped_lock lock(mutex_tracker_list_);
 
       // transform the reference into the currently used frame
-      // this is under the mutex_tracker_list_ since we don't wont the odometry switch to happen
+      // this is under the mutex_tracker_list since we don't won't the odometry switch to happen
       // to the tracker before we actually call the goto service
 
       auto ret = transformer_->transformSingle(uav_state.header.frame_id, reference_fcu_untilted);
 
       if (!ret) {
 
-        ROS_WARN("[ControlManager]: the reference could not be transformed.");
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the bumper reference could not be transformed.");
         return false;
       }
 
@@ -6293,7 +6293,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
   // if repulsing_ and the distance is safe once again
   if ((repulsing_ && !horizontal_collision_detected && !vertical_collision_detected)) {
 
-    ROS_INFO("[ControlManager]: repulsion was stopped");
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: repulsion was stopped");
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
