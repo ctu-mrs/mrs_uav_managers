@@ -4012,6 +4012,8 @@ bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::R
     return true;
   }
 
+  ROS_WARN_THROTTLE(1.0, "[ControlManager]: ehover trigger by callback");
+
   res.success = ehover(res.message);
 
   return true;
@@ -4040,6 +4042,8 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
     return true;
   }
 
+  ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe triggered by callback");
+
   res.success = failsafe();
 
   return true;
@@ -4054,6 +4058,8 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
   if (!is_initialized_)
     return false;
 
+  ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
+
   res.success = escalatingFailsafe(res.message);
 
   return true;
@@ -4067,6 +4073,8 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& 
 
   if (!is_initialized_)
     return false;
+
+  ROS_WARN_THROTTLE(1.0, "[ControlManager]: eland triggered by callback");
 
   res.success = eland(res.message);
 
@@ -4095,6 +4103,8 @@ bool ControlManager::callbackPartialLanding([[maybe_unused]] std_srvs::Trigger::
 
     return true;
   }
+
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: partial landing triggered by callback");
 
   res.success = partialLanding(res.message);
 
