@@ -517,7 +517,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
           thrust_under_threshold_          = true;
         }
 
-        ROS_INFO_THROTTLE(0.1, "[UavManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time_).toSec());
+        ROS_INFO_THROTTLE(0.5, "[UavManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time_).toSec());
 
       } else {
 
@@ -569,7 +569,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
 
     } else {
 
-      ROS_ERROR("[UavManager]: incorrect tracker detected during landing!");
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: incorrect tracker detected during landing!");
     }
   }
 }
