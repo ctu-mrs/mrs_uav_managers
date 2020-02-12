@@ -1,3 +1,5 @@
+#define VERSION "0.0.3.0"
+
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -34,6 +36,7 @@ class ConstraintManager : public nodelet::Nodelet {
 
 private:
   ros::NodeHandle nh_;
+  std::string     _version_;
   bool            is_initialized_ = false;
 
 private:
@@ -111,6 +114,14 @@ void ConstraintManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
+
+  param_loader.load_param("version", _version_);
+
+  if (_version_ != VERSION) {
+
+    ROS_ERROR("[ConstraintManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
+    ros::shutdown();
+  }
 
   param_loader.load_param("enable_profiler", _profiler_enabled_);
 
@@ -222,7 +233,7 @@ void ConstraintManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[ConstraintManager]: initilized");
+  ROS_INFO("[ConstraintManager]: initialized, version %s", VERSION);
 }
 
 //}

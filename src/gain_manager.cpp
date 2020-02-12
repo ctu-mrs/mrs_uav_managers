@@ -1,3 +1,5 @@
+#define VERSION "0.0.3.0"
+
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -45,6 +47,7 @@ class GainManager : public nodelet::Nodelet {
 
 private:
   ros::NodeHandle nh_;
+  std::string     _version_;
   bool            is_initialized_ = false;
 
 private:
@@ -128,6 +131,14 @@ void GainManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
+
+  param_loader.load_param("version", _version_);
+
+  if (_version_ != VERSION) {
+
+    ROS_ERROR("[GainManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
+    ros::shutdown();
+  }
 
   param_loader.load_param("enable_profiler", _profiler_enabled_);
 
@@ -240,7 +251,7 @@ void GainManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[GainManager]: initilized");
+  ROS_INFO("[GainManager]: initialized, version %s", VERSION);
 }
 
 //}

@@ -1,3 +1,5 @@
+#define VERSION "0.0.3.0"
+
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -199,6 +201,7 @@ public:
 private:
   // node handle stuff
   ros::NodeHandle nh_;
+  std::string     _version_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
 
@@ -783,6 +786,14 @@ void ControlManager::onInit() {
   // --------------------------------------------------------------
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
+
+  param_loader.load_param("version", _version_);
+
+  if (_version_ != VERSION) {
+
+    ROS_ERROR("[ControlManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
+    ros::shutdown();
+  }
 
   param_loader.load_param("uav_name", _uav_name_);
 
@@ -1487,7 +1498,7 @@ void ControlManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[ControlManager]: initialized");
+  ROS_INFO("[ControlManager]: initialized, version %s", VERSION);
 }
 
 //}

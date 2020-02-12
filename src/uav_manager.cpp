@@ -1,3 +1,5 @@
+#define VERSION "0.0.3.0"
+
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -56,6 +58,7 @@ class UavManager : public nodelet::Nodelet {
 
 private:
   ros::NodeHandle nh_;
+  std::string     _version_;
   bool            is_initialized_ = false;
 
 public:
@@ -265,9 +268,17 @@ void UavManager::onInit() {
 
   ros::Time::waitForValid();
 
+  ROS_INFO("[UavManager]: initializing");
+
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
-  ROS_INFO("[UavManager]: initializing");
+  param_loader.load_param("version", _version_);
+
+  if (_version_ != VERSION) {
+
+    ROS_ERROR("[UavManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
+    ros::shutdown();
+  }
 
   param_loader.load_param("enable_profiler", _profiler_enabled_);
 
@@ -387,7 +398,7 @@ void UavManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[UavManager]: initilized");
+  ROS_INFO("[UavManager]: initialized, version %s", VERSION);
 }
 
 //}
