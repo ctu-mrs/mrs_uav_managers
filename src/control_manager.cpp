@@ -6495,6 +6495,15 @@ bool ControlManager::ehover(std::string& message_out) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
+    if (active_tracker_idx_ == _null_tracker_idx_) {
+
+      sprintf((char*)&message, "[ControlManager]: cannot trigger ehover while not flying");
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      message_out = std::string(message);
+      return false;
+    }
+
     try {
 
       // check if the tracker is not active
@@ -6631,6 +6640,15 @@ bool ControlManager::eland(std::string& message_out) {
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
+
+    if (active_tracker_idx_ == _null_tracker_idx_) {
+
+      sprintf((char*)&message, "[ControlManager]: cannot trigger eland while not flying");
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      message_out = std::string(message);
+      return false;
+    }
 
     try {
 
@@ -6795,6 +6813,15 @@ bool ControlManager::partialLanding(std::string& message_out) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
+    if (active_tracker_idx_ == _null_tracker_idx_) {
+
+      sprintf((char*)&message, "[ControlManager]: cannot trigger partial landing while not flying");
+      ROS_ERROR("[ControlManager]: %s", message);
+
+      message_out = std::string(message);
+      return false;
+    }
+
     try {
 
       // check if the tracker is not active
@@ -6891,6 +6918,12 @@ bool ControlManager::failsafe() {
     {
       // TODO: I dont like this locking here, push it downstream pls
       std::scoped_lock lock(mutex_controller_list_);
+
+      if (active_tracker_idx_ == _null_tracker_idx_) {
+
+        ROS_ERROR("[ControlManager]: cannot trigger failsafe while not flying");
+        return false;
+      }
 
       mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
 
