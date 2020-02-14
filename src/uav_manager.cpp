@@ -1483,6 +1483,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
   ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", takeoff_x_, takeoff_y_);
 
+  ungrip();
+
   mrs_msgs::ReferenceStampedSrv reference_out;
 
   reference_out.request.header.frame_id = takeoff_frame_id_;
