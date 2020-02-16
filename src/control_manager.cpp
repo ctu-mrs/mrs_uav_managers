@@ -4309,15 +4309,37 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
   if (!is_initialized_)
     return false;
 
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
   callbacks_enabled_ = false;
 
   mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
-  char                                     message[400];
+
+  std::stringstream ss;
+
+  // transform the reference to the current frame
+  mrs_msgs::ReferenceStamped original_reference;
+  original_reference.header    = req.header;
+  original_reference.reference = req.reference;
+
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+  if (!ret) {
+
+    ss << "[ControlManager]: the emergency reference could not be transformed.";
+
+    ROS_WARN_STREAM_THROTTLE(1.0, ss.str());
+    res.message = ss.str();
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
   std_srvs::SetBoolRequest req_enable_callbacks;
 
   mrs_msgs::ReferenceSrvRequest req_goto_out;
-  req_goto_out.reference = req.reference;
+  req_goto_out.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -4344,8 +4366,8 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
       res.message = tracker_response->message;
       res.success = tracker_response->success;
     } else {
-      sprintf((char*)&message, "The tracker '%s' does not implement 'goto' service!", _tracker_names_[active_tracker_idx_].c_str());
-      res.message = message;
+      ss << "The tracker \"" << _tracker_names_[active_tracker_idx_] << " does not implement 'goto' service!";
+      res.message = ss.str();
       res.success = false;
     }
   }
