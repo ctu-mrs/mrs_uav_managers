@@ -4647,11 +4647,10 @@ bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mr
 
   std::stringstream message;
 
-  message << "The minimal height set to " << min_height_ << ".";
-
-  ROS_INFO_STREAM("[ControlManager]: " << message.str());
-
   mrs_lib::set_mutexed(mutex_min_height_, min_height, min_height_);
+
+  message << "minimal height set to " << min_height;
+  ROS_INFO_STREAM("[ControlManager]: " << message.str());
 
   res.success = true;
   res.message = message.str();
