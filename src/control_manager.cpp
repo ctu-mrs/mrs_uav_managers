@@ -23,6 +23,7 @@
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
 #include <mrs_msgs/ValidateReferenceList.h>
+#include <mrs_msgs/BumperParamsSrv.h>
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
@@ -400,6 +401,7 @@ private:
 
   // bumper service servers
   ros::ServiceServer service_server_bumper_enabler_;
+  ros::ServiceServer service_server_bumper_set_params_;
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
@@ -551,6 +553,7 @@ private:
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
   bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
   bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
@@ -637,13 +640,14 @@ private:
   bool         repulsing_                = false;
   unsigned int repulsing_from_           = 0;
 
-  double _bumper_horizontal_distance_ = 0;
-  double _bumper_vertical_distance_   = 0;
+  double bumper_horizontal_distance_ = 0;
+  double bumper_vertical_distance_   = 0;
 
-  double _bumper_repulsion_horizontal_distance_ = 0;
-  double _bumper_repulsion_horizontal_offset_   = 0;
-  double _bumper_repulsion_vertical_distance_   = 0;
-  double _bumper_repulsion_vertical_offset_     = 0;
+  double     bumper_repulsion_horizontal_distance_ = 0;
+  double     bumper_repulsion_horizontal_offset_   = 0;
+  double     bumper_repulsion_vertical_distance_   = 0;
+  double     bumper_repulsion_vertical_offset_     = 0;
+  std::mutex mutex_bumper_params_;
 
   bool bumperValidatePoint(mrs_msgs::ReferenceStamped& point);
   int  bumperGetSectorId(const double x, const double y, const double z);
@@ -881,17 +885,17 @@ void ControlManager::onInit() {
 
   param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.load_param("obstacle_bumper/timer_rate", _bumper_timer_rate_);
-  param_loader.load_param("obstacle_bumper/horizontal_distance", _bumper_horizontal_distance_);
-  param_loader.load_param("obstacle_bumper/vertical_distance", _bumper_vertical_distance_);
+  param_loader.load_param("obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
+  param_loader.load_param("obstacle_bumper/vertical_distance", bumper_vertical_distance_);
 
   param_loader.load_param("obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
 
   param_loader.load_param("obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
 
-  param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", _bumper_repulsion_horizontal_distance_);
-  param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", _bumper_repulsion_horizontal_offset_);
-  param_loader.load_param("obstacle_bumper/repulsion/vertical_distance", _bumper_repulsion_vertical_distance_);
-  param_loader.load_param("obstacle_bumper/repulsion/vertical_offset", _bumper_repulsion_vertical_offset_);
+  param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", bumper_repulsion_horizontal_distance_);
+  param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
+  param_loader.load_param("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
+  param_loader.load_param("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
 
   param_loader.load_param("safety/rc_eland/enabled", _rc_eland_enabled_);
   param_loader.load_param("safety/rc_eland/channel_number", _rc_eland_channel_);
@@ -1444,6 +1448,7 @@ void ControlManager::onInit() {
   service_server_transform_pose_           = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_        = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
+  service_server_bumper_set_params_        = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
   service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
   service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
   service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
@@ -4601,6 +4606,36 @@ bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Req
 
 //}
 
+/* //{ callbackBumperSetParams() */
+
+bool ControlManager::callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  {
+    std::scoped_lock lock(mutex_bumper_params_);
+
+    bumper_horizontal_distance_ = req.horizontal_limit;
+    bumper_vertical_distance_   = req.vertical_limit;
+
+    bumper_repulsion_horizontal_distance_ = req.repulsion_horizontal_limit;
+    bumper_repulsion_vertical_distance_   = req.repulsion_vertical_limit;
+
+    bumper_repulsion_horizontal_offset_ = req.repulsion_horizontal_offset;
+    bumper_repulsion_vertical_offset_   = req.repulsion_vertical_offset;
+  }
+
+  ROS_INFO("[ControlManager]: bumper params were set");
+
+  res.success = true;
+  res.message = "bumper params set";
+
+  return true;
+}
+
+//}
+
 /* //{ callbackSetMinHeight() */
 
 bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res) {
@@ -5925,6 +5960,9 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   // copy member variables
   auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
+  auto [bumper_vertical_distance, bumper_horizontal_distance] =
+      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_vertical_distance_, bumper_horizontal_distance_);
+
   if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
     return true;
   }
@@ -5967,15 +6005,15 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  if (horizontal_point_distance <= (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_) &&
-      (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_))) {
+  if (horizontal_point_distance <= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance) &&
+      (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance))) {
 
     return true;
   }
 
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
   if (horizontal_point_distance > 0.1 &&
-      (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= _bumper_horizontal_distance_)) {
+      (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance)) {
 
     ROS_WARN_THROTTLE(1.0,
                       "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, obstacle is too close (horizontally)",
@@ -5994,8 +6032,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   }
 
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
-  if (vertical_point_distance > 0.1 &&
-      (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= _bumper_vertical_distance_)) {
+  if (vertical_point_distance > 0.1 && (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance)) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f is not valid, obstacle is too close (vertically)", fcu_x,
                       fcu_y, fcu_z);
@@ -6024,10 +6061,10 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     double new_z = fcu_z;
 
     if (bumper_data.sectors[horizontal_vector_idx] > 0 &&
-        horizontal_point_distance >= (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_)) {
+        horizontal_point_distance >= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance)) {
 
-      new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
-      new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - _bumper_horizontal_distance_);
+      new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance);
+      new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance);
 
       // horizontal_point_distance                    = uav distance to the reference
       // bumper_data.sectors[horizontal_vector_idx]   = uav distance to the obstacle
@@ -6036,8 +6073,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       ROS_WARN_THROTTLE(1.0,
                         "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
                         "to x: %.2f, y: %.2f",
-                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx],
-                        _bumper_horizontal_distance_, new_x, new_y);
+                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance,
+                        new_x, new_y);
 
       point_fcu.reference.position.x = new_x;
       point_fcu.reference.position.y = new_y;
@@ -6052,12 +6089,12 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       }
     }
 
-    if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_)) {
+    if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance)) {
 
-      new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - _bumper_vertical_distance_);
+      new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance);
 
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %.2f is not valid, distance %.2f > (%.2f - %.2f)., HUGGING IT it z: %.2f", fcu_z,
-                        vertical_point_distance, bumper_data.sectors[vertical_vector_idx], _bumper_vertical_distance_, new_z);
+                        vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance, new_z);
 
       point_fcu.reference.position.z = new_z;
 
@@ -6114,6 +6151,12 @@ bool ControlManager::bumperPushFromObstacle(void) {
   auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
   auto uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
+  auto [bumper_repulsion_horizontal_offset, bumper_repulsion_vertical_offset] =
+      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_offset_, bumper_repulsion_vertical_offset_);
+
+  auto [bumper_repulsion_horizontal_distance, bumper_repulsion_vertical_distance] =
+      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_distance_, bumper_repulsion_vertical_distance_);
+
   double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
 
   double direction                     = 0;
@@ -6134,7 +6177,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
     double wall_locked_horizontal = false;
 
     // if the sector is under critical distance
-    if (bumper_data.sectors[i] <= _bumper_repulsion_horizontal_distance_ && bumper_data.sectors[i] < repulsion_distance) {
+    if (bumper_data.sectors[i] <= bumper_repulsion_horizontal_distance && bumper_data.sectors[i] < repulsion_distance) {
 
       // check for locking between the oposite walls
       // get the desired direction of motion
@@ -6142,11 +6185,11 @@ bool ControlManager::bumperPushFromObstacle(void) {
       int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
 
       if (bumper_data.sectors[oposite_sector_idx] > 0 && ((bumper_data.sectors[i] + bumper_data.sectors[oposite_sector_idx]) <=
-                                                          (2 * _bumper_repulsion_horizontal_distance_ + 2 * _bumper_repulsion_horizontal_offset_))) {
+                                                          (2 * bumper_repulsion_horizontal_distance + 2 * bumper_repulsion_horizontal_offset))) {
 
         wall_locked_horizontal = true;
 
-        if (fabs(bumper_data.sectors[i] - bumper_data.sectors[oposite_sector_idx]) <= 2 * _bumper_repulsion_horizontal_offset_) {
+        if (fabs(bumper_data.sectors[i] - bumper_data.sectors[oposite_sector_idx]) <= 2 * bumper_repulsion_horizontal_offset) {
 
           ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper locked between two walls");
           continue;
@@ -6165,12 +6208,12 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       if (wall_locked_horizontal) {
         if (bumper_data.sectors[i] < bumper_data.sectors[oposite_sector_idx]) {
-          repulsion_distance = _bumper_repulsion_horizontal_offset_;
+          repulsion_distance = bumper_repulsion_horizontal_offset;
         } else {
-          repulsion_distance = -_bumper_repulsion_horizontal_offset_;
+          repulsion_distance = -bumper_repulsion_horizontal_offset;
         }
       } else {
-        repulsion_distance = _bumper_repulsion_horizontal_distance_ + _bumper_repulsion_horizontal_offset_ - bumper_data.sectors[i];
+        repulsion_distance = bumper_repulsion_horizontal_distance + bumper_repulsion_horizontal_offset - bumper_data.sectors[i];
       }
 
       // TODO why is this not used?
@@ -6191,29 +6234,29 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   // check for vertical collision down
   if (bumper_data.sectors[bumper_data.n_horizontal_sectors] > 0 &&
-      bumper_data.sectors[bumper_data.n_horizontal_sectors] <= _bumper_repulsion_vertical_distance_) {
+      bumper_data.sectors[bumper_data.n_horizontal_sectors] <= bumper_repulsion_vertical_distance) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper: potential collision below");
     collision_above             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = _bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors];
+    vertical_repulsion_distance = bumper_repulsion_vertical_distance - bumper_data.sectors[bumper_data.n_horizontal_sectors];
   }
 
   // check for vertical collision up
   if (bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] > 0 &&
-      bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] <= _bumper_repulsion_vertical_distance_) {
+      bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] <= bumper_repulsion_vertical_distance) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper: potential collision above");
     collision_below             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(_bumper_repulsion_vertical_distance_ - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]);
+    vertical_repulsion_distance = -(bumper_repulsion_vertical_distance - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]);
   }
 
   // check the up/down wall locking
   if (collision_above && collision_below) {
 
     if (((bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
-         (2 * _bumper_repulsion_vertical_distance_ + 2 * _bumper_repulsion_vertical_offset_))) {
+         (2 * bumper_repulsion_vertical_distance + 2 * bumper_repulsion_vertical_offset))) {
 
       // TODO: why is this not used?
       /* wall_locked_vertical = true; */
@@ -6221,7 +6264,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) / 2.0;
 
       if (fabs(bumper_data.sectors[bumper_data.n_horizontal_sectors] - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
-          2 * _bumper_repulsion_vertical_offset_) {
+          2 * bumper_repulsion_vertical_offset) {
 
         ROS_INFO_THROTTLE(1.0, "[ControlManager]: bumper locked between the floor and ceiling");
         vertical_collision_detected = false;
