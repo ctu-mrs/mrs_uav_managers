@@ -1554,7 +1554,7 @@ void UavManager::setOdometryCallbacks(const bool input) {
 
 void UavManager::ungrip(void) {
 
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: ungripping payload");
+  ROS_INFO_THROTTLE(1.0, "[UavManager]: ungripping payload");
 
   std_srvs::Trigger srv;
 
@@ -1563,11 +1563,11 @@ void UavManager::ungrip(void) {
   if (res) {
 
     if (!srv.response.success) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: %s.", srv.response.message.c_str());
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: service call for ungripping payload returned: %s.", srv.response.message.c_str());
     }
 
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+    ROS_ERROR_THROTTLE(1.0, "[UavManager]: service call for ungripping payload failed!");
   }
 }
 

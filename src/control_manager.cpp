@@ -762,6 +762,9 @@ private:
   bool escalatingFailsafe(std::string& message_out);
   bool arming(bool input);
   bool isOffboard(void);
+
+  void               ungrip(void);
+  ros::ServiceClient service_client_ungrip_;
 };
 
 //}
@@ -1460,6 +1463,7 @@ void ControlManager::onInit() {
   service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
+  service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -2495,6 +2499,20 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   }
 
   // | ----------------- position control error ----------------- |
+  if (control_error > _eland_threshold_ / 2.0) {
+
+    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+
+      if (!failsafe_triggered_ && !eland_triggered_) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Relasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
+                           position_error_x_, position_error_y_, position_error_z_);
+
+        ungrip();
+      }
+    }
+  }
+
   if (control_error > _eland_threshold_) {
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
@@ -8517,6 +8535,29 @@ double ControlManager::RCChannelToRange(double rc_value, double range, double de
   }
 
   return 0.0;
+}
+
+//}
+
+/* ungrip() //{ */
+
+void ControlManager::ungrip(void) {
+
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: ungripping payload");
+
+  std_srvs::Trigger srv;
+
+  bool res = service_client_ungrip_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+  }
 }
 
 //}
