@@ -23,10 +23,12 @@
 #include <mrs_msgs/GainManagerDiagnostics.h>
 
 #include <mavros_msgs/State.h>
+#include <sensor_msgs/NavSatFix.h>
 
 #include <mrs_lib/Profiler.h>
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/mutex.h>
+#include <mrs_lib/transformer.h>
 
 #include <tf/transform_datatypes.h>
 
@@ -45,7 +47,7 @@ typedef enum
 {
 
   IDLE_STATE,
-  FLY_HOME_STATE,
+  FLY_THERE_STATE,
   LANDING_STATE,
 
 } LandingStates_t;
@@ -60,6 +62,10 @@ private:
   ros::NodeHandle nh_;
   std::string     _version_;
   bool            is_initialized_ = false;
+  std::string     _uav_name_;
+
+public:
+  std::shared_ptr<mrs_lib::Transformer> transformer_;
 
 public:
   virtual void onInit();
@@ -67,10 +73,12 @@ public:
   bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackLand(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackLandHome(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
   void callbackOdometry(const nav_msgs::OdometryConstPtr& msg);
   void callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr& msg);
   void callbackAttitudeCommand(const mrs_msgs::AttitudeCommandConstPtr& msg);
   void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
+  void callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg);
   void callbackAttitudeCmd(const mrs_msgs::AttitudeCommandConstPtr& msg);
   void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
   void callbackHeight(const mrs_msgs::Float64StampedConstPtr& msg);
@@ -157,10 +165,13 @@ public:
   std::mutex         mutex_mavros_state_;
   bool               got_mavros_state_ = false;
 
+  ros::Subscriber subscriber_mavros_gps_;
+
   // service servers
   ros::ServiceServer service_server_takeoff_;
   ros::ServiceServer service_server_land_;
   ros::ServiceServer service_server_land_home_;
+  ros::ServiceServer service_server_land_there_;
 
   // service clients
   ros::ServiceClient service_client_takeoff_;
@@ -178,9 +189,7 @@ public:
   std::mutex mutex_services_;
 
   // saved takeoff coordinates
-  double      takeoff_x_;
-  double      takeoff_y_;
-  std::string takeoff_frame_id_;
+  mrs_msgs::ReferenceStamped land_there_reference_;
 
   // to which height to takeoff
   double _takeoff_height_;
@@ -280,6 +289,8 @@ void UavManager::onInit() {
     ros::shutdown();
   }
 
+  param_loader.load_param("uav_name", _uav_name_);
+
   param_loader.load_param("enable_profiler", _profiler_enabled_);
 
   param_loader.load_param("null_tracker", _null_tracker_name_);
@@ -330,6 +341,10 @@ void UavManager::onInit() {
     ros::shutdown();
   }
 
+  // | --------------------- tf transformer --------------------- |
+
+  transformer_ = std::make_shared<mrs_lib::Transformer>("ControlManager", _uav_name_);
+
   // --------------------------------------------------------------
   // |             Initialize subscribers and services            |
   // --------------------------------------------------------------
@@ -337,6 +352,7 @@ void UavManager::onInit() {
   subscriber_odometry_     = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_cmd_ = nh_.subscribe("attitude_cmd_in", 1, &UavManager::callbackAttitudeCmd, this, ros::TransportHints().tcpNoDelay());
   subscriber_mavros_state_ = nh_.subscribe("mavros_state_in", 1, &UavManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
+  subscriber_mavros_gps_   = nh_.subscribe("mavros_gps_in", 1, &UavManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
   subscriber_max_height_   = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_height_       = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_motors_       = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
@@ -352,9 +368,10 @@ void UavManager::onInit() {
       nh_.subscribe("constraint_manager_diagnostics_in", 1, &UavManager::callbackConstraints, this, ros::TransportHints().tcpNoDelay());
   constraints_last_time_ = ros::Time(0);
 
-  service_server_takeoff_   = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
-  service_server_land_      = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
-  service_server_land_home_ = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
+  service_server_takeoff_    = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
+  service_server_land_       = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
+  service_server_land_home_  = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
+  service_server_land_there_ = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
 
   service_client_takeoff_                = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
   service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
@@ -419,7 +436,7 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
     case IDLE_STATE:
       break;
-    case FLY_HOME_STATE:
+    case FLY_THERE_STATE:
       break;
     case LANDING_STATE: {
 
@@ -451,17 +468,28 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
   auto attitude_cmd                = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
   auto odometry                    = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
-  double odometry_x, odometry_y;
-  odometry_x = odometry.pose.pose.position.x;
-  odometry_y = odometry.pose.pose.position.y;
+  auto res = transformer_->transformSingle(odometry.header.frame_id, land_there_reference_);
+
+  mrs_msgs::ReferenceStamped land_there_current_frame;
+
+  if (res) {
+
+    land_there_current_frame = res.value();
+  } else {
+
+    ROS_ERROR("[UavManager]: could not transform the reference into the current frame! land by yourselve pls.");
+    return;
+  }
 
   if (current_state_landing_ == IDLE_STATE) {
 
     return;
 
-  } else if (current_state_landing_ == FLY_HOME_STATE) {
+  } else if (current_state_landing_ == FLY_THERE_STATE) {
 
-    if (sqrt(pow(odometry_x - takeoff_x_, 2) + pow(odometry_y - takeoff_y_, 2)) < 0.5) {
+    if (sqrt(pow(odometry.pose.pose.position.x - land_there_current_frame.reference.position.x, 2) +
+             pow(odometry.pose.pose.position.y - land_there_current_frame.reference.position.y, 2) +
+             pow(odometry.pose.pose.position.z - land_there_current_frame.reference.position.z, 2)) < 0.5) {
 
       ROS_INFO("[UavManager]: landing");
 
@@ -915,6 +943,20 @@ void UavManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
 
 //}
 
+/* //{ callbackMavrosGps() */
+
+void UavManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg) {
+
+  if (!is_initialized_)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+
+  transformer_->setCurrentLatLon(msg->latitude, msg->longitude);
+}
+
+//}
+
 /* //{ callbackAttitudeCmd() */
 
 void UavManager::callbackAttitudeCmd(const mrs_msgs::AttitudeCommandConstPtr& msg) {
@@ -1033,6 +1075,8 @@ void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
     tf::Matrix3x3 m(quaternion_odometry);
     m.getRPY(odometry_roll_, odometry_pitch_, odometry_yaw_);
 
+    transformer_->setCurrentControlFrame(odometry_.header.frame_id);
+
     got_odometry_ = true;
   }
 }
@@ -1096,10 +1140,6 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
   auto mavros_state                = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
   auto last_mass_difference        = mrs_lib::get_mutexed(mutex_last_mass_difference_, last_mass_difference_);
-
-  double odometry_x, odometry_y;
-  odometry_x = odometry.pose.pose.position.x;
-  odometry_y = odometry.pose.pose.position.y;
 
   char message[200];
 
@@ -1261,9 +1301,11 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.success = takeoff_out.response.success;
       res.message = takeoff_out.response.message;
 
-      takeoff_x_        = odometry_x;
-      takeoff_y_        = odometry_y;
-      takeoff_frame_id_ = odometry.header.frame_id;
+      land_there_reference_.header               = odometry.header;
+      land_there_reference_.reference.position.x = odometry.pose.pose.position.x;
+      land_there_reference_.reference.position.y = odometry.pose.pose.position.y;
+      land_there_reference_.reference.position.z = odometry.pose.pose.position.z;
+      land_there_reference_.reference.yaw        = tf::getYaw(odometry.pose.pose.orientation);
 
       {
         // if enabled, start the timer for measuring the flight time
@@ -1273,7 +1315,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
         }
       }
 
-      ROS_INFO("[UavManager]: took off, saving x=%0.2f, y=%0.2f as home position", takeoff_x_, takeoff_y_);
+      ROS_INFO("[UavManager]: took off, saving x=%0.2f, y=%0.2f as home position", land_there_reference_.reference.position.x,
+               land_there_reference_.reference.position.y);
 
       takingoff_ = true;
       number_of_takeoffs_++;
@@ -1436,11 +1479,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
   if (!is_initialized_)
     return false;
 
-  // copy member variables
   auto odometry = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
-
-  double odometry_z;
-  odometry_z = odometry.pose.pose.position.z;
 
   char message[100];
 
@@ -1481,18 +1520,17 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
   takingoff_           = false;
   takeoff_timer_.stop();
 
-  ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", takeoff_x_, takeoff_y_);
+  ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", land_there_reference_.reference.position.x, land_there_reference_.reference.position.y);
 
   ungrip();
 
   mrs_msgs::ReferenceStampedSrv reference_out;
 
-  reference_out.request.header.frame_id = takeoff_frame_id_;
+  land_there_reference_.reference.position.z = odometry.pose.pose.position.z;
 
-  reference_out.request.reference.position.x = takeoff_x_;
-  reference_out.request.reference.position.y = takeoff_y_;
-  reference_out.request.reference.position.z = odometry_z;
-  reference_out.request.reference.yaw        = odometry_yaw_;
+  reference_out.request.header.frame_id = land_there_reference_.header.frame_id;
+  reference_out.request.header.stamp    = ros::Time::now();
+  reference_out.request.reference       = land_there_reference_.reference;
 
   {
     std::scoped_lock lock(mutex_services_);
@@ -1505,7 +1543,94 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     res.success = reference_out.response.success;
     res.message = "Flying home for landing";
 
-    changeLandingState(FLY_HOME_STATE);
+    changeLandingState(FLY_THERE_STATE);
+
+    landing_timer_.start();
+
+  } else {
+
+    res.success = reference_out.response.success;
+    res.message = reference_out.response.message;
+    changeLandingState(IDLE_STATE);
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ callbackLandThere() */
+
+bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  char message[100];
+
+  if (!got_odometry_) {
+    sprintf((char*)&message, "Can't land, missing odometry!");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
+
+  if (!got_control_manager_diagnostics_) {
+    sprintf((char*)&message, "Can't land, missing tracker status!");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
+
+  if (!got_attitude_cmd_) {
+    sprintf((char*)&message, "Can't land, missing attitude command!");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
+
+  if (fixing_max_height_) {
+    sprintf((char*)&message, "Can't land, descedning to safety height!");
+    res.message = message;
+    res.success = false;
+    ROS_ERROR("[UavManager]: %s", message);
+    return true;
+  }
+
+  // stop the eventual takeoff
+  waiting_for_takeoff_ = false;
+  takingoff_           = false;
+  takeoff_timer_.stop();
+
+  ROS_INFO("[UavManager]: landing there -> x=%.2f, y=%.2f, z=%.2f, yaw=%.2f in %s", req.reference.position.x, req.reference.position.y,
+           req.reference.position.z, req.reference.yaw, req.header.frame_id.c_str());
+
+  ungrip();
+
+  mrs_msgs::ReferenceStampedSrv reference_out;
+
+  land_there_reference_.header    = req.header;
+  land_there_reference_.reference = req.reference;
+
+  reference_out.request.header.frame_id = land_there_reference_.header.frame_id;
+  reference_out.request.header.stamp    = ros::Time::now();
+  reference_out.request.reference       = land_there_reference_.reference;
+
+  {
+    std::scoped_lock lock(mutex_services_);
+
+    service_client_emergency_reference_.call(reference_out);
+  }
+
+  if (reference_out.response.success == true) {
+
+    res.success = reference_out.response.success;
+    res.message = "Flying there for landing";
+
+    changeLandingState(FLY_THERE_STATE);
 
     landing_timer_.start();
 

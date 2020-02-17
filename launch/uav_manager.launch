@@ -53,6 +53,7 @@
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param name="uav_mass" value="$(arg UAV_MASS)" />
+      <param name="uav_name" value="$(arg UAV_NAME)" />
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="g" value="$(arg g)" />
 
@@ -62,6 +63,7 @@
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
+      <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
@@ -77,6 +79,7 @@
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
       <remap from="~land_home_in" to="~land_home" />
+      <remap from="~land_there_in" to="~land_there" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
