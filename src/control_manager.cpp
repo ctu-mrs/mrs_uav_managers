@@ -2505,8 +2505,8 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Relasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
-                           position_error_x_, position_error_y_, position_error_z_);
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Relasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
+                           _eland_threshold_ / 2.0, position_error_x_, position_error_y_, position_error_z_);
 
         ungrip();
       }
@@ -2530,6 +2530,20 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
   // | -------------------- yaw control error ------------------- |
   // do not have to mutex the yaw_error_ here since I am filling it in this function
+  if (yaw_error_ > _yaw_error_eland_threshold_ / 2.0) {
+
+    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+
+      if (!failsafe_triggered_ && !eland_triggered_) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
+                           (180.0 / M_PI) * _yaw_error_eland_threshold_ / 2.0);
+
+        ungrip();
+      }
+    }
+  }
+
   if (yaw_error_ > _yaw_error_eland_threshold_) {
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
