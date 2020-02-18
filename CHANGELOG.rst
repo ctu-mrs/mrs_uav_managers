@@ -2,6 +2,107 @@
 Changelog for package mrs_uav_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* updated land/eland cutoff params -> 2x faster landing detection
+* added land_there service to uav_manager
+* added yaw error payload release check
+* added emergency ungrip before eland
+* emergency reference is transformed
+* added bumper params service
+* ungripping payload while landing home
+* added version checks
+* changed the motors on pub to offboard on
+* added checks for null tracker to emergency callbacks
+* added motors-on publisher
+* pushing common handlers to controllers
+* sprinkled in some Profiler to ControlManger
+* added landing_controller option to UavManager
+* removed NullTracker switch before landing
+* increased joystick carrot distance
+* muted null_trackers callback message
+* increased timeouts for profiler routines
+* added hiccup detector
+* added services for reference validation
+* sped up land_home
+* updated control manager diag
+* added motors to diag
+* updated the joystick control fallback
+* fixed constraint/gain manger setting bug
+* gain/const manager don't give up when they fail
+* throttled RC mode prints
+* gain/const manager: fallbacks only if neccessary
+* control error publish only when flying
+* updated compilation flags
+* fixed bumper's obstacle hugging
+* updated odometry missing timeout
+* added maxthrust ungripper
+* ControlManager: updated cmd odom publisher
+* added gain and constraint diagnostics
+* added height to point obstacles
+* removed target attitude publisher from control manager
+* swtiched from target_att to att_cmd
+* added odom callbacks setter
+* updated debil land timeout
+* added odometry callbacks disabler
+* fixed the controller init after null tracker
+* returning true when activating already active t/c
+* throttled partial landing rinfo
+* added getMinHeight service
+* added trackerResetStatic method to trackers
+* added set_min_height service
+* refactored disabling of switching callbacks
+* reworked switch-tracker/controller callbacks
+* workaraounded point obstacles in latlon_origin
+* updated bumper description
+* updated control error publisher
+* updated uav_names param loading
+* fixed wrong return value in resetTracker()
+* added area coordinate markers
+* updated UAV mass in launch files
+* fixed bumper infinity bug
+* added constraints publisher
+* updated transformer calls
+* added OFFBOARD fall-out check with subsequent motors(0)
+* added WORLD_NAME parameter to launch files
+* updated R-mode params
+* retard 2.0
+* updated defaut constraints to something more sensible
+* fixed bumper safety area transformation
+* updated the null attitude command
+* fixed common handler initialization before tracker loading
+* safety area marker in local origin
+* fixed max altitude bug
+* added routines for validation of odom. and uav state
+* added nan checks for cont. and track. commands
+* fixed deadlock during null return check from controllers
+* added service for resetting a tracker
+* added bumper enabler services
+* updated safety area markers
+* added mavros gps subscriber
+* generalized the transforms
+* updated nulltracker's response
+* extracted the tf transformer from control manager
+* fixed rc channel empty detection bug
+* updated get_mutexed calls
+* refatored mutexes to use get_mutexed()
+* fixed wrong mass publisher type
+* fixed wrong integral gains
+* fixed high integration gains
+* added bumper to mpc tracker
+* separated rviz visual markers coming from control manager
+* fixed tf bug with asin
+* changed fcu services to fcu_untilted
+* updated disarming routine
+* changed set_reference to just reference
+* references are transformed by tfs
+* added speed tracker
+* added transformer
+* added reference transform routine
+* added odometry switch to uavStateCallback
+* fixed race condition bug when failsafing after controller returns null
+* Contributors: Matej Petrlik, Pavel Petracek, Pavel Petráček, Petr Stepan, Tomas Baca, Vit Kratky
+
 0.0.3 (2019-10-25)
 ------------------
 * fixed retard mode rc channels
