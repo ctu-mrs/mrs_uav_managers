@@ -4,6 +4,7 @@ Changelog for package mrs_uav_manager
 
 Forthcoming
 -----------
+* added safety area toggle service
 * updated land/eland cutoff params -> 2x faster landing detection
 * added land_there service to uav_manager
 * added yaw error payload release check
