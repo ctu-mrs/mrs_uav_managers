@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.4 (2020-02-18)
+------------------
 * added safety area toggle service
 * updated land/eland cutoff params -> 2x faster landing detection
 * added land_there service to uav_manager
