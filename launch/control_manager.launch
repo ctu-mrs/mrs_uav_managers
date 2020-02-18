@@ -307,6 +307,7 @@
       <remap from="~get_min_height_in" to="~get_min_height" />
       <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
+      <remap from="~use_safety_area_in" to="~use_safety_area" />
 
     </node>
 

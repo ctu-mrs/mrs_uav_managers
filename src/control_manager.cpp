@@ -373,6 +373,7 @@ private:
   ros::ServiceServer service_server_enable_callbacks_;
   ros::ServiceServer service_server_set_constraints_;
   ros::ServiceServer service_server_use_joystick_;
+  ros::ServiceServer service_server_use_safety_area_;
   ros::ServiceServer service_server_emergency_reference_;
   ros::ServiceServer service_server_pirouette_;
   ros::ServiceServer service_server_eland_;
@@ -502,7 +503,7 @@ private:
 
   // safety area
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
-  bool                                 _use_safety_area_ = false;
+  bool                                 use_safety_area_ = false;
   std::string                          _safety_area_frame_;
   double                               min_height_                 = 0;
   bool                                 _obstacle_points_enabled_   = false;
@@ -552,6 +553,7 @@ private:
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
@@ -967,12 +969,12 @@ void ControlManager::onInit() {
 
   // | ----------------------- safety area ---------------------- |
 
-  param_loader.load_param("safety_area/use_safety_area", _use_safety_area_);
+  param_loader.load_param("safety_area/use_safety_area", use_safety_area_);
   param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
   param_loader.load_param("safety_area/min_height", min_height_);
   param_loader.load_param("safety_area/max_height", _max_height_);
 
-  if (_use_safety_area_) {
+  if (use_safety_area_) {
     Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
 
     param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
@@ -1025,7 +1027,7 @@ void ControlManager::onInit() {
     }
   }
 
-  common_handlers_->safety_area.use_safety_area       = _use_safety_area_;
+  common_handlers_->safety_area.use_safety_area       = use_safety_area_;
   common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
@@ -1445,6 +1447,7 @@ void ControlManager::onInit() {
   service_server_enable_callbacks_         = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
   service_server_set_constraints_          = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
   service_server_use_joystick_             = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+  service_server_use_safety_area_          = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
   service_server_eland_                    = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
   service_server_partial_landing_          = nh_.advertiseService("partial_land_in", &ControlManager::callbackPartialLanding, this);
   service_server_transform_reference_      = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
@@ -1648,7 +1651,7 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
   // |               publish the safety area markers              |
   // --------------------------------------------------------------
 
-  if (_use_safety_area_) {
+  if (use_safety_area_) {
 
     visualization_msgs::MarkerArray safety_area_marker_array;
     visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
@@ -4637,6 +4640,29 @@ bool ControlManager::callbackBumperEnableService(std_srvs::SetBool::Request& req
 
 //}
 
+/* //{ callbackUseSafetyArea() */
+
+bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  use_safety_area_ = req.data;
+
+  std::stringstream ss;
+
+  ss << "safety area " << (use_safety_area_ ? "ENABLED" : "DISABLED");
+
+  ROS_INFO_STREAM("[ControlManager]: " << ss.str());
+
+  res.success = true;
+  res.message = ss.str();
+
+  return true;
+}
+
+//}
+
 /* //{ callbackBumperEnableRepulsionService() */
 
 bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
@@ -5879,7 +5905,7 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsS
 
 bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point) {
 
-  if (!_use_safety_area_) {
+  if (!use_safety_area_) {
     return true;
   }
 
@@ -5915,7 +5941,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
 bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point) {
 
-  if (!_use_safety_area_) {
+  if (!use_safety_area_) {
     return true;
   }
 
@@ -5939,7 +5965,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
 bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
 
-  if (!_use_safety_area_) {
+  if (!use_safety_area_) {
     return true;
   }
 
