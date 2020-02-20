@@ -738,7 +738,6 @@ private:
 
   // automatic pc shutdown (DARPA specific)
   bool   _automatic_pc_shutdown_enabled_ = false;
-  double _automatic_pc_shutdown_threshold_;
 
   // pirouette
   bool       _pirouette_enabled_ = false;
@@ -927,7 +926,6 @@ void ControlManager::onInit() {
   param_loader.load_param("rc_joystick/channels/thrust", _rc_channel_thrust_);
 
   param_loader.load_param("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
-  param_loader.load_param("automatic_pc_shutdown/distance_threshold", _automatic_pc_shutdown_threshold_);
 
   param_loader.load_param("pirouette/speed", _pirouette_speed_);
   param_loader.load_param("pirouette/timer_rate", _pirouette_timer_rate_);
@@ -5714,15 +5712,10 @@ void ControlManager::shutdown() {
 
   if (_automatic_pc_shutdown_enabled_) {
 
-    double distance_to_origin = sqrt(pow(uav_state.pose.position.x, 2.0) + pow(uav_state.pose.position.y, 2.0));
+    ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
 
-    if (distance_to_origin > _automatic_pc_shutdown_threshold_) {
-
-      ROS_INFO("[ControlManager]: Calling service for shutdown (DARPA-specific)");
-
-      std_srvs::Trigger shutdown_out;
-      service_client_shutdown_.call(shutdown_out);
-    }
+    std_srvs::Trigger shutdown_out;
+    service_client_shutdown_.call(shutdown_out);
   }
 }
 

@@ -102,8 +102,7 @@ obstacle_bumper:
 
 automatic_pc_shutdown:
 
-  enabled: false
-  distance_threshold: 5 # [m]
+  enabled: true
 
 partial_land:
 
