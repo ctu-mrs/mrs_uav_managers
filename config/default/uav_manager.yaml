@@ -38,8 +38,8 @@ landing:
   landing_controller: "MpcController"
 
   # those two must apply simultaneously
-  landing_cutoff_mass_factor:  0.75 # how much light does the drone appear to be?
-  landing_cutoff_timeout:  1.0 # [s] how long does the thrust has to be bellow the mass factor
+  landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
+  landing_cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
 
   disarm: true
 
