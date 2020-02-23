@@ -3880,8 +3880,8 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
     } else {
 
       // detect the switch of a switch on the RC
-      if ((rc_joystick_channel_last_value_ < PWM_MIDDLE && msg->channels[_rc_joystick_channel_] > PWM_MIDDLE) ||
-          (rc_joystick_channel_last_value_ > PWM_MIDDLE && msg->channels[_rc_joystick_channel_] < PWM_MIDDLE)) {
+      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - 200) && msg->channels[_rc_joystick_channel_] > (PWM_MIDDLE + 200)) ||
+          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + 200) && msg->channels[_rc_joystick_channel_] < (PWM_MIDDLE - 200))) {
 
         // enter an event to the std vector
         std::scoped_lock lock(mutex_rc_channel_switch_time_);
