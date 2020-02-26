@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.5 (2020-02-26)
+------------------
 * added deadband around retard mode
 * undone the new landing mass factor parameters for landing and elanding
 * updated automatic shutdown
