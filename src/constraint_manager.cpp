@@ -319,39 +319,49 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
 
-  char message[200];
+  std::stringstream ss;
 
   if (!stringInVector(req.value, _constraint_names_)) {
 
-    sprintf((char *)&message, "The constraints '%s' do not exist (in the ConstraintManager's config).", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' do not exist (in the ConstraintManager's config)";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[ConstraintManager]: %s", message);
     return true;
   }
 
   if (!stringInVector(req.value, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' are not allowed given the current odometry type";
+
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[ConstraintManager]: %s", message);
     return true;
   }
 
   // try to set the constraints
   if (!setConstraints(req.value)) {
 
-    res.message = "the control_manager can't set the constraints";
+    ss << "the ControlManager could not set the constraints";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
     return true;
 
   } else {
 
-    sprintf((char *)&message, "The constraints '%s' are set.", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' were set";
+
+    ROS_INFO_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = true;
-    ROS_INFO("[ConstraintManager]: %s", message);
     return true;
   }
 }

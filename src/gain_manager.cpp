@@ -425,39 +425,49 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
 
-  char message[200];
+  std::stringstream ss;
 
   if (!stringInVector(req.value, _gain_names_)) {
 
-    sprintf((char *)&message, "The gains '%s' do not exist (in the gain_manager's config).", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' do not exist (in the GainManager's config)";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[GainManager]: %s", message);
     return true;
   }
 
   if (!stringInVector(req.value, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The gains '%s' are not allowed given the current odometry.type.", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' are not allowed given the current odometry type";
+
+    ROS_WARN_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[GainManager]: %s", message);
     return true;
   }
 
-  // try to set the _gains_
+  // try to set the gains
   if (!setGains(req.value)) {
 
-    res.message = "the controller can't set the gains";
+    ss << "the So3Controller could not set the gains";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
     return true;
 
   } else {
 
-    sprintf((char *)&message, "The gains '%s' are set.", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' are set.";
+
+    ROS_INFO_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = true;
-    ROS_INFO("[GainManager]: %s", message);
     return true;
   }
 }
