@@ -10,9 +10,6 @@ LineTracker:
 JoyTracker:
   address: "mrs_trackers/JoyTracker"
 
-JoyBumperTracker:
-  address: "mrs_trackers/JoyBumperTracker"
-
 MatlabTracker:
   address: "mrs_trackers/MatlabTracker"
 
