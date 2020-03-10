@@ -19,7 +19,6 @@
 
     <!-- custom configs for trackers -->
   <arg name="custom_config_csv_tracker" default="" />
-  <arg name="custom_config_joy_bumper_tracker" default="" />
   <arg name="custom_config_joy_tracker" default="" />
   <arg name="custom_config_landoff_tracker" default="" />
   <arg name="custom_config_line_tracker" default="" />
@@ -164,15 +163,6 @@
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
-
-      <!-- JoyBumperTracker -->
-      <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/default/joy_bumper_tracker.yaml" />
-      <rosparam ns="joy_bumper_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_bumper_tracker.yaml" />
-      <rosparam if="$(eval not arg('custom_config_joy_bumper_tracker') == '')" ns="joy_bumper_tracker" file="$(arg custom_config_joy_bumper_tracker)" />
-      <param name="joy_bumper_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~joy_bumper_tracker/profiler" to="profiler" />
-      <remap from="~joy_bumper_tracker/joystick_in" to="/joy" />
-      <remap from="~joy_bumper_tracker/bumper_in" to="bumper/obstacle_sectors" />
 
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/default/matlab_tracker.yaml" />

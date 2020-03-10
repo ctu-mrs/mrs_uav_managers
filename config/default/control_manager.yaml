@@ -53,11 +53,15 @@ safety:
   eland:
 
     controller: "EmergencyController"
+
+    # Making those numbers smaller than "factor: 0.5, timeout: 2.0" can result in premature
+    # landing detection, especially in the case of wild eland with weird initial conditions.
+    # It might be safe with just the normal landing though.
     cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
     cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
 
     disarm: true
-    timer_rate: 10
+    timer_rate: 10 # [Hz]
 
   escalating_failsafe:
 

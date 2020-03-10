@@ -7,7 +7,6 @@ trackers : [
   "MatlabTracker",
   "SpeedTracker",
   "NullTracker",
-  "JoyBumperTracker",
 ]
 
 # - list of names of dynamically loaded controllers

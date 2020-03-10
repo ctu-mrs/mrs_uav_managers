@@ -136,7 +136,8 @@ void ConstraintManager::onInit() {
 
   // loading constraint names
   for (it = _constraint_names_.begin(); it != _constraint_names_.end(); ++it) {
-    ROS_INFO_STREAM("[ConstraintManager]: loading constraints \"" << *it << "\"");
+
+    ROS_INFO_STREAM("[ConstraintManager]: loading constraints '" << *it << "'");
 
     mrs_msgs::TrackerConstraintsSrvRequest new_constraints;
 
@@ -172,7 +173,7 @@ void ConstraintManager::onInit() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _constraint_names_)) {
-        ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
+        ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
         ros::shutdown();
       }
     }
@@ -187,7 +188,7 @@ void ConstraintManager::onInit() {
     param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
-      ROS_ERROR("[ConstraintManager]: the element '%s' of %s_allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
+      ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
@@ -250,7 +251,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
   it = _constraints_.find(constraints_name);
 
   if (it == _constraints_.end()) {
-    ROS_ERROR("[ConstraintManager]: could not setConstraints(), the constraint name \"%s\" is not on the list", constraints_name.c_str());
+    ROS_ERROR("[ConstraintManager]: could not setConstraints(), the constraint name '%s' is not on the list", constraints_name.c_str());
     return false;
   }
 
@@ -274,7 +275,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
     } else {
 
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: set service for setting constraints returned: %s", srv_call.response.message.c_str());
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: set service for setting constraints returned: '%s'", srv_call.response.message.c_str());
       return false;
     }
   }
@@ -319,39 +320,49 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
 
-  char message[200];
+  std::stringstream ss;
 
   if (!stringInVector(req.value, _constraint_names_)) {
 
-    sprintf((char *)&message, "The constraints '%s' do not exist (in the ConstraintManager's config).", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' do not exist (in the ConstraintManager's config)";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[ConstraintManager]: %s", message);
     return true;
   }
 
   if (!stringInVector(req.value, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The constraints '%s' are not allowed given the current odometry.type.", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' are not allowed given the current odometry type";
+
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[ConstraintManager]: %s", message);
     return true;
   }
 
   // try to set the constraints
   if (!setConstraints(req.value)) {
 
-    res.message = "the control_manager can't set the constraints";
+    ss << "the ControlManager could not set the constraints";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
     return true;
 
   } else {
 
-    sprintf((char *)&message, "The constraints '%s' are set.", req.value.c_str());
-    res.message = message;
+    ss << "the constraints '" << req.value.c_str() << "' were set";
+
+    ROS_INFO_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = true;
-    ROS_INFO("[ConstraintManager]: %s", message);
     return true;
   }
 }
@@ -376,21 +387,21 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
   auto last_estimator_type  = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
 
   if (!got_odometry_diagnostics_) {
-    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can't do constraint management, missing odometry diagnostics!");
+    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing odometry diagnostics!");
     return;
   }
 
   // | --- automatically set constraints when odometry.type changes -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the odometry type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_fallback_constraints_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_fallback_constraints_.end()) {
 
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry.type \"%s\" was not specified in the constraint_manager's config!",
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry type '%s' was not specified in the constraint_manager's config!",
                         odometry_diagnostics.estimator_type.name.c_str());
 
     } else {
@@ -403,14 +414,14 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
         // else, try to set the fallback constraints
       } else {
 
-        ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints \"%s\" are not within the allowed constraints for \"%s\"",
-                          current_constraints.c_str(), odometry_diagnostics.estimator_type.name.c_str());
+        ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(),
+                          odometry_diagnostics.estimator_type.name.c_str());
 
         if (setConstraints(it->second)) {
 
           last_estimator_type = odometry_diagnostics.estimator_type.type;
 
-          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: \"%s\"", it->second.c_str());
+          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: '%s'", it->second.c_str());
 
         } else {
 
@@ -453,7 +464,7 @@ void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
     it = _map_type_allowed_constraints_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_allowed_constraints_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry.type \"%s\" was not specified in the constraint_manager's config!",
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry.type '%s' was not specified in the constraint_manager's config!",
                         odometry_diagnostics.estimator_type.name.c_str());
     } else {
       diagnostics.available = it->second;
@@ -472,7 +483,7 @@ void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
     publisher_diagnostics_.publish(diagnostics);
   }
   catch (...) {
-    ROS_ERROR("[ConstraintManager]: Exception caught during publishing topic %s.", publisher_diagnostics_.getTopic().c_str());
+    ROS_ERROR("[ConstraintManager]: exception caught during publishing topic %s", publisher_diagnostics_.getTopic().c_str());
   }
 }
 

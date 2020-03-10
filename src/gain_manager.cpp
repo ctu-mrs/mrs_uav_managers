@@ -153,7 +153,8 @@ void GainManager::onInit() {
 
   // loading gain_names
   for (it = _gain_names_.begin(); it != _gain_names_.end(); ++it) {
-    ROS_INFO_STREAM("[GainManager]: loading gains \"" << *it << "\"");
+
+    ROS_INFO_STREAM("[GainManager]: loading gains '" << *it << "'");
 
     Gains_t new_gains;
 
@@ -188,7 +189,7 @@ void GainManager::onInit() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _gain_names_)) {
-        ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
+        ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
         ros::shutdown();
       }
     }
@@ -203,7 +204,7 @@ void GainManager::onInit() {
     param_loader.load_param("gain_management/fallback_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
-      ROS_ERROR("[GainManager]: the element '%s' of %s_allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
+      ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
@@ -245,7 +246,7 @@ void GainManager::onInit() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loaded_successfully()) {
-    ROS_ERROR("[GainManager]: Could not load all parameters!");
+    ROS_ERROR("[GainManager]: could not load all parameters!");
     ros::shutdown();
   }
 
@@ -268,7 +269,7 @@ bool GainManager::setGains(std::string gains_name) {
   it = _gains_.find(gains_name);
 
   if (it == _gains_.end()) {
-    ROS_WARN("[GainManager]: Can't set gains for '%s', the mode is not on a list!", gains_name.c_str());
+    ROS_WARN("[GainManager]: can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
     return false;
   }
 
@@ -381,8 +382,6 @@ void GainManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstP
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometryDiagnostics");
 
-  ROS_INFO_ONCE("[GainManager]: odom diag");
-
   {
     std::scoped_lock lock(mutex_odometry_diagnostics_);
 
@@ -425,39 +424,49 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
 
-  char message[200];
+  std::stringstream ss;
 
   if (!stringInVector(req.value, _gain_names_)) {
 
-    sprintf((char *)&message, "The gains '%s' do not exist (in the gain_manager's config).", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' do not exist (in the GainManager's config)";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[GainManager]: %s", message);
     return true;
   }
 
   if (!stringInVector(req.value, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
 
-    sprintf((char *)&message, "The gains '%s' are not allowed given the current odometry.type.", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' are not allowed given the current odometry type";
+
+    ROS_WARN_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[GainManager]: %s", message);
     return true;
   }
 
-  // try to set the _gains_
+  // try to set the gains
   if (!setGains(req.value)) {
 
-    res.message = "the controller can't set the gains";
+    ss << "the So3Controller could not set the gains";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = false;
     return true;
 
   } else {
 
-    sprintf((char *)&message, "The gains '%s' are set.", req.value.c_str());
-    res.message = message;
+    ss << "the gains '" << req.value.c_str() << "' are set";
+
+    ROS_INFO_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+
+    res.message = ss.str();
     res.success = true;
-    ROS_INFO("[GainManager]: %s", message);
     return true;
   }
 }
@@ -478,7 +487,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("gainManagementTimer", _rate_, 0.01, event);
 
   if (!got_odometry_diagnostics_) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can't do gain management, missing odometry diagnostics!");
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do gain management, missing odometry diagnostics!");
     return;
   }
 
@@ -490,14 +499,14 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   // | --- automatically set _gains_ when odometry.type changes -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
 
-    ROS_INFO_THROTTLE(1.0, "[GainManager]: the odometry.type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+    ROS_INFO_THROTTLE(1.0, "[GainManager]: the odometry type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_fallback_gains_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_fallback_gains_.end()) {
 
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type \"%s\" was not specified in the gain_manager's config!",
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry type '%s' was not specified in the gain_manager's config!",
                         odometry_diagnostics.estimator_type.name.c_str());
 
     } else {
@@ -510,14 +519,14 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
         // else, try to set the fallback gains
       } else {
 
-        ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains \"%s\" are not within the allowed gains for \"%s\"", current_gains.c_str(),
+        ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
                           odometry_diagnostics.estimator_type.name.c_str());
 
         if (setGains(it->second)) {
 
           last_estimator_type = odometry_diagnostics.estimator_type.type;
 
-          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: \"%s\"", it->second.c_str());
+          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: '%s'", it->second.c_str());
 
         } else {
 
@@ -556,7 +565,7 @@ void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
     it = _map_type_allowed_gains_.find(odometry_diagnostics.estimator_type.name);
 
     if (it == _map_type_allowed_gains_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type \"%s\" was not specified in the gain_manager's config!",
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type '%s' was not specified in the gain_manager's config!",
                         odometry_diagnostics.estimator_type.name.c_str());
     } else {
       diagnostics.available = it->second;
@@ -596,7 +605,7 @@ void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
     publisher_diagnostics_.publish(diagnostics);
   }
   catch (...) {
-    ROS_ERROR("[GainManager]: Exception caught during publishing topic %s.", publisher_diagnostics_.getTopic().c_str());
+    ROS_ERROR("[GainManager]: exception caught during publishing topic %s", publisher_diagnostics_.getTopic().c_str());
   }
 }
 

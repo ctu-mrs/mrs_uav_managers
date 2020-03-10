@@ -1141,110 +1141,110 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
   auto mavros_state                = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
   auto last_mass_difference        = mrs_lib::get_mutexed(mutex_last_mass_difference_, last_mass_difference_);
 
-  char message[200];
+  std::stringstream ss;
 
   if (!got_odometry_) {
-    sprintf((char*)&message, "Can't takeoff, missing odometry!");
-    res.message = message;
+    ss << "can not takeoff, missing odometry!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_mavros_state_ || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
-    sprintf((char*)&message, "Can't takeoff, missing mavros state!");
-    res.message = message;
+    ss << "can not takeoff, missing mavros state!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!mavros_state.armed) {
-    sprintf((char*)&message, "Can't takeoff, UAV not armed!");
-    res.message = message;
+    ss << "can not takeoff, UAV not armed!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (mavros_state.mode.compare(std::string("OFFBOARD")) != 0) {
-    sprintf((char*)&message, "Can't takeoff, UAV not in offboard mode!");
-    res.message = message;
+    ss << "can not takeoff, UAV not in offboard mode!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char*)&message, "Can't takeoff, missing control manager diagnostics!");
-    res.message = message;
+    ss << "can not takeoff, missing control manager diagnostics!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_attitude_cmd_) {
-    sprintf((char*)&message, "Can't takeoff, missing target attitude!");
-    res.message = message;
+    ss << "can not takeoff, missing target attitude!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_max_height_) {
-    sprintf((char*)&message, "Can't takeoff, missing max height");
-    res.message = message;
+    ss << "can not takeoff, missing max height";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_height_) {
-    sprintf((char*)&message, "Can't takeoff, missing height");
-    res.message = message;
+    ss << "can not takeoff, missing height";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_landoff_diagnostics_) {
-    sprintf((char*)&message, "Can't takeoff, missing landoff diagnostics");
-    res.message = message;
+    ss << "can not takeoff, missing landoff diagnostics";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (_null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 &&
       _partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
-    sprintf((char*)&message, "Can't takeoff, need '%s' to be active!", _null_tracker_name_.c_str());
-    res.message = message;
+    ss << "can not takeoff, need '" << _null_tracker_name_ << "' to be active!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (_gain_manager_required_ && (ros::Time::now() - gains_last_time).toSec() > 5.0) {
-    sprintf((char*)&message, "Can't takeoff, GainManager is not running!");
-    res.message = message;
+    ss << "can not takeoff, GainManager is not running!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (_constraint_manager_required_ && (ros::Time::now() - constraints_last_time).toSec() > 5.0) {
-    sprintf((char*)&message, "Can't takeoff, ConstraintManager is not running!");
-    res.message = message;
+    ss << "can not takeoff, ConstraintManager is not running!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
   if (!got_motors_ || (ros::Time::now() - motors.stamp).toSec() > 1.0 || !motors.data) {
-    sprintf((char*)&message, "Can't takeoff, motors are off!");
-    res.message = message;
+    ss << "can not takeoff, motors are off!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
     return true;
   }
 
@@ -1252,19 +1252,20 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
     if (!got_attitude_cmd_) {
 
-      sprintf((char*)&message, "Can't takeoff, missing attitude command!");
-      res.message = message;
+      ss << "can not takeoff, missing attitude command!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      res.message = ss.str();
       res.success = false;
-      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
 
     if (last_mass_difference > 0.5) {
 
-      sprintf((char*)&message, "Can't takeoff, estimated mass difference is too large: %.2f!", last_mass_difference);
-      res.message = message;
+      ss << std::setprecision(2);
+      ss << "can not takeoff, estimated mass difference is too large: " << _null_tracker_name_ << "!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      res.message = ss.str();
       res.success = false;
-      ROS_ERROR("[UavManager]: %s", message);
       return true;
     }
   }
@@ -1362,29 +1363,29 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   // copy member variables
   auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
 
-  char message[100];
+  std::stringstream ss;
 
   if (!got_odometry_) {
-    sprintf((char*)&message, "Can't land, missing odometry!");
-    res.message = message;
+    ss << "can not land, missing odometry!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char*)&message, "Can't land, missing control manager diagnostics!");
-    res.message = message;
+    ss << "can not land, missing control manager diagnostics!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_attitude_cmd_) {
-    sprintf((char*)&message, "Can't land, missing attitude command!");
-    res.message = message;
+    ss << "can not land, missing attitude command!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
@@ -1410,10 +1411,10 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   mrs_msgs::String switch_tracker_out;
   switch_tracker_out.request.value = _landing_tracker_name_;
   if (!service_client_switch_tracker_.call(switch_tracker_out)) {
-    sprintf((char*)&message, "Service call for switching to tracker %s failed.", _landing_tracker_name_.c_str());
-    res.message = message;
+    ss << "service call for switching to tracker '%s' failed.", _landing_tracker_name_.c_str();
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     suc = false;
     return true;
   }
@@ -1421,10 +1422,10 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   mrs_msgs::String switch_controller_out;
   switch_controller_out.request.value = _landing_controller_name_;
   if (!service_client_switch_controller_.call(switch_controller_out)) {
-    sprintf((char*)&message, "Service call for switching to controller %s failed.", _landing_controller_name_.c_str());
-    res.message = message;
+    ss << "service call for switching to controller '%s' failed.", _landing_controller_name_.c_str();
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     suc = false;
     return true;
   }
@@ -1445,26 +1446,28 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
       } else {
 
-        sprintf((char*)&message, "Service call for landing was not successfull: %s", land_out.response.message.c_str());
-        res.message = message;
+        ss << "service call for landing was not successfull: '%s'", land_out.response.message.c_str();
+        res.message = ss.str();
         res.success = false;
-        ROS_ERROR("[UavManager]: %s", message);
+        ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
 
         return true;
       }
 
     } else {
 
-      ROS_ERROR("[UavManager]: service call for landing failed");
+      ss << "service call for landing failed";
       res.success = false;
-      res.message = "service call for landing failed";
+      res.message = ss.str();
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     }
 
   } else {
 
-    ROS_ERROR("[UavManager]: could not switch to landing tracker or controller");
-    res.success = switch_tracker_out.response.success;
-    res.message = switch_tracker_out.response.message;
+    ss << "could not switch to landing tracker or controller: '" << switch_tracker_out.response.message << "'";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.success = false;
+    res.message = ss.str();
   }
 
   return true;
@@ -1481,37 +1484,37 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
   auto odometry = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
-  char message[100];
+  std::stringstream ss;
 
   if (!got_odometry_) {
-    sprintf((char*)&message, "Can't land, missing odometry!");
-    res.message = message;
+    ss << "can not land, missing odometry!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char*)&message, "Can't land, missing tracker status!");
-    res.message = message;
+    ss << "can not land, missing tracker status!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_attitude_cmd_) {
-    sprintf((char*)&message, "Can't land, missing attitude command!");
-    res.message = message;
+    ss << "can not land, missing attitude command!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (fixing_max_height_) {
-    sprintf((char*)&message, "Can't land, descedning to safety height!");
-    res.message = message;
+    ss << "can not land, descedning to safety height!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
@@ -1541,7 +1544,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
   if (reference_out.response.success == true) {
 
     res.success = reference_out.response.success;
-    res.message = "Flying home for landing";
+    res.message = "flying home for landing";
 
     changeLandingState(FLY_THERE_STATE);
 
@@ -1566,37 +1569,37 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
   if (!is_initialized_)
     return false;
 
-  char message[100];
+  std::stringstream ss;
 
   if (!got_odometry_) {
-    sprintf((char*)&message, "Can't land, missing odometry!");
-    res.message = message;
+    ss << "can not land, missing odometry!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_control_manager_diagnostics_) {
-    sprintf((char*)&message, "Can't land, missing tracker status!");
-    res.message = message;
+    ss << "can not land, missing tracker status!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (!got_attitude_cmd_) {
-    sprintf((char*)&message, "Can't land, missing attitude command!");
-    res.message = message;
+    ss << "can not land, missing attitude command!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
   if (fixing_max_height_) {
-    sprintf((char*)&message, "Can't land, descedning to safety height!");
-    res.message = message;
+    ss << "can not land, descedning to safety height!";
+    res.message = ss.str();
     res.success = false;
-    ROS_ERROR("[UavManager]: %s", message);
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     return true;
   }
 
