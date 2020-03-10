@@ -16,7 +16,6 @@ controllers : [
   "AttitudeController",
   "FailsafeController",
   "EmergencyController",
-  "PartialLandingController",
 ]
 
 # - this is the "do nothing tracker", which is active when no other is
@@ -107,14 +106,6 @@ obstacle_bumper:
 automatic_pc_shutdown:
 
   enabled: true
-
-partial_land:
-
-  enabled: true
-  timer_rate: 100 # [Hz]
-  mass_factor_trigger: 0.90 # [-]
-  cutoff_timeout: 0.30 # [s]
-  controller: "PartialLandingController"
 
 joystick:
 

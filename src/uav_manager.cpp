@@ -104,6 +104,7 @@ public:
   std::mutex      mutex_max_height_;
   bool            got_max_height_    = false;
   bool            fixing_max_height_ = false;
+
   // params
   bool   _max_height_enabled_ = false;
   int    _max_height_checking_rate_;
@@ -196,7 +197,6 @@ public:
 
   // names of important trackers
   std::string _null_tracker_name_;
-  std::string _partial_landing_controller_name_;
 
   // Takeoff timer
   ros::Timer takeoff_timer_;
@@ -294,7 +294,6 @@ void UavManager::onInit() {
   param_loader.load_param("enable_profiler", _profiler_enabled_);
 
   param_loader.load_param("null_tracker", _null_tracker_name_);
-  param_loader.load_param("partial_landing_controller", _partial_landing_controller_name_);
 
   param_loader.load_param("takeoff/rate", _takeoff_timer_rate_);
   param_loader.load_param("takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
@@ -1215,8 +1214,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     return true;
   }
 
-  if (_null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0 &&
-      _partial_landing_controller_name_.compare(control_manager_diagnostics.controller_status.controller) != 0) {
+  if (_null_tracker_name_.compare(control_manager_diagnostics.tracker_status.tracker) != 0) {
     ss << "can not takeoff, need '" << _null_tracker_name_ << "' to be active!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     res.message = ss.str();
