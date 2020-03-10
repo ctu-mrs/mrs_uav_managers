@@ -42,7 +42,6 @@ private:
   bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 
-private:
   std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers;
 };
 
