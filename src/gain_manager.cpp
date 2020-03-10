@@ -45,75 +45,77 @@ typedef struct
 
 class GainManager : public nodelet::Nodelet {
 
+public:
+  virtual void onInit();
+
 private:
   ros::NodeHandle nh_;
   std::string     _version_;
   bool            is_initialized_ = false;
 
-private:
+  // | ----------------------- parameters ----------------------- |
+
   std::vector<std::string> _estimator_type_names_;
 
   std::vector<std::string>       _gain_names_;
   std::map<std::string, Gains_t> _gains_;
 
-private:
   std::map<std::string, std::vector<std::string>> _map_type_allowed_gains_;
   std::map<std::string, std::string>              _map_type_fallback_gains_;
 
-public:
-  virtual void onInit();
-  bool         callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
-  void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
-  void         callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
-
-  bool setGains(std::string gains_name);
-
-  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
-
-private:
-  ros::ServiceServer service_server_set_gains_;
+  // | --------------------- service clients -------------------- |
 
   ros::ServiceClient service_client_set_gains_;
 
-  ros::Publisher publisher_diagnostics_;
+  // | ------------------ odometry diagnostics ------------------ |
 
-private:
   ros::Subscriber        subscriber_odometry_diagnostics_;
+  void                   callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
   bool                   got_odometry_diagnostics_ = false;
   mrs_msgs::OdometryDiag odometry_diagnostics_;
   std::mutex             mutex_odometry_diagnostics_;
 
-  // | ------------- gain management ------------- |
+  // | --------------- control manager diagnostics -------------- |
 
-private:
+  ros::Subscriber subscriber_control_manager_diagnostics_;
+  void            callbackControlManagerDiagnostics(const mrs_msgs::ControlManagerDiagnosticsConstPtr &msg);
+  bool            got_control_manager_diagnostics_ = false;
+  std::mutex      mutex_control_manager_diagnostics_;
+
+  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics_;
+
+  // | --------------------- gain management -------------------- |
+
+  bool setGains(std::string gains_name);
+
+  ros::ServiceServer service_server_set_gains_;
+  bool               callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
   std::mutex                          mutex_last_estimator_type_;
 
   void       gainsManagementTimer(const ros::TimerEvent &event);
   ros::Timer gains_management_timer_;
-
-  void       diagnosticsTimer(const ros::TimerEvent &event);
-  ros::Timer diagnostics_timer_;
-
-  int _rate_;
-  int _diagnostics_rate_;
-
-  // | --------------------- gain management -------------------- |
-
-private:
-  ros::Subscriber                     subscriber_control_manager_diagnostics_;
-  bool                                got_control_manager_diagnostics_ = false;
-  mrs_msgs::ControlManagerDiagnostics control_manager_diagnostics_;
-  std::mutex                          mutex_control_manager_diagnostics_;
+  int        _gain_management_rate_;
 
   std::string current_gains_;
   std::mutex  mutex_current_gains_;
 
-  // | ------------------------ profiler_ ------------------------ |
-private:
+  // | ------------------ diagnostics publisher ----------------- |
+
+  void           diagnosticsTimer(const ros::TimerEvent &event);
+  ros::Publisher publisher_diagnostics_;
+  ros::Timer     diagnostics_timer_;
+  int            _diagnostics_rate_;
+
+  // | ------------------------ profiler ------------------------ |
+
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
-  ;
+
+  // | ------------------------- helpers ------------------------ |
+
+  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 };
 
 //}
@@ -146,7 +148,7 @@ void GainManager::onInit() {
 
   param_loader.load_param("estimator_types", _estimator_type_names_);
 
-  param_loader.load_param("rate", _rate_);
+  param_loader.load_param("rate", _gain_management_rate_);
   param_loader.load_param("diagnostics_rate", _diagnostics_rate_);
 
   std::vector<std::string>::iterator it;
@@ -234,7 +236,7 @@ void GainManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  gains_management_timer_ = nh_.createTimer(ros::Rate(_rate_), &GainManager::gainsManagementTimer, this);
+  gains_management_timer_ = nh_.createTimer(ros::Rate(_gain_management_rate_), &GainManager::gainsManagementTimer, this);
   diagnostics_timer_      = nh_.createTimer(ros::Rate(_diagnostics_rate_), &GainManager::diagnosticsTimer, this);
 
   // --------------------------------------------------------------
@@ -484,7 +486,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("gainManagementTimer", _rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("gainManagementTimer", _gain_management_rate_, 0.01, event);
 
   if (!got_odometry_diagnostics_) {
     ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do gain management, missing odometry diagnostics!");

@@ -34,69 +34,69 @@ namespace constraint_manager
 
 class ConstraintManager : public nodelet::Nodelet {
 
+public:
+  virtual void onInit();
+
 private:
   ros::NodeHandle nh_;
   std::string     _version_;
   bool            is_initialized_ = false;
 
-private:
+  // | ----------------------- parameters ----------------------- |
+
   std::vector<std::string> _estimator_type_names_;
 
   std::vector<std::string>                                      _constraint_names_;
   std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest> _constraints_;
 
-private:
   std::map<std::string, std::vector<std::string>> _map_type_allowed_constraints_;
   std::map<std::string, std::string>              _map_type_fallback_constraints_;
 
-public:
-  virtual void onInit();
-  bool         callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
-  void         callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
-
-  bool setConstraints(std::string constraints_names);
-
-  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
-
-private:
-  ros::ServiceServer service_server_set_constraints_;
+  // | --------------------- service clients -------------------- |
 
   ros::ServiceClient service_client_set_constraints_;
 
-  ros::Publisher publisher_diagnostics_;
-  ros::Publisher publisher_set_c_;
+  // | ------------------ odometry diagnostics ------------------ |
 
-private:
-  ros::Subscriber        subscriber_odometry_diagnostics_;
-  bool                   got_odometry_diagnostics_ = false;
+  ros::Subscriber subscriber_odometry_diagnostics_;
+  void            callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
+  bool            got_odometry_diagnostics_ = false;
+  std::mutex      mutex_odometry_diagnostics_;
+
   mrs_msgs::OdometryDiag odometry_diagnostics_;
-  std::mutex             mutex_odometry_diagnostics_;
 
   // | ------------- constraint management ------------- |
 
-private:
+  bool setConstraints(std::string constraints_names);
+
+  ros::ServiceServer service_server_set_constraints_;
+  bool               callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
   std::mutex                          mutex_last_estimator_type_;
 
   void       constraintsManagementTimer(const ros::TimerEvent &event);
   ros::Timer constraints_management_timer_;
-
-  void       diagnosticsTimer(const ros::TimerEvent &event);
-  ros::Timer diagnostics_timer_;
-
-  int _rate_;
-  int _diagnostics_rate_;
-
-  // | ------------------ constraint management ----------------- |
+  int        _constraint_management_rate_;
 
   std::string current_constraints_;
   std::mutex  mutex_current_constraints_;
 
-  // | ------------------------ profiler_ ------------------------ |
-private:
+  // | ------------------ diagnostics publisher ----------------- |
+
+  void           diagnosticsTimer(const ros::TimerEvent &event);
+  ros::Publisher publisher_diagnostics_;
+  ros::Timer     diagnostics_timer_;
+  int            _diagnostics_rate_;
+
+  // | ------------------------ profiler ------------------------ |
+
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
-  ;
+
+  // | ------------------------- helpers ------------------------ |
+
+  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 };
 
 //}
@@ -129,7 +129,7 @@ void ConstraintManager::onInit() {
 
   param_loader.load_param("estimator_types", _estimator_type_names_);
 
-  param_loader.load_param("rate", _rate_);
+  param_loader.load_param("rate", _constraint_management_rate_);
   param_loader.load_param("diagnostics_rate", _diagnostics_rate_);
 
   std::vector<std::string>::iterator it;
@@ -216,7 +216,7 @@ void ConstraintManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  constraints_management_timer_ = nh_.createTimer(ros::Rate(_rate_), &ConstraintManager::constraintsManagementTimer, this);
+  constraints_management_timer_ = nh_.createTimer(ros::Rate(_constraint_management_rate_), &ConstraintManager::constraintsManagementTimer, this);
   diagnostics_timer_            = nh_.createTimer(ros::Rate(_diagnostics_rate_), &ConstraintManager::diagnosticsTimer, this);
 
   // --------------------------------------------------------------
@@ -380,7 +380,7 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("constraintsManagementTimer", _rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("constraintsManagementTimer", _constraint_management_rate_, 0.01, event);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
