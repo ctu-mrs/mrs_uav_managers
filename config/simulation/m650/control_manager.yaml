@@ -1,0 +1,25 @@
+# - list of names of dynamically loaded trackers
+trackers : [
+  "MpcTracker",
+  "LineTracker",
+  "LandoffTracker",
+  "JoyTracker",
+  "MatlabTracker",
+  "SpeedTracker",
+  "NullTracker",
+]
+
+# - list of names of dynamically loaded controllers
+controllers : [
+  "So3Controller",
+  "MpcController",
+  "NsfController",
+  "AttitudeController",
+  "AccelerationController",
+  "FailsafeController",
+  "EmergencyController",
+]
+
+safety:
+
+  min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying

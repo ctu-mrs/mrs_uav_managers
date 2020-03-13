@@ -1,0 +1,42 @@
+gains: [
+  "default",
+]
+
+gain_management:
+
+  # list of allowed gains per odometry mode
+  allowed_gains:
+    ICP: ["default"]
+    VSLAM: ["default"]
+    BRICKFLOW: ["default"]
+    HECTOR: ["default"]
+    ALOAM: ["default"]
+    T265: ["default"]
+    BRICK: ["default"]
+    VIO: ["default"]
+    LIDAR: ["default"]
+    RTK: ["default"]
+    OPTFLOWGPS: ["default"]
+    GPS: ["default"]
+    OPTFLOW: ["default"]
+    TOWER: ["default"]
+    OTHER: ["default"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_gains:
+    ICP: "default"
+    VSLAM: "default"
+    BRICKFLOW: "default"
+    HECTOR: "default"
+    ALOAM: "default"
+    T265: "default"
+    BRICK: "default"
+    VIO: "default"
+    LIDAR: "default"
+    RTK: "default"
+    OPTFLOWGPS: "default"
+    GPS: "default"
+    OPTFLOW: "default"
+    TOWER: "default"
+    OTHER: "default"
