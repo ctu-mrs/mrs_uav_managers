@@ -96,7 +96,6 @@
 
 /* defines //{ */
 
-#define STRING_EQUAL 0
 #define TAU 2 * M_PI
 #define PWM_MIDDLE 1500.0
 #define PWM_MIN 1000.0
@@ -925,8 +924,7 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/rc_eland/action", _rc_eland_action_);
 
   // check the values of RC eland action
-  if (_rc_eland_action_.compare(ELAND_STR) != STRING_EQUAL && _rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) != STRING_EQUAL &&
-      _rc_eland_action_.compare(FAILSAFE_STR) != STRING_EQUAL) {
+  if (_rc_eland_action_ != ELAND_STR && _rc_eland_action_ != ESCALATING_FAILSAFE_STR && _rc_eland_action_ != FAILSAFE_STR) {
     ROS_ERROR("[ControlManager]: the rc_eland/action parameter (%s) is not correct, requires {%s, %s, %s}", _rc_eland_action_.c_str(), ELAND_STR,
               ESCALATING_FAILSAFE_STR, FAILSAFE_STR);
     ros::shutdown();
@@ -1190,7 +1188,7 @@ void ControlManager::onInit() {
 
     std::string tracker_name = _tracker_names_[i];
 
-    if (tracker_name.compare(_ehover_tracker_name_) == 0) {
+    if (tracker_name == _ehover_tracker_name_) {
       hover_tracker_check  = true;
       _ehover_tracker_idx_ = i;
       break;
@@ -1207,7 +1205,7 @@ void ControlManager::onInit() {
 
     std::string controller_name = _controller_names_[i];
 
-    if (controller_name.compare(_failsafe_controller_name_) == 0) {
+    if (controller_name == _failsafe_controller_name_) {
       failsafe_controller_check = true;
       _failsafe_controller_idx_ = i;
       break;
@@ -1224,7 +1222,7 @@ void ControlManager::onInit() {
 
     std::string controller_name = _controller_names_[i];
 
-    if (controller_name.compare(_eland_controller_name_) == 0) {
+    if (controller_name == _eland_controller_name_) {
       eland_controller_check = true;
       _eland_controller_idx_ = i;
       break;
@@ -1245,7 +1243,7 @@ void ControlManager::onInit() {
 
     std::string tracker_name = _tracker_names_[i];
 
-    if (tracker_name.compare(_landoff_tracker_name_) == 0) {
+    if (tracker_name == _landoff_tracker_name_) {
       landoff_tracker_check = true;
       _landoff_tracker_idx_ = i;
       break;
@@ -1266,7 +1264,7 @@ void ControlManager::onInit() {
 
     std::string tracker_name = _tracker_names_[i];
 
-    if (tracker_name.compare(_null_tracker_name_) == 0) {
+    if (tracker_name == _null_tracker_name_) {
       null_tracker_check = true;
       _null_tracker_idx_ = i;
       break;
@@ -1289,7 +1287,7 @@ void ControlManager::onInit() {
 
       std::string tracker_name = _tracker_names_[i];
 
-      if (tracker_name.compare(_joystick_tracker_name_) == 0) {
+      if (tracker_name == _joystick_tracker_name_) {
         joystick_tracker_check = true;
         _joystick_tracker_idx_ = i;
         break;
@@ -1306,7 +1304,7 @@ void ControlManager::onInit() {
 
       std::string controller_name = _controller_names_[i];
 
-      if (controller_name.compare(_joystick_controller_name_) == 0) {
+      if (controller_name == _joystick_controller_name_) {
         joystick_controller_check = true;
         _joystick_controller_idx_ = i;
         break;
@@ -1323,7 +1321,7 @@ void ControlManager::onInit() {
 
       std::string tracker_name = _tracker_names_[i];
 
-      if (tracker_name.compare(_joystick_fallback_tracker_name_) == 0) {
+      if (tracker_name == _joystick_fallback_tracker_name_) {
         joystick_fallback_tracker_check = true;
         _joystick_fallback_tracker_idx_ = i;
         break;
@@ -1340,7 +1338,7 @@ void ControlManager::onInit() {
 
       std::string controller_name = _controller_names_[i];
 
-      if (controller_name.compare(_joystick_fallback_controller_name_) == 0) {
+      if (controller_name == _joystick_fallback_controller_name_) {
         joystick_fallback_controller_check = true;
         _joystick_fallback_controller_idx_ = i;
         break;
@@ -3260,7 +3258,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
-    if (msg->header.frame_id.compare(uav_state_.header.frame_id) != STRING_EQUAL) {
+    if (msg->header.frame_id != uav_state_.header.frame_id) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
       {
@@ -3719,7 +3717,7 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) 
   got_mavros_state_ = true;
 
   // | ------ detect and print the changes in offboard mode ----- |
-  if (mavros_state_.mode.compare(std::string("OFFBOARD")) == STRING_EQUAL) {
+  if (mavros_state_.mode == "OFFBOARD") {
 
     if (!offboard_mode_) {
       offboard_mode_ = true;
@@ -3812,7 +3810,7 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
     } else {
 
-      if (_rc_eland_action_.compare(ELAND_STR) == STRING_EQUAL) {
+      if (_rc_eland_action_ == ELAND_STR) {
 
         if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
@@ -3822,11 +3820,11 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
           eland();
         }
-      } else if (_rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) == STRING_EQUAL) {
+      } else if (_rc_eland_action_ == ESCALATING_FAILSAFE_STR) {
 
         escalatingFailsafe();
 
-      } else if (_rc_eland_action_.compare(FAILSAFE_STR) == STRING_EQUAL) {
+      } else if (_rc_eland_action_ == FAILSAFE_STR) {
 
         if (!failsafe_triggered_) {
 
@@ -5605,7 +5603,7 @@ bool ControlManager::isOffboard(void) {
   // copy member variables
   auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
 
-  if (got_mavros_state_ && (ros::Time::now() - mavros_state.header.stamp).toSec() < 1.0 && mavros_state.mode.compare(std::string("OFFBOARD")) == STRING_EQUAL) {
+  if (got_mavros_state_ && (ros::Time::now() - mavros_state.header.stamp).toSec() < 1.0 && mavros_state.mode == "OFFBOARD") {
 
     return true;
   }
@@ -6980,7 +6978,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
           tracker_list_[active_tracker_idx_]->deactivate();
 
           // if switching from null tracker, activate the active the controller
-          if (_tracker_names_[active_tracker_idx_].compare(_null_tracker_name_) == 0) {
+          if (_tracker_names_[active_tracker_idx_] == _null_tracker_name_) {
 
             ROS_INFO("[ControlManager]: reactivating '%s' due to switching from 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
             {
@@ -7017,7 +7015,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
             }
 
             // if switching to null tracker, deactivate the active controller
-          } else if (_tracker_names_[new_tracker_idx].compare(_null_tracker_name_) == 0) {
+          } else if (_tracker_names_[new_tracker_idx] == _null_tracker_name_) {
 
             ROS_INFO("[ControlManager]: deactivating '%s' due to switching to 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
             {
@@ -7648,7 +7646,7 @@ std::string ControlManager::resolveFrameName(const std::string in) {
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  if (in.compare("") == STRING_EQUAL) {
+  if (in == "") {
 
     return uav_state.header.frame_id;
   }
