@@ -281,7 +281,7 @@
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="~landoff_tracker/eland" />
       <remap from="~land_out" to="~landoff_tracker/land" />
-      <remap from="~shutdown_out" to="automatic_start_mbzirc/shutdown" />
+      <remap from="~shutdown_out" to="~shutdown" />
       <remap from="~pirouette_in" to="~pirouette" />
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
