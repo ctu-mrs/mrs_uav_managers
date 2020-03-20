@@ -5,6 +5,8 @@
 
 #include <ros/ros.h>
 
+#include <mrs_uav_manager/common_handlers.h>
+
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/UavState.h>
@@ -12,6 +14,8 @@
 #include <mrs_msgs/Float64Srv.h>
 #include <mrs_msgs/Float64SrvRequest.h>
 #include <mrs_msgs/Float64SrvResponse.h>
+
+#include <mrs_msgs/Float64.h>
 
 #include <mrs_msgs/ReferenceSrv.h>
 #include <mrs_msgs/ReferenceSrvRequest.h>
@@ -25,26 +29,11 @@
 #include <std_srvs/SetBoolRequest.h>
 #include <std_srvs/SetBoolResponse.h>
 
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/Vector3Stamped.h>
-
 #include <mrs_msgs/TrackerConstraintsSrv.h>
 #include <mrs_msgs/TrackerConstraintsSrvRequest.h>
 #include <mrs_msgs/TrackerConstraintsSrvResponse.h>
 
-#include <mrs_msgs/Reference.h>
-#include <mrs_msgs/ReferenceStamped.h>
-#include <mrs_msgs/Float64.h>
-
 #include <mrs_msgs/AttitudeCommand.h>
-
-#include <geometry_msgs/TransformStamped.h>
-
-#include <Eigen/Eigen>
-
-#include <mrs_lib/transformer.h>
-
-#include <mrs_uav_manager/common_handlers.h>
 
 //}
 
@@ -54,29 +43,134 @@ namespace mrs_uav_manager
 class Tracker {
 
 public:
-  virtual ~Tracker(void) {
-  }
+  virtual ~Tracker(void) = 0;
 
+  /**
+   * @brief It is called once for every tracker. The runtime is not limited.
+   *
+   * @param parent_nh the node handle of the ControlManager
+   * @param uav_name the UAV name (e.g., "uav1")
+   * @param common_handlers handlers shared between trackers and controllers
+   */
   virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) = 0;
-  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &cmd)                                                                                     = 0;
-  virtual void deactivate(void)                                                                                                                             = 0;
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &msg)                                                                                = 0;
-  virtual bool resetStatic(void)                                                                                                                            = 0;
 
-  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &msg, const mrs_msgs::AttitudeCommand::ConstPtr &cmd) = 0;
-  virtual const mrs_msgs::TrackerStatus             getStatus()                                                                                     = 0;
+  /**
+   * @brief It is called before the trackers output will be required and used. Should not take much time (within miliseconds).
+   *
+   * @param last_position_cmd the last command produced by the last active tracker. Should be used as an initial condition to maintain a smooth reference.
+   *
+   * @return true if success
+   */
+  virtual bool activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) = 0;
 
-  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd)         = 0;
+  /**
+   * @brief is called when this trackers output is no longer needed. However, it can be activated later.
+   */
+  virtual void deactivate(void) = 0;
+
+  /**
+   * @brief It is called during every switch of reference frames of the UAV state estimate.
+   * The tracker should recalculate its internal states from old the frame to the new one.
+   *
+   * @param new_uav_state the new UavState which will come in the next update()
+   */
+  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+
+  /**
+   * @brief Request for reseting the tracker's states given the UAV is static.
+   *
+   * @return true if success
+   */
+  virtual bool resetStatic(void) = 0;
+
+  /**
+   * @brief The most important routine. It is called with every odometry update and it should produce a new reference for the controllers.
+   *
+   * @param uav_state the latest UAV state estimate
+   * @param last_attitude_cmd the last controller's output command (may be useful)
+   *
+   * @return the new reference for the controllers
+   */
+  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
+                                                           const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
+
+  /**
+   * @brief A request for the tracker's status.
+   *
+   * @return the tracker's status
+   */
+  virtual const mrs_msgs::TrackerStatus getStatus() = 0;
+
+  /**
+   * @brief Request for a flight to a given position.
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for a flight to a relative position in the current world frame.
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
   virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goToRelative(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd)   = 0;
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd)         = 0;
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr   setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
 
-  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd)           = 0;
+  /**
+   * @brief Request for a flight to the given altitude.
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for setting a desired yaw.
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for setting a desired relative yaw.
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::Float64SrvResponse::ConstPtr setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for stopping the motion of the UAV.
+   *
+   * @param trigger service request (not used)
+   *
+   * @return a service response
+   */
+  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for enabling/disabling callbacks.
+   *
+   * @param cmd service request
+   *
+   * @return a service response
+   */
   virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) = 0;
 
-  virtual bool goTo(const mrs_msgs::ReferenceConstPtr &msg) = 0;
-
+  /**
+   * @brief Request for setting new constraints.
+   *
+   * @param constraints to be set
+   *
+   * @return a service response
+   */
   virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 }  // namespace mrs_uav_manager

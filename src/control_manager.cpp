@@ -6,20 +6,17 @@
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
 
+#include <mrs_uav_manager/Controller.h>
+#include <mrs_uav_manager/Tracker.h>
+
 #include <mrs_msgs/String.h>
-#include <mrs_msgs/PositionCommand.h>
-#include <mrs_msgs/AttitudeCommand.h>
-#include <mrs_msgs/TrackerStatus.h>
-#include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
-#include <mrs_msgs/UavState.h>
 #include <mrs_msgs/TrackerConstraints.h>
 #include <mrs_msgs/ControlError.h>
-#include <mrs_msgs/Float64Srv.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
 #include <mrs_msgs/ValidateReferenceList.h>
@@ -27,7 +24,6 @@
 
 #include <geometry_msgs/Point32.h>
 #include <nav_msgs/Odometry.h>
-#include <std_msgs/Float64.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
 #include <mrs_lib/Profiler.h>
@@ -39,14 +35,12 @@
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
 
-#include <mrs_uav_manager/Controller.h>
-#include <mrs_uav_manager/Tracker.h>
-
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/RCIn.h>
-#include <std_srvs/SetBool.h>
+
+#include <std_msgs/Float64.h>
 
 #include <pluginlib/class_loader.h>
 
@@ -868,8 +862,8 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/failsafe_timer_rate", _failsafe_timer_rate_);
 
   param_loader.load_param("uav_mass", _uav_mass_);
-  param_loader.load_param("hover_thrust/a", _motor_params_.hover_thrust_a);
-  param_loader.load_param("hover_thrust/b", _motor_params_.hover_thrust_b);
+  param_loader.load_param("hover_thrust/a", _motor_params_.A);
+  param_loader.load_param("hover_thrust/b", _motor_params_.B);
   param_loader.load_param("g", _g_);
 
   param_loader.load_param("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
@@ -2477,7 +2471,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
                   _odometry_innovation_threshold_, odometry_innovation.pose.pose.position.x, odometry_innovation.pose.pose.position.y,
                   odometry_innovation.pose.pose.position.z);
 
-        auto [success, message] = eland();
+        eland();
       }
     }
   }
@@ -2496,7 +2490,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
 
-        auto [success, message] = eland();
+        eland();
       }
     }
   }
@@ -2525,7 +2519,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
                   position_error_x_, position_error_y_, position_error_z_);
 
-        auto [success, message] = eland();
+        eland();
       }
     }
   }
@@ -2555,7 +2549,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
 
-        auto [success, message] = eland();
+        eland();
       }
     }
   }
@@ -2583,7 +2577,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
     ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
 
-    auto [success, message] = arming(false);
+    arming(false);
   }
 
   // --------------------------------------------------------------
@@ -2649,7 +2643,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
 
         switchMotors(false);
-        auto [success, message] = arming(false);
+        arming(false);
       }
     }
   }
@@ -2692,7 +2686,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
     }
 
     // recalculate the mass based on the thrust
-    thrust_mass_estimate_ = pow((last_attitude_cmd->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_;
+    thrust_mass_estimate_ = pow((last_attitude_cmd->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
     // condition for automatic motor turn off
@@ -2723,7 +2717,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
       if (_eland_disarm_enabled_) {
 
         ROS_INFO("[ControlManager]: calling for disarm");
-        auto [success, message] = arming(false);
+        arming(false);
       }
 
       shutdown();
@@ -2765,7 +2759,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
     return;
   }
 
-  double thrust_mass_estimate_ = pow((last_attitude_cmd_->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_;
+  double thrust_mass_estimate_ = pow((last_attitude_cmd_->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
   // condition for automatic motor turn off
@@ -2790,7 +2784,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
 
     ROS_INFO("[ControlManager]: detecting zero thrust, disarming");
 
-    auto [success, message] = arming(false);
+    arming(false);
   }
 }
 
@@ -2845,7 +2839,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     joystick_failsafe_pressed_ = false;
 
-    auto [success, message] = eland();
+    eland();
   }
 
   // if back was pressed and held for > 0.1 s
@@ -3826,11 +3820,11 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
           rc_eland_triggered_ = true;
 
-          auto [success, message] = eland();
+          eland();
         }
       } else if (_rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) == STRING_EQUAL) {
 
-        auto [success, message] = escalatingFailsafe();
+        escalatingFailsafe();
 
       } else if (_rc_eland_action_.compare(FAILSAFE_STR) == STRING_EQUAL) {
 
@@ -4962,6 +4956,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
       std::stringstream ss;
       ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'goto' service!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, " << ss.str());
 
       res.message = ss.str();
       res.success = false;
@@ -5047,17 +5042,22 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
     }
   }
 
-  bool tracker_response;
+  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
 
-  mrs_msgs::Reference reference_out = transformed_reference.reference;
+  // prepare the message for current tracker
+  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  req_goto_out.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    tracker_response = tracker_list_[active_tracker_idx_]->goTo(mrs_msgs::Reference::ConstPtr(std::make_unique<mrs_msgs::Reference>(reference_out)));
+    tracker_response =
+        tracker_list_[active_tracker_idx_]->goTo(mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(req_goto_out)));
 
-    if (!tracker_response) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' does not implement 'goto' topic!", _tracker_names_[active_tracker_idx_].c_str());
+    if (tracker_response == mrs_msgs::ReferenceSrvResponse::Ptr()) {
+
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: 'goto' topic failed, "
+                                         << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'goto' service!");
     }
   }
 }
@@ -7233,7 +7233,7 @@ void ControlManager::updateTrackers(void) {
 
           std::string ehover_message;
 
-          auto [success, message] = ehover();
+          ehover();
         }
 
       } else {
@@ -7590,7 +7590,7 @@ void ControlManager::publish(void) {
 
     mrs_msgs::Float64Stamped thrust_out;
     thrust_out.header.stamp = ros::Time::now();
-    thrust_out.value        = (pow((last_attitude_cmd->thrust - _motor_params_.hover_thrust_b) / _motor_params_.hover_thrust_a, 2) / _g_) * 10.0;
+    thrust_out.value        = (pow((last_attitude_cmd->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_) * 10.0;
 
     try {
       publisher_thrust_force_.publish(thrust_out);
