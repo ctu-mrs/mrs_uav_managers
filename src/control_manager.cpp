@@ -1773,8 +1773,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
              << "lon: " << border_points_bot_original[i].y;
         } else {
           ss << "idx: " << i << std::endl
-             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
-             << "lon: " << border_points_bot_original[i].y;
+             << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original[i].x << std::endl
+             << "y: " << border_points_bot_original[i].y;
         }
 
         safety_area_coordinates_marker.color.r = 0;
@@ -1805,8 +1805,8 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
              << "lon: " << border_points_bot_original[i].y;
         } else {
           ss << "idx: " << i << std::endl
-             << std::setprecision(1) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
-             << "lon: " << border_points_bot_original[i].y;
+             << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original[i].x << std::endl
+             << "y: " << border_points_bot_original[i].y;
         }
 
         safety_area_coordinates_marker.color.r = 1;
