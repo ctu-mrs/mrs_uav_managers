@@ -769,9 +769,10 @@ private:
   bool validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command);
   bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
 
-  // checks for invalid values odometry and uav_state msgs
+  // checks for invalid messages in/out
   bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
   bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
+  bool validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget attitude_target);
 
   // translates the PWM raw value to a desired range
   double RCChannelToRange(double rc_value, double range, double deadband);
@@ -4652,28 +4653,28 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
   }
 
   if (!std::isfinite(req.reference.reference.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.reference.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.y'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.reference.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.z'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.reference.yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.yaw'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4772,22 +4773,22 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
     original_reference.reference = req.list.list[i];
 
     if (!std::isfinite(original_reference.reference.position.x)) {
-      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.x\"!!!");
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.x'!!!");
       res.success[i] = false;
     }
 
     if (!std::isfinite(original_reference.reference.position.y)) {
-      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.y\"!!!");
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.y'!!!");
       res.success[i] = false;
     }
 
     if (!std::isfinite(original_reference.reference.position.z)) {
-      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.position.z\"!!!");
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.z'!!!");
       res.success[i] = false;
     }
 
     if (!std::isfinite(original_reference.reference.yaw)) {
-      ROS_DEBUG("[ControlManager]: NaN detected in variable \"original_reference.reference.yaw\"!!!");
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.yaw'!!!");
       res.success[i] = false;
     }
 
@@ -4852,28 +4853,28 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   }
 
   if (!std::isfinite(req.reference.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.y'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.z'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
   }
 
   if (!std::isfinite(req.reference.yaw)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.yaw'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4976,22 +4977,22 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   }
 
   if (!std::isfinite(msg->reference.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'msg->reference.position.x'!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'msg->reference.position.y'!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'msg->reference.position.z'!!!");
     return;
   }
 
   if (!std::isfinite(msg->reference.yaw)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"msg->reference.yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'msg->reference.yaw'!!!");
     return;
   }
 
@@ -5082,7 +5083,7 @@ bool ControlManager::callbackGoToService(mrs_msgs::Vec4::Request& req, mrs_msgs:
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'request_in.goal[%d]'!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5185,7 +5186,7 @@ bool ControlManager::callbackGoToFcuService(mrs_msgs::Vec4::Request& req, mrs_ms
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'request_in.goal[%d]'!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5300,7 +5301,7 @@ bool ControlManager::callbackGoToRelativeService(mrs_msgs::Vec4::Request& req, m
   // check number validity
   for (int i = 0; i < 4; i++) {
     if (!std::isfinite(request_in.goal[i])) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"request_in.goal[%d]\"!!!", i);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'request_in.goal[%d]'!!!", i);
       res.message = "NaNs/infs in the goal!";
       res.success = false;
       return true;
@@ -5409,7 +5410,7 @@ bool ControlManager::callbackGoToAltitudeService(mrs_msgs::Vec1::Request& req, m
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.goal'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5489,7 +5490,7 @@ bool ControlManager::callbackSetYawService(mrs_msgs::Vec1::Request& req, mrs_msg
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.goal\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.goal'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -5546,7 +5547,7 @@ bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req,
 
   // check number validity
   if (!std::isfinite(req.goal)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable \"req.value\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.value'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -7683,27 +7684,8 @@ void ControlManager::publish(void) {
 
   if (should_publish) {
 
-    // test the output attitude for NaNs
-    if (!std::isfinite(attitude_target.orientation.x)) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.x\"!!!");
-      return;
-    }
-    if (!std::isfinite(attitude_target.orientation.y)) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.y\"!!!");
-      return;
-    }
-    if (!std::isfinite(attitude_target.orientation.z)) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.z\"!!!");
-      return;
-    }
-    if (!std::isfinite(attitude_target.orientation.w)) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.orientation.w\"!!!");
-      return;
-    }
-
-    // test the output attitude_rate for NaNs
-    if (!std::isfinite(attitude_target.thrust)) {
-      ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_target.thrust\"!!!");
+    if (!validateMavrosAttitudeTarget(attitude_target)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the target attitude is not valid just before publishing, returning");
       return;
     }
 
@@ -7813,151 +7795,151 @@ bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::Co
   // check attitude
 
   if (!std::isfinite(position_command->attitude.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->attitude.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->attitude.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.z'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->attitude.w)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude.w\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.w'!!!");
     return false;
   }
 
   // check positions
 
   if (!std::isfinite(position_command->position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.z'!!!");
     return false;
   }
 
   // check velocities
 
   if (!std::isfinite(position_command->velocity.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->velocity.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->velocity.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->velocity.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->velocity.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->velocity.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.z'!!!");
     return false;
   }
 
   // check accelerations
 
   if (!std::isfinite(position_command->acceleration.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->acceleration.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->acceleration.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->acceleration.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->acceleration.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->acceleration.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.z'!!!");
     return false;
   }
 
   // check jerk
 
   if (!std::isfinite(position_command->jerk.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->jerk.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->jerk.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->jerk.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->jerk.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->jerk.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.z'!!!");
     return false;
   }
 
   // check snap
 
   if (!std::isfinite(position_command->snap.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->snap.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->snap.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->snap.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->snap.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->snap.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.z'!!!");
     return false;
   }
 
   // check attitude rate
 
   if (!std::isfinite(position_command->attitude_rate.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude_rate.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.x'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->attitude_rate.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude_rate.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.y'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->attitude_rate.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->attitude_rate.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.z'!!!");
     return false;
   }
 
   // check yaws
 
   if (!std::isfinite(position_command->yaw)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->yaw\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->yaw_dot)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->yaw_dot\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_dot'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->yaw_ddot)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->yaw_ddot\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_ddot'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->yaw_dddot)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->yaw_dddot\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_dddot'!!!");
     return false;
   }
 
   if (!std::isfinite(position_command->yaw_ddddot)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"position_command->yaw_ddddot\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_ddddot'!!!");
     return false;
   }
 
@@ -7973,105 +7955,105 @@ bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::Co
   // check euler attitude
 
   if (!std::isfinite(attitude_command->euler_attitude.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->euler_attitude.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.x'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->euler_attitude.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->euler_attitude.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.y'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->euler_attitude.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->euler_attitude.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.z'!!!");
     return false;
   }
 
   // check quater attitude
 
   if (!std::isfinite(attitude_command->quater_attitude.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->quater_attitude.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.x'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->quater_attitude.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->quater_attitude.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.y'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->quater_attitude.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->quater_attitude.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.z'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->quater_attitude.w)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->quater_attitude.w\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.w'!!!");
     return false;
   }
 
   // check attitude rate
 
   if (!std::isfinite(attitude_command->attitude_rate.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->attitude_rate.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude_rate.x'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->attitude_rate.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->attitude_rate.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude_rate.y'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->attitude_rate.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->attitude_rate.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude_rate.z'!!!");
     return false;
   }
 
   // check desired_acceleration
 
   if (!std::isfinite(attitude_command->desired_acceleration.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->desired_acceleration.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->desired_acceleration.x'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->desired_acceleration.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->desired_acceleration.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->desired_acceleration.y'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->desired_acceleration.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->desired_acceleration.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->desired_acceleration.z'!!!");
     return false;
   }
 
   // check the constraints
 
   if (!std::isfinite(attitude_command->horizontal_speed_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->horizontal_speed_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->horizontal_speed_constraint'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->horizontal_acc_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->horizontal_acc_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->horizontal_acc_constraint'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->vertical_asc_speed_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->vertical_asc_speed_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->vertical_asc_speed_constraint'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->vertical_asc_acc_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->vertical_asc_acc_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->vertical_asc_acc_constraint'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->vertical_desc_speed_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->vertical_desc_speed_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->vertical_desc_speed_constraint'!!!");
     return false;
   }
 
   if (!std::isfinite(attitude_command->vertical_desc_acc_constraint)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"attitude_command->vertical_desc_acc_constraint\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->vertical_desc_acc_constraint'!!!");
     return false;
   }
 
@@ -8087,56 +8069,56 @@ bool ControlManager::validateOdometry(const nav_msgs::OdometryConstPtr odometry)
   // check position
 
   if (!std::isfinite(odometry->pose.pose.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.x'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->pose.pose.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.y'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->pose.pose.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.z'!!!");
     return false;
   }
 
   // check orientation
 
   if (!std::isfinite(odometry->pose.pose.orientation.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.orientation.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.x'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->pose.pose.orientation.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.orientation.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.y'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->pose.pose.orientation.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.orientation.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.z'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->pose.pose.orientation.w)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->pose.pose.orientation.w\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.w'!!!");
     return false;
   }
 
   // check velocity
 
   if (!std::isfinite(odometry->twist.twist.linear.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->twist.twist.linear.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.x'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->twist.twist.linear.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->twist.twist.linear.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.y'!!!");
     return false;
   }
 
   if (!std::isfinite(odometry->twist.twist.linear.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"odometry->twist.twist.linear.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.z'!!!");
     return false;
   }
 
@@ -8152,141 +8134,196 @@ bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state
   // check position
 
   if (!std::isfinite(uav_state->pose.position.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.position.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->pose.position.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.position.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->pose.position.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.position.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.z'!!!");
     return false;
   }
 
   // check orientation
 
   if (!std::isfinite(uav_state->pose.orientation.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.orientation.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->pose.orientation.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.orientation.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->pose.orientation.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.orientation.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.z'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->pose.orientation.w)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->pose.orientation.w\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.w'!!!");
     return false;
   }
 
   // check linear velocity
 
   if (!std::isfinite(uav_state->velocity.linear.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.linear.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->velocity.linear.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.linear.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->velocity.linear.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.linear.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.z'!!!");
     return false;
   }
 
   // check angular velocity
 
   if (!std::isfinite(uav_state->velocity.angular.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.angular.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->velocity.angular.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.angular.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->velocity.angular.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->velocity.angular.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.z'!!!");
     return false;
   }
 
   // check linear acceleration
 
   if (!std::isfinite(uav_state->acceleration.linear.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.linear.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration.linear.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.linear.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration.linear.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.linear.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.z'!!!");
     return false;
   }
 
   // check angular acceleration
 
   if (!std::isfinite(uav_state->acceleration.angular.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.angular.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration.angular.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.angular.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration.angular.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration.angular.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.z'!!!");
     return false;
   }
 
   // check acceleration angular disturbance
 
   if (!std::isfinite(uav_state->acceleration_disturbance.angular.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.angular.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration_disturbance.angular.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.angular.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration_disturbance.angular.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.angular.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.z'!!!");
     return false;
   }
 
   // check acceleration linear disturbance
 
   if (!std::isfinite(uav_state->acceleration_disturbance.linear.x)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.linear.x\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.x'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration_disturbance.linear.y)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.linear.y\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.y'!!!");
     return false;
   }
 
   if (!std::isfinite(uav_state->acceleration_disturbance.linear.z)) {
-    ROS_ERROR("[ControlManager]: NaN detected in variable \"uav_state->acceleration_disturbance.linear.z\"!!!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.z'!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateMavrosAttitudeTarget() //{ */
+
+bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget attitude_target) {
+
+  // check the orientation
+
+  if (!std::isfinite(attitude_target.orientation.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_target.orientation.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_target.orientation.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.z'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_target.orientation.w)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.w'!!!");
+    return false;
+  }
+
+  // check the body rate
+
+  if (!std::isfinite(attitude_target.body_rate.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_target.body_rate.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(attitude_target.body_rate.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.z'!!!");
+    return false;
+  }
+
+  // check the thrust
+
+  if (!std::isfinite(attitude_target.thrust)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.thrust'!!!");
     return false;
   }
 
