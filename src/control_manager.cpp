@@ -4698,7 +4698,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
   if (!ret) {
 
-    ROS_WARN("[ControlManager]: the reference could not be transformed");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed");
     res.message = "the reference could not be transformed";
     res.success = false;
     return true;
@@ -4708,14 +4708,14 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR("[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -4730,7 +4730,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     from_point.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
-      ROS_ERROR("[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
