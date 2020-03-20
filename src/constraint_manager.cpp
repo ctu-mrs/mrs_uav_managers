@@ -75,8 +75,8 @@ private:
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
   std::mutex                          mutex_last_estimator_type_;
 
-  void       constraintsManagementTimer(const ros::TimerEvent &event);
-  ros::Timer constraints_management_timer_;
+  void       timerConstraintManagement(const ros::TimerEvent &event);
+  ros::Timer timer_constraint_management_;
   int        _constraint_management_rate_;
 
   std::string current_constraints_;
@@ -84,9 +84,9 @@ private:
 
   // | ------------------ diagnostics publisher ----------------- |
 
-  void           diagnosticsTimer(const ros::TimerEvent &event);
+  void           timerDiagnostics(const ros::TimerEvent &event);
   ros::Publisher publisher_diagnostics_;
-  ros::Timer     diagnostics_timer_;
+  ros::Timer     timer_diagnostics_;
   int            _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
@@ -216,12 +216,10 @@ void ConstraintManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  constraints_management_timer_ = nh_.createTimer(ros::Rate(_constraint_management_rate_), &ConstraintManager::constraintsManagementTimer, this);
-  diagnostics_timer_            = nh_.createTimer(ros::Rate(_diagnostics_rate_), &ConstraintManager::diagnosticsTimer, this);
+  timer_constraint_management_ = nh_.createTimer(ros::Rate(_constraint_management_rate_), &ConstraintManager::timerConstraintManagement, this);
+  timer_diagnostics_           = nh_.createTimer(ros::Rate(_diagnostics_rate_), &ConstraintManager::timerDiagnostics, this);
 
-  // --------------------------------------------------------------
-  // |                          profiler_                          |
-  // --------------------------------------------------------------
+  // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "ConstraintManager", _profiler_enabled_);
 
@@ -373,14 +371,14 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* constraintsManagementTimer() //{ */
+/* timerConstraintManagement() //{ */
 
-void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event) {
+void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("constraintsManagementTimer", _constraint_management_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerConstraintManagement", _constraint_management_rate_, 0.01, event);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
@@ -436,9 +434,9 @@ void ConstraintManager::constraintsManagementTimer(const ros::TimerEvent &event)
 
 //}
 
-/* diagnosticsTimer() //{ */
+/* timerDiagnostics() //{ */
 
-void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
+void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
 
   if (!is_initialized_)
     return;
@@ -447,7 +445,7 @@ void ConstraintManager::diagnosticsTimer(const ros::TimerEvent &event) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("diagnosticsTimer", _diagnostics_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);

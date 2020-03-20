@@ -94,8 +94,8 @@ private:
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
   std::mutex                          mutex_last_estimator_type_;
 
-  void       gainsManagementTimer(const ros::TimerEvent &event);
-  ros::Timer gains_management_timer_;
+  void       timerGainManagement(const ros::TimerEvent &event);
+  ros::Timer timer_gain_management_;
   int        _gain_management_rate_;
 
   std::string current_gains_;
@@ -103,9 +103,9 @@ private:
 
   // | ------------------ diagnostics publisher ----------------- |
 
-  void           diagnosticsTimer(const ros::TimerEvent &event);
+  void           timerDiagnostics(const ros::TimerEvent &event);
   ros::Publisher publisher_diagnostics_;
-  ros::Timer     diagnostics_timer_;
+  ros::Timer     timer_diagnostics_;
   int            _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
@@ -236,12 +236,10 @@ void GainManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  gains_management_timer_ = nh_.createTimer(ros::Rate(_gain_management_rate_), &GainManager::gainsManagementTimer, this);
-  diagnostics_timer_      = nh_.createTimer(ros::Rate(_diagnostics_rate_), &GainManager::diagnosticsTimer, this);
+  timer_gain_management_ = nh_.createTimer(ros::Rate(_gain_management_rate_), &GainManager::timerGainManagement, this);
+  timer_diagnostics_     = nh_.createTimer(ros::Rate(_diagnostics_rate_), &GainManager::timerDiagnostics, this);
 
-  // --------------------------------------------------------------
-  // |                          profiler_                          |
-  // --------------------------------------------------------------
+  // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "GainManager", _profiler_enabled_);
 
@@ -481,7 +479,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
 
 /* gainManagementTimer() //{ */
 
-void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
+void GainManager::timerGainManagement(const ros::TimerEvent &event) {
 
   if (!is_initialized_)
     return;
@@ -545,7 +543,7 @@ void GainManager::gainsManagementTimer(const ros::TimerEvent &event) {
 
 /* dignosticsTimer() //{ */
 
-void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
+void GainManager::timerDiagnostics(const ros::TimerEvent &event) {
 
   if (!is_initialized_)
     return;
@@ -553,7 +551,7 @@ void GainManager::diagnosticsTimer(const ros::TimerEvent &event) {
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_gains        = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("diagnosticsTimer", _diagnostics_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
 
   mrs_msgs::GainManagerDiagnostics diagnostics;
 

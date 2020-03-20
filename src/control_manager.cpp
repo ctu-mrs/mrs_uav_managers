@@ -575,39 +575,39 @@ private:
   // | ------------------------- timers ------------------------- |
 
   // timer for regular status publishing
-  ros::Timer status_timer_;
-  void       statusTimer(const ros::TimerEvent& event);
+  ros::Timer timer_status_;
+  void       timerStatus(const ros::TimerEvent& event);
 
   // timer for issuing the failsafe landing
-  ros::Timer failsafe_timer_;
-  void       failsafeTimer(const ros::TimerEvent& event);
+  ros::Timer timer_failsafe_;
+  void       timerFailsafe(const ros::TimerEvent& event);
   bool       failsafe_triggered_ = false;
 
   // oneshot timer for running controllers and trackers
-  ros::Timer control_timer_;
-  void       controlTimerOneshot(const ros::TimerEvent& event);
+  ros::Timer timer_control_;
+  void       timerControl(const ros::TimerEvent& event);
   bool       running_control_timer_ = false;
 
   // timer for issuing emergancy landing
-  ros::Timer elanding_timer_;
-  void       elandingTimer(const ros::TimerEvent& event);
+  ros::Timer timer_eland_;
+  void       timerEland(const ros::TimerEvent& event);
   bool       eland_triggered_ = false;
 
   // timer for regular checking of controller errors
-  ros::Timer safety_timer_;
-  void       safetyTimer(const ros::TimerEvent& event);
+  ros::Timer timer_safety_;
+  void       timerSafety(const ros::TimerEvent& event);
   bool       running_safety_timer_        = false;
   double     odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
-  ros::Timer pirouette_timer_;
-  void       pirouetteTimer(const ros::TimerEvent& event);
+  ros::Timer timer_pirouette_;
+  void       timerPirouette(const ros::TimerEvent& event);
 
   // | --------------------- obstacle bumper -------------------- |
 
   // bumper timer
-  ros::Timer bumper_timer_;
-  void       bumperTimer(const ros::TimerEvent& event);
+  ros::Timer timer_bumper_;
+  void       timerBumper(const ros::TimerEvent& event);
 
   // bumper subscriber
   ros::Subscriber subscriber_bumper_;
@@ -704,8 +704,8 @@ private:
   int _channel_pitch_, _channel_roll_, _channel_yaw_, _channel_thrust_;
   int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_yaw_, _channel_mult_thrust_;
 
-  ros::Timer joystick_timer_;
-  void       joystickTimer(const ros::TimerEvent& event);
+  ros::Timer timer_joystick_;
+  void       timerJoystick(const ros::TimerEvent& event);
   double     _joystick_timer_rate_ = 0;
 
   double _joystick_carrot_distance_ = 0;
@@ -1377,15 +1377,11 @@ void ControlManager::onInit() {
 
   motors_ = false;
 
-  // --------------------------------------------------------------
-  // |                          profiler_                          |
-  // --------------------------------------------------------------
+  // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "ControlManager", _profiler_enabled_);
 
-  // --------------------------------------------------------------
-  // |                         publishers                         |
-  // --------------------------------------------------------------
+  // | ----------------------- publishers ----------------------- |
 
   publisher_control_output_                  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
   publisher_position_cmd_                    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
@@ -1405,9 +1401,7 @@ void ControlManager::onInit() {
   publisher_mpc_trajectory_                  = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
   publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
 
-  // --------------------------------------------------------------
-  // |                         subscribers                        |
-  // --------------------------------------------------------------
+  // | ----------------------- subscribers ---------------------- |
 
   if (_state_input_ == 0) {
     subscriber_uav_state_ = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
@@ -1480,18 +1474,16 @@ void ControlManager::onInit() {
   service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReferenceService, this);
   service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
-  // --------------------------------------------------------------
-  // |                           timers                           |
-  // --------------------------------------------------------------
+  // | ------------------------- timers ------------------------- |
 
-  status_timer_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::statusTimer, this);
-  safety_timer_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::safetyTimer, this);
-  bumper_timer_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::bumperTimer, this);
-  elanding_timer_  = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::elandingTimer, this, false, false);
-  failsafe_timer_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::failsafeTimer, this, false, false);
-  pirouette_timer_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::pirouetteTimer, this, false, false);
-  joystick_timer_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::joystickTimer, this);
-  control_timer_   = nh_.createTimer(ros::Duration(0), &ControlManager::controlTimerOneshot, this, true, false);
+  timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
+  timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
+  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this);
+  timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
+  timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
+  timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
+  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
+  timer_control_   = nh_.createTimer(ros::Duration(0), &ControlManager::timerControl, this, true, false);  // oneshot timer
 
   // | ----------------------- finish init ---------------------- |
 
@@ -1511,14 +1503,14 @@ void ControlManager::onInit() {
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* //{ statusTimer() */
+/* //{ timerStatus() */
 
-void ControlManager::statusTimer(const ros::TimerEvent& event) {
+void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("statusTimer", _status_timer_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
 
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -2297,16 +2289,16 @@ void ControlManager::statusTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ safetyTimer() */
+/* //{ timerSafety() */
 
-void ControlManager::safetyTimer(const ros::TimerEvent& event) {
+void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   mrs_lib::ScopeUnset unset_running(running_safety_timer_);
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("safetyTimer", _safety_timer_rate_, 0.05, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
 
   // copy member variables
   auto last_attitude_cmd                         = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2322,7 +2314,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   }
 
   if (odometry_switch_in_progress_) {
-    ROS_WARN("[ControlManager]: safetyTimer tried to run while odometry switch in progress");
+    ROS_WARN("[ControlManager]: timerSafety tried to run while odometry switch in progress");
     return;
   }
 
@@ -2337,7 +2329,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
   // | --------- calculate control errors and tilt angle -------- |
 
-  // This means that the failsafeTimer only does its work when Controllers and Trackers produce valid output.
+  // This means that the timerFailsafe only does its work when Controllers and Trackers produce valid output.
   // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
   if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
     return;
@@ -2555,7 +2547,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   // |      activate failsafe when odometry stops publishing      |
   // --------------------------------------------------------------
-  // to do that, we need to fire up safetyTimer, which will regularly trigger the controllers
+  // to do that, we need to fire up timerSafety, which will regularly trigger the controllers
   // in place of the odometryCallback()
 
   if ((ros::Time::now() - uav_state_last_time).toSec() > _uav_state_max_missing_time_) {
@@ -2659,14 +2651,14 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ elandingTimer() */
+/* //{ timerEland() */
 
-void ControlManager::elandingTimer(const ros::TimerEvent& event) {
+void ControlManager::timerEland(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("elandingTimer", _elanding_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerEland", _elanding_timer_rate_, 0.01, event);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2678,7 +2670,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
   } else if (current_state_landing_ == LANDING_STATE) {
 
     if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: elandingTimer: last_attitude_cmd has not been initialized, returning");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerEland: last_attitude_cmd has not been initialized, returning");
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
       return;
     }
@@ -2724,7 +2716,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
 
       ROS_WARN("[ControlManager]: emergency landing finished");
 
-      elanding_timer_.stop();
+      timer_eland_.stop();
 
       // we should NOT set eland_triggered_=true
     }
@@ -2733,14 +2725,14 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ failsafeTimer() */
+/* //{ timerFailsafe() */
 
-void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
+void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("failsafeTimer", _failsafe_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerFailsafe", _failsafe_timer_rate_, 0.01, event);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2752,7 +2744,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
   publish();
 
   if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafeTimer: last_attitude_cmd has not been initialized, returning");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerFailsafe: last_attitude_cmd has not been initialized, returning");
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
     return;
   }
@@ -2788,14 +2780,14 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ joystickTimer() */
+/* //{ timerJoystick() */
 
-void ControlManager::joystickTimer(const ros::TimerEvent& event) {
+void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("joystickTimer", _status_timer_rate_, 0.05, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
 
   // copy member variables
   auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
@@ -3064,14 +3056,14 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ bumperTimer() */
+/* //{ timerBumper() */
 
-void ControlManager::bumperTimer(const ros::TimerEvent& event) {
+void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("bumperTimer", _bumper_timer_rate_, 0.05, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -3103,14 +3095,14 @@ void ControlManager::bumperTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ pirouetteTimer() */
+/* //{ timerPirouette() */
 
-void ControlManager::pirouetteTimer(const ros::TimerEvent& event) {
+void ControlManager::timerPirouette(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("pirouetteTimer", _pirouette_timer_rate_, 0.01, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerPirouette", _pirouette_timer_rate_, 0.01, event);
 
   pirouette_iterator_++;
 
@@ -3121,7 +3113,7 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent& event) {
   if (rc_eland_triggered_ || failsafe_triggered_ || eland_triggered_ || (pirouette_iterator_ > pirouette_duration * _pirouette_timer_rate_)) {
 
     _pirouette_enabled_ = false;
-    pirouette_timer_.stop();
+    timer_pirouette_.stop();
 
     setCallbacks(true);
 
@@ -3155,20 +3147,20 @@ void ControlManager::pirouetteTimer(const ros::TimerEvent& event) {
 
 /* controlTimer() //{ */
 
-void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent& event) {
+void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::ScopeUnset unset_running(running_control_timer_);
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("controlTimerOneshot");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerControl");
 
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
 
-  if (!failsafe_triggered_) {  // when failsafe is triggered, updateControllers() and publish() is called in failsafeTimer()
+  if (!failsafe_triggered_) {  // when failsafe is triggered, updateControllers() and publish() is called in timerFailsafe()
 
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
@@ -3179,7 +3171,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
     }
 
     ros::TimerEvent safety_timer_event;
-    safetyTimer(safety_timer_event);
+    timerSafety(safety_timer_event);
 
     updateTrackers();
 
@@ -3205,7 +3197,7 @@ void ControlManager::controlTimerOneshot([[maybe_unused]] const ros::TimerEvent&
 
   if (odometry_switch_in_progress_) {
 
-    safety_timer_.start();
+    timer_safety_.start();
     odometry_switch_in_progress_ = false;
 
     {
@@ -3271,7 +3263,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
       odometry_switch_in_progress_ = true;
 
       // we have to stop safety timer, otherwise it will interfere
-      safety_timer_.stop();
+      timer_safety_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
         ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
@@ -3326,8 +3318,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
   // run the control loop asynchronously in an OneShotTimer
   // but only if its not already running
   if (!running_control_timer_) {
-    control_timer_.stop();
-    control_timer_.start();
+    timer_control_.stop();
+    timer_control_.start();
   }
 }
 
@@ -3427,7 +3419,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       odometry_switch_in_progress_ = true;
 
       // we have to stop safety timer, otherwise it will interfere
-      safety_timer_.stop();
+      timer_safety_.stop();
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
         ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
@@ -3478,8 +3470,8 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
   // run the control loop asynchronously in an OneShotTimer
   // but only if its not already running
   if (!running_control_timer_) {
-    control_timer_.stop();
-    control_timer_.start();
+    timer_control_.stop();
+    timer_control_.start();
   }
 }
 
@@ -4333,7 +4325,7 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
   pirouette_inital_yaw_ = uav_yaw;
   pirouette_iterator_   = 0;
-  pirouette_timer_.start();
+  timer_pirouette_.start();
 
   res.success = true;
   res.message = "activated";
@@ -6424,7 +6416,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       break;
     case LANDING_STATE: {
 
-      elanding_timer_.start();
+      timer_eland_.start();
       eland_triggered_ = true;
       bumper_enabled_  = false;
 
@@ -6671,7 +6663,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       }
 
       failsafe_triggered_ = true;
-      elanding_timer_.stop();
+      timer_eland_.stop();
 
       if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
         landing_uav_mass_ = _uav_mass_;
@@ -6680,7 +6672,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       }
 
       eland_triggered_ = false;
-      failsafe_timer_.start();
+      timer_failsafe_.start();
 
       bumper_enabled_ = false;
 
@@ -6771,8 +6763,8 @@ std::tuple<bool, std::string> ControlManager::arming(bool input) {
     switchMotors(false);
   }
 
-  failsafe_timer_.stop();
-  elanding_timer_.stop();
+  timer_failsafe_.stop();
+  timer_eland_.stop();
 
   std::stringstream ss;
 

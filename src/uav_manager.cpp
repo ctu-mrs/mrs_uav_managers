@@ -98,7 +98,7 @@ public:
   bool               got_odometry_ = false;
 
   // odometry subscriber
-  ros::Timer      max_height_timer_;
+  ros::Timer      timer_max_height_;
   ros::Subscriber subscriber_max_height_;
   double          _max_height_;
   std::mutex      mutex_max_height_;
@@ -199,7 +199,7 @@ public:
   std::string _null_tracker_name_;
 
   // Takeoff timer
-  ros::Timer takeoff_timer_;
+  ros::Timer timer_takeoff_;
   double     _takeoff_timer_rate_;
   bool       takingoff_            = false;
   int        number_of_takeoffs_   = 0;
@@ -215,7 +215,7 @@ public:
   bool        _after_takeoff_pirouette_ = false;
 
   // Landing timer
-  ros::Timer  landing_timer_;
+  ros::Timer  timer_landing_;
   std::string _landing_tracker_name_;
   std::string _landing_controller_name_;
   double      _landing_cutoff_mass_factor_;
@@ -234,21 +234,21 @@ public:
   LandingStates_t previous_state_landing_ = IDLE_STATE;
 
   // timer callbacks
-  void landingTimer(const ros::TimerEvent& event);
-  void takeoffTimer(const ros::TimerEvent& event);
-  void maxHeightTimer(const ros::TimerEvent& event);
-  void flighttimeTimer(const ros::TimerEvent& event);
-  void maxthrustTimer(const ros::TimerEvent& event);
+  void timerLanding(const ros::TimerEvent& event);
+  void timerTakeoff(const ros::TimerEvent& event);
+  void timerMaxHeight(const ros::TimerEvent& event);
+  void timerFlighttime(const ros::TimerEvent& event);
+  void timerMaxthrust(const ros::TimerEvent& event);
 
   // Timer for checking max flight time
-  ros::Timer flighttime_timer_;
+  ros::Timer timer_flighttime_;
   double     _flighttime_timer_rate_;
   double     _flighttime_max_time_;
   bool       _flighttime_timer_enabled_ = false;
   double     flighttime_                = 0;
 
   // Timer for checking maximum thrust
-  ros::Timer maxthrust_timer_;
+  ros::Timer timer_maxthrust_;
   bool       _maxthrust_timer_enabled_ = false;
   double     _maxthrust_timer_rate_;
   double     _maxthrust_max_thrust_;
@@ -344,9 +344,7 @@ void UavManager::onInit() {
 
   transformer_ = std::make_shared<mrs_lib::Transformer>("ControlManager", _uav_name_);
 
-  // --------------------------------------------------------------
-  // |             Initialize subscribers and services            |
-  // --------------------------------------------------------------
+  // | ----------------------- subscribers ---------------------- |
 
   subscriber_odometry_     = nh_.subscribe("odometry_in", 1, &UavManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   subscriber_attitude_cmd_ = nh_.subscribe("attitude_cmd_in", 1, &UavManager::callbackAttitudeCmd, this, ros::TransportHints().tcpNoDelay());
@@ -367,10 +365,14 @@ void UavManager::onInit() {
       nh_.subscribe("constraint_manager_diagnostics_in", 1, &UavManager::callbackConstraints, this, ros::TransportHints().tcpNoDelay());
   constraints_last_time_ = ros::Time(0);
 
+  // | --------------------- service servers -------------------- |
+
   service_server_takeoff_    = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
   service_server_land_       = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
   service_server_land_home_  = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
   service_server_land_there_ = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
+
+  // | --------------------- service clients -------------------- |
 
   service_client_takeoff_                = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
   service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
@@ -385,29 +387,23 @@ void UavManager::onInit() {
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
   service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
 
-  // --------------------------------------------------------------
-  // |                    landing state machine                   |
-  // --------------------------------------------------------------
+  // | ---------------------- state machine --------------------- |
 
   changeLandingState(IDLE_STATE);
 
-  // --------------------------------------------------------------
-  // |                          profiler                          |
-  // --------------------------------------------------------------
+  // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "UavManager", _profiler_enabled_);
 
-  // --------------------------------------------------------------
-  // |                           timers                           |
-  // --------------------------------------------------------------
+  // | ------------------------- timers ------------------------- |
 
-  landing_timer_    = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::landingTimer, this, false, false);
-  takeoff_timer_    = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::takeoffTimer, this, false, false);
-  flighttime_timer_ = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::flighttimeTimer, this, false, false);
-  maxthrust_timer_  = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::maxthrustTimer, this, false, false);
+  timer_landing_    = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
+  timer_takeoff_    = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
+  timer_flighttime_ = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
+  timer_maxthrust_  = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
 
   if (_max_height_enabled_) {
-    max_height_timer_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::maxHeightTimer, this);
+    timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
   }
 
   // | ----------------------- finish init ---------------------- |
@@ -453,14 +449,14 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* //{ landingTimer() */
+/* //{ timerLanding() */
 
-void UavManager::landingTimer(const ros::TimerEvent& event) {
+void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("landingTimer", _landing_timer_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerLanding", _landing_timer_rate_, 0.1, event);
 
   // copy member variables
   auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
@@ -602,7 +598,7 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
           ROS_WARN("[UavManager]: emergency landing finished");
         }
 
-        landing_timer_.stop();
+        timer_landing_.stop();
       }
 
     } else {
@@ -614,14 +610,14 @@ void UavManager::landingTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ takeoffTimer() */
+/* //{ timerTakeoff() */
 
-void UavManager::takeoffTimer(const ros::TimerEvent& event) {
+void UavManager::timerTakeoff(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("takeoffTimer", _takeoff_timer_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerTakeoff", _takeoff_timer_rate_, 0.1, event);
 
   auto landoff_diagnostics = mrs_lib::get_mutexed(mutex_landoff_diagnostics_, landoff_diagnostics_);
 
@@ -645,7 +641,7 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
 
       // if enabled, start the timer for landing after reaching max thrust
       if (_maxthrust_timer_enabled_) {
-        maxthrust_timer_.start();
+        timer_maxthrust_.start();
       }
 
       mrs_msgs::String switch_tracker_out;
@@ -691,21 +687,21 @@ void UavManager::takeoffTimer(const ros::TimerEvent& event) {
         }
       }
 
-      takeoff_timer_.stop();
+      timer_takeoff_.stop();
     }
   }
 }
 
 //}
 
-/* //{ maxHeightTimer() */
+/* //{ timerMaxHeight() */
 
-void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
+void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxHeightTimer", _max_height_checking_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
 
   auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
   auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
@@ -782,21 +778,21 @@ void UavManager::maxHeightTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ flighttimeTimer() */
+/* //{ timerFlighttime() */
 
-void UavManager::flighttimeTimer(const ros::TimerEvent& event) {
+void UavManager::timerFlighttime(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("flighttimeTimer", _flighttime_timer_rate_, 0.1, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerFlighttime", _flighttime_timer_rate_, 0.1, event);
 
   flighttime_ += 1.0 / _flighttime_timer_rate_;
 
   if (flighttime_ > _flighttime_max_time_) {
 
     flighttime_ = 0;
-    flighttime_timer_.stop();
+    timer_flighttime_.stop();
 
     ROS_INFO("[UavManager]: max flight time achieved, landing");
 
@@ -814,7 +810,7 @@ void UavManager::flighttimeTimer(const ros::TimerEvent& event) {
 
       changeLandingState(LANDING_STATE);
 
-      landing_timer_.start();
+      timer_landing_.start();
 
     } else {
 
@@ -825,14 +821,14 @@ void UavManager::flighttimeTimer(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ maxthrustTimer() */
+/* //{ timerMaxthrust() */
 
-void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
+void UavManager::timerMaxthrust(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("maxthrustTimer", _maxthrust_timer_rate_, 0.03, event);
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxthrust", _maxthrust_timer_rate_, 0.03, event);
 
   // copy member variables
   auto attitude_cmd = mrs_lib::get_mutexed(mutex_attitude_cmd_, attitude_cmd_);
@@ -866,7 +862,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
 
   if (maxthrust_above_threshold_ && (ros::Time::now() - maxthrust_first_time_).toSec() > _maxthrust_eland_timeout_) {
 
-    maxthrust_timer_.stop();
+    timer_maxthrust_.stop();
 
     ROS_ERROR("[UavManager]: thrust over threshold (%.2f/%.2f) for more than %.2f s, calling emergency landing", attitude_cmd.thrust, _maxthrust_max_thrust_,
               _maxthrust_eland_timeout_);
@@ -885,7 +881,7 @@ void UavManager::maxthrustTimer(const ros::TimerEvent& event) {
 
       changeLandingState(LANDING_STATE);
 
-      landing_timer_.start();
+      timer_landing_.start();
 
     } else {
 
@@ -1310,7 +1306,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
         // if enabled, start the timer for measuring the flight time
         if (_flighttime_timer_enabled_) {
 
-          flighttime_timer_.start();
+          timer_flighttime_.start();
         }
       }
 
@@ -1321,7 +1317,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       number_of_takeoffs_++;
       waiting_for_takeoff_ = true;
 
-      takeoff_timer_.start();
+      timer_takeoff_.start();
     }
 
     // could not activate the landoff tracker!
@@ -1390,7 +1386,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   // stop the eventual takeoff
   waiting_for_takeoff_ = false;
   takingoff_           = false;
-  takeoff_timer_.stop();
+  timer_takeoff_.stop();
 
   {
     std::scoped_lock lock(mutex_last_mass_difference_);
@@ -1402,7 +1398,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
   setOdometryCallbacks(false);
 
-  flighttime_timer_.stop();
+  timer_flighttime_.stop();
 
   bool suc = true;
 
@@ -1440,7 +1436,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
         changeLandingState(LANDING_STATE);
 
-        landing_timer_.start();
+        timer_landing_.start();
 
       } else {
 
@@ -1519,7 +1515,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
   // stop the eventual takeoff
   waiting_for_takeoff_ = false;
   takingoff_           = false;
-  takeoff_timer_.stop();
+  timer_takeoff_.stop();
 
   ROS_INFO("[UavManager]: landing on home -> x=%0.2f, y=%0.2f", land_there_reference_.reference.position.x, land_there_reference_.reference.position.y);
 
@@ -1546,7 +1542,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
     changeLandingState(FLY_THERE_STATE);
 
-    landing_timer_.start();
+    timer_landing_.start();
 
   } else {
 
@@ -1604,7 +1600,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
   // stop the eventual takeoff
   waiting_for_takeoff_ = false;
   takingoff_           = false;
-  takeoff_timer_.stop();
+  timer_takeoff_.stop();
 
   ROS_INFO("[UavManager]: landing there -> x=%.2f, y=%.2f, z=%.2f, yaw=%.2f in %s", req.reference.position.x, req.reference.position.y,
            req.reference.position.z, req.reference.yaw, req.header.frame_id.c_str());
@@ -1633,7 +1629,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
     changeLandingState(FLY_THERE_STATE);
 
-    landing_timer_.start();
+    timer_landing_.start();
 
   } else {
 
