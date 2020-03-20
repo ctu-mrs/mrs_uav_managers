@@ -784,17 +784,18 @@ private:
   double sanitizeYaw(const double yaw_in);
   double angleDist(const double in1, const double in2);
 
-  void shutdown();
-  void setCallbacks(bool in);
-  bool arming(bool input);
-  bool isOffboard(void);
+  void                          shutdown();
+  void                          setCallbacks(bool in);
+  bool                          isOffboard(void);
+  bool                          elandSrv(void);
+  std::tuple<bool, std::string> arming(bool input);
 
   // safety functions impl
-  bool ehover(std::string& message_out);
-  bool hover(std::string& message_out);
-  bool eland(std::string& message_out);
-  bool failsafe();
-  bool escalatingFailsafe(std::string& message_out);
+  std::tuple<bool, std::string> ehover(void);
+  std::tuple<bool, std::string> hover(void);
+  std::tuple<bool, std::string> eland(void);
+  std::tuple<bool, std::string> failsafe(void);
+  std::tuple<bool, std::string> escalatingFailsafe(void);
 };
 
 //}
@@ -2476,8 +2477,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
                   _odometry_innovation_threshold_, odometry_innovation.pose.pose.position.x, odometry_innovation.pose.pose.position.y,
                   odometry_innovation.pose.pose.position.z);
 
-        std::string message_out;
-        eland(message_out);
+        auto [success, message] = eland();
       }
     }
   }
@@ -2496,8 +2496,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
                   (180.0 / M_PI) * _tilt_limit_eland_);
 
-        std::string message_out;
-        eland(message_out);
+        auto [success, message] = eland();
       }
     }
   }
@@ -2526,8 +2525,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
                   position_error_x_, position_error_y_, position_error_z_);
 
-        std::string message_out;
-        eland(message_out);
+        auto [success, message] = eland();
       }
     }
   }
@@ -2557,8 +2555,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
 
-        std::string message_out;
-        eland(message_out);
+        auto [success, message] = eland();
       }
     }
   }
@@ -2586,7 +2583,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
 
     ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
 
-    arming(false);
+    auto [success, message] = arming(false);
   }
 
   // --------------------------------------------------------------
@@ -2652,7 +2649,7 @@ void ControlManager::safetyTimer(const ros::TimerEvent& event) {
         ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
 
         switchMotors(false);
-        arming(false);
+        auto [success, message] = arming(false);
       }
     }
   }
@@ -2726,7 +2723,7 @@ void ControlManager::elandingTimer(const ros::TimerEvent& event) {
       if (_eland_disarm_enabled_) {
 
         ROS_INFO("[ControlManager]: calling for disarm");
-        arming(false);
+        auto [success, message] = arming(false);
       }
 
       shutdown();
@@ -2793,7 +2790,7 @@ void ControlManager::failsafeTimer(const ros::TimerEvent& event) {
 
     ROS_INFO("[ControlManager]: detecting zero thrust, disarming");
 
-    arming(false);
+    auto [success, message] = arming(false);
   }
 }
 
@@ -2848,8 +2845,7 @@ void ControlManager::joystickTimer(const ros::TimerEvent& event) {
 
     joystick_failsafe_pressed_ = false;
 
-    std::string message_out;
-    eland(message_out);
+    auto [success, message] = eland();
   }
 
   // if back was pressed and held for > 0.1 s
@@ -3830,13 +3826,11 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
           rc_eland_triggered_ = true;
 
-          std::string message_out;
-          eland(message_out);
+          auto [success, message] = eland();
         }
       } else if (_rc_eland_action_.compare(ESCALATING_FAILSAFE_STR) == STRING_EQUAL) {
 
-        std::string message_out;
-        escalatingFailsafe(message_out);
+        auto [success, message] = escalatingFailsafe();
 
       } else if (_rc_eland_action_.compare(FAILSAFE_STR) == STRING_EQUAL) {
 
@@ -3983,7 +3977,10 @@ bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::R
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: ehover trigger by callback");
 
-  res.success = ehover(res.message);
+  auto [success, message] = ehover();
+
+  res.success = success;
+  res.message = message;
 
   return true;
 }
@@ -4012,7 +4009,10 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: failsafe triggered by callback");
 
-  res.success = failsafe();
+  auto [success, message] = failsafe();
+
+  res.success = success;
+  res.message = message;
 
   return true;
 }
@@ -4028,7 +4028,10 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
 
-  res.success = escalatingFailsafe(res.message);
+  auto [success, message] = escalatingFailsafe();
+
+  res.success = success;
+  res.message = message;
 
   return true;
 }
@@ -4044,7 +4047,10 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& 
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: eland triggered by callback");
 
-  res.success = eland(res.message);
+  auto [success, message] = eland();
+
+  res.success = success;
+  res.message = message;
 
   return true;
 }
@@ -4144,7 +4150,9 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
   } else {
 
-    if (arming(false)) {
+    auto [success, message] = arming(false);
+
+    if (success) {
 
       ss << "disarmed";
       res.success = true;
@@ -4152,7 +4160,7 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
     } else {
 
-      ss << "could not disarm";
+      ss << "could not disarm: " << message;
       res.success = false;
       ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     }
@@ -4408,7 +4416,10 @@ bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Re
   if (!is_initialized_)
     return false;
 
-  res.success = hover(res.message);
+  auto [success, message] = hover();
+
+  res.success = success;
+  res.message = message;
 
   return true;
 }
@@ -6436,13 +6447,10 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 
 /* hover() //{ */
 
-bool ControlManager::hover(std::string& message_out) {
+std::tuple<bool, std::string> ControlManager::hover(void) {
 
-  if (!is_initialized_) {
-
-    message_out = std::string("the ControlManager is not initialized");
-    return false;
-  }
+  if (!is_initialized_)
+    return std::tuple(false, "the ControlManager is not initialized");
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -6455,16 +6463,14 @@ bool ControlManager::hover(std::string& message_out) {
 
     if (tracker_response != std_srvs::TriggerResponse::Ptr()) {
 
-      message_out = tracker_response->message;
-      return tracker_response->success;
+      return std::tuple(tracker_response->success, tracker_response->message);
 
     } else {
 
       std::stringstream ss;
       ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'goto' service!";
 
-      message_out = ss.str();
-      return false;
+      return std::tuple(false, ss.str());
     }
   }
 }
@@ -6473,292 +6479,122 @@ bool ControlManager::hover(std::string& message_out) {
 
 /* //{ ehover() */
 
-bool ControlManager::ehover(std::string& message_out) {
+std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   if (!is_initialized_)
-    return false;
+    return std::tuple(false, "the ControlManager is not initialized");
 
   // copy the member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+
+  if (active_tracker_idx == _null_tracker_idx_) {
+
+    std::stringstream ss;
+    ss << "can not trigger ehover while not flying";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+    return std::tuple(false, ss.str());
+  }
+
+  {
+
+    auto [success, message] = switchTracker(_ehover_tracker_name_);
+
+    // check if the tracker was successfully switched
+    // this is vital, that is the core of the hover
+    if (!success) {
+
+      std::stringstream ss;
+      ss << "error during switching to ehover tracker: '" << message << "'";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+      return std::tuple(success, ss.str());
+    }
+  }
+
+  {
+    auto [success, message] = switchController(_eland_controller_name_);
+
+    // check if the controller was successfully switched
+    // this is not vital, we can continue without that
+    if (!success) {
+
+      std::stringstream ss;
+      ss << "error during switching to ehover controller: '" << message << "'";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    }
+  }
 
   std::stringstream ss;
+  ss << "ehover activated";
+  ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
-  bool success = false;
-
-  {
-    std::scoped_lock lock(mutex_tracker_list_);
-
-    if (active_tracker_idx_ == _null_tracker_idx_) {
-
-      ss << "can not trigger ehover while not flying";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      message_out = ss.str();
-
-      return false;
-    }
-
-    try {
-
-      // check if the tracker is not active
-      if (_ehover_tracker_idx_ == active_tracker_idx_) {
-
-        ss << "not switching, the tracker '" << _ehover_tracker_name_ << "' is already active!";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      } else {
-
-        ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating the tracker '%s'", _tracker_names_[_ehover_tracker_idx_].c_str());
-        tracker_list_[_ehover_tracker_idx_]->activate(last_position_cmd);
-
-        ss << "the tracker '" << _ehover_tracker_name_ << "' was activated";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        // super important, switch the active tracker idx
-        try {
-
-          tracker_list_[active_tracker_idx_]->deactivate();
-          active_tracker_idx_ = _ehover_tracker_idx_;
-
-          success = true;
-        }
-        catch (std::runtime_error& exrun) {
-
-          ss << "could not deactivate the tracker '" << _tracker_names_[active_tracker_idx_] << "'";
-          ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-          message_out = ss.str();
-          success     = false;
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-
-      ss << "error during activation of the tracker '" << _ehover_tracker_name_ << "'";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-
-      message_out = ss.str();
-      success     = false;
-    }
-  }
-
-  {
-    std::scoped_lock lock(mutex_controller_list_);
-
-    try {
-
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating the controller '%s'", _controller_names_[_eland_controller_idx_].c_str());
-
-      // check if the controller is not active
-      if (_eland_controller_idx_ == active_controller_idx_) {
-
-        ss << "not switching, the controller '" << _eland_controller_name_ << "' is already active!";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      } else {
-
-        controller_list_[_eland_controller_idx_]->activate(last_attitude_cmd);
-        ss << "the controller '" << _controller_names_[_eland_controller_idx_] << "' was activated";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        try {
-
-          // deactivate the old controller
-          controller_list_[active_controller_idx_]->deactivate();
-          active_controller_idx_ = _eland_controller_idx_;  // super important
-
-          success = true;
-        }
-        catch (std::runtime_error& exrun) {
-
-          ss << "could not deactivate the controller '" << _tracker_names_[active_tracker_idx_] << "'";
-          ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-          message_out = ss.str();
-          success     = false;
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-
-      ss << "error during activation of the controller '" << _ehover_tracker_name_ << "'";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-
-      message_out = ss.str();
-      success     = false;
-    }
-  }
-
-  if (success) {
-    ss << "ehover activated";
-    ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    message_out = ss.str();
-  }
-
-  return success;
+  return std::tuple(true, ss.str());
 }
 
 //}
 
 /* eland() //{ */
 
-bool ControlManager::eland(std::string& message_out) {
+std::tuple<bool, std::string> ControlManager::eland(void) {
 
   if (!is_initialized_)
-    return false;
+    return std::tuple(false, "the ControlManager is not initialized");
 
-  if (eland_triggered_ || failsafe_triggered_) {
-    return false;
-  }
+  if (eland_triggered_ || failsafe_triggered_)
+    return std::tuple(false, "eland or failsafe are triggered");
 
   // copy member variables
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+
+  if (active_tracker_idx == _null_tracker_idx_) {
+
+    std::stringstream ss;
+    ss << "can not trigger eland while not flying";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+    return std::tuple(false, ss.str());
+  }
+
+  {
+    auto [success, message] = switchTracker(_ehover_tracker_name_);
+
+    // check if the tracker was successfully switched
+    // this is vital
+    if (!success) {
+
+      std::stringstream ss;
+      ss << "error during switching to eland tracker: '" << message << "'";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+      return std::tuple(success, ss.str());
+    }
+  }
+
+  {
+    auto [success, message] = switchController(_eland_controller_name_);
+
+    // check if the controller was successfully switched
+    // this is not vital, we can continue without it
+    if (!success) {
+
+      std::stringstream ss;
+      ss << "error during switching to eland controller: '" << message << "'";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    }
+  }
+
+  // | ----------------- call the eland service ----------------- |
 
   std::stringstream ss;
+  bool              success;
 
-  bool success = false;
+  if (elandSrv()) {
 
-  {
-    std::scoped_lock lock(mutex_tracker_list_);
-
-    if (active_tracker_idx_ == _null_tracker_idx_) {
-
-      ss << "can not trigger eland while not flying";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      message_out = ss.str();
-      return false;
-    }
-
-    try {
-
-      // check if the tracker is not active
-      if (_ehover_tracker_idx_ == active_tracker_idx_) {
-
-        ss << "not switching, the tracker '" << _ehover_tracker_name_ << "' is already active!";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      } else {
-
-        ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating the tracker '%s'", _tracker_names_[_ehover_tracker_idx_].c_str());
-
-        tracker_list_[_ehover_tracker_idx_]->activate(last_position_cmd);
-
-        ss << "the tracker '" << _ehover_tracker_name_ << "' was activated";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        // super important, switch the active tracker idx
-        try {
-
-          tracker_list_[active_tracker_idx_]->deactivate();
-          active_tracker_idx_ = _ehover_tracker_idx_;
-
-          success = true;
-        }
-        catch (std::runtime_error& exrun) {
-
-          ss << "could not deactivate the tracker '" << _tracker_names_[active_tracker_idx_] << "'";
-          ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-          message_out = ss.str();
-          success     = false;
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-
-      ss << "error during activation of the tracker '" << _ehover_tracker_name_ << "'";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-
-      message_out = ss.str();
-      success     = false;
-    }
-  }
-
-  {
-    std::scoped_lock lock(mutex_controller_list_);
-
-    try {
-
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating the controller %s", _controller_names_[_eland_controller_idx_].c_str());
-
-      // check if the controller is not active
-      if (_eland_controller_idx_ == active_controller_idx_) {
-
-        ss << "not switching, the controller '" << _eland_controller_name_ << "' is already active!";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-      } else {
-
-        controller_list_[_eland_controller_idx_]->activate(last_attitude_cmd);
-        ss << "the controller '" << _controller_names_[_eland_controller_idx_] << "' was activated";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        try {
-
-          controller_list_[active_controller_idx_]->deactivate();
-          active_controller_idx_ = _eland_controller_idx_;  // super important
-
-          success = true;
-        }
-        catch (std::runtime_error& exrun) {
-
-          ss << "could not deactivate the controller '" << _controller_names_[active_controller_idx_] << "'";
-          ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
-          message_out = ss.str();
-          success     = false;
-        }
-      }
-    }
-    catch (std::runtime_error& exrun) {
-
-      ss << "error during activation of the controller '" << _ehover_tracker_name_ << "'";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-
-      message_out = ss.str();
-      success     = false;
-    }
-  }
-
-  std_srvs::Trigger eland_out;
-  service_client_eland_.call(eland_out);
-
-  if (eland_out.response.success) {
 
     changeLandingState(LANDING_STATE);
 
@@ -6766,129 +6602,127 @@ bool ControlManager::eland(std::string& message_out) {
 
     ss << "eland activated";
     ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    message_out = ss.str();
+
+    success = true;
 
   } else {
 
-    ss << "error during activation of eland: '" << message_out << "'";
+    ss << "error during activation of eland";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
-    message_out = ss.str();
-    success     = false;
+    success = false;
   }
 
-  return success;
+  return std::tuple(success, ss.str());
 }
 
 //}
 
 /* failsafe() //{ */
 
-bool ControlManager::failsafe() {
+std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto pixhawk_odometry      = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
 
   if (!is_initialized_)
-    return false;
+    return std::tuple(false, "the ControlManager is not initialized");
 
-  if (failsafe_triggered_) {
-    return false;
+  if (failsafe_triggered_)
+    return std::tuple(false, "failsafe already triggered");
+
+  if (active_tracker_idx == _null_tracker_idx_) {
+
+    std::stringstream ss;
+    ss << "can not trigger failsafe while not flying";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
   }
 
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
-    {
-      // TODO: I dont like this locking here, push it downstream pls
+    // calculate the euler angles
+    tf::Quaternion pixhawk_attitude;
+    quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, pixhawk_attitude);
+    tf::Matrix3x3 m(pixhawk_attitude);
+    double        roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
+    failsafe_attitude_cmd                  = *last_attitude_cmd;
+    failsafe_attitude_cmd.euler_attitude.z = yaw;
+
+    mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
+
+    try {
+
       std::scoped_lock lock(mutex_controller_list_);
 
-      if (active_tracker_idx_ == _null_tracker_idx_) {
-
-        ROS_ERROR("[ControlManager]: can not trigger failsafe while not flying");
-        return false;
-      }
-
-      mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
-
-      failsafe_attitude_cmd = *last_attitude_cmd;
+      ROS_INFO("[ControlManager]: activating the controller '%s'", _failsafe_controller_name_.c_str());
+      controller_list_[_failsafe_controller_idx_]->activate(failsafe_attitude_cmd_ptr);
 
       {
-        // calculate the euler angles
-        tf::Quaternion pixhawk_attitude;
-        quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, pixhawk_attitude);
-        tf::Matrix3x3 m(pixhawk_attitude);
-        double        roll, pitch, yaw;
-        m.getRPY(roll, pitch, yaw);
+        std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
-        failsafe_attitude_cmd.euler_attitude.z = yaw;
+        // update the time (used in failsafe)
+        controller_tracker_switch_time_ = ros::Time::now();
       }
 
-      mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
+      failsafe_triggered_ = true;
+      elanding_timer_.stop();
 
+      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+        landing_uav_mass_ = _uav_mass_;
+      } else {
+        landing_uav_mass_ = _uav_mass_ + last_attitude_cmd->mass_difference;
+      }
+
+      eland_triggered_ = false;
+      failsafe_timer_.start();
+
+      bumper_enabled_ = false;
+
+      setOdometryCallbacks(false);
+
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: the controller '%s' was activated", _failsafe_controller_name_.c_str());
+
+      // super important, switch the active controller idx
       try {
 
-        ROS_INFO("[ControlManager]: activating the controller '%s'", _failsafe_controller_name_.c_str());
-        controller_list_[_failsafe_controller_idx_]->activate(failsafe_attitude_cmd_ptr);
-
-        {
-          std::scoped_lock lock(mutex_controller_tracker_switch_time_);
-
-          // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
-        }
-
-        failsafe_triggered_ = true;
-        elanding_timer_.stop();
-
-        if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-          landing_uav_mass_ = _uav_mass_;
-        } else {
-          landing_uav_mass_ = _uav_mass_ + last_attitude_cmd->mass_difference;
-        }
-
-        eland_triggered_ = false;
-        failsafe_timer_.start();
-
-        bumper_enabled_ = false;
-
-        setOdometryCallbacks(false);
-
-        ROS_INFO("[ControlManager]: the controller '%s' was activated", _failsafe_controller_name_.c_str());
-
-        // super important, switch the active controller idx
-        try {
-
-          controller_list_[active_controller_idx_]->deactivate();
-          active_controller_idx_ = _failsafe_controller_idx_;
-        }
-        catch (std::runtime_error& exrun) {
-          ROS_ERROR("[ControlManager]: could not deactivate the controller '%s'", _controller_names_[active_controller_idx_].c_str());
-        }
+        controller_list_[active_controller_idx_]->deactivate();
+        active_controller_idx_ = _failsafe_controller_idx_;
       }
       catch (std::runtime_error& exrun) {
-        ROS_ERROR("[ControlManager]: error during activation of the controller '%s'", _failsafe_controller_name_.c_str());
-        ROS_ERROR("[ControlManager]: exception: '%s'", exrun.what());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not deactivate the controller '%s'", _controller_names_[active_controller_idx_].c_str());
       }
+    }
+    catch (std::runtime_error& exrun) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: error during activation of the controller '%s'", _failsafe_controller_name_.c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
     }
   }
 
-  return true;
+  return std::tuple(true, "failsafe activated");
 }
 
 //}
 
 /* escalatingFailsafe() //{ */
 
-bool ControlManager::escalatingFailsafe(std::string& message_out) {
+std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
+
+  std::stringstream ss;
 
   if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
 
-    message_out = "too soon for escalating failsafe";
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
-    return false;
+    ss << "too soon for escalating failsafe";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+    return std::tuple(false, ss.str());
   }
 
   ROS_WARN("[ControlManager]: escalating failsafe triggered");
@@ -6896,25 +6730,31 @@ bool ControlManager::escalatingFailsafe(std::string& message_out) {
   if (!eland_triggered_ && !failsafe_triggered_ && motors_) {
 
     escalating_failsafe_time_ = ros::Time::now();
+
     ROS_WARN_THROTTLE(0.1, "[ControlManager]: escalating failsafe calls for eland");
-    return eland(message_out);
+
+    return eland();
 
   } else if (eland_triggered_) {
 
-    message_out = "escalating failsafe escalates to failsafe";
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
     escalating_failsafe_time_ = ros::Time::now();
+
+    ss << "escalating failsafe escalates to failsafe";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
     return failsafe();
 
   } else if (failsafe_triggered_) {
 
     escalating_failsafe_time_ = ros::Time::now();
-    message_out               = "escalating failsafe escalates to disarm";
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: %s", message_out.c_str());
+
+    ss << "escalating failsafe escalates to disarm";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
     return arming(false);
   }
 
-  return false;
+  return std::tuple(false, "escalating failsafe reached an improper state");
 }
 
 //}
@@ -6923,7 +6763,7 @@ bool ControlManager::escalatingFailsafe(std::string& message_out) {
 
 /* arming() //{ */
 
-bool ControlManager::arming(bool input) {
+std::tuple<bool, std::string> ControlManager::arming(bool input) {
 
   mavros_msgs::CommandBool srv_out;
   srv_out.request.value = input;
@@ -6936,7 +6776,10 @@ bool ControlManager::arming(bool input) {
   failsafe_timer_.stop();
   elanding_timer_.stop();
 
+  std::stringstream ss;
+
   // we cannot disarm if the drone is not in offboard mode
+  // this is super important!
   if (isOffboard()) {
 
     ROS_INFO("[ControlManager]: calling for disarming");
@@ -6944,23 +6787,28 @@ bool ControlManager::arming(bool input) {
     if (service_client_arm_.call(srv_out)) {
 
       if (srv_out.response.success) {
-        ROS_INFO("[ControlManager]: service call for disarm was successful");
+        ss << "service call for disarm was successful";
+        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       } else {
-        ROS_ERROR("[ControlManager]: service call for disarm was unsuccessful");
+        ss << "service call for disarm failed";
+        ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       }
 
     } else {
-      ROS_ERROR("[ControlManager]: calling for disarm resulted in failure: '%d'", srv_out.response.result);
+      ss << "calling for disarm resulted in failure: '" << srv_out.response.result << "'";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     }
 
     shutdown();
 
-    return srv_out.response.success;
+    return std::tuple(srv_out.response.success, ss.str());
 
   } else {
 
-    ROS_WARN("[ControlManager]: cannot disarm, not in OFFBOARD mode");
-    return false;
+    ss << "cannot disarm, not in OFFBOARD mode";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+    return std::tuple(false, ss.str());
   }
 }
 
@@ -7009,6 +6857,34 @@ void ControlManager::setOdometryCallbacks(const bool input) {
 
   } else {
     ROS_ERROR("[ControlManager]: service call for toggle odometry callbacks failed!");
+  }
+}
+
+//}
+
+/* elandSrv() //{ */
+
+bool ControlManager::elandSrv(void) {
+
+  ROS_INFO("[ControlManager]: calling for eland");
+
+  std_srvs::Trigger srv;
+
+  bool res = service_client_eland_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[ControlManager]: service call for eland returned: '%s'", srv.response.message.c_str());
+    }
+
+    return srv.response.success;
+
+  } else {
+
+    ROS_ERROR("[ControlManager]: service call for eland failed!");
+
+    return false;
   }
 }
 
@@ -7357,7 +7233,7 @@ void ControlManager::updateTrackers(void) {
 
           std::string ehover_message;
 
-          [[maybe_unused]] bool ehover_res = ehover(ehover_message);
+          auto [success, message] = ehover();
         }
 
       } else {
