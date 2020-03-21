@@ -1529,6 +1529,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   auto [position_error_x, position_error_y, position_error_z] =
       mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto min_height            = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
 
   double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
@@ -1537,6 +1538,23 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   uav_x = uav_state.pose.position.x;
   uav_y = uav_state.pose.position.y;
   uav_z = uav_state.pose.position.z;
+
+  // --------------------------------------------------------------
+  // |                      print the status                      |
+  // --------------------------------------------------------------
+
+  {
+    std::string controller = _controller_names_[active_controller_idx];
+    std::string tracker    = _tracker_names_[active_tracker_idx];
+    double      mass       = last_attitude_cmd->total_mass;
+    double      bx_b       = last_attitude_cmd->disturbance_bx_b;
+    double      by_b       = last_attitude_cmd->disturbance_by_b;
+    double      wx_w       = last_attitude_cmd->disturbance_wx_w;
+    double      wy_w       = last_attitude_cmd->disturbance_wy_w;
+
+    ROS_INFO_THROTTLE(5.0, "[ControlManager]: tracker: '%s', controller: '%s', mass: '%.2f kg', disturbances: body [%.2f, %.2f] N, world [%.2f, %.2f] N",
+                      tracker.c_str(), controller.c_str(), mass, bx_b, by_b, wx_w, wy_w);
+  }
 
   // --------------------------------------------------------------
   // |                   publish the diagnostics                  |

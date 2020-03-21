@@ -176,8 +176,8 @@ void GainManager::onInit() {
     param_loader.load_param(*it + "/vertical/attitude/kq", new_gains.kqz);
     param_loader.load_param(*it + "/vertical/attitude/kw", new_gains.kwz);
 
-    param_loader.load_param(*it + "/weight_estimator/km", new_gains.km);
-    param_loader.load_param(*it + "/weight_estimator/km_lim", new_gains.km_lim);
+    param_loader.load_param(*it + "/mass_estimator/km", new_gains.km);
+    param_loader.load_param(*it + "/mass_estimator/km_lim", new_gains.km_lim);
 
     _gains_.insert(std::pair<std::string, Gains_t>(*it, new_gains));
   }
