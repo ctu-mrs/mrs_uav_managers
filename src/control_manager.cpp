@@ -1994,7 +1994,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     Eigen::Vector3d      vec3d;
     geometry_msgs::Point point;
 
-    /* world x disturbance //{ */
+    /* world disturbance //{ */
     {
 
       visualization_msgs::Marker marker;
@@ -2035,72 +2035,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       /* tip //{ */
 
       point.x = uav_x + multiplier * last_attitude_cmd->disturbance_wx_w;
-      point.y = uav_y;
-      point.z = uav_z;
-
-      marker.points.push_back(point);
-
-      //}
-
-      marker.scale.x = 0.05;
-      marker.scale.y = 0.05;
-      marker.scale.z = 0.05;
-
-      marker.color.a = 0.5;
-      marker.color.r = 1.0;
-      marker.color.g = 0.0;
-      marker.color.b = 0.0;
-
-      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-      msg_out.markers.push_back(marker);
-    }
-
-    //}
-
-    /* world y disturbance //{ */
-    {
-
-      visualization_msgs::Marker marker;
-
-      marker.header.frame_id = uav_state.header.frame_id;
-      marker.header.stamp    = ros::Time::now();
-      marker.ns              = "control_manager";
-      marker.id              = id++;
-      marker.type            = visualization_msgs::Marker::ARROW;
-      marker.action          = visualization_msgs::Marker::ADD;
-
-      /* position //{ */
-
-      marker.pose.position.x = 0.0;
-      marker.pose.position.y = 0.0;
-      marker.pose.position.z = 0.0;
-
-      //}
-
-      /* orientation //{ */
-
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
-
-      //}
-
-      // defining points
-
-      /* origin //{ */
-      point.x = uav_x;
-      point.y = uav_y;
-      point.z = uav_z;
-
-      marker.points.push_back(point);
-
-      //}
-
-      /* tip //{ */
-
-      point.x = uav_x;
       point.y = uav_y + multiplier * last_attitude_cmd->disturbance_wy_w;
       point.z = uav_z;
 
@@ -2124,7 +2058,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     //}
 
-    /* body x disturbance //{ */
+    /* body disturbance //{ */
     {
 
       visualization_msgs::Marker marker;
@@ -2165,75 +2099,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* tip //{ */
 
-      vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, 0, 0;
-      vec3d = quat_eigen * vec3d;
-
-      point.x = uav_x + vec3d[0];
-      point.y = uav_y + vec3d[1];
-      point.z = uav_z + vec3d[2];
-
-      marker.points.push_back(point);
-
-      //}
-
-      marker.scale.x = 0.05;
-      marker.scale.y = 0.05;
-      marker.scale.z = 0.05;
-
-      marker.color.a = 0.5;
-      marker.color.r = 0.0;
-      marker.color.g = 1.0;
-      marker.color.b = 0.0;
-
-      marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-
-      msg_out.markers.push_back(marker);
-    }
-
-    //}
-
-    /* body y disturbance //{ */
-    {
-
-      visualization_msgs::Marker marker;
-
-      marker.header.frame_id = uav_state.header.frame_id;
-      marker.header.stamp    = ros::Time::now();
-      marker.ns              = "control_manager";
-      marker.id              = id++;
-      marker.type            = visualization_msgs::Marker::ARROW;
-      marker.action          = visualization_msgs::Marker::ADD;
-
-      /* position //{ */
-
-      marker.pose.position.x = 0.0;
-      marker.pose.position.y = 0.0;
-      marker.pose.position.z = 0.0;
-
-      //}
-
-      /* orientation //{ */
-
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
-
-      //}
-
-      /* origin //{ */
-
-      point.x = uav_x;
-      point.y = uav_y;
-      point.z = uav_z;
-
-      marker.points.push_back(point);
-
-      //}
-
-      /* tip //{ */
-
-      vec3d << 0, multiplier * last_attitude_cmd->disturbance_by_b, 0;
+      vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, multiplier * last_attitude_cmd->disturbance_by_b, 0;
       vec3d = quat_eigen * vec3d;
 
       point.x = uav_x + vec3d[0];
