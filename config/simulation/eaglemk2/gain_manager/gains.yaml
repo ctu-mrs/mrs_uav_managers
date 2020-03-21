@@ -21,8 +21,8 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 4.0
-      kw: 6.0
+      kq: 8.0
+      kw: 1.0
 
   mass_estimator:
     km: 1.0
@@ -51,8 +51,8 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 4.0
-      kw: 6.0
+      kq: 8.0
+      kw: 1.0
 
   mass_estimator:
     km: 1.0
@@ -81,8 +81,8 @@ tight:
     ka: 1.0
 
     attitude:
-      kq: 4.0
-      kw: 6.0
+      kq: 8.0
+      kw: 1.0
 
   mass_estimator:
     km: 1.0
