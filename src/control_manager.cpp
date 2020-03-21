@@ -7180,63 +7180,76 @@ void ControlManager::updateTrackers(void) {
   mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
   mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
-  try {
+  // for each tracker
+  for (int i = 0; i < int(tracker_list_.size()); i++) {
 
-    // for each tracker
-    for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+    if (i == active_tracker_idx) {
 
-      if ((int)i == active_tracker_idx) {
-
+      try {
         std::scoped_lock lock(mutex_tracker_list_);
 
-        // if it is the active one, update and retrieve the command
+        // active tracker => update and retrieve the command
         tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
+      }
+      catch (std::runtime_error& exrun) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active tracker (%s)", _tracker_names_[active_tracker_idx].c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active tracker");
+
+        eland();
+      }
+
+    } else {
+
+      try {
+        std::scoped_lock lock(mutex_tracker_list_);
+
+        // nonactive tracker => just update without retrieving the command
+        tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
+      }
+      catch (std::runtime_error& exrun) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the tracker '%s'", _tracker_names_[i].c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the tracker");
+
+        eland();
+      }
+    }
+  }
+
+  if (tracker_output_cmd != mrs_msgs::PositionCommand::Ptr() && validatePositionCommand(tracker_output_cmd)) {
+
+    std::scoped_lock lock(mutex_last_position_cmd_);
+
+    last_position_cmd_ = tracker_output_cmd;
+
+  } else {
+
+    if (active_tracker_idx != _null_tracker_idx_) {
+
+      if (active_tracker_idx == _ehover_tracker_idx_) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the ehover tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
+
+        failsafe();
 
       } else {
 
-        std::scoped_lock lock(mutex_tracker_list_);
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
-        // if it is not the active one, just update without retrieving the command
-        tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
+        std::string ehover_message;
+
+        ehover();
       }
-    }
 
-    if (tracker_output_cmd != mrs_msgs::PositionCommand::Ptr() && validatePositionCommand(tracker_output_cmd)) {
+    } else {
 
       std::scoped_lock lock(mutex_last_position_cmd_);
 
       last_position_cmd_ = tracker_output_cmd;
-
-    } else {
-
-      if (active_tracker_idx != _null_tracker_idx_) {
-
-        if (active_tracker_idx == _ehover_tracker_idx_) {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the ehover tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
-
-          failsafe();
-
-        } else {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
-
-          std::string ehover_message;
-
-          ehover();
-        }
-
-      } else {
-
-        std::scoped_lock lock(mutex_last_position_cmd_);
-
-        last_position_cmd_ = tracker_output_cmd;
-      }
     }
-  }
-  catch (std::runtime_error& exrun) {
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: exception while updating trackers");
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
   }
 }
 
@@ -7286,66 +7299,82 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
   } else {
 
-    try {
+    // for each controller
+    for (int i = 0; i < int(controller_list_.size()); i++) {
 
-      // for each controller
-      for (unsigned int i = 0; i < controller_list_.size(); i++) {
+      if (i == active_controller_idx) {
 
-        if ((int)i == active_controller_idx) {
-
+        try {
           std::scoped_lock lock(mutex_controller_list_);
 
-          // if it is the active one, update and retrieve the command
+          // active controller => update and retrieve the command
           controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_position_cmd);
-
-        } else {
-
-          std::scoped_lock lock(mutex_controller_list_);
-
-          // if it is not the active one, just update without retrieving the command
-          controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
         }
-      }
+        catch (std::runtime_error& exrun) {
 
-      // normally the active controller returns a valid command
-      if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr() && validateAttitudeCommand(controller_output_cmd)) {
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active controller (%s)", _controller_names_[active_controller_idx].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
 
-        std::scoped_lock lock(mutex_last_attitude_cmd_);
+          if (eland_triggered_) {
 
-        last_attitude_cmd_ = controller_output_cmd;
+            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering failsafe due to an exception in the active controller (eland is already active)");
+            failsafe();
 
-        // but it can return an empty command, due to some critical internal error
-        // which means we should trigger the failsafe landing
+          } else {
+
+            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active controller");
+            eland();
+          }
+        }
+
       } else {
 
-        // only if the controller is still active, trigger failsafe
-        // if not active, we don't care, we should not ask the controller for
-        // the result anyway -> this could mean a race condition occured
-        // like it once happend during landing
-        bool controller_status = false;
-
-        {
+        try {
           std::scoped_lock lock(mutex_controller_list_);
 
-          controller_status = controller_list_[active_controller_idx]->getStatus().active;
+          // nonactive controller => just update without retrieving the command
+          controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
         }
+        catch (std::runtime_error& exrun) {
 
-        if (controller_status) {
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the controller '%s'", _controller_names_[i].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland (somebody should notice this)");
 
-          ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned empty or invalid command");
-
-          failsafe();
+          eland();
         }
       }
     }
-    catch (std::runtime_error& exrun) {
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: exception while updating controllers");
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+    // normally the active controller returns a valid command
+    if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr() && validateAttitudeCommand(controller_output_cmd)) {
 
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering failsafe due to an exception in the controller");
+      std::scoped_lock lock(mutex_last_attitude_cmd_);
 
-      failsafe();
+      last_attitude_cmd_ = controller_output_cmd;
+
+      // but it can return an empty command, due to some critical internal error
+      // which means we should trigger the failsafe landing
+    } else {
+
+      // only if the controller is still active, trigger failsafe
+      // if not active, we don't care, we should not ask the controller for
+      // the result anyway -> this could mean a race condition occured
+      // like it once happend during landing
+      bool controller_status = false;
+
+      {
+        std::scoped_lock lock(mutex_controller_list_);
+
+        controller_status = controller_list_[active_controller_idx]->getStatus().active;
+      }
+
+      if (controller_status) {
+
+        ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned empty or invalid command");
+
+        failsafe();
+      }
     }
   }
 }
