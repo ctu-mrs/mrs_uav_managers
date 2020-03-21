@@ -617,11 +617,10 @@ private:
   mrs_msgs::ObstacleSectors bumper_data_;
   std::mutex                mutex_bumper_data_;
 
-  bool         bumper_enabled_           = false;
-  bool         _bumper_hugging_enabled_  = false;
-  bool         bumper_repulsion_enabled_ = false;
-  bool         repulsing_                = false;
-  unsigned int repulsing_from_           = 0;
+  bool bumper_enabled_           = false;
+  bool _bumper_hugging_enabled_  = false;
+  bool bumper_repulsion_enabled_ = false;
+  bool repulsing_                = false;
 
   double bumper_horizontal_distance_ = 0;
   double bumper_vertical_distance_   = 0;
@@ -1007,7 +1006,7 @@ void ControlManager::onInit() {
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
 
       if (_safety_area_frame_ == "latlon_origin") {
-        for (unsigned int i = 0; i < point_obstacle_points.size(); i++) {
+        for (int i = 0; i < int(point_obstacle_points.size()); i++) {
 
           Eigen::MatrixXd temp = point_obstacle_points[i];
           temp(0, 2) *= 8.9832e-06;
@@ -1061,7 +1060,7 @@ void ControlManager::onInit() {
 
   tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Tracker>>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
-  for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
     std::string tracker_name = _tracker_names_[i];
 
@@ -1090,7 +1089,7 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: trackers were loaded");
 
-  for (unsigned long i = 0; i < tracker_list_.size(); i++) {
+  for (int i = 0; i < int(tracker_list_.size()); i++) {
 
     std::map<std::string, TrackerParams>::iterator it;
     it = trackers_.find(_tracker_names_[i]);
@@ -1115,7 +1114,7 @@ void ControlManager::onInit() {
   controller_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Controller>>("mrs_uav_manager", "mrs_uav_manager::Controller");
 
   // for each controller in the list
-  for (unsigned long i = 0; i < _controller_names_.size(); i++) {
+  for (int i = 0; i < int(_controller_names_.size()); i++) {
 
     std::string controller_name = _controller_names_[i];
 
@@ -1162,9 +1161,9 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: controllers were loaded");
 
-  for (unsigned long i = 0; i < controller_list_.size(); i++) {
-    try {
+  for (int i = 0; i < int(controller_list_.size()); i++) {
 
+    try {
       std::map<std::string, ControllerParams>::iterator it;
       it = controllers_.find(_controller_names_[i]);
 
@@ -1184,7 +1183,8 @@ void ControlManager::onInit() {
 
   // check if the hover_tracker is within the loaded trackers
   bool hover_tracker_check = false;
-  for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
     std::string tracker_name = _tracker_names_[i];
 
@@ -1201,7 +1201,8 @@ void ControlManager::onInit() {
 
   // check if the failsafe controller is within the loaded controllers
   bool failsafe_controller_check = false;
-  for (unsigned long i = 0; i < _controller_names_.size(); i++) {
+
+  for (int i = 0; i < int(_controller_names_.size()); i++) {
 
     std::string controller_name = _controller_names_[i];
 
@@ -1218,7 +1219,8 @@ void ControlManager::onInit() {
 
   // check if the eland controller is within the loaded controllers
   bool eland_controller_check = false;
-  for (unsigned long i = 0; i < _controller_names_.size(); i++) {
+
+  for (int i = 0; i < int(_controller_names_.size()); i++) {
 
     std::string controller_name = _controller_names_[i];
 
@@ -1239,7 +1241,8 @@ void ControlManager::onInit() {
 
   // check if the landoff_tracker is within the loaded trackers
   bool landoff_tracker_check = false;
-  for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
     std::string tracker_name = _tracker_names_[i];
 
@@ -1260,7 +1263,8 @@ void ControlManager::onInit() {
 
   // check if the hover_tracker is within the loaded trackers
   bool null_tracker_check = false;
-  for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
     std::string tracker_name = _tracker_names_[i];
 
@@ -1283,7 +1287,8 @@ void ControlManager::onInit() {
 
     // check if the tracker for joystick control exists
     bool joystick_tracker_check = false;
-    for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+
+    for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
       std::string tracker_name = _tracker_names_[i];
 
@@ -1300,7 +1305,8 @@ void ControlManager::onInit() {
 
     // check if the controller for joystick control exists
     bool joystick_controller_check = false;
-    for (unsigned long i = 0; i < _controller_names_.size(); i++) {
+
+    for (int i = 0; i < int(_controller_names_.size()); i++) {
 
       std::string controller_name = _controller_names_[i];
 
@@ -1317,7 +1323,8 @@ void ControlManager::onInit() {
 
     // check if the fallback tracker for joystick control exists
     bool joystick_fallback_tracker_check = false;
-    for (unsigned long i = 0; i < _tracker_names_.size(); i++) {
+
+    for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
       std::string tracker_name = _tracker_names_[i];
 
@@ -1334,7 +1341,8 @@ void ControlManager::onInit() {
 
     // check if the fallback controller for joystick control exists
     bool joystick_fallback_controller_check = false;
-    for (unsigned long i = 0; i < _controller_names_.size(); i++) {
+
+    for (int i = 0; i < int(_controller_names_.size()); i++) {
 
       std::string controller_name = _controller_names_[i];
 
@@ -2781,10 +2789,10 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     bool nothing_to_do = true;
 
-    if (rc_channels.channels.size() < uint(4)) {
+    if (rc_channels.channels.size() < 4) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in topic is %d)",
-                         uint(rc_channels.channels.size()));
+                         int(rc_channels.channels.size()));
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: tip: this could be caused by the RC failsafe not being configured!");
 
     } else {
@@ -2887,7 +2895,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
           std::scoped_lock lock(mutex_tracker_list_);
 
           // disable callbacks of all trackers
-          for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+          for (int i = 0; i < int(tracker_list_.size()); i++) {
             tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
           }
         }
@@ -2908,7 +2916,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
           std::scoped_lock lock(mutex_tracker_list_);
 
           // enable callbacks of all trackers
-          for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+          for (int i = 0; i < int(tracker_list_.size()); i++) {
             tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
           }
         }
@@ -3637,10 +3645,10 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
   // when the switch change its position
   if (_rc_goto_enabled_) {
 
-    if (uint(_rc_joystick_channel_) >= msg->channels.size()) {
+    if (_rc_joystick_channel_ >= int(msg->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", uint(_rc_joystick_channel_),
-                         uint(msg->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", _rc_joystick_channel_,
+                         int(msg->channels.size()));
 
     } else {
 
@@ -3662,15 +3670,15 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
   // | ------------------------ rc eland ------------------------ |
   if (_rc_eland_enabled_) {
 
-    if (uint(_rc_eland_channel_) >= msg->channels.size()) {
+    if (_rc_eland_channel_ >= int(msg->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, uint(msg->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, int(msg->channels.size()));
 
     } else {
 
       if (_rc_eland_action_ == ELAND_STR) {
 
-        if (msg->channels[_rc_eland_channel_] >= uint(_rc_eland_threshold_) && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
+        if (msg->channels[_rc_eland_channel_] >= _rc_eland_threshold_ && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
           ROS_WARN("[ControlManager]: triggering eland by RC");
 
@@ -4125,7 +4133,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
 
     // disable callbacks of all trackers
     req_enable_callbacks.data = false;
-    for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
       tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
 
@@ -5502,7 +5510,7 @@ void ControlManager::setCallbacks(bool in) {
     std::scoped_lock lock(mutex_tracker_list_);
 
     // set callbacks to all trackers
-    for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
       tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
   }
@@ -5581,7 +5589,7 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest const
     std::scoped_lock lock(mutex_tracker_list_);
 
     // for each tracker
-    for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
 
       // if it is the active one, update and retrieve the command
       tracker_response = tracker_list_[i]->setConstraints(
@@ -6060,8 +6068,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // TODO why is this not used?
       // min_distance = bumper_data.sectors[i];
 
-      repulsing_from_ = i;
-
       horizontal_collision_detected = true;
     }
   }
@@ -6179,7 +6185,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // disable callbacks of all trackers
       req_enable_callbacks.data = false;
-      for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+      for (int i = 0; i < int(tracker_list_.size()); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
@@ -6211,7 +6217,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // enable callbacks of all trackers
       req_enable_callbacks.data = true;
-      for (unsigned int i = 0; i < tracker_list_.size(); i++) {
+      for (int i = 0; i < int(tracker_list_.size()); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
@@ -6251,7 +6257,7 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
   // calculate the idx
   int idx = floor((point_heading_horizontal + (sector_size / 2.0)) / sector_size);
 
-  if (uint(idx) > bumper_data.n_horizontal_sectors - 1) {
+  if (idx > int(bumper_data.n_horizontal_sectors) - 1) {
     idx -= bumper_data.n_horizontal_sectors;
   }
 
@@ -6782,7 +6788,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
   int new_tracker_idx = -1;
 
-  for (unsigned int i = 0; i < _tracker_names_.size(); i++) {
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
     if (tracker_name == _tracker_names_[i]) {
       new_tracker_idx = i;
     }
@@ -6937,7 +6943,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
   int new_controller_idx = -1;
 
-  for (unsigned int i = 0; i < _controller_names_.size(); i++) {
+  for (int i = 0; i < int(_controller_names_.size()); i++) {
     if (controller_name == _controller_names_[i]) {
       new_controller_idx = i;
     }
