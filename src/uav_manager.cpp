@@ -703,6 +703,10 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
 
+  if (!got_max_height_ || !got_odometry_) {
+    return;
+  }
+
   auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
   auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
 
@@ -714,10 +718,6 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   double odometry_x_speed, odometry_y_speed;
   odometry_x_speed = odometry.twist.twist.linear.x;
   odometry_y_speed = odometry.twist.twist.linear.y;
-
-  if (!got_max_height_ || !got_odometry_) {
-    return;
-  }
 
   if (!fixing_max_height_) {
 
@@ -1180,22 +1180,6 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
   if (!got_attitude_cmd_) {
     ss << "can not takeoff, missing target attitude!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-    res.message = ss.str();
-    res.success = false;
-    return true;
-  }
-
-  if (!got_max_height_) {
-    ss << "can not takeoff, missing max height";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-    res.message = ss.str();
-    res.success = false;
-    return true;
-  }
-
-  if (!got_height_) {
-    ss << "can not takeoff, missing height";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     res.message = ss.str();
     res.success = false;

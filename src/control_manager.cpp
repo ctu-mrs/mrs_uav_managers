@@ -23,6 +23,7 @@
 #include <mrs_msgs/BumperParamsSrv.h>
 
 #include <geometry_msgs/Point32.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Odometry.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
@@ -108,6 +109,8 @@
 #define ELAND_STR "eland"
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
+#define INPUT_UAV_STATE 0
+#define INPUT_ODOMETY 1
 
 //}
 
@@ -831,7 +834,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("state_input", _state_input_);
 
-  if (!(_state_input_ == 0 || _state_input_ == 1)) {
+  if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
     ros::shutdown();
   }
@@ -870,6 +873,30 @@ void ControlManager::onInit() {
   param_loader.load_param("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
   param_loader.load_param("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
   _tilt_error_disarm_threshold_ = (_tilt_error_disarm_threshold_ / 180.0) * M_PI;
+
+  // default constraints
+
+  param_loader.load_param("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
+  param_loader.load_param("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
+  param_loader.load_param("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
+  param_loader.load_param("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
+
+  param_loader.load_param("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
+  param_loader.load_param("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
+  param_loader.load_param("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
+  param_loader.load_param("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
+
+  param_loader.load_param("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
+  param_loader.load_param("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
+  param_loader.load_param("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
+  param_loader.load_param("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
+
+  param_loader.load_param("default_constraints/yaw/speed", current_constraints_.constraints.yaw_speed);
+  param_loader.load_param("default_constraints/yaw/acceleration", current_constraints_.constraints.yaw_acceleration);
+  param_loader.load_param("default_constraints/yaw/jerk", current_constraints_.constraints.yaw_jerk);
+  param_loader.load_param("default_constraints/yaw/snap", current_constraints_.constraints.yaw_snap);
+
+  // joystick
 
   param_loader.load_param("joystick/enabled", _joystick_enabled_);
   param_loader.load_param("joystick/mode", _joystick_mode_);
@@ -1411,9 +1438,9 @@ void ControlManager::onInit() {
 
   // | ----------------------- subscribers ---------------------- |
 
-  if (_state_input_ == 0) {
+  if (_state_input_ == INPUT_UAV_STATE) {
     subscriber_uav_state_ = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
-  } else if (_state_input_ == 1) {
+  } else if (_state_input_ == INPUT_ODOMETY) {
     subscriber_odometry_ = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
   }
 
@@ -1492,6 +1519,11 @@ void ControlManager::onInit() {
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
   timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
   timer_control_   = nh_.createTimer(ros::Duration(0), &ControlManager::timerControl, this, true, false);  // oneshot timer
+
+  // | --------------- set the default constraints -------------- |
+
+  sanitized_constraints_ = current_constraints_;
+  setConstraints(current_constraints_);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -2201,7 +2233,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || !got_odometry_innovation_ || !got_pixhawk_odometry_ || active_tracker_idx == _null_tracker_idx_) {
+  if (!got_uav_state_ || (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) || !got_pixhawk_odometry_ ||
+      active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -3181,18 +3214,39 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   //}
 
-  // --------------------------------------------------------------
-  // |                      copy the odometry                     |
-  // --------------------------------------------------------------
+  // | ----------- copy the odometry to the uav_state ----------- |
 
   {
     std::scoped_lock lock(mutex_uav_state_);
 
     uav_state_ = mrs_msgs::UavState();
 
-    uav_state_.header   = msg->header;
-    uav_state_.pose     = msg->pose.pose;
-    uav_state_.velocity = msg->twist.twist;
+    uav_state_.header           = msg->header;
+    uav_state_.pose             = msg->pose.pose;
+    uav_state_.velocity.angular = msg->twist.twist.angular;
+
+    // transform the twist into the header's frame
+    {
+      // the velocity from the odometry
+      geometry_msgs::Vector3Stamped speed_child_frame;
+      speed_child_frame.header.frame_id = msg->child_frame_id;
+      speed_child_frame.header.stamp    = msg->header.stamp;
+      speed_child_frame.vector.x        = msg->twist.twist.linear.x;
+      speed_child_frame.vector.y        = msg->twist.twist.linear.y;
+      speed_child_frame.vector.z        = msg->twist.twist.linear.z;
+
+      auto res = transformer_->transformSingle(msg->header.frame_id, speed_child_frame);
+
+      if (res) {
+        uav_state_.velocity.linear.x = res.value().vector.x;
+        uav_state_.velocity.linear.y = res.value().vector.y;
+        uav_state_.velocity.linear.z = res.value().vector.z;
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the odometry speed from '%s' to '%s'", msg->child_frame_id.c_str(),
+                           msg->header.frame_id.c_str());
+        return;
+      }
+    }
 
     // calculate the euler angles
     tf::Quaternion uav_attitude;
@@ -6790,7 +6844,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (!got_odometry_innovation_) {
+  if (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -6945,7 +6999,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (!got_odometry_innovation_) {
+  if (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());

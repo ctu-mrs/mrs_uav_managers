@@ -548,6 +548,10 @@ void GainManager::timerDiagnostics(const ros::TimerEvent &event) {
   if (!is_initialized_)
     return;
 
+  if (!got_odometry_diagnostics_) {
+    return;
+  }
+
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_gains        = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 

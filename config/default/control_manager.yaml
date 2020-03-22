@@ -80,6 +80,35 @@ safety:
     threshold: 1500 # [us]
     action: "eland" # {eland, escalating_failsafe, failsafe}
 
+# Those are normally overridden by the ConstraintManager.
+default_constraints:
+
+  horizontal:
+    speed: 2.0
+    acceleration: 1.0
+    jerk: 10.0
+    snap: 10.0
+
+  vertical:
+
+    ascending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+      snap: 2.0
+
+    descending:
+      speed: 1.0
+      acceleration: 1.0
+      jerk: 2.0
+      snap: 2.0
+
+  yaw:
+    speed: 0.5
+    acceleration: 0.5
+    jerk: 3.0
+    snap: 5.0
+
 obstacle_bumper:
 
   enabled: false
