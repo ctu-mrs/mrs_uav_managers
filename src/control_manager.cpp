@@ -2225,13 +2225,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
 
   // copy member variables
-  auto last_attitude_cmd                         = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd                         = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto [uav_state, uav_state_last_time, uav_yaw] = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_state_last_time_, uav_yaw_);
-  auto odometry_innovation                       = mrs_lib::get_mutexed(mutex_odometry_innovation_, odometry_innovation_);
-  auto controller_tracker_switch_time            = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
-  auto active_controller_idx                     = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
-  auto active_tracker_idx                        = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto [uav_state, uav_yaw]  = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_yaw_);
+  auto odometry_innovation   = mrs_lib::get_mutexed(mutex_odometry_innovation_, odometry_innovation_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (!got_uav_state_ || (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) || !got_pixhawk_odometry_ ||
       active_tracker_idx == _null_tracker_idx_) {
@@ -2357,6 +2356,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   if (control_error > _failsafe_threshold_ && !failsafe_triggered_) {
 
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered_) {
@@ -2378,6 +2379,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   if (last_innovation > _odometry_innovation_threshold_) {
 
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
@@ -2396,7 +2399,10 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   // | ------------------- tilt control error ------------------- |
+
   if (tilt_angle > _tilt_limit_eland_) {
+
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
@@ -2411,7 +2417,10 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   // | ----------------- position control error ----------------- |
+
   if (control_error > _eland_threshold_ / 2.0) {
+
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
@@ -2427,6 +2436,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   if (control_error > _eland_threshold_) {
 
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
@@ -2441,7 +2452,10 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | -------------------- yaw control error ------------------- |
   // do not have to mutex the yaw_error_ here since I am filling it in this function
+
   if (yaw_error_ > _yaw_error_eland_threshold_ / 2.0) {
+
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
@@ -2456,6 +2470,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   if (yaw_error_ > _yaw_error_eland_threshold_) {
+
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
     if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
@@ -2475,13 +2491,18 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // to do that, we need to fire up timerSafety, which will regularly trigger the controllers
   // in place of the odometryCallback()
 
-  if ((ros::Time::now() - uav_state_last_time).toSec() > _uav_state_max_missing_time_) {
+  {
+    auto uav_state_last_time = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_last_time_);
 
-    if (!failsafe_triggered_) {
+    if ((ros::Time::now() - uav_state_last_time).toSec() > _uav_state_max_missing_time_) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land", (ros::Time::now() - uav_state_last_time).toSec());
+      if (!failsafe_triggered_) {
 
-      failsafe();
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land",
+                           (ros::Time::now() - uav_state_last_time).toSec());
+
+        failsafe();
+      }
     }
   }
 
@@ -2500,6 +2521,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   if (_tilt_error_disarm_enabled_) {
+
+    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
     // the time from the last controller/tracker switch
     // fyi: we should not
