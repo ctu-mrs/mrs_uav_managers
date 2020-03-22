@@ -1412,6 +1412,11 @@ void ControlManager::onInit() {
 
   motors_ = false;
 
+  // | --------------- set the default constraints -------------- |
+
+  sanitized_constraints_ = current_constraints_;
+  setConstraints(current_constraints_);
+
   // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "ControlManager", _profiler_enabled_);
@@ -1519,11 +1524,6 @@ void ControlManager::onInit() {
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
   timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
   timer_control_   = nh_.createTimer(ros::Duration(0), &ControlManager::timerControl, this, true, false);  // oneshot timer
-
-  // | --------------- set the default constraints -------------- |
-
-  sanitized_constraints_ = current_constraints_;
-  setConstraints(current_constraints_);
 
   // | ----------------------- finish init ---------------------- |
 
