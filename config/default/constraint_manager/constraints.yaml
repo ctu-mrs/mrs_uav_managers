@@ -3,8 +3,8 @@ slow:
   horizontal:
     speed: 2.0
     acceleration: 1.0
-    jerk: 10.0
-    snap: 10.0
+    jerk: 20.0
+    snap: 20.0
 
   vertical:
 
@@ -23,8 +23,8 @@ slow:
   yaw:
     speed: 0.5
     acceleration: 0.5
-    jerk: 3.0
-    snap: 5.0
+    jerk: 10.0
+    snap: 10.0
 
 medium:
 
@@ -51,8 +51,8 @@ medium:
   yaw:
     speed: 1.0
     acceleration: 1.0
-    jerk: 3.0
-    snap: 5.0
+    jerk: 10.0
+    snap: 10.0
 
 fast:
 
@@ -79,5 +79,5 @@ fast:
   yaw:
     speed: 2.0
     acceleration: 2.0
-    jerk: 3.0
-    snap: 5.0
+    jerk: 10.0
+    snap: 10.0
