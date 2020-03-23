@@ -1019,6 +1019,7 @@ void ControlManager::onInit() {
 
     param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
     std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+
     if (_obstacle_polygons_enabled_) {
       polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
     } else {
@@ -1033,6 +1034,7 @@ void ControlManager::onInit() {
       point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
 
       if (_safety_area_frame_ == "latlon_origin") {
+
         for (int i = 0; i < int(point_obstacle_points.size()); i++) {
 
           Eigen::MatrixXd temp = point_obstacle_points[i];
@@ -1053,6 +1055,7 @@ void ControlManager::onInit() {
     try {
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
     }
+
     catch (mrs_lib::SafetyZone::BorderError) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
       ros::shutdown();
@@ -4667,14 +4670,14 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
   // check the obstacle bumper
   if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, potential collision with an obstacle!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, potential collision with an obstacle!");
     res.message = "potential collision with an obstacle";
     res.success = false;
     return true;
   }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the point is outside of the safety area!");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
     res.message = "the point is outside of the safety area";
     res.success = false;
     return true;
@@ -4689,7 +4692,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     from_point.reference.position.z = last_position_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: 'set_reference' service failed, the path is going outside the safety area!");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the path is going outside the safety area!");
       res.message = "the path is going outside the safety area";
       res.success = false;
       return true;
