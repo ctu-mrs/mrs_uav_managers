@@ -102,49 +102,13 @@ public:
   virtual const mrs_msgs::TrackerStatus getStatus() = 0;
 
   /**
-   * @brief Request for a flight to a given position.
+   * @brief Request for a flight to a given coordinates.
    *
    * @param cmd the reference
    *
    * @return a service response
    */
-  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
-
-  /**
-   * @brief Request for a flight to a relative position in the current world frame.
-   *
-   * @param cmd the reference
-   *
-   * @return a service response
-   */
-  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr goToRelative(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
-
-  /**
-   * @brief Request for a flight to the given altitude.
-   *
-   * @param cmd the reference
-   *
-   * @return a service response
-   */
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
-
-  /**
-   * @brief Request for setting a desired yaw.
-   *
-   * @param cmd the reference
-   *
-   * @return a service response
-   */
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
-
-  /**
-   * @brief Request for setting a desired relative yaw.
-   *
-   * @param cmd the reference
-   *
-   * @return a service response
-   */
-  virtual const mrs_msgs::Float64SrvResponse::ConstPtr setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) = 0;
+  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
 
   /**
    * @brief Request for stopping the motion of the UAV.

@@ -20,11 +20,7 @@ public:
   const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
   void                                      switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state);
 
-  const mrs_msgs::ReferenceSrvResponse::ConstPtr goTo(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
-  const mrs_msgs::ReferenceSrvResponse::ConstPtr goToRelative(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
-  const mrs_msgs::Float64SrvResponse::ConstPtr   goToAltitude(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
-  const mrs_msgs::Float64SrvResponse::ConstPtr   setYaw(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
-  const mrs_msgs::Float64SrvResponse::ConstPtr   setYawRelative(const mrs_msgs::Float64SrvRequest::ConstPtr &cmd);
+  const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
 
   const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
@@ -150,44 +146,10 @@ const std_srvs::SetBoolResponse::ConstPtr NullTracker::enableCallbacks(const std
 
 //}
 
-// | -------------------- setpoint services ------------------- |
+/* //{ setReference() */
 
-/* //{ goTo() */
-
-const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::goTo([[maybe_unused]] const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) {
+const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::setReference([[maybe_unused]] const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) {
   return mrs_msgs::ReferenceSrvResponse::Ptr();
-}
-
-//}
-
-/* //{ goToRelative() */
-
-const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::goToRelative([[maybe_unused]] const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) {
-  return mrs_msgs::ReferenceSrvResponse::Ptr();
-}
-
-//}
-
-/* //{ goToAltitude() */
-
-const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::goToAltitude([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
-  return mrs_msgs::Float64SrvResponse::Ptr();
-}
-
-//}
-
-/* //{ setYaw() */
-
-const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::setYaw([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
-  return mrs_msgs::Float64SrvResponse::Ptr();
-}
-
-//}
-
-/* //{ setYawRelative() */
-
-const mrs_msgs::Float64SrvResponse::ConstPtr NullTracker::setYawRelative([[maybe_unused]] const mrs_msgs::Float64SrvRequest::ConstPtr &cmd) {
-  return mrs_msgs::Float64SrvResponse::Ptr();
 }
 
 //}
