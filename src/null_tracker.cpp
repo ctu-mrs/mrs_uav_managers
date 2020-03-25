@@ -20,9 +20,14 @@ public:
   const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
   void                                      switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state);
 
-  const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
+  const mrs_msgs::ReferenceSrvResponse::ConstPtr           setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
+  const mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr setTrajectoryReference(const mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr &cmd);
 
   const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd);
+  const std_srvs::TriggerResponse::ConstPtr startTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd);
+  const std_srvs::TriggerResponse::ConstPtr stopTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd);
+  const std_srvs::TriggerResponse::ConstPtr resumeTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd);
+  const std_srvs::TriggerResponse::ConstPtr gotoTrajectoryStart(const std_srvs::TriggerRequest::ConstPtr &cmd);
 
   const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &cmd);
 
@@ -154,11 +159,52 @@ const mrs_msgs::ReferenceSrvResponse::ConstPtr NullTracker::setReference([[maybe
 
 //}
 
+/* //{ setTrajectoryReference() */
+
+const mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr NullTracker::setTrajectoryReference([
+    [maybe_unused]] const mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr &cmd) {
+  return mrs_msgs::TrajectoryReferenceSrvResponse::Ptr();
+}
+
+//}
+
 // | --------------------- other services --------------------- |
 
 /* //{ hover() */
 
 const std_srvs::TriggerResponse::ConstPtr NullTracker::hover([[maybe_unused]] const std_srvs::TriggerRequest::ConstPtr &cmd) {
+  return std_srvs::TriggerResponse::Ptr();
+}
+
+//}
+
+/* //{ startTrajectoryTracking() */
+
+const std_srvs::TriggerResponse::ConstPtr NullTracker::startTrajectoryTracking([[maybe_unused]] const std_srvs::TriggerRequest::ConstPtr &cmd) {
+  return std_srvs::TriggerResponse::Ptr();
+}
+
+//}
+
+/* //{ stopTrajectoryTracking() */
+
+const std_srvs::TriggerResponse::ConstPtr NullTracker::stopTrajectoryTracking([[maybe_unused]] const std_srvs::TriggerRequest::ConstPtr &cmd) {
+  return std_srvs::TriggerResponse::Ptr();
+}
+
+//}
+
+/* //{ resumeTrajectoryTracking() */
+
+const std_srvs::TriggerResponse::ConstPtr NullTracker::resumeTrajectoryTracking([[maybe_unused]] const std_srvs::TriggerRequest::ConstPtr &cmd) {
+  return std_srvs::TriggerResponse::Ptr();
+}
+
+//}
+
+/* //{ gotoTrajectoryStart() */
+
+const std_srvs::TriggerResponse::ConstPtr NullTracker::gotoTrajectoryStart([[maybe_unused]] const std_srvs::TriggerRequest::ConstPtr &cmd) {
   return std_srvs::TriggerResponse::Ptr();
 }
 

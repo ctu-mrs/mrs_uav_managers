@@ -62,6 +62,7 @@
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
 #include <mrs_msgs/ReferenceList.h>
+#include <mrs_msgs/TrajectoryReference.h>
 
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/ReferenceStampedSrvRequest.h>
@@ -393,6 +394,14 @@ private:
   ros::ServiceServer service_server_reference_;
   ros::Subscriber    subscriber_reference_;
 
+  // trajectory tracking
+  ros::ServiceServer service_server_trajectory_reference_;
+  ros::Subscriber    subscriber_trajectory_reference_;
+  ros::ServiceServer service_server_start_trajectory_tracking_;
+  ros::ServiceServer service_server_stop_trajectory_tracking_;
+  ros::ServiceServer service_server_resume_trajectory_tracking_;
+  ros::ServiceServer service_server_goto_trajectory_start_;
+
   // transform service servers
   ros::ServiceServer service_server_transform_reference_;
   ros::ServiceServer service_server_transform_pose_;
@@ -527,27 +536,33 @@ private:
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
+  void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg);
   bool callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackSetYawRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-  bool callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  bool callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res);
+  bool callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   // safety callbacks
-  bool callbackHoverService(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackEHoverService(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackHover(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackStartTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackStopTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackResumeTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackEHover(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackFailsafe(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
   bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
@@ -760,6 +775,9 @@ private:
   // sets the reference to the active tracker
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
 
+  // sets the reference trajectory to the active tracker
+  std::tuple<bool, std::string, bool> setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in);
+
   // this publishes the control commands
   void publish(void);
 
@@ -791,6 +809,10 @@ private:
   // safety functions impl
   std::tuple<bool, std::string> ehover(void);
   std::tuple<bool, std::string> hover(void);
+  std::tuple<bool, std::string> startTrajectoryTracking(void);
+  std::tuple<bool, std::string> stopTrajectoryTracking(void);
+  std::tuple<bool, std::string> resumeTrajectoryTracking(void);
+  std::tuple<bool, std::string> gotoTrajectoryStart(void);
   std::tuple<bool, std::string> eland(void);
   std::tuple<bool, std::string> failsafe(void);
   std::tuple<bool, std::string> escalatingFailsafe(void);
@@ -1469,30 +1491,34 @@ void ControlManager::onInit() {
 
   // | -------------------- general services -------------------- |
 
-  service_server_switch_tracker_           = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-  service_server_switch_controller_        = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_server_reset_tracker_            = nh_.advertiseService("tracker_reset_static_in", &ControlManager::callbackTrackerResetStatic, this);
-  service_server_hover_                    = nh_.advertiseService("hover_in", &ControlManager::callbackHoverService, this);
-  service_server_ehover_                   = nh_.advertiseService("ehover_in", &ControlManager::callbackEHoverService, this);
-  service_server_failsafe_                 = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-  service_server_failsafe_escalating_      = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_motors_                   = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
-  service_server_arm_                      = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-  service_server_enable_callbacks_         = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-  service_server_set_constraints_          = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-  service_server_use_joystick_             = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-  service_server_use_safety_area_          = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
-  service_server_eland_                    = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_transform_reference_      = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_pose_           = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
-  service_server_transform_vector3_        = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
-  service_server_bumper_enabler_           = nh_.advertiseService("bumper_in", &ControlManager::callbackBumperEnableService, this);
-  service_server_bumper_set_params_        = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
-  service_server_bumper_repulsion_enabler_ = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsionService, this);
-  service_server_set_min_height_           = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
-  service_server_get_min_height_           = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
-  service_server_validate_reference_       = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
-  service_server_validate_reference_list_  = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
+  service_server_switch_tracker_             = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
+  service_server_switch_controller_          = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_server_reset_tracker_              = nh_.advertiseService("tracker_reset_static_in", &ControlManager::callbackTrackerResetStatic, this);
+  service_server_hover_                      = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
+  service_server_ehover_                     = nh_.advertiseService("ehover_in", &ControlManager::callbackEHover, this);
+  service_server_failsafe_                   = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
+  service_server_failsafe_escalating_        = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
+  service_server_motors_                     = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+  service_server_arm_                        = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+  service_server_enable_callbacks_           = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+  service_server_set_constraints_            = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+  service_server_use_joystick_               = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+  service_server_use_safety_area_            = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
+  service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
+  service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
+  service_server_bumper_set_params_          = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
+  service_server_bumper_repulsion_enabler_   = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsion, this);
+  service_server_set_min_height_             = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
+  service_server_get_min_height_             = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
+  service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
+  service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
+  service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking", &ControlManager::callbackStartTrajectoryTracking, this);
+  service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking", &ControlManager::callbackStopTrajectoryTracking, this);
+  service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking", &ControlManager::callbackResumeTrajectoryTracking, this);
+  service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start", &ControlManager::callbackGotoTrajectoryStart, this);
 
   service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
@@ -1509,15 +1535,18 @@ void ControlManager::onInit() {
   service_server_goto_relative_    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
   service_server_goto_altitude_    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
   service_server_set_yaw_          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYaw, this);
-  service_server_set_yaw_relative_ = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelativeService, this);
+  service_server_set_yaw_relative_ = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelative, this);
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
+  subscriber_reference_     = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
-  subscriber_reference_ = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  service_server_trajectory_reference_ = nh_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
+  subscriber_trajectory_reference_ =
+      nh_.subscribe("trajectory_reference_in", 1, &ControlManager::callbackTrajectoryReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   // | --------------------- other services --------------------- |
 
-  service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReferenceService, this);
+  service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
   service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
   // | ------------------------- timers ------------------------- |
@@ -3921,7 +3950,7 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigg
 
 /* //{ callbackEHover() */
 
-bool ControlManager::callbackEHoverService([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4195,9 +4224,9 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Req
 
 //}
 
-/* //{ callbackEmergencyReferenceService() */
+/* //{ callbackEmergencyReference() */
 
-bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4247,7 +4276,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
     req_enable_callbacks.data = true;
     tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
-    // call the goto
+    // call the setReference()
     tracker_response = tracker_list_[active_tracker_idx_]->setReference(
         mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(req_goto_out)));
 
@@ -4259,7 +4288,7 @@ bool ControlManager::callbackEmergencyReferenceService(mrs_msgs::ReferenceStampe
       res.message = tracker_response->message;
       res.success = tracker_response->success;
     } else {
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'goto' service!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
       res.message = ss.str();
       res.success = false;
     }
@@ -4373,14 +4402,82 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
 //}
 
-/* //{ callbackHoverService() */
+/* //{ callbackHover() */
 
-bool ControlManager::callbackHoverService([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
 
   auto [success, message] = hover();
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackStartTrajectoryTracking() */
+
+bool ControlManager::callbackStartTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto [success, message] = startTrajectoryTracking();
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackStopTrajectoryTracking() */
+
+bool ControlManager::callbackStopTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto [success, message] = stopTrajectoryTracking();
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackResumeTrajectoryTracking() */
+
+bool ControlManager::callbackResumeTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto [success, message] = resumeTrajectoryTracking();
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackGotoTrajectoryStart() */
+
+bool ControlManager::callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  auto [success, message] = gotoTrajectoryStart();
 
   res.success = success;
   res.message = message;
@@ -4477,9 +4574,9 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
 
 //}
 
-/* //{ callbackBumperEnableService() */
+/* //{ callbackEnableBumper() */
 
-bool ControlManager::callbackBumperEnableService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4523,9 +4620,9 @@ bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_
 
 //}
 
-/* //{ callbackBumperEnableRepulsionService() */
+/* //{ callbackBumperEnableRepulsion() */
 
-bool ControlManager::callbackBumperEnableRepulsionService(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!is_initialized_)
     return false;
@@ -4848,7 +4945,46 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 //}
 
-// human callable services
+/* //{ callbackTrajectoryReferenceService() */
+
+bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
+
+  mrs_msgs::TrajectoryReferenceSrvRequest trajectory;
+
+  auto [success, message, modified] = setTrajectoryReference(req.trajectory);
+
+  res.success = success;
+  res.message = message;
+  res.message = modified;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackTrajectoryReferenceTopic() */
+
+void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg) {
+
+  if (!is_initialized_)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
+
+  setTrajectoryReference(*msg);
+}
+
+//}
+
+// | -------------- human-colable "goto" services ------------- |
 
 /* //{ callbackGoto() */
 
@@ -5006,9 +5142,9 @@ bool ControlManager::callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1
 
 //}
 
-/* //{ callbackSetYawRelativeService() */
+/* //{ callbackSetYawRelative() */
 
-bool ControlManager::callbackSetYawRelativeService(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackSetYawRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5138,9 +5274,48 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function()!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
       return std::tuple(false, ss.str());
+    }
+  }
+}
+
+//}
+
+/* setTrajectoryReference() //{ */
+
+std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in) {
+
+  std::stringstream ss;
+
+  if (!callbacks_enabled_) {
+    ss << "can not set the reference, the callbacks are disabled";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
+  mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr response;
+  mrs_msgs::TrajectoryReferenceSrvRequest            request;
+
+  // prepare the message for current tracker
+  request.trajectory = trajectory_in;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    response = tracker_list_[active_tracker_idx_]->setTrajectoryReference(
+        mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+
+    if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+
+      return std::tuple(response->success, response->message, response->modified);
+
+    } else {
+
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
+      return std::tuple(false, ss.str(), false);
     }
   }
 }
@@ -6002,20 +6177,19 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr tracker_response;
+    std_srvs::TriggerResponse::ConstPtr response;
+    std_srvs::TriggerRequest            request;
 
-    std_srvs::TriggerRequest hover_out;
+    response = tracker_list_[active_tracker_idx_]->hover(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
-    tracker_response = tracker_list_[active_tracker_idx_]->hover(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(hover_out)));
+    if (response != std_srvs::TriggerResponse::Ptr()) {
 
-    if (tracker_response != std_srvs::TriggerResponse::Ptr()) {
-
-      return std::tuple(tracker_response->success, tracker_response->message);
+      return std::tuple(response->success, response->message);
 
     } else {
 
       std::stringstream ss;
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'goto' service!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'hover()' function!";
 
       return std::tuple(false, ss.str());
     }
@@ -6302,6 +6476,135 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
   }
 
   return std::tuple(false, "escalating failsafe reached an improper state");
+}
+
+//}
+
+// | ------------------- trajectory tracking ------------------ |
+
+/* startTrajectoryTracking() //{ */
+
+std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
+
+  if (!is_initialized_)
+    return std::tuple(false, "the ControlManager is not initialized");
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    std_srvs::TriggerResponse::ConstPtr response;
+    std_srvs::TriggerRequest            request;
+
+    response =
+        tracker_list_[active_tracker_idx_]->startTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+
+    if (response != std_srvs::TriggerResponse::Ptr()) {
+
+      return std::tuple(response->success, response->message);
+
+    } else {
+
+      std::stringstream ss;
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'startTrajectoryTracking()' function!";
+
+      return std::tuple(false, ss.str());
+    }
+  }
+}
+
+//}
+
+/* stopTrajectoryTracking() //{ */
+
+std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
+
+  if (!is_initialized_)
+    return std::tuple(false, "the ControlManager is not initialized");
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    std_srvs::TriggerResponse::ConstPtr response;
+    std_srvs::TriggerRequest            request;
+
+    response =
+        tracker_list_[active_tracker_idx_]->stopTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+
+    if (response != std_srvs::TriggerResponse::Ptr()) {
+
+      return std::tuple(response->success, response->message);
+
+    } else {
+
+      std::stringstream ss;
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'stopTrajectoryTracking()' function!";
+
+      return std::tuple(false, ss.str());
+    }
+  }
+}
+
+//}
+
+/* resumeTrajectoryTracking() //{ */
+
+std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
+
+  if (!is_initialized_)
+    return std::tuple(false, "the ControlManager is not initialized");
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    std_srvs::TriggerResponse::ConstPtr response;
+    std_srvs::TriggerRequest            request;
+
+    response =
+        tracker_list_[active_tracker_idx_]->resumeTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+
+    if (response != std_srvs::TriggerResponse::Ptr()) {
+
+      return std::tuple(response->success, response->message);
+
+    } else {
+
+      std::stringstream ss;
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'resumeTrajectoryTracking()' function!";
+
+      return std::tuple(false, ss.str());
+    }
+  }
+}
+
+//}
+
+/* gotoTrajectoryStart() //{ */
+
+std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
+
+  if (!is_initialized_)
+    return std::tuple(false, "the ControlManager is not initialized");
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    std_srvs::TriggerResponse::ConstPtr response;
+    std_srvs::TriggerRequest            request;
+
+    response = tracker_list_[active_tracker_idx_]->gotoTrajectoryStart(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+
+    if (response != std_srvs::TriggerResponse::Ptr()) {
+
+      return std::tuple(response->success, response->message);
+
+    } else {
+
+      std::stringstream ss;
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'gotoTrajectoryStart()' function!";
+
+      return std::tuple(false, ss.str());
+    }
+  }
 }
 
 //}

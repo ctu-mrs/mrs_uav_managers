@@ -196,19 +196,9 @@
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <param name="mpc_tracker/diagnostics_topic" value="control_manager/mpc_tracker/diagnostics" />
-      <param name="mpc_tracker/predicted_trajectory_esp_topic" value="control_manager/mpc_tracker/predicted_trajectory_esp" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
-      <remap from="~mpc_tracker/set_trajectory_in" to="~mpc_tracker/set_trajectory" />
       <remap from="~mpc_tracker/odometry_diagnostics_in" to="odometry/diagnostics" />
-      <remap from="~mpc_tracker/start_trajectory_following_in" to="~mpc_tracker/start_trajectory_following" />
-      <remap from="~mpc_tracker/stop_trajectory_following_in" to="~mpc_tracker/stop_trajectory_following" />
-      <remap from="~mpc_tracker/resume_trajectory_following_in" to="~mpc_tracker/resume_trajectory_following" />
-      <remap from="~mpc_tracker/fly_to_trajectory_start_in" to="~mpc_tracker/fly_to_trajectory_start" />
-      <remap from="~mpc_tracker/set_mpc_matrix_in" to="~mpc_tracker/set_Q" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
-      <remap from="~mpc_tracker/cmd_acceleration_out" to="~mpc_tracker/cmd_acceleration" />
-      <remap from="~mpc_tracker/setpoint_odom_out" to="~mpc_tracker/setpoint_odom" />
-      <remap from="~mpc_tracker/headless_in" to="~mpc_tracker/headless" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
       <remap from="~mpc_tracker/trajectory_original/poses_out" to="~mpc_tracker/trajectory_original/poses" />
       <remap from="~mpc_tracker/trajectory_original/markers_out" to="~mpc_tracker/trajectory_original/markers" />
@@ -230,6 +220,7 @@
 
       <!-- Subscribers and Services -->
       <remap from="~reference_in" to="~reference" />
+      <remap from="~trajectory_reference_in" to="~trajectory_reference" />
       <remap from="~goto_in" to="~goto" />
       <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
@@ -268,6 +259,10 @@
       <remap from="~tracker_reset_static_in" to="~tracker_reset_static" />
       <remap from="~hover_in" to="~hover" />
       <remap from="~ehover_in" to="~ehover" />
+      <remap from="~start_trajectory_tracking_in" to="~start_trajectory_tracking" />
+      <remap from="~stop_trajectory_tracking_in" to="~stop_trajectory_tracking" />
+      <remap from="~resume_trajectory_tracking_in" to="~resume_trajectory_tracking" />
+      <remap from="~goto_trajectory_start_in" to="~goto_trajectory_start" />
       <remap from="~motors_in" to="~motors" />
       <remap from="~emergency_reference_in" to="~emergency_reference" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />

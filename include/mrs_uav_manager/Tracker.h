@@ -21,6 +21,10 @@
 #include <mrs_msgs/ReferenceSrvRequest.h>
 #include <mrs_msgs/ReferenceSrvResponse.h>
 
+#include <mrs_msgs/TrajectoryReferenceSrv.h>
+#include <mrs_msgs/TrajectoryReferenceSrvRequest.h>
+#include <mrs_msgs/TrajectoryReferenceSrvResponse.h>
+
 #include <std_srvs/Trigger.h>
 #include <std_srvs/TriggerRequest.h>
 #include <std_srvs/TriggerResponse.h>
@@ -111,13 +115,58 @@ public:
   virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
 
   /**
+   * @brief Request for a flight along a given trajectory
+   *
+   * @param cmd the reference trajectory
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr setTrajectoryReference(const mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr &cmd) = 0;
+
+  /**
    * @brief Request for stopping the motion of the UAV.
    *
-   * @param trigger service request (not used)
+   * @param trigger service request
    *
    * @return a service response
    */
   virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request to goto to the first trajectory coordinate.
+   *
+   * @param trigger service request
+   *
+   * @return a service response
+   */
+  virtual const std_srvs::TriggerResponse::ConstPtr gotoTrajectoryStart(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request to start tracking of the pre-loaded trajectory
+   *
+   * @param trigger service request
+   *
+   * @return a service response
+   */
+  virtual const std_srvs::TriggerResponse::ConstPtr startTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request to stop tracking of the pre-loaded trajectory. The hover() routine will be engaged, thus it should be implemented by the tracker.
+   *
+   * @param trigger service request
+   *
+   * @return a service response
+   */
+  virtual const std_srvs::TriggerResponse::ConstPtr stopTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request to resume the previously stopped trajectory tracking.
+   *
+   * @param trigger service request
+   *
+   * @return a service response
+   */
+  virtual const std_srvs::TriggerResponse::ConstPtr resumeTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
 
   /**
    * @brief Request for enabling/disabling callbacks.
