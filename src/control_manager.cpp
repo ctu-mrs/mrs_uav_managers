@@ -92,8 +92,6 @@
 #include <mrs_msgs/Vec1Request.h>
 #include <mrs_msgs/Vec1Response.h>
 
-#include <mrs_msgs/TrackerTrajectory.h>
-
 //}
 
 /* defines //{ */
@@ -360,7 +358,6 @@ private:
   ros::Publisher publisher_safety_area_coordinates_markers_;
   ros::Publisher publisher_disturbances_markers_;
   ros::Publisher publisher_bumper_status_;
-  ros::Publisher publisher_mpc_trajectory_;
   ros::Publisher publisher_current_constraints_;
 
   // | --------------------- service servers -------------------- |
@@ -1466,7 +1463,6 @@ void ControlManager::onInit() {
   publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
   publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
-  publisher_mpc_trajectory_                  = nh_.advertise<mrs_msgs::TrackerTrajectory>("mpc_trajectory_out", 1);
   publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
 
   // | ----------------------- subscribers ---------------------- |
@@ -2849,17 +2845,20 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
       } else if (_joystick_mode_ == 1) {
 
-        mrs_msgs::TrackerTrajectory trajectory;
+        mrs_msgs::TrajectoryReference trajectory;
+
+        double dt = 0.2;
 
         trajectory.fly_now         = true;
         trajectory.header.frame_id = "fcu_untilted";
         trajectory.use_yaw         = true;
+        trajectory.dt              = dt;
 
-        mrs_msgs::TrackerPoint point;
-        point.x   = 0;
-        point.y   = 0;
-        point.z   = 0;
-        point.yaw = 0;
+        mrs_msgs::Reference point;
+        point.position.x = 0;
+        point.position.y = 0;
+        point.position.z = 0;
+        point.yaw        = 0;
 
         trajectory.points.push_back(point);
 
@@ -2867,20 +2866,15 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
         for (int i = 0; i < 50; i++) {
 
-          point.x += _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * (speed * 0.2);
-          point.y += _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * (speed * 0.2);
-          point.z += _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_] * (speed * 0.2);
+          point.position.x += _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * (speed * dt);
+          point.position.y += _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * (speed * dt);
+          point.position.z += _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_] * (speed * dt);
           point.yaw = _channel_mult_yaw_ * joystick_data_.axes[_channel_yaw_];
 
           trajectory.points.push_back(point);
         }
 
-        try {
-          publisher_mpc_trajectory_.publish(trajectory);
-        }
-        catch (...) {
-          ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_mpc_trajectory_.getTopic().c_str());
-        }
+        setTrajectoryReference(trajectory);
       }
     }
   }
