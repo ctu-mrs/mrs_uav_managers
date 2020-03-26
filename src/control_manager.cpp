@@ -4282,7 +4282,7 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
       res.message = tracker_response->message;
       res.success = tracker_response->success;
     } else {
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setReference()' function!";
       res.message = ss.str();
       res.success = false;
     }
@@ -4951,13 +4951,11 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
 
-  mrs_msgs::TrajectoryReferenceSrvRequest trajectory;
-
   auto [success, message, modified] = setTrajectoryReference(req.trajectory);
 
-  res.success = success;
-  res.message = message;
-  res.message = modified;
+  res.success  = success;
+  res.message  = message;
+  res.modified = modified;
 
   return true;
 }
@@ -5268,7 +5266,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
       return std::tuple(false, ss.str());
     }
@@ -5307,7 +5305,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'setReference()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
       return std::tuple(false, ss.str(), false);
     }
@@ -6499,7 +6497,7 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
     } else {
 
       std::stringstream ss;
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'startTrajectoryTracking()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'startTrajectoryTracking()' function!";
 
       return std::tuple(false, ss.str());
     }
@@ -6531,7 +6529,7 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
     } else {
 
       std::stringstream ss;
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'stopTrajectoryTracking()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'stopTrajectoryTracking()' function!";
 
       return std::tuple(false, ss.str());
     }
@@ -6563,7 +6561,7 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
     } else {
 
       std::stringstream ss;
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'resumeTrajectoryTracking()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'resumeTrajectoryTracking()' function!";
 
       return std::tuple(false, ss.str());
     }
@@ -6594,7 +6592,7 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
     } else {
 
       std::stringstream ss;
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement 'gotoTrajectoryStart()' function!";
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'gotoTrajectoryStart()' function!";
 
       return std::tuple(false, ss.str());
     }
