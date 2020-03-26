@@ -24,6 +24,7 @@
 
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <nav_msgs/Odometry.h>
 
 #include <mrs_lib/SafetyZone/SafetyZone.h>
@@ -691,6 +692,8 @@ private:
   void               ungrip(void);
   ros::ServiceClient service_client_ungrip_;
 
+  double dist2d(const double ax, const double ay, const double bx, const double by);
+
   // | ------------------------ pirouette ----------------------- |
 
   bool       _pirouette_enabled_ = false;
@@ -757,6 +760,11 @@ private:
   int    _rc_joystick_n_switches_;
   double _rc_joystick_carrot_distance_ = 0;
   int    _rc_joystick_timeout_;
+
+  // | ------------------- trajectory loading ------------------- |
+
+  ros::Publisher pub_debug_original_trajectory_poses_;
+  ros::Publisher pub_debug_original_trajectory_markers_;
 
   // | --------------------- other routines --------------------- |
 
@@ -1464,6 +1472,8 @@ void ControlManager::onInit() {
   publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
   publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
+  pub_debug_original_trajectory_poses_       = nh_.advertise<geometry_msgs::PoseArray>("trajectory_original/poses_out", 1, true);
+  pub_debug_original_trajectory_markers_     = nh_.advertise<visualization_msgs::MarkerArray>("trajectory_original/markers_out", 1, true);
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -2062,7 +2072,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       }
 
     } else {
-      ROS_WARN_ONCE("[ControlManager]: missing TFs, cannot publish safety area markers");
+      ROS_WARN_ONCE("[ControlManager]: missing TFs, can not publish safety area markers");
     }
   }
 
@@ -5279,6 +5289,9 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
 std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in) {
 
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
   std::stringstream ss;
 
   if (!callbacks_enabled_) {
@@ -5287,11 +5300,442 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
     return std::tuple(false, ss.str(), false);
   }
 
+  /* validate the size and check for NaNs //{ */
+
+  // check for the size 0, which is invalid
+  if (trajectory_in.points.size() == 0) {
+
+    ss << "can not load trajectory with size 0";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
+  for (int i = 0; i < int(trajectory_in.points.size()); i++) {
+
+    // check the point for NaN/inf
+    bool no_nans = true;
+
+    if (!std::isfinite(trajectory_in.points[i].position.x)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].x'!!!", i);
+      no_nans = false;
+    }
+
+    if (!std::isfinite(trajectory_in.points[i].position.y)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].y'!!!", i);
+      no_nans = false;
+    }
+
+    if (!std::isfinite(trajectory_in.points[i].position.z)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].z'!!!", i);
+      no_nans = false;
+    }
+
+    if (!std::isfinite(trajectory_in.points[i].yaw)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].yaw'!!!", i);
+      no_nans = false;
+    }
+
+    if (no_nans == false) {
+
+      ss << "trajectory contains NaNs/infs.";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+    }
+  }
+
+  //}
+
+  /* publish the debugging topics of the original trajectory //{ */
+
+  {
+
+    geometry_msgs::PoseArray debug_trajectory_out;
+    debug_trajectory_out.header = trajectory_in.header;
+
+    debug_trajectory_out.header.frame_id = transformer_->resolveFrameName(debug_trajectory_out.header.frame_id);
+
+    if (debug_trajectory_out.header.frame_id == "") {
+      debug_trajectory_out.header.frame_id = uav_state.header.frame_id;
+    }
+
+    if (debug_trajectory_out.header.stamp == ros::Time(0)) {
+      debug_trajectory_out.header.stamp = ros::Time::now();
+    }
+
+    for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
+
+      geometry_msgs::Pose new_pose;
+
+      new_pose.position.x = trajectory_in.points[i].position.x;
+      new_pose.position.y = trajectory_in.points[i].position.y;
+      new_pose.position.z = trajectory_in.points[i].position.z;
+
+      tf::Quaternion orientation;
+      orientation.setEuler(0, 0, trajectory_in.points[i].yaw);
+      new_pose.orientation.x = orientation.x();
+      new_pose.orientation.y = orientation.y();
+      new_pose.orientation.z = orientation.z();
+      new_pose.orientation.w = orientation.w();
+
+      debug_trajectory_out.poses.push_back(new_pose);
+    }
+
+    try {
+      pub_debug_original_trajectory_poses_.publish(debug_trajectory_out);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", pub_debug_original_trajectory_poses_.getTopic().c_str());
+    }
+
+    visualization_msgs::MarkerArray msg_out;
+
+    visualization_msgs::Marker marker;
+
+    marker.header = trajectory_in.header;
+
+    marker.header.frame_id = transformer_->resolveFrameName(marker.header.frame_id);
+
+    if (marker.header.frame_id == "") {
+      marker.header.frame_id = uav_state.header.frame_id;
+    }
+
+    if (marker.header.stamp == ros::Time(0)) {
+      marker.header.stamp = ros::Time::now();
+    }
+
+    marker.type               = visualization_msgs::Marker::LINE_LIST;
+    marker.color.a            = 1;
+    marker.scale.x            = 0.05;
+    marker.color.r            = 0;
+    marker.color.g            = 1;
+    marker.color.b            = 0;
+    marker.pose.orientation.w = 1;
+
+    for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
+
+      geometry_msgs::Point point1;
+
+      point1.x = trajectory_in.points[i].position.x;
+      point1.y = trajectory_in.points[i].position.y;
+      point1.z = trajectory_in.points[i].position.z;
+
+      marker.points.push_back(point1);
+
+      geometry_msgs::Point point2;
+
+      point2.x = trajectory_in.points[i + 1].position.x;
+      point2.y = trajectory_in.points[i + 1].position.y;
+      point2.z = trajectory_in.points[i + 1].position.z;
+
+      marker.points.push_back(point2);
+    }
+
+    msg_out.markers.push_back(marker);
+
+    try {
+      pub_debug_original_trajectory_markers_.publish(msg_out);
+    }
+    catch (...) {
+      ROS_ERROR("exception caught during publishing topic %s", pub_debug_original_trajectory_markers_.getTopic().c_str());
+    }
+  }
+
+  //}
+
+  mrs_msgs::TrajectoryReference processed_trajectory = trajectory_in;
+
+  int trajectory_size = int(processed_trajectory.points.size());
+
+  bool trajectory_modified = false;
+
+  /* bumper check //{ */
+
+  if (bumper_enabled_) {
+
+    for (int i = 0; i < trajectory_size; i++) {
+
+      mrs_msgs::ReferenceStamped des_reference;
+      des_reference.header    = processed_trajectory.header;
+      des_reference.reference = processed_trajectory.points[i];
+
+      if (!bumperValidatePoint(des_reference)) {
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: trajectory violates bumper and can not be fixed, shortening it!");
+        trajectory_size     = i;
+        trajectory_modified = true;
+        processed_trajectory.points.resize(trajectory_size);
+        break;
+
+      } else {
+
+        processed_trajectory.points[i] = des_reference.reference;
+      }
+    }
+  }
+
+  if (trajectory_size == 0) {
+
+    ss << "the whole trajectory violates bumper, can not execute it!";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
+  //}
+
+  /* transform the trajectory to the safety area frame //{ */
+
+  if (use_safety_area_) {
+
+    auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, _safety_area_frame_, uav_state_.header.stamp);
+
+    if (!ret) {
+
+      ss << "coult not create TF transformer from the trajectory frame to the safety area frame";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+    }
+
+    mrs_lib::TransformStamped tf = ret.value();
+
+    for (int i = 0; i < trajectory_size; i++) {
+
+      mrs_msgs::ReferenceStamped trajectory_point;
+      trajectory_point.header    = processed_trajectory.header;
+      trajectory_point.reference = processed_trajectory.points[i];
+
+      auto ret = transformer_->transform(tf, trajectory_point);
+
+      if (!ret) {
+
+        ss << "the trajectory can not be transformed to the safety area frame";
+        ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+        return std::tuple(false, ss.str(), false);
+
+      } else {
+
+        // transform the points in the trajectory to the current frame
+        processed_trajectory.points[i] = ret.value().reference;
+      }
+    }
+
+    processed_trajectory.header.frame_id = tf.to();
+  }
+
+  //}
+
+  /* safety area check //{ */
+
+  if (use_safety_area_) {
+
+    // transform the current state to the safety area frame
+    mrs_msgs::ReferenceStamped x_current_frame;
+    x_current_frame.header               = uav_state.header;
+    x_current_frame.reference.position.x = last_position_cmd->position.x;
+    x_current_frame.reference.position.y = last_position_cmd->position.y;
+    x_current_frame.reference.position.z = last_position_cmd->position.z;
+
+    auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
+
+    mrs_msgs::ReferenceStamped x_area_frame;
+
+    if (res) {
+      x_area_frame = res.value();
+    } else {
+
+      ss << "could not transform current state to safety area frame!";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+    }
+
+    int last_valid_idx    = 0;
+    int first_invalid_idx = -1;
+
+    double min_height = getMinHeight();
+    double max_height = getMaxHeight();
+
+    for (int i = 0; i < trajectory_size; i++) {
+
+      // saturate the trajectory to min and max height
+      if (processed_trajectory.points[i].position.z < min_height) {
+
+        processed_trajectory.points[i].position.z = min_height;
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the minimum height!");
+        trajectory_modified = true;
+      }
+
+      if (processed_trajectory.points[i].position.z > max_height) {
+
+        processed_trajectory.points[i].position.z = max_height;
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the maximum height!");
+        trajectory_modified = true;
+      }
+
+      // check the point agains the safety area
+      mrs_msgs::ReferenceStamped des_reference;
+      des_reference.header    = processed_trajectory.header;
+      des_reference.reference = processed_trajectory.points[i];
+
+      if (!isPointInSafetyArea2d(des_reference)) {
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory contains points outside of the safety area!");
+        trajectory_modified = true;
+
+        // the first invalid point
+        if (first_invalid_idx == -1) {
+
+          first_invalid_idx = i;
+
+          last_valid_idx = i - 1;
+        }
+
+        // the point is ok
+      } else {
+
+        // we found a point, which is ok, after founding a point which was not ok
+        if (first_invalid_idx != -1) {
+
+          // interpolate
+          // TODO dont do this when fly_now == true and just start the trajectory in the first valid point
+          if (last_valid_idx == -1) {  // special case, we had no valid point so far
+
+            // interpolate between the current position and the valid point
+            double angle           = atan2(processed_trajectory.points[i].position.y - x_area_frame.reference.position.y,
+                                 processed_trajectory.points[i].position.x - x_area_frame.reference.position.x);
+            double dist_two_points = dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
+                                            x_area_frame.reference.position.x, x_area_frame.reference.position.y);
+
+            if (dist_two_points > 1.0) {
+              ss << "the trajectory starts outside of the safety area!";
+              ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+              return std::tuple(false, ss.str(), false);
+            }
+
+            double step = dist_two_points / i;
+
+            for (int j = 0; j < i; j++) {
+              processed_trajectory.points[i].position.x = x_area_frame.reference.position.x + j * cos(angle) * step;
+              processed_trajectory.points[i].position.y = x_area_frame.reference.position.y + j * sin(angle) * step;
+            }
+
+            // we have a valid point in the past
+          } else {
+
+            bool interpolation_success = true;
+
+            // iterpolate between the last valid point and this new valid point
+            double angle = atan2((processed_trajectory.points[i].position.y - processed_trajectory.points[last_valid_idx].position.y),
+                                 (processed_trajectory.points[i].position.x - processed_trajectory.points[last_valid_idx].position.x));
+
+            double dist_two_points = dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
+                                            processed_trajectory.points[last_valid_idx].position.x, processed_trajectory.points[last_valid_idx].position.y);
+            double step            = dist_two_points / (i - last_valid_idx);
+
+            for (int j = last_valid_idx; j < i; j++) {
+
+              mrs_msgs::ReferenceStamped temp_point;
+              temp_point.header.frame_id      = processed_trajectory.header.frame_id;
+              temp_point.reference.position.x = processed_trajectory.points[last_valid_idx].position.x + (j - last_valid_idx) * cos(angle) * step;
+              temp_point.reference.position.y = processed_trajectory.points[last_valid_idx].position.y + (j - last_valid_idx) * sin(angle) * step;
+
+              if (!isPointInSafetyArea2d(temp_point)) {
+
+                interpolation_success = false;
+                break;
+
+              } else {
+
+                processed_trajectory.points[j].position.x = temp_point.reference.position.x;
+                processed_trajectory.points[j].position.y = temp_point.reference.position.y;
+              }
+            }
+
+            if (!interpolation_success) {
+              break;
+            }
+          }
+
+          first_invalid_idx = -1;
+        }
+      }
+    }
+
+    // special case, the trajectory does not end with a valid point
+    if (first_invalid_idx != -1) {
+
+      // super special case, the whole trajectory is invalid
+      if (first_invalid_idx == 0) {
+
+        ss << "the whole trajectory is outside of the safety area!";
+        ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+        return std::tuple(false, ss.str(), false);
+
+        // there is a good portion of the trajectory in the beginning
+      } else {
+
+        trajectory_size = last_valid_idx + 1;
+        processed_trajectory.points.resize(trajectory_size);
+        trajectory_modified = true;
+      }
+    }
+  }
+
+  if (trajectory_size == 0) {
+
+    ss << "the trajectory somehow happened to be empty after all the checks! This message should not appear!";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
+  //}
+
+  /* transform the trajectory to the current control frame //{ */
+
+  auto ret = transformer_->getTransform(uav_state.header.frame_id, "", uav_state_.header.stamp);
+
+  if (!ret) {
+
+    ss << "coult not create TF transformer for the trajectory";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
+  mrs_lib::TransformStamped tf = ret.value();
+
+  for (int i = 0; i < trajectory_size; i++) {
+
+    mrs_msgs::ReferenceStamped trajectory_point;
+    trajectory_point.header    = processed_trajectory.header;
+    trajectory_point.reference = processed_trajectory.points[i];
+
+    auto ret = transformer_->transform(tf, trajectory_point);
+
+    if (!ret) {
+
+      ss << "trajectory cannnot be transformed";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+
+    } else {
+
+      // transform the points in the trajectory to the current frame
+      processed_trajectory.points[i] = ret.value().reference;
+    }
+  }
+
+  //}
+
   mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr response;
   mrs_msgs::TrajectoryReferenceSrvRequest            request;
 
+  // check for empty trajectory
+  if (processed_trajectory.points.size() == 0) {
+    ss << "reference trajectory was processing and it is now empty, this should not happen!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str(), false);
+  }
+
   // prepare the message for current tracker
-  request.trajectory = trajectory_in;
+  request.trajectory = processed_trajectory;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -5301,7 +5745,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
 
-      return std::tuple(response->success, response->message, response->modified);
+      return std::tuple(response->success, response->message, response->modified || trajectory_modified);
 
     } else {
 
@@ -5672,7 +6116,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
   if (!ret) {
 
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference to fcu frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: can not transform reference to fcu frame");
 
     return false;
   }
@@ -5815,7 +6259,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
     if (!ret) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: cannot transform reference back to original frame");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: can not transform reference back to original frame");
 
       return false;
     }
@@ -6620,7 +7064,7 @@ std::tuple<bool, std::string> ControlManager::arming(bool input) {
 
   std::stringstream ss;
 
-  // we cannot disarm if the drone is not in offboard mode
+  // we can not disarm if the drone is not in offboard mode
   // this is super important!
   if (isOffboard()) {
 
@@ -6647,7 +7091,7 @@ std::tuple<bool, std::string> ControlManager::arming(bool input) {
 
   } else {
 
-    ss << "cannot disarm, not in OFFBOARD mode";
+    ss << "can not disarm, not in OFFBOARD mode";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
     return std::tuple(false, ss.str());
@@ -8134,6 +8578,15 @@ void ControlManager::ungrip(void) {
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
   }
+}
+
+//}
+
+/* //{ dist2d() */
+
+double ControlManager::dist2d(const double ax, const double ay, const double bx, const double by) {
+
+  return sqrt(pow(ax - bx, 2) + pow(ay - by, 2));
 }
 
 //}
