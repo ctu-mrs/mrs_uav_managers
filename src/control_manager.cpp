@@ -5842,11 +5842,8 @@ void ControlManager::publishDiagnostics(void) {
 
     mrs_msgs::TrackerStatus tracker_status;
 
-    tracker_status = tracker_list_[active_tracker_idx_]->getStatus();
-
-    tracker_status.tracker = _tracker_names_[active_tracker_idx_];
-
-    diagnostics_msg.tracker_status = tracker_status;
+    diagnostics_msg.active_tracker = _tracker_names_[active_tracker_idx_];
+    diagnostics_msg.tracker_status = tracker_list_[active_tracker_idx_]->getStatus();
   }
 
   // | --------------- fill the controller status --------------- |
@@ -5856,11 +5853,8 @@ void ControlManager::publishDiagnostics(void) {
 
     mrs_msgs::ControllerStatus controller_status;
 
-    controller_status = controller_list_[active_controller_idx_]->getStatus();
-
-    controller_status.controller = _controller_names_[active_controller_idx_];
-
-    diagnostics_msg.controller_status = controller_status;
+    diagnostics_msg.active_controller = _controller_names_[active_controller_idx_];
+    diagnostics_msg.controller_status = controller_list_[active_controller_idx_]->getStatus();
   }
 
   try {

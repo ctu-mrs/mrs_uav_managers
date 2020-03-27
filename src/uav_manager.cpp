@@ -536,7 +536,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   } else if (current_state_landing_ == LANDING_STATE) {
 
 
-    if (_landing_tracker_name_ == control_manager_diagnostics.tracker_status.tracker) {
+    if (_landing_tracker_name_ == control_manager_diagnostics.active_tracker) {
 
       // recalculate the mass based on the thrust
       thrust_mass_estimate_ = pow((attitude_cmd.thrust - _hover_thrust_b_) / _hover_thrust_a_, 2) / _g_;
@@ -1194,7 +1194,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     return true;
   }
 
-  if (_null_tracker_name_ != control_manager_diagnostics.tracker_status.tracker) {
+  if (_null_tracker_name_ != control_manager_diagnostics.active_tracker) {
     ss << "can not takeoff, need '" << _null_tracker_name_ << "' to be active!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     res.message = ss.str();
