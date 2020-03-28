@@ -69,7 +69,6 @@
       <remap from="~height_in" to="odometry/altitude" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
-      <remap from="~landoff_diagnostics_in" to="control_manager/landoff_tracker/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->

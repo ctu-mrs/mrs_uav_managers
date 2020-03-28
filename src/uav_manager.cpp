@@ -16,7 +16,6 @@
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/BoolStamped.h>
-#include <mrs_msgs/LandoffDiagnostics.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
@@ -120,13 +119,6 @@ public:
   double    thrust_mass_estimate_;
   bool      thrust_under_threshold_ = false;
   ros::Time thrust_mass_estimate_first_time_;
-
-  // diagnostics from landoff tracker
-  void                         callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr& msg);
-  ros::Subscriber              subscriber_landoff_diagnostics_;
-  mrs_msgs::LandoffDiagnostics landoff_diagnostics_;
-  std::mutex                   mutex_landoff_diagnostics_;
-  bool                         got_landoff_diagnostics_ = false;
 
   // subscriber for motors on/off
   ros::Subscriber       subscriber_motors_;
@@ -353,8 +345,6 @@ void UavManager::onInit() {
   subscriber_max_height_   = nh_.subscribe("max_height_in", 1, &UavManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_height_       = nh_.subscribe("height_in", 1, &UavManager::callbackHeight, this, ros::TransportHints().tcpNoDelay());
   subscriber_motors_       = nh_.subscribe("motors_in", 1, &UavManager::callbackMotors, this, ros::TransportHints().tcpNoDelay());
-  subscriber_landoff_diagnostics_ =
-      nh_.subscribe("landoff_diagnostics_in", 1, &UavManager::callbackLandoffDiagnostics, this, ros::TransportHints().tcpNoDelay());
   subscriber_control_manager_diagnostics_ =
       nh_.subscribe("control_manager_diagnostics_in", 1, &UavManager::callbackControlManagerDiagnostics, this, ros::TransportHints().tcpNoDelay());
 
@@ -619,23 +609,23 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerTakeoff", _takeoff_timer_rate_, 0.1, event);
 
-  auto landoff_diagnostics = mrs_lib::get_mutexed(mutex_landoff_diagnostics_, landoff_diagnostics_);
+  auto control_manager_diagnostics = mrs_lib::get_mutexed(mutex_control_manager_diagnostics_, control_manager_diagnostics_);
 
   if (waiting_for_takeoff_) {
 
-    if (landoff_diagnostics.taking_off) {
+    if (control_manager_diagnostics.active_tracker == _takeoff_tracker_name_ && control_manager_diagnostics.tracker_status.moving_reference) {
 
       waiting_for_takeoff_ = false;
     } else {
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from LandoffTracker");
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from the ControlManager");
       return;
     }
   }
 
   if (takingoff_) {
 
-    if (!landoff_diagnostics.taking_off) {
+    if (control_manager_diagnostics.active_tracker != _takeoff_tracker_name_ || !control_manager_diagnostics.tracker_status.moving_reference) {
 
       ROS_INFO("[UavManager]: take off finished, switching to %s", _after_takeoff_tracker_name_.c_str());
 
@@ -1098,26 +1088,6 @@ void UavManager::callbackMotors(const mrs_msgs::BoolStampedConstPtr& msg) {
 
 //}
 
-/* //{ callbackLandoffDiagnostics() */
-
-void UavManager::callbackLandoffDiagnostics(const mrs_msgs::LandoffDiagnosticsConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackLandoffDiagnostics");
-
-  {
-    std::scoped_lock lock(mutex_landoff_diagnostics_);
-
-    landoff_diagnostics_ = *msg;
-
-    got_landoff_diagnostics_ = true;
-  }
-}
-
-//}
-
 // | -------------------- service callbacks ------------------- |
 
 /* //{ callbackTakeoff() */
@@ -1180,14 +1150,6 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
   if (!got_attitude_cmd_) {
     ss << "can not takeoff, missing target attitude!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-    res.message = ss.str();
-    res.success = false;
-    return true;
-  }
-
-  if (!got_landoff_diagnostics_) {
-    ss << "can not takeoff, missing landoff diagnostics";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
     res.message = ss.str();
     res.success = false;

@@ -184,7 +184,6 @@
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
       <remap from="~landoff_tracker/eland_in" to="~landoff_tracker/eland" />
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
-      <remap from="~landoff_tracker/diagnostics_out" to="~landoff_tracker/diagnostics" />
 
       <!-- MpcTracker -->
       <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
