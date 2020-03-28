@@ -613,7 +613,7 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
 
   if (waiting_for_takeoff_) {
 
-    if (control_manager_diagnostics.active_tracker == _takeoff_tracker_name_ && control_manager_diagnostics.tracker_status.moving_reference) {
+    if (control_manager_diagnostics.active_tracker == _takeoff_tracker_name_ && control_manager_diagnostics.tracker_status.have_goal) {
 
       waiting_for_takeoff_ = false;
     } else {
@@ -625,7 +625,7 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
 
   if (takingoff_) {
 
-    if (control_manager_diagnostics.active_tracker != _takeoff_tracker_name_ || !control_manager_diagnostics.tracker_status.moving_reference) {
+    if (control_manager_diagnostics.active_tracker != _takeoff_tracker_name_ || !control_manager_diagnostics.tracker_status.have_goal) {
 
       ROS_INFO("[UavManager]: take off finished, switching to %s", _after_takeoff_tracker_name_.c_str());
 
