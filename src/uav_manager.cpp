@@ -28,8 +28,7 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
-
-#include <tf/transform_datatypes.h>
+#include <mrs_lib/geometry_utils.h>
 
 //}
 
@@ -90,9 +89,6 @@ public:
   // odometry subscriber
   ros::Subscriber    subscriber_odometry_;
   nav_msgs::Odometry odometry_;
-  double             odometry_yaw_;
-  double             odometry_roll_;
-  double             odometry_pitch_;
   std::mutex         mutex_odometry_;
   bool               got_odometry_ = false;
 
@@ -697,8 +693,8 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
     return;
   }
 
-  auto max_height               = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
-  auto [odometry, odometry_yaw] = mrs_lib::get_mutexed(mutex_odometry_, odometry_, odometry_yaw_);
+  auto max_height = mrs_lib::get_mutexed(mutex_max_height_, _max_height_);
+  auto odometry   = mrs_lib::get_mutexed(mutex_odometry_, odometry_);
 
   double odometry_x, odometry_y, odometry_z;
   odometry_x = odometry.pose.pose.position.x;
@@ -731,7 +727,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
       reference_out.request.reference.position.x = odometry_x + stop_dist_x;
       reference_out.request.reference.position.y = odometry_y + stop_dist_y;
       reference_out.request.reference.position.z = max_height - fabs(_max_height_offset_);
-      reference_out.request.reference.yaw        = odometry_yaw;
+      reference_out.request.reference.yaw        = mrs_lib::AttitudeConvertor(odometry.pose.pose.orientation).getYaw();
 
       {
         std::scoped_lock lock(mutex_services_);
@@ -1054,13 +1050,7 @@ void UavManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
     odometry_ = *msg;
 
-    // calculate the euler angles
-    tf::Quaternion quaternion_odometry;
-    quaternionMsgToTF(odometry_.pose.pose.orientation, quaternion_odometry);
-    tf::Matrix3x3 m(quaternion_odometry);
-    m.getRPY(odometry_roll_, odometry_pitch_, odometry_yaw_);
-
-    transformer_->setCurrentControlFrame(odometry_.header.frame_id);
+    transformer_->setCurrentControlFrame(msg->header.frame_id);
 
     got_odometry_ = true;
   }
@@ -1246,7 +1236,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       land_there_reference_.reference.position.x = odometry.pose.pose.position.x;
       land_there_reference_.reference.position.y = odometry.pose.pose.position.y;
       land_there_reference_.reference.position.z = odometry.pose.pose.position.z;
-      land_there_reference_.reference.yaw        = tf::getYaw(odometry.pose.pose.orientation);
+      land_there_reference_.reference.yaw        = mrs_lib::AttitudeConvertor(odometry.pose.pose.orientation).getYaw();
 
       {
         // if enabled, start the timer for measuring the flight time

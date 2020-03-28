@@ -54,13 +54,6 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_eigen/tf2_eigen.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf/transform_datatypes.h>
-#include <tf_conversions/tf_eigen.h>
-
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
 #include <mrs_msgs/ReferenceList.h>
@@ -1815,10 +1808,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       safety_area_marker.color.g         = 0;
       safety_area_marker.color.b         = 0;
 
-      safety_area_marker.pose.orientation.x = 0;
-      safety_area_marker.pose.orientation.y = 0;
-      safety_area_marker.pose.orientation.z = 0;
-      safety_area_marker.pose.orientation.w = 1;
+      safety_area_marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
 
       visualization_msgs::Marker safety_area_coordinates_marker;
 
@@ -1832,10 +1822,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       safety_area_coordinates_marker.id = 0;
 
-      safety_area_coordinates_marker.pose.orientation.x = 0;
-      safety_area_coordinates_marker.pose.orientation.y = 0;
-      safety_area_coordinates_marker.pose.orientation.z = 0;
-      safety_area_coordinates_marker.pose.orientation.w = 1;
+      safety_area_coordinates_marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
 
       /* adding safety area points //{ */
 
@@ -2083,7 +2070,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     double multiplier = 1.0;
 
-    Eigen::Quaterniond quat_eigen(uav_state.pose.orientation.w, uav_state.pose.orientation.x, uav_state.pose.orientation.y, uav_state.pose.orientation.z);
+    Eigen::Quaterniond quat_eigen = mrs_lib::AttitudeConvertor(uav_state.pose.orientation);
 
     Eigen::Vector3d      vec3d;
     geometry_msgs::Point point;
@@ -2110,10 +2097,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* orientation //{ */
 
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
+      marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
 
       //}
 
@@ -2174,10 +2158,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* orientation //{ */
 
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
+      marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
 
       //}
 
@@ -2315,72 +2296,33 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     velocity_error_z_ = last_position_cmd->velocity.z - uav_state.velocity.linear.z;
   }
 
-  // tilt angle
-  tf::Quaternion odometry_quaternion;
-  quaternionMsgToTF(uav_state.pose.orientation, odometry_quaternion);
-
   // rotate the drone's z axis
-  tf::Vector3 uav_z_in_world = tf::Transform(odometry_quaternion) * tf::Vector3(0, 0, 1);
+  tf2::Vector3 uav_z_in_world = tf2::Transform(mrs_lib::AttitudeConvertor(uav_state.pose.orientation)) * tf2::Vector3(0, 0, 1);
 
   // calculate the angle between the drone's z axis and the world's z axis
-  double tilt_angle = acos(uav_z_in_world.dot(tf::Vector3(0, 0, 1)));
+  double tilt_angle = acos(uav_z_in_world.dot(tf2::Vector3(0, 0, 1)));
 
   // | ------------ calculate the tilt and yaw error ------------ |
 
   // | --------------------- the tilt error --------------------- |
-  tf::Quaternion attitude_cmd_quaternion;
 
-  // calculate the quaternion
-  if (last_attitude_cmd->quater_attitude_set) {
+  tf2::Quaternion attitude_cmd_quaternion = mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude);
 
-    attitude_cmd_quaternion.setX(last_attitude_cmd->quater_attitude.x);
-    attitude_cmd_quaternion.setY(last_attitude_cmd->quater_attitude.y);
-    attitude_cmd_quaternion.setZ(last_attitude_cmd->quater_attitude.z);
-    attitude_cmd_quaternion.setW(last_attitude_cmd->quater_attitude.w);
+  // calculate the desired drone's z axis in the world frame
+  tf2::Vector3 uav_z_in_world_desired = tf2::Transform(attitude_cmd_quaternion) * tf2::Vector3(0, 0, 1);
 
-  } else if (last_attitude_cmd->euler_attitude_set) {
+  // calculate the angle between the drone's z axis and the world's z axis
+  {
+    std::scoped_lock lock(mutex_attitude_error_);
 
-    // convert the RPY to quaternion
-    attitude_cmd_quaternion =
-        tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-  }
-
-  if (last_attitude_cmd->quater_attitude_set || last_attitude_cmd->euler_attitude_set) {
-
-    // calculate the desired drone's z axis in the world frame
-    tf::Vector3 uav_z_in_world_desired = tf::Transform(attitude_cmd_quaternion) * tf::Vector3(0, 0, 1);
-
-    // calculate the angle between the drone's z axis and the world's z axis
-    {
-      std::scoped_lock lock(mutex_attitude_error_);
-
-      tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
-    }
+    tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
   }
 
   // | ---------------------- the yaw error --------------------- |
-  if (last_attitude_cmd->euler_attitude_set) {
+  {
+    std::scoped_lock lock(mutex_attitude_error_);
 
-    {
-      std::scoped_lock lock(mutex_attitude_error_);
-
-      yaw_error_ = last_attitude_cmd->euler_attitude.z - uav_yaw;
-    }
-
-  } else if (last_attitude_cmd->quater_attitude_set) {
-
-    // calculate the euler angles
-    tf::Quaternion quater_attitude_cmd;
-    quaternionMsgToTF(last_attitude_cmd->quater_attitude, quater_attitude_cmd);
-    tf::Matrix3x3 m(quater_attitude_cmd);
-    double        attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw;
-    m.getRPY(attitude_cmd_roll, attitude_cmd_pitch, attitude_cmd_yaw);
-
-    {
-      std::scoped_lock lock(mutex_attitude_error_);
-
-      yaw_error_ = mrs_lib::angleBetween(attitude_cmd_yaw, uav_yaw);
-    }
+    yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude).getYaw(), uav_yaw);
   }
 
   // do not have to mutex the position error, since I am filling it in this function
@@ -3167,7 +3109,6 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
     if (got_constraints_) {
 
       // update the constraints to trackers, if need to
-
       if (enforceControllersConstraints(sanitized_constraints)) {
         setConstraints(sanitized_constraints);
 
@@ -3182,6 +3123,7 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
     publish();
   }
 
+  // if odometry switch happened, we finish it here and turn the safety timer back on
   if (odometry_switch_in_progress_) {
 
     timer_safety_.start();
@@ -3311,10 +3253,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
     }
 
     // calculate the euler angles
-    tf::Quaternion uav_attitude;
-    quaternionMsgToTF(msg->pose.pose.orientation, uav_attitude);
-    tf::Matrix3x3 m(uav_attitude);
-    m.getRPY(uav_roll_, uav_pitch_, uav_yaw_);
+    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConvertor(msg->pose.pose.orientation).getRPY();
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -3462,11 +3401,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
     uav_state_ = *msg;
 
-    // calculate the euler angles
-    tf::Quaternion uav_quaternion;
-    quaternionMsgToTF(uav_state_.pose.orientation, uav_quaternion);
-    tf::Matrix3x3 m(uav_quaternion);
-    m.getRPY(uav_roll_, uav_pitch_, uav_yaw_);
+    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConvertor(uav_state_.pose.orientation).getRPY();
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -5365,12 +5300,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
       new_pose.position.y = trajectory_in.points[i].position.y;
       new_pose.position.z = trajectory_in.points[i].position.z;
 
-      tf::Quaternion orientation;
-      orientation.setEuler(0, 0, trajectory_in.points[i].yaw);
-      new_pose.orientation.x = orientation.x();
-      new_pose.orientation.y = orientation.y();
-      new_pose.orientation.z = orientation.z();
-      new_pose.orientation.w = orientation.w();
+      new_pose.orientation = mrs_lib::AttitudeConvertor(0, 0, trajectory_in.points[i].yaw);
 
       debug_trajectory_out.poses.push_back(new_pose);
     }
@@ -5398,13 +5328,13 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
       marker.header.stamp = ros::Time::now();
     }
 
-    marker.type               = visualization_msgs::Marker::LINE_LIST;
-    marker.color.a            = 1;
-    marker.scale.x            = 0.05;
-    marker.color.r            = 0;
-    marker.color.g            = 1;
-    marker.color.b            = 0;
-    marker.pose.orientation.w = 1;
+    marker.type             = visualization_msgs::Marker::LINE_LIST;
+    marker.color.a          = 1;
+    marker.scale.x          = 0.05;
+    marker.color.r          = 0;
+    marker.color.g          = 1;
+    marker.color.b          = 0;
+    marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
 
     for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
 
@@ -6792,16 +6722,10 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
-    // calculate the euler angles
-    tf::Quaternion pixhawk_attitude;
-    quaternionMsgToTF(pixhawk_odometry.pose.pose.orientation, pixhawk_attitude);
-    tf::Matrix3x3 m(pixhawk_attitude);
-    double        roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);
-
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
-    failsafe_attitude_cmd                  = *last_attitude_cmd;
-    failsafe_attitude_cmd.euler_attitude.z = yaw;
+    failsafe_attitude_cmd          = *last_attitude_cmd;
+    double current_yaw             = mrs_lib::AttitudeConvertor(pixhawk_odometry.pose.pose.orientation).getYaw();
+    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConvertor(0, 0, current_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
 
@@ -7680,8 +7604,6 @@ void ControlManager::publish(void) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  tf::Quaternion desired_orientation;
-
   // --------------------------------------------------------------
   // |                  publish the position cmd                  |
   // --------------------------------------------------------------
@@ -7719,34 +7641,13 @@ void ControlManager::publish(void) {
 
     if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-      // when controlling with quaternion or attitude rates, the quaternion should be filled in
-      if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE || last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude);
 
-        desired_orientation.setX(last_attitude_cmd->quater_attitude.x);
-        desired_orientation.setY(last_attitude_cmd->quater_attitude.y);
-        desired_orientation.setZ(last_attitude_cmd->quater_attitude.z);
-        desired_orientation.setW(last_attitude_cmd->quater_attitude.w);
-
-      } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {  // when controlling with euler attitude, convert it to quaternion
-
-        desired_orientation =
-            tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-      } else {
-
-        // else use just the yaw from position command
-        desired_orientation = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
-      }
-
+      // use just the yaw from position command
     } else {
 
-      // else use just the yaw from position command
-      desired_orientation = tf::createQuaternionFromRPY(0, 0, last_position_cmd->yaw);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, last_position_cmd->yaw);
     }
-
-    desired_orientation.normalize();
-
-    // fill in the desired orientation
-    quaternionTFToMsg(desired_orientation, cmd_odom.pose.pose.orientation);
 
     try {
       publisher_cmd_odom_.publish(cmd_odom);
@@ -7755,9 +7656,8 @@ void ControlManager::publish(void) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_cmd_odom_.getTopic().c_str());
     }
 
-    // publish the full command structure
     try {
-      publisher_position_cmd_.publish(last_position_cmd);  // the last_position_cmd is already a ConstPtr
+      publisher_position_cmd_.publish(last_position_cmd);
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_position_cmd_.getTopic().c_str());
@@ -7822,24 +7722,9 @@ void ControlManager::publish(void) {
 
     attitude_target.thrust = last_attitude_cmd->thrust;
 
-    if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_EULER_ATTITUDE) {
+    if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE) {
 
-      // convert the RPY to quaternion
-      desired_orientation =
-          tf::createQuaternionFromRPY(last_attitude_cmd->euler_attitude.x, last_attitude_cmd->euler_attitude.y, last_attitude_cmd->euler_attitude.z);
-
-      desired_orientation.normalize();
-      quaternionTFToMsg(desired_orientation, attitude_target.orientation);
-
-      attitude_target.body_rate.x = 0.0;
-      attitude_target.body_rate.y = 0.0;
-      attitude_target.body_rate.z = 0.0;
-
-      attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
-
-    } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_QUATER_ATTITUDE) {
-
-      attitude_target.orientation = last_attitude_cmd->quater_attitude;
+      attitude_target.orientation = last_attitude_cmd->attitude;
 
       attitude_target.body_rate.x = 0.0;
       attitude_target.body_rate.y = 0.0;
@@ -7853,7 +7738,7 @@ void ControlManager::publish(void) {
       attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
       attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
 
-      attitude_target.orientation = last_attitude_cmd->quater_attitude;
+      attitude_target.orientation = last_attitude_cmd->attitude;
 
       attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
     }
@@ -7904,7 +7789,7 @@ void ControlManager::publish(void) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_thrust_force_.getTopic().c_str());
     }
   }
-}
+}  // namespace control_manager
 
 //}
 
@@ -8097,40 +7982,18 @@ bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::Co
 
   // check euler attitude
 
-  if (!std::isfinite(attitude_command->euler_attitude.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.x'!!!");
+  if (!std::isfinite(attitude_command->attitude.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_command->euler_attitude.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.y'!!!");
+  if (!std::isfinite(attitude_command->attitude.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_command->euler_attitude.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->euler_attitude.z'!!!");
-    return false;
-  }
-
-  // check quater attitude
-
-  if (!std::isfinite(attitude_command->quater_attitude.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.x'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(attitude_command->quater_attitude.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.y'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(attitude_command->quater_attitude.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.z'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(attitude_command->quater_attitude.w)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->quater_attitude.w'!!!");
+  if (!std::isfinite(attitude_command->attitude.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_command->attitude.z'!!!");
     return false;
   }
 
