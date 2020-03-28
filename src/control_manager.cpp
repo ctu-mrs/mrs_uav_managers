@@ -33,6 +33,7 @@
 #include <mrs_lib/Utils.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/geometry_utils.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -692,8 +693,6 @@ private:
   void               ungrip(void);
   ros::ServiceClient service_client_ungrip_;
 
-  double dist2d(const double ax, const double ay, const double bx, const double by);
-
   // | ------------------------ pirouette ----------------------- |
 
   bool       _pirouette_enabled_ = false;
@@ -800,10 +799,6 @@ private:
 
   // tell the mrs_odometry to disable its callbacks
   void setOdometryCallbacks(const bool input);
-
-  // yaw manipulation
-  double sanitizeYaw(const double yaw_in);
-  double angleDist(const double in1, const double in2);
 
   void                          shutdown();
   void                          setCallbacks(bool in);
@@ -2384,7 +2379,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     {
       std::scoped_lock lock(mutex_attitude_error_);
 
-      yaw_error_ = angleDist(attitude_cmd_yaw, uav_yaw);
+      yaw_error_ = mrs_lib::angleBetween(attitude_cmd_yaw, uav_yaw);
     }
   }
 
@@ -5601,8 +5596,8 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
             // interpolate between the current position and the valid point
             double angle           = atan2(processed_trajectory.points[i].position.y - x_area_frame.reference.position.y,
                                  processed_trajectory.points[i].position.x - x_area_frame.reference.position.x);
-            double dist_two_points = dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
-                                            x_area_frame.reference.position.x, x_area_frame.reference.position.y);
+            double dist_two_points = mrs_lib::dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
+                                                     x_area_frame.reference.position.x, x_area_frame.reference.position.y);
 
             if (dist_two_points > 1.0) {
               ss << "the trajectory starts outside of the safety area!";
@@ -5626,9 +5621,10 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
             double angle = atan2((processed_trajectory.points[i].position.y - processed_trajectory.points[last_valid_idx].position.y),
                                  (processed_trajectory.points[i].position.x - processed_trajectory.points[last_valid_idx].position.x));
 
-            double dist_two_points = dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
-                                            processed_trajectory.points[last_valid_idx].position.x, processed_trajectory.points[last_valid_idx].position.y);
-            double step            = dist_two_points / (i - last_valid_idx);
+            double dist_two_points =
+                mrs_lib::dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
+                                processed_trajectory.points[last_valid_idx].position.x, processed_trajectory.points[last_valid_idx].position.y);
+            double step = dist_two_points / (i - last_valid_idx);
 
             for (int j = last_valid_idx; j < i; j++) {
 
@@ -7912,44 +7908,6 @@ void ControlManager::publish(void) {
 
 //}
 
-/* sanitizeYaw() //{ */
-
-double ControlManager::sanitizeYaw(const double yaw_in) {
-
-  double yaw_out = yaw_in;
-
-  // if desired yaw_out is grater then 2*M_PI mod it
-  if (fabs(yaw_out) > 2 * M_PI) {
-    yaw_out = fmod(yaw_out, 2 * M_PI);
-  }
-
-  // move it to its place
-  if (yaw_out > M_PI) {
-    yaw_out -= 2 * M_PI;
-  } else if (yaw_out < -M_PI) {
-    yaw_out += 2 * M_PI;
-  }
-
-  return yaw_out;
-}
-
-//}
-
-/* angleDist() //{ */
-
-double ControlManager::angleDist(const double in1, const double in2) {
-
-  double sanitized_difference = fabs(sanitizeYaw(in1) - sanitizeYaw(in2));
-
-  if (sanitized_difference > M_PI) {
-    sanitized_difference = 2 * M_PI - sanitized_difference;
-  }
-
-  return fabs(sanitized_difference);
-}
-
-//}
-
 /* resolveFrameName() //{ */
 
 std::string ControlManager::resolveFrameName(const std::string in) {
@@ -8572,15 +8530,6 @@ void ControlManager::ungrip(void) {
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
   }
-}
-
-//}
-
-/* //{ dist2d() */
-
-double ControlManager::dist2d(const double ax, const double ay, const double bx, const double by) {
-
-  return sqrt(pow(ax - bx, 2) + pow(ay - by, 2));
 }
 
 //}
