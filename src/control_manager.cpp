@@ -5676,8 +5676,8 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setReference()' function!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
       return std::tuple(false, ss.str(), false);
     }
   }
