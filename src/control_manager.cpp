@@ -34,6 +34,7 @@
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/attitude_converter.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -1808,7 +1809,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       safety_area_marker.color.g         = 0;
       safety_area_marker.color.b         = 0;
 
-      safety_area_marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
+      safety_area_marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
       visualization_msgs::Marker safety_area_coordinates_marker;
 
@@ -1822,7 +1823,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       safety_area_coordinates_marker.id = 0;
 
-      safety_area_coordinates_marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
+      safety_area_coordinates_marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
       /* adding safety area points //{ */
 
@@ -2070,7 +2071,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     double multiplier = 1.0;
 
-    Eigen::Quaterniond quat_eigen = mrs_lib::AttitudeConvertor(uav_state.pose.orientation);
+    Eigen::Quaterniond quat_eigen = mrs_lib::AttitudeConverter(uav_state.pose.orientation);
 
     Eigen::Vector3d      vec3d;
     geometry_msgs::Point point;
@@ -2097,7 +2098,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* orientation //{ */
 
-      marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
+      marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
       //}
 
@@ -2158,7 +2159,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* orientation //{ */
 
-      marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
+      marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
       //}
 
@@ -2297,7 +2298,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   // rotate the drone's z axis
-  tf2::Vector3 uav_z_in_world = tf2::Transform(mrs_lib::AttitudeConvertor(uav_state.pose.orientation)) * tf2::Vector3(0, 0, 1);
+  tf2::Vector3 uav_z_in_world = tf2::Transform(mrs_lib::AttitudeConverter(uav_state.pose.orientation)) * tf2::Vector3(0, 0, 1);
 
   // calculate the angle between the drone's z axis and the world's z axis
   double tilt_angle = acos(uav_z_in_world.dot(tf2::Vector3(0, 0, 1)));
@@ -2306,7 +2307,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | --------------------- the tilt error --------------------- |
 
-  tf2::Quaternion attitude_cmd_quaternion = mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude);
+  tf2::Quaternion attitude_cmd_quaternion = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
 
   // calculate the desired drone's z axis in the world frame
   tf2::Vector3 uav_z_in_world_desired = tf2::Transform(attitude_cmd_quaternion) * tf2::Vector3(0, 0, 1);
@@ -2322,7 +2323,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   {
     std::scoped_lock lock(mutex_attitude_error_);
 
-    yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude).getYaw(), uav_yaw);
+    yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw(), uav_yaw);
   }
 
   // do not have to mutex the position error, since I am filling it in this function
@@ -3253,7 +3254,7 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
     }
 
     // calculate the euler angles
-    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConvertor(msg->pose.pose.orientation).getRPY();
+    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(msg->pose.pose.orientation);
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -3401,7 +3402,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
     uav_state_ = *msg;
 
-    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConvertor(uav_state_.pose.orientation).getRPY();
+    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(uav_state_.pose.orientation);
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -5300,7 +5301,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
       new_pose.position.y = trajectory_in.points[i].position.y;
       new_pose.position.z = trajectory_in.points[i].position.z;
 
-      new_pose.orientation = mrs_lib::AttitudeConvertor(0, 0, trajectory_in.points[i].yaw);
+      new_pose.orientation = mrs_lib::AttitudeConverter(0, 0, trajectory_in.points[i].yaw);
 
       debug_trajectory_out.poses.push_back(new_pose);
     }
@@ -5334,7 +5335,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
     marker.color.r          = 0;
     marker.color.g          = 1;
     marker.color.b          = 0;
-    marker.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, 0);
+    marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
     for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
 
@@ -6724,8 +6725,8 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
     failsafe_attitude_cmd          = *last_attitude_cmd;
-    double current_yaw             = mrs_lib::AttitudeConvertor(pixhawk_odometry.pose.pose.orientation).getYaw();
-    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConvertor(0, 0, current_yaw);
+    double current_yaw             = mrs_lib::AttitudeConverter(pixhawk_odometry.pose.pose.orientation).getYaw();
+    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, current_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
 
@@ -7641,12 +7642,12 @@ void ControlManager::publish(void) {
 
     if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConvertor(last_attitude_cmd->attitude);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
 
       // use just the yaw from position command
     } else {
 
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConvertor(0, 0, last_position_cmd->yaw);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->yaw);
     }
 
     try {

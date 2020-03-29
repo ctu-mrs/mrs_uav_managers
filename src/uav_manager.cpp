@@ -28,7 +28,7 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
-#include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/attitude_converter.h>
 
 //}
 
@@ -727,7 +727,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
       reference_out.request.reference.position.x = odometry_x + stop_dist_x;
       reference_out.request.reference.position.y = odometry_y + stop_dist_y;
       reference_out.request.reference.position.z = max_height - fabs(_max_height_offset_);
-      reference_out.request.reference.yaw        = mrs_lib::AttitudeConvertor(odometry.pose.pose.orientation).getYaw();
+      reference_out.request.reference.yaw        = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getYaw();
 
       {
         std::scoped_lock lock(mutex_services_);
@@ -1236,7 +1236,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       land_there_reference_.reference.position.x = odometry.pose.pose.position.x;
       land_there_reference_.reference.position.y = odometry.pose.pose.position.y;
       land_there_reference_.reference.position.z = odometry.pose.pose.position.z;
-      land_there_reference_.reference.yaw        = mrs_lib::AttitudeConvertor(odometry.pose.pose.orientation).getYaw();
+      land_there_reference_.reference.yaw        = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getYaw();
 
       {
         // if enabled, start the timer for measuring the flight time
