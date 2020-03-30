@@ -103,7 +103,7 @@ default_constraints:
       jerk: 2.0
       snap: 2.0
 
-  yaw:
+  heading:
     speed: 0.5
     acceleration: 0.5
     jerk: 3.0
@@ -196,7 +196,7 @@ joystick:
 
     pitch: 1 # []
     roll: 3 # []
-    yaw: 0 # []
+    heading: 0 # []
     thrust: 4 # []
 
   # multipliers for scaling and reversing the channels
@@ -204,7 +204,7 @@ joystick:
 
     pitch: 1.0 # []
     roll: 1.0 # []
-    yaw: 1.0 # []
+    heading: 1.0 # []
     thrust: 1.0 # []
 
 rc_joystick:
@@ -223,7 +223,7 @@ rc_joystick:
   channels:
     pitch: 2
     roll: 0
-    yaw: 3
+    heading: 3
     thrust: 1
 
 pirouette:

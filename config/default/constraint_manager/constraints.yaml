@@ -20,7 +20,7 @@ slow:
       jerk: 2.0
       snap: 2.0
 
-  yaw:
+  heading:
     speed: 0.5
     acceleration: 0.5
     jerk: 10.0
@@ -48,7 +48,7 @@ medium:
       jerk: 3.0
       snap: 5.0
 
-  yaw:
+  heading:
     speed: 1.0
     acceleration: 1.0
     jerk: 10.0
@@ -76,7 +76,7 @@ fast:
       jerk: 5.0
       snap: 3.0
 
-  yaw:
+  heading:
     speed: 2.0
     acceleration: 2.0
     jerk: 10.0

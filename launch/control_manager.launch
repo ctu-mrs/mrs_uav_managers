@@ -222,8 +222,8 @@
       <remap from="~goto_fcu_in" to="~goto_fcu" />
       <remap from="~goto_relative_in" to="~goto_relative" />
       <remap from="~goto_altitude_in" to="~goto_altitude" />
-      <remap from="~set_yaw_in" to="~set_yaw" />
-      <remap from="~set_yaw_relative_in" to="~set_yaw_relative" />
+      <remap from="~set_heading_in" to="~set_heading" />
+      <remap from="~set_heading_relative_in" to="~set_heading_relative" />
       <remap from="~transform_reference_in" to="~transform_reference" />
       <remap from="~transform_pose_in" to="~transform_pose" />
       <remap from="~transform_vector3_in" to="~transform_vector3" />

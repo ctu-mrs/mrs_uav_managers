@@ -156,10 +156,10 @@ void ConstraintManager::onInit() {
     param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
     param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
 
-    param_loader.load_param(*it + "/yaw/speed", new_constraints.constraints.yaw_speed);
-    param_loader.load_param(*it + "/yaw/acceleration", new_constraints.constraints.yaw_acceleration);
-    param_loader.load_param(*it + "/yaw/jerk", new_constraints.constraints.yaw_jerk);
-    param_loader.load_param(*it + "/yaw/snap", new_constraints.constraints.yaw_snap);
+    param_loader.load_param(*it + "/heading/speed", new_constraints.constraints.heading_speed);
+    param_loader.load_param(*it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
+    param_loader.load_param(*it + "/heading/jerk", new_constraints.constraints.heading_jerk);
+    param_loader.load_param(*it + "/heading/snap", new_constraints.constraints.heading_snap);
 
     _constraints_.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsSrvRequest>(*it, new_constraints));
   }

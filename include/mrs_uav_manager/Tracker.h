@@ -77,8 +77,10 @@ public:
    * The tracker should recalculate its internal states from old the frame to the new one.
    *
    * @param new_uav_state the new UavState which will come in the next update()
+   *
+   * @return a service response
    */
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
 
   /**
    * @brief Request for reseting the tracker's states given the UAV is static.

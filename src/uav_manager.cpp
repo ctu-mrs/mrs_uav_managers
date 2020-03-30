@@ -727,7 +727,13 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
       reference_out.request.reference.position.x = odometry_x + stop_dist_x;
       reference_out.request.reference.position.y = odometry_y + stop_dist_y;
       reference_out.request.reference.position.z = max_height - fabs(_max_height_offset_);
-      reference_out.request.reference.yaw        = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getYaw();
+
+      try {
+        reference_out.request.reference.heading = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getHeading();
+      }
+      catch (...) {
+        ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not calculate the current UAV heading");
+      }
 
       {
         std::scoped_lock lock(mutex_services_);
@@ -1236,7 +1242,14 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       land_there_reference_.reference.position.x = odometry.pose.pose.position.x;
       land_there_reference_.reference.position.y = odometry.pose.pose.position.y;
       land_there_reference_.reference.position.z = odometry.pose.pose.position.z;
-      land_there_reference_.reference.yaw        = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getYaw();
+
+      try {
+        land_there_reference_.reference.heading = mrs_lib::AttitudeConverter(odometry.pose.pose.orientation).getHeading();
+      }
+      catch (...) {
+        ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not calculate the current UAV heading");
+        land_there_reference_.reference.heading = 0;
+      }
 
       {
         // if enabled, start the timer for measuring the flight time
@@ -1538,8 +1551,8 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
   takingoff_           = false;
   timer_takeoff_.stop();
 
-  ROS_INFO("[UavManager]: landing there -> x=%.2f, y=%.2f, z=%.2f, yaw=%.2f in %s", req.reference.position.x, req.reference.position.y,
-           req.reference.position.z, req.reference.yaw, req.header.frame_id.c_str());
+  ROS_INFO("[UavManager]: landing there -> x=%.2f, y=%.2f, z=%.2f, heading=%.2f in %s", req.reference.position.x, req.reference.position.y,
+           req.reference.position.z, req.reference.heading, req.header.frame_id.c_str());
 
   ungrip();
 

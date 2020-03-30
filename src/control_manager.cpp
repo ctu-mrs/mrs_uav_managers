@@ -100,7 +100,7 @@
 #define REF_X 0
 #define REF_Y 1
 #define REF_Z 2
-#define REF_YAW 3
+#define REF_HEADING 3
 #define ELAND_STR "eland"
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
@@ -271,6 +271,7 @@ private:
   double             uav_roll_                    = 0;
   double             uav_pitch_                   = 0;
   double             uav_yaw_                     = 0;
+  double             uav_heading_                 = 0;
   std::mutex         mutex_uav_state_;
 
   // odometry hiccup detection
@@ -380,8 +381,8 @@ private:
   ros::ServiceServer service_server_goto_fcu_;
   ros::ServiceServer service_server_goto_relative_;
   ros::ServiceServer service_server_goto_altitude_;
-  ros::ServiceServer service_server_set_yaw_;
-  ros::ServiceServer service_server_set_yaw_relative_;
+  ros::ServiceServer service_server_set_heading_;
+  ros::ServiceServer service_server_set_heading_relative_;
 
   // the reference service and subscriber
   ros::ServiceServer service_server_reference_;
@@ -534,8 +535,8 @@ private:
   bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackSetYawRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
+  bool callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
   bool callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res);
   bool callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
@@ -693,7 +694,7 @@ private:
   double     _pirouette_speed_;
   double     _pirouette_timer_rate_;
   std::mutex mutex_pirouette_;
-  double     pirouette_inital_yaw_;
+  double     pirouette_initial_heading_;
   double     pirouette_iterator_;
   bool       callbackPirouette(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
@@ -711,8 +712,8 @@ private:
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
 
   // channel numbers and channel multipliers
-  int _channel_pitch_, _channel_roll_, _channel_yaw_, _channel_thrust_;
-  int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_yaw_, _channel_mult_thrust_;
+  int _channel_pitch_, _channel_roll_, _channel_heading_, _channel_thrust_;
+  int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_thrust_;
 
   ros::Timer timer_joystick_;
   void       timerJoystick(const ros::TimerEvent& event);
@@ -744,7 +745,7 @@ private:
   std::mutex           mutex_rc_channel_switch_time_;
 
   // the RC channel mapping of the main 4 control signals
-  double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_yaw_, _rc_channel_thrust_;
+  double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
   bool   _rc_goto_enabled_               = false;
   bool   rc_goto_active_                 = false;
@@ -910,10 +911,10 @@ void ControlManager::onInit() {
   param_loader.load_param("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
   param_loader.load_param("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
 
-  param_loader.load_param("default_constraints/yaw/speed", current_constraints_.constraints.yaw_speed);
-  param_loader.load_param("default_constraints/yaw/acceleration", current_constraints_.constraints.yaw_acceleration);
-  param_loader.load_param("default_constraints/yaw/jerk", current_constraints_.constraints.yaw_jerk);
-  param_loader.load_param("default_constraints/yaw/snap", current_constraints_.constraints.yaw_snap);
+  param_loader.load_param("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
+  param_loader.load_param("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
+  param_loader.load_param("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
+  param_loader.load_param("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
 
   // joystick
 
@@ -940,13 +941,13 @@ void ControlManager::onInit() {
   // load channels
   param_loader.load_param("joystick/channels/pitch", _channel_pitch_);
   param_loader.load_param("joystick/channels/roll", _channel_roll_);
-  param_loader.load_param("joystick/channels/yaw", _channel_yaw_);
+  param_loader.load_param("joystick/channels/heading", _channel_heading_);
   param_loader.load_param("joystick/channels/thrust", _channel_thrust_);
 
   // load channel multipliers
   param_loader.load_param("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
   param_loader.load_param("joystick/channel_multipliers/roll", _channel_mult_roll_);
-  param_loader.load_param("joystick/channel_multipliers/yaw", _channel_mult_yaw_);
+  param_loader.load_param("joystick/channel_multipliers/heading", _channel_mult_heading_);
   param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
   param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
@@ -983,7 +984,7 @@ void ControlManager::onInit() {
 
   param_loader.load_param("rc_joystick/channels/pitch", _rc_channel_pitch_);
   param_loader.load_param("rc_joystick/channels/roll", _rc_channel_roll_);
-  param_loader.load_param("rc_joystick/channels/yaw", _rc_channel_yaw_);
+  param_loader.load_param("rc_joystick/channels/heading", _rc_channel_heading_);
   param_loader.load_param("rc_joystick/channels/thrust", _rc_channel_thrust_);
 
   param_loader.load_param("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
@@ -1525,12 +1526,12 @@ void ControlManager::onInit() {
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  service_server_goto_             = nh_.advertiseService("goto_in", &ControlManager::callbackGoto, this);
-  service_server_goto_fcu_         = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGotoFcu, this);
-  service_server_goto_relative_    = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
-  service_server_goto_altitude_    = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
-  service_server_set_yaw_          = nh_.advertiseService("set_yaw_in", &ControlManager::callbackSetYaw, this);
-  service_server_set_yaw_relative_ = nh_.advertiseService("set_yaw_relative_in", &ControlManager::callbackSetYawRelative, this);
+  service_server_goto_                 = nh_.advertiseService("goto_in", &ControlManager::callbackGoto, this);
+  service_server_goto_fcu_             = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGotoFcu, this);
+  service_server_goto_relative_        = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
+  service_server_goto_altitude_        = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
+  service_server_set_heading_          = nh_.advertiseService("set_heading_in", &ControlManager::callbackSetHeading, this);
+  service_server_set_heading_relative_ = nh_.advertiseService("set_heading_relative_in", &ControlManager::callbackSetHeadingRelative, this);
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
   subscriber_reference_     = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
@@ -2778,14 +2779,14 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     mrs_msgs::Vec4::Request request;
 
     if (fabs(joystick_data_.axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data_.axes[_channel_roll_]) >= 0.05 ||
-        fabs(joystick_data_.axes[_channel_yaw_]) >= 0.05 || fabs(joystick_data_.axes[_channel_thrust_]) >= 0.05) {
+        fabs(joystick_data_.axes[_channel_heading_]) >= 0.05 || fabs(joystick_data_.axes[_channel_thrust_]) >= 0.05) {
 
       if (_joystick_mode_ == 0) {
 
-        request.goal[REF_X]   = _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * _joystick_carrot_distance_;
-        request.goal[REF_Y]   = _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * _joystick_carrot_distance_;
-        request.goal[REF_Z]   = _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_];
-        request.goal[REF_YAW] = _channel_mult_yaw_ * joystick_data_.axes[_channel_yaw_];
+        request.goal[REF_X]       = _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * _joystick_carrot_distance_;
+        request.goal[REF_Y]       = _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * _joystick_carrot_distance_;
+        request.goal[REF_Z]       = _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_];
+        request.goal[REF_HEADING] = _channel_mult_heading_ * joystick_data_.axes[_channel_heading_];
 
         mrs_msgs::Vec4::Response response;
 
@@ -2799,14 +2800,14 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
         trajectory.fly_now         = true;
         trajectory.header.frame_id = "fcu_untilted";
-        trajectory.use_yaw         = true;
+        trajectory.use_heading     = true;
         trajectory.dt              = dt;
 
         mrs_msgs::Reference point;
         point.position.x = 0;
         point.position.y = 0;
         point.position.z = 0;
-        point.yaw        = 0;
+        point.heading    = 0;
 
         trajectory.points.push_back(point);
 
@@ -2817,7 +2818,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
           point.position.x += _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * (speed * dt);
           point.position.y += _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * (speed * dt);
           point.position.z += _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_] * (speed * dt);
-          point.yaw = _channel_mult_yaw_ * joystick_data_.axes[_channel_yaw_];
+          point.heading = _channel_mult_heading_ * joystick_data_.axes[_channel_heading_];
 
           trajectory.points.push_back(point);
         }
@@ -2833,10 +2834,10 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     mrs_msgs::Vec4::Request request;
 
-    double des_x   = 0;
-    double des_y   = 0;
-    double des_z   = 0;
-    double des_yaw = 0;
+    double des_x       = 0;
+    double des_y       = 0;
+    double des_z       = 0;
+    double des_heading = 0;
 
     bool nothing_to_do = true;
 
@@ -2848,10 +2849,10 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     } else {
 
-      double tmp_x   = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_y   = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_z   = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
-      double tmp_yaw = -RCChannelToRange(rc_channels.channels[_rc_channel_yaw_], 1.0, 0.1);
+      double tmp_x       = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_y       = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_z       = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
+      double tmp_heading = -RCChannelToRange(rc_channels.channels[_rc_channel_heading_], 1.0, 0.1);
 
       if (abs(tmp_x) > 1e-3) {
         des_x         = tmp_x;
@@ -2868,18 +2869,18 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
         nothing_to_do = false;
       }
 
-      if (abs(tmp_yaw) > 1e-3) {
-        des_yaw       = tmp_yaw;
+      if (abs(tmp_heading) > 1e-3) {
+        des_heading   = tmp_heading;
         nothing_to_do = false;
       }
     }
 
     if (!nothing_to_do) {
 
-      request.goal[REF_X]   = des_x;
-      request.goal[REF_Y]   = des_y;
-      request.goal[REF_Z]   = des_z;
-      request.goal[REF_YAW] = des_yaw;
+      request.goal[REF_X]       = des_x;
+      request.goal[REF_Y]       = des_y;
+      request.goal[REF_Z]       = des_z;
+      request.goal[REF_HEADING] = des_heading;
 
       mrs_msgs::Vec4Response response;
 
@@ -2902,8 +2903,8 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
       callbacks_enabled_ = false;
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: goto by RC by x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", request.goal[REF_X], request.goal[REF_Y], request.goal[REF_Z],
-                        request.goal[REF_YAW]);
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: goto by RC by x=%.2f, y=%.2f, z=%.2f, heading=%.2f", request.goal[REF_X], request.goal[REF_Y],
+                        request.goal[REF_Z], request.goal[REF_HEADING]);
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
@@ -3063,7 +3064,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
     reference_request.reference.position.x = last_position_cmd->position.x;
     reference_request.reference.position.y = last_position_cmd->position.y;
     reference_request.reference.position.z = last_position_cmd->position.z;
-    reference_request.reference.yaw        = pirouette_inital_yaw_ + pirouette_iterator_ * pirouette_step_size;
+    reference_request.reference.heading    = pirouette_initial_heading_ + pirouette_iterator_ * pirouette_step_size;
 
     setReference(reference_request);
 
@@ -3133,8 +3134,8 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
     {
       std::scoped_lock lock(mutex_uav_state_);
 
-      ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
-               uav_state.pose.position.z, uav_yaw_);
+      ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
+               uav_state.pose.position.z, uav_heading_);
     }
   }
 }
@@ -3186,8 +3187,8 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                 uav_state_.pose.position.z, uav_yaw_);
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                 uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3255,6 +3256,13 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
     // calculate the euler angles
     std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(msg->pose.pose.orientation);
+
+    try {
+      uav_heading_ = mrs_lib::AttitudeConverter(msg->pose.pose.orientation).getHeading();
+    }
+    catch (...) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading");
+    }
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -3360,8 +3368,8 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, yaw=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                 uav_state_.pose.position.z, uav_yaw_);
+        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                 uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3403,6 +3411,13 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
     uav_state_ = *msg;
 
     std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(uav_state_.pose.orientation);
+
+    try {
+      uav_heading_ = mrs_lib::AttitudeConverter(uav_state_.pose.orientation).getHeading();
+    }
+    catch (...) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading, not updating it");
+    }
 
     uav_state_last_time_ = ros::Time::now();
 
@@ -4242,7 +4257,23 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
     return false;
 
   // copy member variables
-  auto uav_yaw = mrs_lib::get_mutexed(mutex_uav_state_, uav_yaw_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+  double uav_heading;
+  try {
+    uav_heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+  }
+  catch (...) {
+    std::stringstream ss;
+    ss << "could not calculate the UAV heading to initialize the pirouette";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+    res.message = ss.str();
+    res.success = false;
+
+    return false;
+  }
 
   if (_pirouette_enabled_) {
     res.success = false;
@@ -4267,8 +4298,8 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
 
   setCallbacks(false);
 
-  pirouette_inital_yaw_ = uav_yaw;
-  pirouette_iterator_   = 0;
+  pirouette_initial_heading_ = uav_heading;
+  pirouette_iterator_        = 0;
   timer_pirouette_.start();
 
   res.success = true;
@@ -4680,8 +4711,8 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
-  if (!std::isfinite(req.reference.reference.yaw)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.yaw'!!!");
+  if (!std::isfinite(req.reference.reference.heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.heading'!!!");
     res.message = "NaNs/infs in the goal!";
     res.success = false;
     return true;
@@ -4794,8 +4825,8 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
       res.success[i] = false;
     }
 
-    if (!std::isfinite(original_reference.reference.yaw)) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.yaw'!!!");
+    if (!std::isfinite(original_reference.reference.heading)) {
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.heading'!!!");
       res.success[i] = false;
     }
 
@@ -4937,7 +4968,7 @@ bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::
   des_reference.reference.position.x = req.goal[REF_X];
   des_reference.reference.position.y = req.goal[REF_Y];
   des_reference.reference.position.z = req.goal[REF_Z];
-  des_reference.reference.yaw        = req.goal[REF_YAW];
+  des_reference.reference.heading    = req.goal[REF_HEADING];
 
   auto [success, message] = setReference(des_reference);
 
@@ -4967,7 +4998,7 @@ bool ControlManager::callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec
   des_reference.reference.position.x = req.goal[REF_X];
   des_reference.reference.position.y = req.goal[REF_Y];
   des_reference.reference.position.z = req.goal[REF_Z];
-  des_reference.reference.yaw        = req.goal[REF_YAW];
+  des_reference.reference.heading    = req.goal[REF_HEADING];
 
   auto [success, message] = setReference(des_reference);
 
@@ -4999,7 +5030,7 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
   des_reference.reference.position.x = last_position_cmd->position.x + req.goal[REF_X];
   des_reference.reference.position.y = last_position_cmd->position.y + req.goal[REF_Y];
   des_reference.reference.position.z = last_position_cmd->position.z + req.goal[REF_Z];
-  des_reference.reference.yaw        = last_position_cmd->yaw + req.goal[REF_YAW];
+  des_reference.reference.heading    = last_position_cmd->heading + req.goal[REF_HEADING];
 
   auto [success, message] = setReference(des_reference);
 
@@ -5031,7 +5062,7 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
   des_reference.reference.position.x = last_position_cmd->position.x;
   des_reference.reference.position.y = last_position_cmd->position.y;
   des_reference.reference.position.z = req.goal;
-  des_reference.reference.yaw        = last_position_cmd->yaw;
+  des_reference.reference.heading    = last_position_cmd->heading;
 
   auto [success, message] = setReference(des_reference);
 
@@ -5043,9 +5074,9 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
 
 //}
 
-/* //{ callbackSetYaw() */
+/* //{ callbackSetHeading() */
 
-bool ControlManager::callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5053,7 +5084,7 @@ bool ControlManager::callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetYaw");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetHeading");
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
@@ -5063,7 +5094,7 @@ bool ControlManager::callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1
   des_reference.reference.position.x = last_position_cmd->position.x;
   des_reference.reference.position.y = last_position_cmd->position.y;
   des_reference.reference.position.z = last_position_cmd->position.z;
-  des_reference.reference.yaw        = req.goal;
+  des_reference.reference.heading    = req.goal;
 
   auto [success, message] = setReference(des_reference);
 
@@ -5075,9 +5106,9 @@ bool ControlManager::callbackSetYaw(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1
 
 //}
 
-/* //{ callbackSetYawRelative() */
+/* //{ callbackSetHeadingRelative() */
 
-bool ControlManager::callbackSetYawRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5093,7 +5124,7 @@ bool ControlManager::callbackSetYawRelative(mrs_msgs::Vec1::Request& req, mrs_ms
   des_reference.reference.position.x = last_position_cmd->position.x;
   des_reference.reference.position.y = last_position_cmd->position.y;
   des_reference.reference.position.z = last_position_cmd->position.z;
-  des_reference.reference.yaw        = last_position_cmd->yaw + req.goal;
+  des_reference.reference.heading    = last_position_cmd->heading + req.goal;
 
   auto [success, message] = setReference(des_reference);
 
@@ -5139,8 +5170,8 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
-  if (!std::isfinite(reference_in.reference.yaw)) {
-    ss << "NaN detected in variable 'reference_in.reference.yaw'!!!";
+  if (!std::isfinite(reference_in.reference.heading)) {
+    ss << "NaN detected in variable 'reference_in.reference.heading'!!!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
@@ -5261,8 +5292,8 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
       no_nans = false;
     }
 
-    if (!std::isfinite(trajectory_in.points[i].yaw)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].yaw'!!!", i);
+    if (!std::isfinite(trajectory_in.points[i].heading)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].heading'!!!", i);
       no_nans = false;
     }
 
@@ -5301,7 +5332,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
       new_pose.position.y = trajectory_in.points[i].position.y;
       new_pose.position.z = trajectory_in.points[i].position.z;
 
-      new_pose.orientation = mrs_lib::AttitudeConverter(0, 0, trajectory_in.points[i].yaw);
+      new_pose.orientation = mrs_lib::AttitudeConverter(0, 0, trajectory_in.points[i].heading);
 
       debug_trajectory_out.poses.push_back(new_pose);
     }
@@ -6371,7 +6402,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       reference_fcu_untilted.reference.position.y = 0;
     }
 
-    reference_fcu_untilted.reference.yaw = 0;
+    reference_fcu_untilted.reference.heading = 0;
 
     if (vertical_collision_detected) {
       reference_fcu_untilted.reference.position.z = vertical_repulsion_distance;
@@ -6725,8 +6756,8 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
     failsafe_attitude_cmd          = *last_attitude_cmd;
-    double current_yaw             = mrs_lib::AttitudeConverter(pixhawk_odometry.pose.pose.orientation).getYaw();
-    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, current_yaw);
+    double pixhawk_yaw             = mrs_lib::AttitudeConverter(pixhawk_odometry.pose.pose.orientation).getYaw();
+    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
 
@@ -7634,8 +7665,8 @@ void ControlManager::publish(void) {
       cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
     }
 
-    if (last_position_cmd->use_yaw_dot) {
-      cmd_odom.twist.twist.angular.z = last_position_cmd->yaw_dot;
+    if (last_position_cmd->use_heading_rate) {
+      cmd_odom.twist.twist.angular.z = last_position_cmd->heading_rate;
     }
 
     // | -------------- prepared desired orientation -------------- |
@@ -7644,10 +7675,10 @@ void ControlManager::publish(void) {
 
       cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
 
-      // use just the yaw from position command
+      // use just the heading from position command
     } else {
 
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->yaw);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->heading);
     }
 
     try {
@@ -7821,28 +7852,6 @@ std::string ControlManager::resolveFrameName(const std::string in) {
 
 bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command) {
 
-  // check attitude
-
-  if (!std::isfinite(position_command->attitude.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.x'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->attitude.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.y'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->attitude.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.z'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->attitude.w)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude.w'!!!");
-    return false;
-  }
-
   // check positions
 
   if (!std::isfinite(position_command->position.x)) {
@@ -7945,30 +7954,15 @@ bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::Co
     return false;
   }
 
-  // check yaws
+  // check heading
 
-  if (!std::isfinite(position_command->yaw)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw'!!!");
+  if (!std::isfinite(position_command->heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->heading'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->yaw_dot)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_dot'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->yaw_ddot)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_ddot'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->yaw_dddot)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_dddot'!!!");
-    return false;
-  }
-
-  if (!std::isfinite(position_command->yaw_ddddot)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->yaw_ddddot'!!!");
+  if (!std::isfinite(position_command->heading_rate)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->heading_rate'!!!");
     return false;
   }
 
