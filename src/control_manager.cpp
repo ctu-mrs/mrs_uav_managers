@@ -2406,7 +2406,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
+        ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
                            _eland_threshold_ / 2.0, position_error_x_, position_error_y_, position_error_z_);
 
         ungrip();
@@ -2441,7 +2441,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
+        ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                            (180.0 / M_PI) * _yaw_error_eland_threshold_ / 2.0);
 
         ungrip();
@@ -7714,7 +7714,7 @@ void ControlManager::publish(void) {
 
   } else if (active_tracker_idx == _null_tracker_idx_) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: 'NullTracker' is active, not controlling");
+    ROS_WARN_THROTTLE(5.0, "[ControlManager]: 'NullTracker' is active, not controlling");
 
     // set the desired attitude to the current odometry
     // better than setting it to something unrelated
@@ -8382,11 +8382,11 @@ void ControlManager::ungrip(void) {
   if (res) {
 
     if (!srv.response.success) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: '%s'", srv.response.message.c_str());
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: '%s'", srv.response.message.c_str());
     }
 
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
   }
 }
 

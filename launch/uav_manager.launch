@@ -82,7 +82,7 @@
       <remap from="~land_there_in" to="~land_there" />
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
-      <remap from="~eland_out" to="control_manager/landoff_tracker/eland" />
+      <remap from="~eland_out" to="control_manager/eland" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />

@@ -19,12 +19,12 @@ takeoff:
   rate: 10 # [Hz]
 
   during_takeoff:
+    controller: "MpcControllerr"
     tracker: "LandoffTracker"
-    controller: "MpcController"
 
   after_takeoff:
-    tracker: "MpcTracker"
     controller: "MpcController"
+    tracker: "MpcTracker"
 
     pirouette: false
 
