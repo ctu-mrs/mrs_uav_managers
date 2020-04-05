@@ -35,6 +35,8 @@
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/geometry_utils.h>
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/msg_extractor.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -262,11 +264,13 @@ private:
 
   // | -------------- uav_state/odometry subscriber ------------- |
 
-  ros::Subscriber    subscriber_odometry_;
-  ros::Subscriber    subscriber_uav_state_;
+  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_odometry_;
+  mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_uav_state_;
+  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_pixhawk_odometry_;
+
   mrs_msgs::UavState uav_state_;
-  bool               got_uav_state_ = false;
-  ros::Time          uav_state_last_time_;              // when was the last time we got the state estimate?
+  mrs_msgs::UavState previous_uav_state_;
+  bool               got_uav_state_               = false;
   double             _uav_state_max_missing_time_ = 0;  // how long should we tolerate missing state estimate?
   double             uav_roll_                    = 0;
   double             uav_pitch_                   = 0;
@@ -279,35 +283,22 @@ private:
   double uav_state_hiccup_factor_ = 1;
   int    uav_state_count_         = 0;
 
-  // | --------------- PixHawk odometry subscriber -------------- |
-
-  ros::Subscriber    subscriber_pixhawk_odometry_;
-  nav_msgs::Odometry pixhawk_odometry_;
-  bool               got_pixhawk_odometry_ = false;
-  std::mutex         mutex_pixhawk_odometry_;
-
   // | ------------------ Mavros GPS subscriber ----------------- |
 
   ros::Subscriber subscriber_mavros_gps_;
 
   // | ------------------ max height subscriber ----------------- |
 
-  ros::Subscriber subscriber_max_height_;
-  double          max_height_external_    = 0;
-  double          max_height_safety_area_ = 0;
-  double          _max_height_            = 0;
-  bool            got_max_height_         = false;
-  std::mutex      mutex_max_height_external_;
-  std::mutex      mutex_min_height_;
+  mrs_lib::SubscribeHandlerPtr<mrs_msgs::Float64Stamped> sh_max_height_;
+  double                                                 max_height_safety_area_ = 0;
+  double                                                 _max_height_            = 0;
+  std::mutex                                             mutex_min_height_;
 
   // | ------------- odometry innovation subscriber ------------- |
 
   // odometry innovation is published by the odometry node
   // it is used to issue eland if the estimator's input is too wonky
-  ros::Subscriber    subscriber_odometry_innovation_;
-  nav_msgs::Odometry odometry_innovation_;
-  std::mutex         mutex_odometry_innovation_;
-  bool               got_odometry_innovation_ = false;
+  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_odometry_innovation_;
 
   // | --------------------- common handlers -------------------- |
 
@@ -433,13 +424,10 @@ private:
 
   // | ----------------- Mavros state subscriber ---------------- |
 
-  // gives us the inner pixhwak state
-  ros::Subscriber    subscriber_mavros_state_;
-  mavros_msgs::State mavros_state_;
-  std::mutex         mutex_mavros_state_;
-  bool               got_mavros_state_ = false;
-  bool               offboard_mode_    = false;
-  bool               armed_            = false;
+  mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_mavros_state_;
+
+  bool offboard_mode_ = false;
+  bool armed_         = false;
 
   // | --------------------- thrust and mass -------------------- |
 
@@ -513,15 +501,17 @@ private:
 
   // | ------------------------ callbacks ----------------------- |
 
-  // getting info callbacks
-  void callbackOdometry(const nav_msgs::OdometryConstPtr& msg);
-  void callbackUavState(const mrs_msgs::UavStateConstPtr& msg);
-  void callbackOdometryInnovation(const nav_msgs::OdometryConstPtr& msg);
-  void callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& msg);
+  // topic callbacks
+  void callbackOdometry(const mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_ptr);
+  void callbackUavState(const mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_ptr);
+  void callbackMavrosState(const mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_ptr);
+
   void callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg);
-  void callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg);
-  void callbackMavrosState(const mavros_msgs::StateConstPtr& msg);
   void callbackRC(const mavros_msgs::RCInConstPtr& msg);
+
+  // topic timeouts
+  void timeoutUavState(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
+  void timeoutMavrosState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
@@ -622,12 +612,7 @@ private:
   void       timerBumper(const ros::TimerEvent& event);
 
   // bumper subscriber
-  ros::Subscriber subscriber_bumper_;
-  void            callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr& msg);
-  bool            got_bumper_ = false;
-
-  mrs_msgs::ObstacleSectors bumper_data_;
-  std::mutex                mutex_bumper_data_;
+  mrs_lib::SubscribeHandlerPtr<mrs_msgs::ObstacleSectors> sh_bumper_;
 
   bool bumper_enabled_           = false;
   bool _bumper_hugging_enabled_  = false;
@@ -700,13 +685,10 @@ private:
 
   // | -------------------- joystick control -------------------- |
 
-  // joystick control
-  std::mutex mutex_joystick_;
+  mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_joystick_;
 
-  ros::Subscriber  subscriber_joystick_;
-  void             callbackJoystick(const sensor_msgs::JoyConstPtr& msg);
-  sensor_msgs::Joy joystick_data_;
-  bool             callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  void callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_ptr);
+  bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
@@ -1467,23 +1449,29 @@ void ControlManager::onInit() {
 
   // | ----------------------- subscribers ---------------------- |
 
+  mrs_lib::SubscribeMgr smgr(nh_);
+
+  ros::Duration uav_state_timeout(_uav_state_max_missing_time_);
+
   if (_state_input_ == INPUT_UAV_STATE) {
-    subscriber_uav_state_ = nh_.subscribe("uav_state_in", 1, &ControlManager::callbackUavState, this, ros::TransportHints().tcpNoDelay());
+    sh_uav_state_ = smgr.create_handler<mrs_msgs::UavState>("uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
+                                                            &ControlManager::callbackUavState, this, true, true, 1, ros::TransportHints().tcpNoDelay());
   } else if (_state_input_ == INPUT_ODOMETY) {
-    subscriber_odometry_ = nh_.subscribe("odometry_in", 1, &ControlManager::callbackOdometry, this, ros::TransportHints().tcpNoDelay());
+    sh_odometry_ = smgr.create_handler<nav_msgs::Odometry>("odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
+                                                           &ControlManager::callbackOdometry, this, true, true, 1, ros::TransportHints().tcpNoDelay());
   }
 
-  subscriber_pixhawk_odometry_ = nh_.subscribe("mavros_odometry_in", 1, &ControlManager::callbackPixhawkOdometry, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_gps_       = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
-  subscriber_max_height_       = nh_.subscribe("max_height_in", 1, &ControlManager::callbackMaxHeight, this, ros::TransportHints().tcpNoDelay());
-  subscriber_joystick_         = nh_.subscribe("joystick_in", 1, &ControlManager::callbackJoystick, this, ros::TransportHints().tcpNoDelay());
-  subscriber_bumper_           = nh_.subscribe("bumper_sectors_in", 1, &ControlManager::callbackBumper, this, ros::TransportHints().tcpNoDelay());
-  subscriber_mavros_state_     = nh_.subscribe("mavros_state_in", 1, &ControlManager::callbackMavrosState, this, ros::TransportHints().tcpNoDelay());
-  subscriber_rc_               = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
-  subscriber_odometry_innovation_ =
-      nh_.subscribe("odometry_innovation_in", 1, &ControlManager::callbackOdometryInnovation, this, ros::TransportHints().tcpNoDelay());
+  sh_odometry_innovation_ = smgr.create_handler<nav_msgs::Odometry>("odometry_innovation_in", true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_pixhawk_odometry_    = smgr.create_handler<nav_msgs::Odometry>("mavros_odometry_in", true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_bumper_              = smgr.create_handler<mrs_msgs::ObstacleSectors>("bumper_sectors_in", true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_max_height_          = smgr.create_handler<mrs_msgs::Float64Stamped>("max_height_in", true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_joystick_ =
+      smgr.create_handler<sensor_msgs::Joy>("joystick_in", &ControlManager::callbackJoystick, this, true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_mavros_state_ = smgr.create_handler<mavros_msgs::State>("mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
+                                                             &ControlManager::callbackMavrosState, this, true, true, 1, ros::TransportHints().tcpNoDelay());
 
-  uav_state_last_time_ = ros::Time(0);
+  subscriber_mavros_gps_ = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
+  subscriber_rc_         = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
 
   // | -------------------- general services -------------------- |
 
@@ -1584,18 +1572,14 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
 
   // copy member variables
-  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd   = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd   = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
-  auto yaw_error           = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto yaw_error         = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto [position_error_x, position_error_y, position_error_z] =
       mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-  auto min_height            = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
-
-  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
 
   double uav_x, uav_y, uav_z;
   uav_x = uav_state.pose.position.x;
@@ -1731,8 +1715,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     mrs_lib::Polygon border = safety_zone_->getBorder();
 
-    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(min_height);
-    std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(max_height);
+    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinHeight());
+    std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxHeight());
 
     std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
     std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
@@ -1897,8 +1881,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto polygon : polygon_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(min_height);
-        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(max_height);
+        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinHeight());
+        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxHeight());
 
         // transform border bottom points to local origin
         for (size_t i = 0; i < points_bot.size(); i++) {
@@ -1970,7 +1954,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto point : point_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(min_height);
+        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinHeight());
         std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
 
         // transform bottom points to local origin
@@ -2247,11 +2231,10 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto [uav_state, uav_yaw]  = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_yaw_);
-  auto odometry_innovation   = mrs_lib::get_mutexed(mutex_odometry_innovation_, odometry_innovation_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) || !got_pixhawk_odometry_ ||
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) || !sh_pixhawk_odometry_->has_data() ||
       active_tracker_idx == _null_tracker_idx_) {
     return;
   }
@@ -2354,22 +2337,24 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // |     activate emergency land in case of large innovation    |
   // --------------------------------------------------------------
 
-  double last_innovation = sqrt(pow(odometry_innovation.pose.pose.position.x, 2.0) + pow(odometry_innovation.pose.pose.position.y, 2.0) +
-                                pow(odometry_innovation.pose.pose.position.z, 2.0));
+  {
+    auto [x, y, z, heading] = mrs_lib::getPose(sh_odometry_innovation_->get_data());
 
-  if (last_innovation > _odometry_innovation_threshold_) {
+    double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+    if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if (!failsafe_triggered_ && !eland_triggered_) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f)", last_innovation,
-                  _odometry_innovation_threshold_, odometry_innovation.pose.pose.position.x, odometry_innovation.pose.pose.position.y,
-                  odometry_innovation.pose.pose.position.z);
+        if (!failsafe_triggered_ && !eland_triggered_) {
 
-        eland();
+          ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
+                    last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+
+          eland();
+        }
       }
     }
   }
@@ -2461,27 +2446,6 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
                   (180.0 / M_PI) * _yaw_error_eland_threshold_);
 
         eland();
-      }
-    }
-  }
-
-  // --------------------------------------------------------------
-  // |      activate failsafe when odometry stops publishing      |
-  // --------------------------------------------------------------
-  // to do that, we need to fire up timerSafety, which will regularly trigger the controllers
-  // in place of the odometryCallback()
-
-  {
-    auto uav_state_last_time = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_last_time_);
-
-    if ((ros::Time::now() - uav_state_last_time).toSec() > _uav_state_max_missing_time_) {
-
-      if (!failsafe_triggered_) {
-
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving odometry for %.3f, initiating failsafe land",
-                           (ros::Time::now() - uav_state_last_time).toSec());
-
-        failsafe();
       }
     }
   }
@@ -2664,7 +2628,6 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto pixhawk_odometry  = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   updateControllers(uav_state);
@@ -2712,15 +2675,20 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
 void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
+
+  if (!sh_joystick_->has_data()) {
+    return;
+  }
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
 
+  auto joystick_data = sh_joystick_->get_data();
+
   // copy member variables
   auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
-
-  std::scoped_lock lock(mutex_joystick_);
 
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
@@ -2778,15 +2746,15 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     mrs_msgs::Vec4::Request request;
 
-    if (fabs(joystick_data_.axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data_.axes[_channel_roll_]) >= 0.05 ||
-        fabs(joystick_data_.axes[_channel_heading_]) >= 0.05 || fabs(joystick_data_.axes[_channel_thrust_]) >= 0.05) {
+    if (fabs(joystick_data->axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data->axes[_channel_roll_]) >= 0.05 ||
+        fabs(joystick_data->axes[_channel_heading_]) >= 0.05 || fabs(joystick_data->axes[_channel_thrust_]) >= 0.05) {
 
       if (_joystick_mode_ == 0) {
 
-        request.goal[REF_X]       = _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * _joystick_carrot_distance_;
-        request.goal[REF_Y]       = _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * _joystick_carrot_distance_;
-        request.goal[REF_Z]       = _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_];
-        request.goal[REF_HEADING] = _channel_mult_heading_ * joystick_data_.axes[_channel_heading_];
+        request.goal[REF_X]       = _channel_mult_pitch_ * joystick_data->axes[_channel_pitch_] * _joystick_carrot_distance_;
+        request.goal[REF_Y]       = _channel_mult_roll_ * joystick_data->axes[_channel_roll_] * _joystick_carrot_distance_;
+        request.goal[REF_Z]       = _channel_mult_thrust_ * joystick_data->axes[_channel_thrust_];
+        request.goal[REF_HEADING] = _channel_mult_heading_ * joystick_data->axes[_channel_heading_];
 
         mrs_msgs::Vec4::Response response;
 
@@ -2815,10 +2783,10 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
         for (int i = 0; i < 50; i++) {
 
-          point.position.x += _channel_mult_pitch_ * joystick_data_.axes[_channel_pitch_] * (speed * dt);
-          point.position.y += _channel_mult_roll_ * joystick_data_.axes[_channel_roll_] * (speed * dt);
-          point.position.z += _channel_mult_thrust_ * joystick_data_.axes[_channel_thrust_] * (speed * dt);
-          point.heading = _channel_mult_heading_ * joystick_data_.axes[_channel_heading_];
+          point.position.x += _channel_mult_pitch_ * joystick_data->axes[_channel_pitch_] * (speed * dt);
+          point.position.y += _channel_mult_roll_ * joystick_data->axes[_channel_roll_] * (speed * dt);
+          point.position.z += _channel_mult_thrust_ * joystick_data->axes[_channel_thrust_] * (speed * dt);
+          point.heading = _channel_mult_heading_ * joystick_data->axes[_channel_heading_];
 
           trajectory.points.push_back(point);
         }
@@ -2993,7 +2961,6 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-  auto bumper_data        = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
 
   if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
@@ -3008,7 +2975,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+  if ((ros::Time::now() - sh_bumper_->last_message_time()).toSec() > 1.0) {
     return;
   }
 
@@ -3150,16 +3117,18 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
+void ControlManager::callbackOdometry(const mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_ptr) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
+  nav_msgs::OdometryConstPtr odom = sh_ptr->get_data();
+
   // | --------------------- check for nans --------------------- |
 
-  if (!validateOdometry(msg)) {
+  if (!validateOdometry(odom)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: incoming 'odometry' contains invalid values, throwing it away");
     return;
   }
@@ -3172,16 +3141,16 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
   mrs_msgs::UavState uav_state_odom;
 
-  uav_state_odom.header   = msg->header;
-  uav_state_odom.pose     = msg->pose.pose;
-  uav_state_odom.velocity = msg->twist.twist;
+  uav_state_odom.header   = odom->header;
+  uav_state_odom.pose     = odom->pose.pose;
+  uav_state_odom.velocity = odom->twist.twist;
 
   mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_odom));
 
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
-    if (msg->header.frame_id != uav_state_.header.frame_id) {
+    if (odom->header.frame_id != uav_state_.header.frame_id) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
       {
@@ -3225,48 +3194,48 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
   {
     std::scoped_lock lock(mutex_uav_state_);
 
+    previous_uav_state_ = uav_state_;
+
     uav_state_ = mrs_msgs::UavState();
 
-    uav_state_.header           = msg->header;
-    uav_state_.pose             = msg->pose.pose;
-    uav_state_.velocity.angular = msg->twist.twist.angular;
+    uav_state_.header           = odom->header;
+    uav_state_.pose             = odom->pose.pose;
+    uav_state_.velocity.angular = odom->twist.twist.angular;
 
     // transform the twist into the header's frame
     {
       // the velocity from the odometry
       geometry_msgs::Vector3Stamped speed_child_frame;
-      speed_child_frame.header.frame_id = msg->child_frame_id;
-      speed_child_frame.header.stamp    = msg->header.stamp;
-      speed_child_frame.vector.x        = msg->twist.twist.linear.x;
-      speed_child_frame.vector.y        = msg->twist.twist.linear.y;
-      speed_child_frame.vector.z        = msg->twist.twist.linear.z;
+      speed_child_frame.header.frame_id = odom->child_frame_id;
+      speed_child_frame.header.stamp    = odom->header.stamp;
+      speed_child_frame.vector.x        = odom->twist.twist.linear.x;
+      speed_child_frame.vector.y        = odom->twist.twist.linear.y;
+      speed_child_frame.vector.z        = odom->twist.twist.linear.z;
 
-      auto res = transformer_->transformSingle(msg->header.frame_id, speed_child_frame);
+      auto res = transformer_->transformSingle(odom->header.frame_id, speed_child_frame);
 
       if (res) {
         uav_state_.velocity.linear.x = res.value().vector.x;
         uav_state_.velocity.linear.y = res.value().vector.y;
         uav_state_.velocity.linear.z = res.value().vector.z;
       } else {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the odometry speed from '%s' to '%s'", msg->child_frame_id.c_str(),
-                           msg->header.frame_id.c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the odometry speed from '%s' to '%s'", odom->child_frame_id.c_str(),
+                           odom->header.frame_id.c_str());
         return;
       }
     }
 
     // calculate the euler angles
-    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(msg->pose.pose.orientation);
+    std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(odom->pose.pose.orientation);
 
     try {
-      uav_heading_ = mrs_lib::AttitudeConverter(msg->pose.pose.orientation).getHeading();
+      uav_heading_ = mrs_lib::AttitudeConverter(odom->pose.pose.orientation).getHeading();
     }
     catch (...) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading");
     }
 
-    uav_state_last_time_ = ros::Time::now();
-
-    transformer_->setCurrentControlFrame(msg->header.frame_id);
+    transformer_->setCurrentControlFrame(odom->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -3283,18 +3252,18 @@ void ControlManager::callbackOdometry(const nav_msgs::OdometryConstPtr& msg) {
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
+void ControlManager::callbackUavState(const mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_ptr) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
 
-  auto uav_state_last_time = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_last_time_);
+  mrs_msgs::UavStateConstPtr uav_state = sh_ptr->get_data();
 
   // | --------------------- check for nans --------------------- |
 
-  if (!validateUavState(msg)) {
+  if (!validateUavState(uav_state)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: incoming 'uav_state' contains invalid values, throwing it away");
     return;
   }
@@ -3307,7 +3276,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
   double alpha2              = 0.666;
   double uav_state_count_lim = 1000;
 
-  double uav_state_dt = (ros::Time::now() - uav_state_last_time).toSec();
+  double uav_state_dt = (ros::Time::now() - previous_uav_state_.header.stamp).toSec();
 
   // belive only reasonable numbers
   if (uav_state_dt <= 1.0) {
@@ -3355,14 +3324,10 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
 
   /* frame switch //{ */
 
-  // | -- prepare an OdometryConstPtr for trackers & controllers -- |
-
-  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(*msg));
-
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
-    if (msg->estimator_iteration != uav_state_.estimator_iteration) {
+    if (uav_state->estimator_iteration != uav_state_.estimator_iteration) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
       {
@@ -3393,8 +3358,8 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       {
         std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
 
-        tracker_list_[active_tracker_idx_]->switchOdometrySource(uav_state_const_ptr);
-        controller_list_[active_controller_idx_]->switchOdometrySource(uav_state_const_ptr);
+        tracker_list_[active_tracker_idx_]->switchOdometrySource(uav_state);
+        controller_list_[active_controller_idx_]->switchOdometrySource(uav_state);
       }
     }
   }
@@ -3408,7 +3373,9 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
   {
     std::scoped_lock lock(mutex_uav_state_);
 
-    uav_state_ = *msg;
+    previous_uav_state_ = uav_state_;
+
+    uav_state_ = *uav_state;
 
     std::tie(uav_roll_, uav_pitch_, uav_yaw_) = mrs_lib::AttitudeConverter(uav_state_.pose.orientation);
 
@@ -3419,9 +3386,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading, not updating it");
     }
 
-    uav_state_last_time_ = ros::Time::now();
-
-    transformer_->setCurrentControlFrame(msg->header.frame_id);
+    transformer_->setCurrentControlFrame(uav_state->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -3431,50 +3396,6 @@ void ControlManager::callbackUavState(const mrs_msgs::UavStateConstPtr& msg) {
   if (!running_control_timer_) {
     timer_control_.stop();
     timer_control_.start();
-  }
-}
-
-//}
-
-/* //{ callbackOdometryInnovation() */
-
-void ControlManager::callbackOdometryInnovation(const nav_msgs::OdometryConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometryInnovation");
-
-  {
-    std::scoped_lock lock(mutex_odometry_innovation_);
-
-    odometry_innovation_ = *msg;
-
-    got_odometry_innovation_ = true;
-  }
-}
-
-//}
-
-/* //{ callbackPixhawkOdometry() */
-
-void ControlManager::callbackPixhawkOdometry(const nav_msgs::OdometryConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackPixhawkOdometry");
-
-  // --------------------------------------------------------------
-  // |                      copy the odometry                     |
-  // --------------------------------------------------------------
-
-  {
-    std::scoped_lock lock(mutex_pixhawk_odometry_);
-
-    pixhawk_odometry_ = *msg;
-
-    got_pixhawk_odometry_ = true;
   }
 }
 
@@ -3494,29 +3415,9 @@ void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg
 
 //}
 
-/* callbackMaxHeight() //{ */
-
-void ControlManager::callbackMaxHeight(const mrs_msgs::Float64StampedConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMaxHeight");
-
-  {
-    std::scoped_lock lock(mutex_max_height_external_);
-
-    max_height_external_ = msg->value;
-
-    got_max_height_ = true;
-  }
-}
-
-//}
-
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
+void ControlManager::callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_ptr) {
 
   if (!is_initialized_)
     return;
@@ -3527,14 +3428,13 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  std::scoped_lock lock(mutex_joystick_);
-
-  joystick_data_ = *msg;
+  sensor_msgs::JoyConstPtr joystick_data = sh_ptr->get_data();
 
   // | ---- switching back to fallback tracker and controller --- |
 
   // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
-  if ((msg->buttons[_channel_A_] == 1 || msg->buttons[_channel_B_] == 1 || msg->buttons[_channel_X_] == 1 || msg->buttons[_channel_Y_] == 1) &&
+  if ((joystick_data->buttons[_channel_A_] == 1 || joystick_data->buttons[_channel_B_] == 1 || joystick_data->buttons[_channel_X_] == 1 ||
+       joystick_data->buttons[_channel_Y_] == 1) &&
       active_tracker_idx == _joystick_tracker_idx_ && active_controller_idx == _joystick_controller_idx_) {
 
     ROS_INFO("[ControlManager]: switching from joystick to normal control");
@@ -3548,7 +3448,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   // | ------- joystick control activation ------- |
 
   // if start button was pressed
-  if (msg->buttons[_channel_start_] == 1) {
+  if (joystick_data->buttons[_channel_start_] == 1) {
 
     if (!joystick_start_pressed_) {
 
@@ -3569,7 +3469,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   // | ---------------- Joystick goto activation ---------------- |
 
   // if back button was pressed
-  if (msg->buttons[_channel_back_] == 1) {
+  if (joystick_data->buttons[_channel_back_] == 1) {
 
     if (!joystick_back_pressed_) {
 
@@ -3590,7 +3490,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   // | ------------------------ Failsafes ----------------------- |
 
   // if LT and RT buttons are both pressed down
-  if (msg->axes[_channel_LT_] < -0.99 && msg->axes[_channel_RT_] < -0.99) {
+  if (joystick_data->axes[_channel_LT_] < -0.99 && joystick_data->axes[_channel_RT_] < -0.99) {
 
     if (!joystick_failsafe_pressed_) {
 
@@ -3609,7 +3509,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   }
 
   // if left and right joypads are both pressed down
-  if (msg->buttons[_channel_L_joy_] == 1 && msg->buttons[_channel_R_joy_] == 1) {
+  if (joystick_data->buttons[_channel_L_joy_] == 1 && joystick_data->buttons[_channel_R_joy_] == 1) {
 
     if (!joystick_eland_pressed_) {
 
@@ -3630,45 +3530,19 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
 
 //}
 
-/* callbackBumper() //{ */
-
-void ControlManager::callbackBumper(const mrs_msgs::ObstacleSectorsConstPtr& msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackBumper");
-
-  ROS_INFO_ONCE("[ControlManager]: getting bumper data");
-
-  {
-    std::scoped_lock lock(mutex_bumper_data_);
-
-    bumper_data_ = *msg;
-
-    got_bumper_ = true;
-  }
-}
-
-//}
-
 /* //{ callbackMavrosState() */
 
-void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) {
+void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_ptr) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosState");
 
-  std::scoped_lock lock(mutex_mavros_state_);
-
-  // | --------------------- save the state --------------------- |
-  mavros_state_     = *msg;
-  got_mavros_state_ = true;
+  mavros_msgs::StateConstPtr state = sh_ptr->get_data();
 
   // | ------ detect and print the changes in offboard mode ----- |
-  if (mavros_state_.mode == "OFFBOARD") {
+  if (state->mode == "OFFBOARD") {
 
     if (!offboard_mode_) {
       offboard_mode_ = true;
@@ -3684,7 +3558,7 @@ void ControlManager::callbackMavrosState(const mavros_msgs::StateConstPtr& msg) 
   }
 
   // | --------- detect and print the changes in arming --------- |
-  if (mavros_state_.armed == true) {
+  if (state->armed == true) {
 
     if (!armed_) {
       armed_ = true;
@@ -3786,6 +3660,38 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
       }
     }
   }
+}
+
+//}
+
+// | --------------------- topic timeouts --------------------- |
+
+/* timeoutUavState() //{ */
+
+void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
+
+  if (failsafe_triggered_) {
+
+    // We need to fire up timerFailsafe, which will regularly trigger the controllers
+    // in place of the callbackUavState/callbackOdometry().
+
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving '%s' for %.3f s, initiating failsafe land", topic.c_str(), (ros::Time::now() - last_msg).toSec());
+
+    failsafe();
+  }
+}
+
+//}
+
+/* timeoutMavrosState() //{ */
+
+void ControlManager::timeoutMavrosState([[maybe_unused]] const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
+
+  ros::Duration time = ros::Time::now() - last_msg;
+
+  ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Not recieving Mavros state message for '%.3f s'! Setup the PixHawk SD card!!", time.toSec());
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: The Mavros state should be supplied at 100 Hz to provided fast refresh rate on the state of the OFFBOARD mode.");
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: If missing, the UAV could be disarmed by safety routines while not knowing it has switched to the MANUAL mode.");
 }
 
 //}
@@ -4008,8 +3914,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     return false;
 
   // copy member variables
-  auto uav_state    = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   std::stringstream ss;
 
@@ -4032,12 +3937,12 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     prereq_check = false;
   }
 
-  if (!got_mavros_state_ || (ros::Time::now() - mavros_state.header.stamp).toSec() > 5.0) {
+  if (!sh_mavros_state_->has_data() || (ros::Time::now() - sh_mavros_state_->last_message_time()).toSec() > 1.0) {
     ss << "can not switch motors ON, missing mavros state!";
     prereq_check = false;
   }
 
-  if (bumper_enabled_ && !got_bumper_) {
+  if (bumper_enabled_ && !sh_bumper_->has_data()) {
     ss << "can not switch motors on, missing bumper data!";
     prereq_check = false;
   }
@@ -5720,15 +5625,20 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
 bool ControlManager::isOffboard(void) {
 
-  // copy member variables
-  auto mavros_state = mrs_lib::get_mutexed(mutex_mavros_state_, mavros_state_);
-
-  if (got_mavros_state_ && (ros::Time::now() - mavros_state.header.stamp).toSec() < 1.0 && mavros_state.mode == "OFFBOARD") {
-
-    return true;
+  if (!sh_mavros_state_->has_data()) {
+    return false;
   }
 
-  return false;
+  mavros_msgs::StateConstPtr mavros_state = sh_mavros_state_->get_data();
+
+  if ((ros::Time::now() - sh_mavros_state_->last_message_time()).toSec() < 1.0 && mavros_state->mode == "OFFBOARD") {
+
+    return true;
+
+  } else {
+
+    return false;
+  }
 }
 
 //}
@@ -5928,8 +5838,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height          = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
-  auto max_height_external = mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
+  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
 
   auto ret = transformer_->transformSingle(_safety_area_frame_, point);
 
@@ -5942,11 +5851,8 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
-  // what is lower, the max height from the safety area, or the max height from odometry?
-  double max_height = _max_height_ > max_height_external ? max_height_external_ : _max_height_;
-
   if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
-      point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= max_height) {
+      point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= getMaxHeight()) {
     return true;
   }
 
@@ -6025,7 +5931,20 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_max_height_external_, max_height_external_);
+  double max_height;
+
+  if (sh_max_height_->has_data()) {
+
+    double max_height_external = sh_max_height_->get_data()->value;
+
+    max_height = _max_height_ > max_height_external ? max_height_external : _max_height_;
+
+  } else {
+
+    max_height = _max_height_;
+  }
+
+  return max_height;
 }
 
 //}
@@ -6050,17 +5969,17 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  if (!got_bumper_) {
+  if (!sh_bumper_->has_data()) {
     return true;
   }
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
 
   auto [bumper_vertical_distance, bumper_horizontal_distance] =
       mrs_lib::get_mutexed(mutex_bumper_params_, bumper_vertical_distance_, bumper_horizontal_distance_);
 
-  if ((ros::Time::now() - bumper_data.header.stamp).toSec() > 1.0) {
+  if ((ros::Time::now() - sh_bumper_->last_message_time()).toSec() > 1.0) {
     return true;
   }
 
@@ -6081,14 +6000,14 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
   // get the id of the sector, where the reference is
   int horizontal_vector_idx = bumperGetSectorId(fcu_x, fcu_y, fcu_z);
-  int vertical_vector_idx   = fcu_z < 0 ? bumper_data.n_horizontal_sectors : bumper_data.n_horizontal_sectors + 1;
+  int vertical_vector_idx   = fcu_z < 0 ? bumper_data->n_horizontal_sectors : bumper_data->n_horizontal_sectors + 1;
 
   // calculate the horizontal distance to the point
   double horizontal_point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
   double vertical_point_distance   = fabs(fcu_z);
 
   // check whether we measure in that direction
-  if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NO_DATA) {
+  if (bumper_data->sectors[horizontal_vector_idx] == bumper_data->OBSTACLE_NO_DATA) {
 
     ROS_WARN_THROTTLE(1.0,
                       "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, we do not measure in that direction",
@@ -6096,21 +6015,21 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return false;
   }
 
-  if (bumper_data.sectors[horizontal_vector_idx] == bumper_data.OBSTACLE_NOT_DETECTED &&
-      bumper_data.sectors[vertical_vector_idx] == bumper_data.OBSTACLE_NOT_DETECTED) {
+  if (bumper_data->sectors[horizontal_vector_idx] == bumper_data->OBSTACLE_NOT_DETECTED &&
+      bumper_data->sectors[vertical_vector_idx] == bumper_data->OBSTACLE_NOT_DETECTED) {
 
     return true;
   }
 
-  if (horizontal_point_distance <= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance) &&
-      (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance))) {
+  if (horizontal_point_distance <= (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance) &&
+      (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance))) {
 
     return true;
   }
 
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
   if (horizontal_point_distance > 0.1 &&
-      (bumper_data.sectors[horizontal_vector_idx] > 0 && bumper_data.sectors[horizontal_vector_idx] <= bumper_horizontal_distance)) {
+      (bumper_data->sectors[horizontal_vector_idx] > 0 && bumper_data->sectors[horizontal_vector_idx] <= bumper_horizontal_distance)) {
 
     ROS_WARN_THROTTLE(1.0,
                       "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, obstacle is too close (horizontally)",
@@ -6129,7 +6048,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
   }
 
   // if the obstacle is too close and hugging can't be done, we can't fly, return false
-  if (vertical_point_distance > 0.1 && (bumper_data.sectors[vertical_vector_idx] > 0 && bumper_data.sectors[vertical_vector_idx] <= bumper_vertical_distance)) {
+  if (vertical_point_distance > 0.1 &&
+      (bumper_data->sectors[vertical_vector_idx] > 0 && bumper_data->sectors[vertical_vector_idx] <= bumper_vertical_distance)) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f is not valid, obstacle is too close (vertically)", fcu_x,
                       fcu_y, fcu_z);
@@ -6157,20 +6077,20 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     double new_y = fcu_y;
     double new_z = fcu_z;
 
-    if (bumper_data.sectors[horizontal_vector_idx] > 0 &&
-        horizontal_point_distance >= (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance)) {
+    if (bumper_data->sectors[horizontal_vector_idx] > 0 &&
+        horizontal_point_distance >= (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance)) {
 
-      new_x = cos(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance);
-      new_y = sin(point_heading_horizontal) * (bumper_data.sectors[horizontal_vector_idx] - bumper_horizontal_distance);
+      new_x = cos(point_heading_horizontal) * (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance);
+      new_y = sin(point_heading_horizontal) * (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance);
 
       // horizontal_point_distance                    = uav distance to the reference
-      // bumper_data.sectors[horizontal_vector_idx]   = uav distance to the obstacle
+      // bumper_data->sectors[horizontal_vector_idx]   = uav distance to the obstacle
       // _bumper_horizontal_distance_                 = the bumper limit
 
       ROS_WARN_THROTTLE(1.0,
                         "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
                         "to x: %.2f, y: %.2f",
-                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data.sectors[horizontal_vector_idx], bumper_horizontal_distance,
+                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data->sectors[horizontal_vector_idx], bumper_horizontal_distance,
                         new_x, new_y);
 
       point_fcu.reference.position.x = new_x;
@@ -6186,12 +6106,12 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       }
     }
 
-    if (bumper_data.sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance)) {
+    if (bumper_data->sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance)) {
 
-      new_z = point_heading_vertical * (bumper_data.sectors[vertical_vector_idx] - bumper_vertical_distance);
+      new_z = point_heading_vertical * (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance);
 
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %.2f is not valid, distance %.2f > (%.2f - %.2f)., HUGGING IT it z: %.2f", fcu_z,
-                        vertical_point_distance, bumper_data.sectors[vertical_vector_idx], bumper_vertical_distance, new_z);
+                        vertical_point_distance, bumper_data->sectors[vertical_vector_idx], bumper_vertical_distance, new_z);
 
       point_fcu.reference.position.z = new_z;
 
@@ -6240,13 +6160,13 @@ bool ControlManager::bumperPushFromObstacle(void) {
     return true;
   }
 
-  if (!got_bumper_) {
+  if (!sh_bumper_->has_data()) {
     return true;
   }
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
-  auto uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
+  auto                              uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   auto [bumper_repulsion_horizontal_offset, bumper_repulsion_vertical_offset] =
       mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_offset_, bumper_repulsion_vertical_offset_);
@@ -6254,7 +6174,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
   auto [bumper_repulsion_horizontal_distance, bumper_repulsion_vertical_distance] =
       mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_distance_, bumper_repulsion_vertical_distance_);
 
-  double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
+  double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
   double direction                     = 0;
   double repulsion_distance            = std::numeric_limits<double>::max();
@@ -6265,28 +6185,28 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double vertical_collision_detected = false;
 
-  for (int i = 0; i < int(bumper_data.n_horizontal_sectors); i++) {
+  for (int i = 0; i < int(bumper_data->n_horizontal_sectors); i++) {
 
-    if (bumper_data.sectors[i] < 0) {
+    if (bumper_data->sectors[i] < 0) {
       continue;
     }
 
     double wall_locked_horizontal = false;
 
     // if the sector is under critical distance
-    if (bumper_data.sectors[i] <= bumper_repulsion_horizontal_distance && bumper_data.sectors[i] < repulsion_distance) {
+    if (bumper_data->sectors[i] <= bumper_repulsion_horizontal_distance && bumper_data->sectors[i] < repulsion_distance) {
 
       // check for locking between the oposite walls
       // get the desired direction of motion
       double oposite_direction  = double(i) * sector_size + M_PI;
       int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
 
-      if (bumper_data.sectors[oposite_sector_idx] > 0 && ((bumper_data.sectors[i] + bumper_data.sectors[oposite_sector_idx]) <=
-                                                          (2 * bumper_repulsion_horizontal_distance + 2 * bumper_repulsion_horizontal_offset))) {
+      if (bumper_data->sectors[oposite_sector_idx] > 0 && ((bumper_data->sectors[i] + bumper_data->sectors[oposite_sector_idx]) <=
+                                                           (2 * bumper_repulsion_horizontal_distance + 2 * bumper_repulsion_horizontal_offset))) {
 
         wall_locked_horizontal = true;
 
-        if (fabs(bumper_data.sectors[i] - bumper_data.sectors[oposite_sector_idx]) <= 2 * bumper_repulsion_horizontal_offset) {
+        if (fabs(bumper_data->sectors[i] - bumper_data->sectors[oposite_sector_idx]) <= 2 * bumper_repulsion_horizontal_offset) {
 
           ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between two walls");
           continue;
@@ -6296,25 +6216,25 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // get the id of the oposite sector
       direction = oposite_direction;
 
-      /* int oposite_sector_idx = (i + bumper_data.n_horizontal_sectors / 2) % bumper_data.n_horizontal_sectors; */
+      /* int oposite_sector_idx = (i + bumper_data->n_horizontal_sectors / 2) % bumper_data->n_horizontal_sectors; */
 
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %d vs. %d), obstacle distance: %.2f, repulsing", i,
-                        oposite_sector_idx, bumper_data.sectors[i]);
+                        oposite_sector_idx, bumper_data->sectors[i]);
 
       ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: oposite direction: %.2f", oposite_direction);
 
       if (wall_locked_horizontal) {
-        if (bumper_data.sectors[i] < bumper_data.sectors[oposite_sector_idx]) {
+        if (bumper_data->sectors[i] < bumper_data->sectors[oposite_sector_idx]) {
           repulsion_distance = bumper_repulsion_horizontal_offset;
         } else {
           repulsion_distance = -bumper_repulsion_horizontal_offset;
         }
       } else {
-        repulsion_distance = bumper_repulsion_horizontal_distance + bumper_repulsion_horizontal_offset - bumper_data.sectors[i];
+        repulsion_distance = bumper_repulsion_horizontal_distance + bumper_repulsion_horizontal_offset - bumper_data->sectors[i];
       }
 
       // TODO why is this not used?
-      // min_distance = bumper_data.sectors[i];
+      // min_distance = bumper_data->sectors[i];
 
       horizontal_collision_detected = true;
     }
@@ -6328,37 +6248,38 @@ bool ControlManager::bumperPushFromObstacle(void) {
   /* bool   wall_locked_vertical        = false; */
 
   // check for vertical collision down
-  if (bumper_data.sectors[bumper_data.n_horizontal_sectors] > 0 &&
-      bumper_data.sectors[bumper_data.n_horizontal_sectors] <= bumper_repulsion_vertical_distance) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 &&
+      bumper_data->sectors[bumper_data->n_horizontal_sectors] <= bumper_repulsion_vertical_distance) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
     collision_above             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = bumper_repulsion_vertical_distance - bumper_data.sectors[bumper_data.n_horizontal_sectors];
+    vertical_repulsion_distance = bumper_repulsion_vertical_distance - bumper_data->sectors[bumper_data->n_horizontal_sectors];
   }
 
   // check for vertical collision up
-  if (bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] > 0 &&
-      bumper_data.sectors[bumper_data.n_horizontal_sectors + 1] <= bumper_repulsion_vertical_distance) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 &&
+      bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= bumper_repulsion_vertical_distance) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
     collision_below             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(bumper_repulsion_vertical_distance - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]);
+    vertical_repulsion_distance = -(bumper_repulsion_vertical_distance - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
   }
 
   // check the up/down wall locking
   if (collision_above && collision_below) {
 
-    if (((bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
+    if (((bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
          (2 * bumper_repulsion_vertical_distance + 2 * bumper_repulsion_vertical_offset))) {
 
       // TODO: why is this not used?
       /* wall_locked_vertical = true; */
 
-      vertical_repulsion_distance = (-bumper_data.sectors[bumper_data.n_horizontal_sectors] + bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) / 2.0;
+      vertical_repulsion_distance =
+          (-bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) / 2.0;
 
-      if (fabs(bumper_data.sectors[bumper_data.n_horizontal_sectors] - bumper_data.sectors[bumper_data.n_horizontal_sectors + 1]) <=
+      if (fabs(bumper_data->sectors[bumper_data->n_horizontal_sectors] - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
           2 * bumper_repulsion_vertical_offset) {
 
         ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between the floor and ceiling");
@@ -6487,7 +6408,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
   // copy member variables
-  auto bumper_data = mrs_lib::get_mutexed(mutex_bumper_data_, bumper_data_);
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -6500,13 +6421,13 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
   }
 
   // heading of the right edge of the first sector
-  double sector_size = TAU / double(bumper_data.n_horizontal_sectors);
+  double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
   // calculate the idx
   int idx = floor((point_heading_horizontal + (sector_size / 2.0)) / sector_size);
 
-  if (idx > int(bumper_data.n_horizontal_sectors) - 1) {
-    idx -= bumper_data.n_horizontal_sectors;
+  if (idx > int(bumper_data->n_horizontal_sectors) - 1) {
+    idx -= bumper_data->n_horizontal_sectors;
   }
 
   return idx;
@@ -6736,7 +6657,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-  auto pixhawk_odometry      = mrs_lib::get_mutexed(mutex_pixhawk_odometry_, pixhawk_odometry_);
 
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
@@ -6756,7 +6676,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
     failsafe_attitude_cmd          = *last_attitude_cmd;
-    double pixhawk_yaw             = mrs_lib::AttitudeConverter(pixhawk_odometry.pose.pose.orientation).getYaw();
+    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_pixhawk_odometry_->get_data()->pose.pose.orientation).getYaw();
     failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
@@ -7142,14 +7062,14 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) {
+  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
-  if (!got_pixhawk_odometry_) {
+  if (!sh_pixhawk_odometry_->has_data()) {
 
     ss << "can not switch tracker, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -7297,14 +7217,14 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (!got_odometry_innovation_ && _state_input_ == INPUT_UAV_STATE) {
+  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
-  if (!got_pixhawk_odometry_) {
+  if (!sh_pixhawk_odometry_->has_data()) {
 
     ss << "can not switch controller, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
