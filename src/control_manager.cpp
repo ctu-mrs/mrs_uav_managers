@@ -2520,7 +2520,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       bool is_flying = offboard_mode_ && active_tracker_idx != _null_tracker_idx_;
 
       // only when flying and not in failsafe
-      if (is_flying && !failsafe_triggered_) {
+      if (is_flying) {
 
         ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
 
@@ -4853,7 +4853,7 @@ void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::Trajectory
 
 //}
 
-// | -------------- human-colable "goto" services ------------- |
+// | ------------- human-callable "goto" services ------------- |
 
 /* //{ callbackGoto() */
 
