@@ -2338,7 +2338,15 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   {
-    auto [x, y, z, heading] = mrs_lib::getPose(sh_odometry_innovation_->get_data());
+    auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_->get_data());
+
+    double heading = 0;
+    try {
+      heading = mrs_lib::getHeading(sh_odometry_innovation_->get_data());
+    }
+    catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
+    }
 
     double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
 

@@ -429,8 +429,18 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == FLY_THERE_STATE) {
 
-    auto [odom_x, odom_y, odom_z, odom_heading] = mrs_lib::getPose(odometry);
-    auto [ref_x, ref_y, ref_z, ref_heading]     = mrs_lib::getPose(land_there_current_frame);
+    auto [odom_x, odom_y, odom_z] = mrs_lib::getPosition(odometry);
+    auto [ref_x, ref_y, ref_z]    = mrs_lib::getPosition(land_there_current_frame);
+
+    double odom_heading, ref_heading;
+    try {
+      odom_heading = mrs_lib::getHeading(odometry);
+      ref_heading  = mrs_lib::getHeading(land_there_current_frame);
+    }
+    catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+      ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
+      return;
+    }
 
     if (mrs_lib::dist3d(odom_x, odom_y, odom_z, ref_x, ref_y, ref_z) < 0.5 && mrs_lib::angleBetween(odom_heading, ref_heading)) {
 
@@ -571,7 +581,16 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   auto max_height = sh_max_height_->get_data()->value;
   auto odometry   = sh_odometry_->get_data();
 
-  auto [odometry_x, odometry_y, odometry_z, odometry_heading] = mrs_lib::getPose(odometry);
+  auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
+
+  double odometry_heading = 0;
+  try {
+    odometry_heading = mrs_lib::getHeading(odometry);
+  }
+  catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+    ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
+    return;
+  }
 
   double odometry_x_speed = odometry->twist.twist.linear.x;
   double odometry_y_speed = odometry->twist.twist.linear.y;
@@ -876,9 +895,24 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
   //}
 
-  auto control_manager_diagnostics            = sh_control_manager_diag_->get_data();
-  auto odometry                               = sh_odometry_->get_data();
-  auto [odom_x, odom_y, odom_z, odom_heading] = mrs_lib::getPose(sh_odometry_->get_data());
+  auto control_manager_diagnostics = sh_control_manager_diag_->get_data();
+  auto odometry                    = sh_odometry_->get_data();
+  auto [odom_x, odom_y, odom_z]    = mrs_lib::getPosition(sh_odometry_->get_data());
+
+  double odom_heading;
+  try {
+    odom_heading = mrs_lib::getHeading(sh_odometry_->get_data());
+  }
+  catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+    ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
+
+    std::stringstream ss;
+    ss << "could not calculate current heading";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    res.message = ss.str();
+    res.success = false;
+    return true;
+  }
 
   ROS_INFO("[UavManager]: taking off");
 
