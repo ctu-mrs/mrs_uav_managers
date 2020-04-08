@@ -404,7 +404,6 @@ private:
   // service clients
   ros::ServiceClient service_client_arm_;
   ros::ServiceClient service_client_eland_;
-  ros::ServiceClient service_client_land_;
   ros::ServiceClient service_client_shutdown_;
   ros::ServiceClient service_client_set_odometry_callbacks_;
 
@@ -775,7 +774,7 @@ private:
   double RCChannelToRange(double rc_value, double range, double deadband);
 
   // tell the mrs_odometry to disable its callbacks
-  void setOdometryCallbacks(const bool input);
+  void odometryCallbacksSrv(const bool input);
 
   void                          shutdown();
   void                          setCallbacks(bool in);
@@ -1506,7 +1505,6 @@ void ControlManager::onInit() {
 
   service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
   service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_land_                   = nh_.serviceClient<std_srvs::Trigger>("land_out");
   service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
   service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
@@ -3051,7 +3049,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
 
 //}
 
-/* controlTimer() //{ */
+/* timerControl() //{ */
 
 void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event) {
 
@@ -5651,24 +5649,6 @@ bool ControlManager::isOffboard(void) {
 
 //}
 
-/* shutdown() //{ */
-
-void ControlManager::shutdown() {
-
-  // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-  if (_automatic_pc_shutdown_enabled_) {
-
-    ROS_INFO("[ControlManager]: calling service for PC shutdown");
-
-    std_srvs::Trigger shutdown_out;
-    service_client_shutdown_.call(shutdown_out);
-  }
-}
-
-//}
-
 /* setCallbacks() //{ */
 
 void ControlManager::setCallbacks(bool in) {
@@ -6636,7 +6616,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 
     changeLandingState(LANDING_STATE);
 
-    setOdometryCallbacks(false);
+    odometryCallbacksSrv(false);
 
     ss << "eland activated";
     ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
@@ -6717,7 +6697,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
       bumper_enabled_ = false;
 
-      setOdometryCallbacks(false);
+      odometryCallbacksSrv(false);
 
       ROS_INFO_THROTTLE(1.0, "[ControlManager]: the controller '%s' was activated", _failsafe_controller_name_.c_str());
 
@@ -6919,7 +6899,7 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 
 //}
 
-// | ------------------------ routines ------------------------ |
+// | ----------------- service client wrappers ---------------- |
 
 /* arming() //{ */
 
@@ -6974,32 +6954,9 @@ std::tuple<bool, std::string> ControlManager::arming(bool input) {
 
 //}
 
-/* switchMotors() //{ */
+/* odometryCallbacksSrv() //{ */
 
-void ControlManager::switchMotors(bool input) {
-
-  ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
-
-  motors_ = input;
-
-  // if switching motors off, switch to NullTracker
-  if (!motors_) {
-
-    ROS_INFO("[ControlManager]: switching to 'NullTracker' after switching motors off");
-
-    switchTracker(_null_tracker_name_);
-
-    ROS_INFO_STREAM("[ControlManager]: switching to the controller '" << _eland_controller_name_ << "' after switching motors off");
-
-    switchController(_eland_controller_name_);
-  }
-}
-
-//}
-
-/* setOdometryCallbacks() //{ */
-
-void ControlManager::setOdometryCallbacks(const bool input) {
+void ControlManager::odometryCallbacksSrv(const bool input) {
 
   ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
@@ -7045,6 +7002,49 @@ bool ControlManager::elandSrv(void) {
     ROS_ERROR("[ControlManager]: service call for eland failed!");
 
     return false;
+  }
+}
+
+//}
+
+/* shutdown() //{ */
+
+void ControlManager::shutdown() {
+
+  // copy member variables
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+  if (_automatic_pc_shutdown_enabled_) {
+
+    ROS_INFO("[ControlManager]: calling service for PC shutdown");
+
+    std_srvs::Trigger shutdown_out;
+    service_client_shutdown_.call(shutdown_out);
+  }
+}
+
+//}
+
+// | ------------------------ routines ------------------------ |
+
+/* switchMotors() //{ */
+
+void ControlManager::switchMotors(bool input) {
+
+  ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
+
+  motors_ = input;
+
+  // if switching motors off, switch to NullTracker
+  if (!motors_) {
+
+    ROS_INFO("[ControlManager]: switching to 'NullTracker' after switching motors off");
+
+    switchTracker(_null_tracker_name_);
+
+    ROS_INFO_STREAM("[ControlManager]: switching to the controller '" << _eland_controller_name_ << "' after switching motors off");
+
+    switchController(_eland_controller_name_);
   }
 }
 
