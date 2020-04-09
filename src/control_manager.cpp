@@ -264,9 +264,9 @@ private:
 
   // | -------------- uav_state/odometry subscriber ------------- |
 
-  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_odometry_;
-  mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_uav_state_;
-  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_pixhawk_odometry_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
+  mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_pixhawk_odometry_;
 
   mrs_msgs::UavState uav_state_;
   mrs_msgs::UavState previous_uav_state_;
@@ -285,20 +285,20 @@ private:
 
   // | ------------------ Mavros GPS subscriber ----------------- |
 
-  ros::Subscriber subscriber_mavros_gps_;
+  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_mavros_gps_;
 
   // | ------------------ max height subscriber ----------------- |
 
-  mrs_lib::SubscribeHandlerPtr<mrs_msgs::Float64Stamped> sh_max_height_;
-  double                                                 max_height_safety_area_ = 0;
-  double                                                 _max_height_            = 0;
-  std::mutex                                             mutex_min_height_;
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_height_;
+  double                                              max_height_safety_area_ = 0;
+  double                                              _max_height_            = 0;
+  std::mutex                                          mutex_min_height_;
 
   // | ------------- odometry innovation subscriber ------------- |
 
   // odometry innovation is published by the odometry node
   // it is used to issue eland if the estimator's input is too wonky
-  mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_odometry_innovation_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_innovation_;
 
   // | --------------------- common handlers -------------------- |
 
@@ -425,7 +425,7 @@ private:
 
   // | ----------------- Mavros state subscriber ---------------- |
 
-  mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_mavros_state_;
+  mrs_lib::SubscribeHandler<mavros_msgs::State> sh_mavros_state_;
 
   bool offboard_mode_ = false;
   bool armed_         = false;
@@ -510,12 +510,11 @@ private:
   // | ------------------------ callbacks ----------------------- |
 
   // topic callbacks
-  void callbackOdometry(const mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_ptr);
-  void callbackUavState(const mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_ptr);
-  void callbackMavrosState(const mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_ptr);
-
-  void callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg);
-  void callbackRC(const mavros_msgs::RCInConstPtr& msg);
+  void callbackOdometry(mrs_lib::MessageWrapper<nav_msgs::Odometry>& wrp);
+  void callbackUavState(mrs_lib::MessageWrapper<mrs_msgs::UavState>& wrp);
+  void callbackMavrosState(mrs_lib::MessageWrapper<mavros_msgs::State>& wrp);
+  void callbackMavrosGps(mrs_lib::MessageWrapper<sensor_msgs::NavSatFix>& wrp);
+  void callbackRC(mrs_lib::MessageWrapper<mavros_msgs::RCIn>& wrp);
 
   // topic timeouts
   void timeoutUavState(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
@@ -621,7 +620,7 @@ private:
   void       timerBumper(const ros::TimerEvent& event);
 
   // bumper subscriber
-  mrs_lib::SubscribeHandlerPtr<mrs_msgs::ObstacleSectors> sh_bumper_;
+  mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors> sh_bumper_;
 
   bool bumper_enabled_           = false;
   bool _bumper_hugging_enabled_  = false;
@@ -694,9 +693,9 @@ private:
 
   // | -------------------- joystick control -------------------- |
 
-  mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_joystick_;
+  mrs_lib::SubscribeHandler<sensor_msgs::Joy> sh_joystick_;
 
-  void callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_ptr);
+  void callbackJoystick(const sensor_msgs::JoyConstPtr& msg);
   bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
@@ -728,10 +727,8 @@ private:
   // | ------------------- RC joystick control ------------------ |
 
   // listening to the RC channels as told by pixhawk
-  ros::Subscriber      subscriber_rc_;
-  mavros_msgs::RCIn    rc_channels_;
-  std::mutex           mutex_rc_channels_;
-  bool                 got_rc_channels_ = false;
+  mrs_lib::SubscribeHandler<mavros_msgs::RCIn> sh_rc_;
+
   std::list<ros::Time> rc_channel_switch_time_;
   std::mutex           mutex_rc_channel_switch_time_;
 
@@ -1460,29 +1457,35 @@ void ControlManager::onInit() {
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeMgr smgr(nh_);
-
   ros::Duration uav_state_timeout(_uav_state_max_missing_time_);
 
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = "ControlManager";
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
   if (_state_input_ == INPUT_UAV_STATE) {
-    sh_uav_state_ = smgr.create_handler<mrs_msgs::UavState>("uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
-                                                            &ControlManager::callbackUavState, this, true, true, 1, ros::TransportHints().tcpNoDelay());
+    sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
+                                                                  &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETY) {
-    sh_odometry_ = smgr.create_handler<nav_msgs::Odometry>("odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
-                                                           &ControlManager::callbackOdometry, this, true, true, 1, ros::TransportHints().tcpNoDelay());
+    sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
+                                                                 &ControlManager::callbackOdometry, this);
   }
 
-  sh_odometry_innovation_ = smgr.create_handler<nav_msgs::Odometry>("odometry_innovation_in", true, true, 1, ros::TransportHints().tcpNoDelay());
-  sh_pixhawk_odometry_    = smgr.create_handler<nav_msgs::Odometry>("mavros_odometry_in", true, true, 1, ros::TransportHints().tcpNoDelay());
-  sh_bumper_              = smgr.create_handler<mrs_msgs::ObstacleSectors>("bumper_sectors_in", true, true, 1, ros::TransportHints().tcpNoDelay());
-  sh_max_height_          = smgr.create_handler<mrs_msgs::Float64Stamped>("max_height_in", true, true, 1, ros::TransportHints().tcpNoDelay());
-  sh_joystick_ =
-      smgr.create_handler<sensor_msgs::Joy>("joystick_in", &ControlManager::callbackJoystick, this, true, true, 1, ros::TransportHints().tcpNoDelay());
-  sh_mavros_state_ = smgr.create_handler<mavros_msgs::State>("mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
-                                                             &ControlManager::callbackMavrosState, this, true, true, 1, ros::TransportHints().tcpNoDelay());
+  sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
+  sh_pixhawk_odometry_    = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
+  sh_bumper_              = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_height_          = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_joystick_            = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_mavros_gps_          = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
+  sh_rc_                  = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
 
-  subscriber_mavros_gps_ = nh_.subscribe("mavros_gps_in", 1, &ControlManager::callbackMavrosGps, this, ros::TransportHints().tcpNoDelay());
-  subscriber_rc_         = nh_.subscribe("rc_in", 1, &ControlManager::callbackRC, this, ros::TransportHints().tcpNoDelay());
+  sh_mavros_state_ = mrs_lib::SubscribeHandler<mavros_msgs::State>(shopts, "mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
+                                                                   &ControlManager::callbackMavrosState, this);
 
   // | -------------------- general services -------------------- |
 
@@ -2246,7 +2249,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) || !sh_pixhawk_odometry_->has_data() ||
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.has_data()) || !sh_pixhawk_odometry_.has_data() ||
       active_tracker_idx == _null_tracker_idx_) {
     return;
   }
@@ -2350,11 +2353,11 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   {
-    auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_->get_data());
+    auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.get_data());
 
     double heading = 0;
     try {
-      heading = mrs_lib::getHeading(sh_odometry_innovation_->get_data());
+      heading = mrs_lib::getHeading(sh_odometry_innovation_.get_data());
     }
     catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
@@ -2699,16 +2702,16 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!sh_joystick_->has_data()) {
+  if (!sh_joystick_.has_data()) {
     return;
   }
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
 
-  auto joystick_data = sh_joystick_->get_data();
+  auto joystick_data = sh_joystick_.get_data();
 
   // copy member variables
-  auto rc_channels = mrs_lib::get_mutexed(mutex_rc_channels_, rc_channels_);
+  mavros_msgs::RCInConstPtr rc_channels = sh_rc_.get_data();
 
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
@@ -2829,18 +2832,18 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     bool nothing_to_do = true;
 
-    if (rc_channels.channels.size() < 4) {
+    if (rc_channels->channels.size() < 4) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in topic is %d)",
-                         int(rc_channels.channels.size()));
+                         int(rc_channels->channels.size()));
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: tip: this could be caused by the RC failsafe not being configured!");
 
     } else {
 
-      double tmp_x       = RCChannelToRange(rc_channels.channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_y       = -RCChannelToRange(rc_channels.channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_z       = RCChannelToRange(rc_channels.channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
-      double tmp_heading = -RCChannelToRange(rc_channels.channels[_rc_channel_heading_], 1.0, 0.1);
+      double tmp_x       = RCChannelToRange(rc_channels->channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_y       = -RCChannelToRange(rc_channels->channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
+      double tmp_z       = RCChannelToRange(rc_channels->channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
+      double tmp_heading = -RCChannelToRange(rc_channels->channels[_rc_channel_heading_], 1.0, 0.1);
 
       if (abs(tmp_x) > 1e-3) {
         des_x         = tmp_x;
@@ -2905,7 +2908,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (_rc_goto_enabled_ && got_rc_channels_) {
+  if (_rc_goto_enabled_ && sh_rc_.has_data()) {
 
     // prune the list of rc_channel_switches
     std::list<ros::Time>::iterator it;
@@ -2995,7 +2998,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if ((ros::Time::now() - sh_bumper_->last_message_time()).toSec() > 1.0) {
+  if ((ros::Time::now() - sh_bumper_.last_message_time()).toSec() > 1.0) {
     return;
   }
 
@@ -3137,14 +3140,14 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(const mrs_lib::SubscribeHandlerPtr<nav_msgs::Odometry> sh_ptr) {
+void ControlManager::callbackOdometry(mrs_lib::MessageWrapper<nav_msgs::Odometry>& wrp) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
 
-  nav_msgs::OdometryConstPtr odom = sh_ptr->get_data();
+  nav_msgs::OdometryConstPtr odom = wrp.get_data();
 
   // | --------------------- check for nans --------------------- |
 
@@ -3272,14 +3275,14 @@ void ControlManager::callbackOdometry(const mrs_lib::SubscribeHandlerPtr<nav_msg
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(const mrs_lib::SubscribeHandlerPtr<mrs_msgs::UavState> sh_ptr) {
+void ControlManager::callbackUavState(mrs_lib::MessageWrapper<mrs_msgs::UavState> wrp) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
 
-  mrs_msgs::UavStateConstPtr uav_state = sh_ptr->get_data();
+  mrs_msgs::UavStateConstPtr uav_state = wrp.get_data();
 
   // | --------------------- check for nans --------------------- |
 
@@ -3423,21 +3426,23 @@ void ControlManager::callbackUavState(const mrs_lib::SubscribeHandlerPtr<mrs_msg
 
 /* //{ callbackMavrosGps() */
 
-void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFixConstPtr& msg) {
+void ControlManager::callbackMavrosGps(mrs_lib::MessageWrapper<sensor_msgs::NavSatFix>& wrp) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
 
-  transformer_->setCurrentLatLon(msg->latitude, msg->longitude);
+  sensor_msgs::NavSatFixConstPtr data = wrp.get_data();
+
+  transformer_->setCurrentLatLon(data->latitude, data->longitude);
 }
 
 //}
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::Joy> sh_ptr) {
+void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
 
   if (!is_initialized_)
     return;
@@ -3448,7 +3453,7 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  sensor_msgs::JoyConstPtr joystick_data = sh_ptr->get_data();
+  sensor_msgs::JoyConstPtr joystick_data = msg;
 
   // | ---- switching back to fallback tracker and controller --- |
 
@@ -3552,14 +3557,14 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandlerPtr<sensor_msgs::
 
 /* //{ callbackMavrosState() */
 
-void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandlerPtr<mavros_msgs::State> sh_ptr) {
+void ControlManager::callbackMavrosState(mrs_lib::MessageWrapper<mavros_msgs::State>& wrp) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosState");
 
-  mavros_msgs::StateConstPtr state = sh_ptr->get_data();
+  mavros_msgs::StateConstPtr state = wrp.get_data();
 
   // | ------ detect and print the changes in offboard mode ----- |
   if (state->mode == "OFFBOARD") {
@@ -3598,7 +3603,7 @@ void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandlerPtr<mavros_msg
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
+void ControlManager::callbackRC(mrs_lib::MessageWrapper<mavros_msgs::RCIn>& wrp) {
 
   if (!is_initialized_)
     return;
@@ -3609,31 +3614,25 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackRC");
 
+  mavros_msgs::RCInConstPtr rc = wrp.get_data();
+
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
-
-  {
-    std::scoped_lock lock(mutex_rc_channels_);
-
-    rc_channels_ = *msg;
-
-    got_rc_channels_ = true;
-  }
 
   // | ------------------- rc joystic control ------------------- |
 
   // when the switch change its position
   if (_rc_goto_enabled_) {
 
-    if (_rc_joystick_channel_ >= int(msg->channels.size())) {
+    if (_rc_joystick_channel_ >= int(rc->channels.size())) {
 
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", _rc_joystick_channel_,
-                         int(msg->channels.size()));
+                         int(rc->channels.size()));
 
     } else {
 
       // detect the switch of a switch on the RC
-      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - 200) && msg->channels[_rc_joystick_channel_] > (PWM_MIDDLE + 200)) ||
-          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + 200) && msg->channels[_rc_joystick_channel_] < (PWM_MIDDLE - 200))) {
+      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - 200) && rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + 200)) ||
+          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + 200) && rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - 200))) {
 
         // enter an event to the std vector
         std::scoped_lock lock(mutex_rc_channel_switch_time_);
@@ -3642,22 +3641,22 @@ void ControlManager::callbackRC(const mavros_msgs::RCInConstPtr& msg) {
       }
 
       // do not forget to update the last... variable
-      rc_joystick_channel_last_value_ = msg->channels[_rc_joystick_channel_];
+      rc_joystick_channel_last_value_ = rc->channels[_rc_joystick_channel_];
     }
   }
 
   // | ------------------------ rc eland ------------------------ |
   if (_rc_eland_enabled_) {
 
-    if (_rc_eland_channel_ >= int(msg->channels.size())) {
+    if (_rc_eland_channel_ >= int(rc->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, int(msg->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, int(rc->channels.size()));
 
     } else {
 
       if (_rc_eland_action_ == ELAND_STR) {
 
-        if (msg->channels[_rc_eland_channel_] >= _rc_eland_threshold_ && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
+        if (rc->channels[_rc_eland_channel_] >= _rc_eland_threshold_ && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
           ROS_WARN("[ControlManager]: triggering eland by RC");
 
@@ -3985,12 +3984,12 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     prereq_check = false;
   }
 
-  if (!sh_mavros_state_->has_data() || (ros::Time::now() - sh_mavros_state_->last_message_time()).toSec() > 1.0) {
+  if (!sh_mavros_state_.has_data() || (ros::Time::now() - sh_mavros_state_.last_message_time()).toSec() > 1.0) {
     ss << "can not switch motors ON, missing mavros state!";
     prereq_check = false;
   }
 
-  if (bumper_enabled_ && !sh_bumper_->has_data()) {
+  if (bumper_enabled_ && !sh_bumper_.has_data()) {
     ss << "can not switch motors on, missing bumper data!";
     prereq_check = false;
   }
@@ -5673,13 +5672,13 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
 bool ControlManager::isOffboard(void) {
 
-  if (!sh_mavros_state_->has_data()) {
+  if (!sh_mavros_state_.has_data()) {
     return false;
   }
 
-  mavros_msgs::StateConstPtr mavros_state = sh_mavros_state_->get_data();
+  mavros_msgs::StateConstPtr mavros_state = sh_mavros_state_.get_data();
 
-  if ((ros::Time::now() - sh_mavros_state_->last_message_time()).toSec() < 1.0 && mavros_state->mode == "OFFBOARD") {
+  if ((ros::Time::now() - sh_mavros_state_.last_message_time()).toSec() < 1.0 && mavros_state->mode == "OFFBOARD") {
 
     return true;
 
@@ -5963,9 +5962,9 @@ double ControlManager::getMaxHeight(void) {
 
   double max_height;
 
-  if (sh_max_height_->has_data()) {
+  if (sh_max_height_.has_data()) {
 
-    double max_height_external = sh_max_height_->get_data()->value;
+    double max_height_external = sh_max_height_.get_data()->value;
 
     max_height = _max_height_ > max_height_external ? max_height_external : _max_height_;
 
@@ -5999,17 +5998,17 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  if (!sh_bumper_->has_data()) {
+  if (!sh_bumper_.has_data()) {
     return true;
   }
 
   // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.get_data();
 
   auto [bumper_vertical_distance, bumper_horizontal_distance] =
       mrs_lib::get_mutexed(mutex_bumper_params_, bumper_vertical_distance_, bumper_horizontal_distance_);
 
-  if ((ros::Time::now() - sh_bumper_->last_message_time()).toSec() > 1.0) {
+  if ((ros::Time::now() - sh_bumper_.last_message_time()).toSec() > 1.0) {
     return true;
   }
 
@@ -6190,12 +6189,12 @@ bool ControlManager::bumperPushFromObstacle(void) {
     return true;
   }
 
-  if (!sh_bumper_->has_data()) {
+  if (!sh_bumper_.has_data()) {
     return true;
   }
 
   // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.get_data();
   auto                              uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   auto [bumper_repulsion_horizontal_offset, bumper_repulsion_vertical_offset] =
@@ -6438,7 +6437,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
 
   // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_->get_data();
+  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.get_data();
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -6706,7 +6705,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
     failsafe_attitude_cmd          = *last_attitude_cmd;
-    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_pixhawk_odometry_->get_data()->pose.pose.orientation).getYaw();
+    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_pixhawk_odometry_.get_data()->pose.pose.orientation).getYaw();
     failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
@@ -7163,14 +7162,14 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) {
+  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.has_data()) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
-  if (!sh_pixhawk_odometry_->has_data()) {
+  if (!sh_pixhawk_odometry_.has_data()) {
 
     ss << "can not switch tracker, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -7318,14 +7317,14 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_->has_data()) {
+  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.has_data()) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
-  if (!sh_pixhawk_odometry_->has_data()) {
+  if (!sh_pixhawk_odometry_.has_data()) {
 
     ss << "can not switch controller, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
