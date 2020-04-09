@@ -366,6 +366,7 @@ private:
   ros::ServiceServer service_server_emergency_reference_;
   ros::ServiceServer service_server_pirouette_;
   ros::ServiceServer service_server_eland_;
+  ros::ServiceServer service_server_parachute_;
 
   // human callbable services for references
   ros::ServiceServer service_server_goto_;
@@ -406,6 +407,7 @@ private:
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_shutdown_;
   ros::ServiceClient service_client_set_odometry_callbacks_;
+  ros::ServiceClient service_client_parachute_;
 
   // min client
   ros::ServiceServer service_server_set_min_height_;
@@ -480,6 +482,13 @@ private:
   // are callbacks enabled to trackers?
   bool callbacks_enabled_ = true;
 
+  // | ------------------------ parachute ----------------------- |
+
+  bool _parachute_enabled_ = false;
+
+  std::tuple<bool, std::string> deployParachute(void);
+  bool                          parachuteSrv(void);
+
   // | ----------------------- safety area ---------------------- |
 
   // safety area
@@ -540,6 +549,7 @@ private:
   bool callbackFailsafe(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -669,7 +679,7 @@ private:
   void       publishDiagnostics(void);
   std::mutex mutex_diagnostics_;
 
-  void               ungrip(void);
+  void               ungripSrv(void);
   ros::ServiceClient service_client_ungrip_;
 
   // | ------------------------ pirouette ----------------------- |
@@ -972,6 +982,8 @@ void ControlManager::onInit() {
 
   param_loader.load_param("pirouette/speed", _pirouette_speed_);
   param_loader.load_param("pirouette/timer_rate", _pirouette_timer_rate_);
+
+  param_loader.load_param("safety/parachute/enabled", _parachute_enabled_);
 
   // | ------------- load the body integrator values ------------ |
 
@@ -1488,6 +1500,7 @@ void ControlManager::onInit() {
   service_server_use_joystick_               = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
   service_server_use_safety_area_            = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
   service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
@@ -1508,6 +1521,7 @@ void ControlManager::onInit() {
   service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
   service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
+  service_client_parachute_              = nh_.serviceClient<std_srvs::Trigger>("parachute_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -2400,7 +2414,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
                            _eland_threshold_ / 2.0, position_error_x_, position_error_y_, position_error_z_);
 
-        ungrip();
+        ungripSrv();
       }
     }
   }
@@ -2435,7 +2449,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
                            (180.0 / M_PI) * _yaw_error_eland_threshold_ / 2.0);
 
-        ungrip();
+        ungripSrv();
       }
     }
   }
@@ -3903,6 +3917,34 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: eland triggered by callback");
 
   auto [success, message] = eland();
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackParachute() */
+
+bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  if (!_parachute_enabled_) {
+
+    std::stringstream ss;
+    ss << "parachute disabled";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    res.message = ss.str();
+    res.success = false;
+  }
+
+  ROS_WARN_THROTTLE(1.0, "[ControlManager]: parachute triggered by callback");
+
+  auto [success, message] = deployParachute();
 
   res.success = success;
   res.message = message;
@@ -7025,6 +7067,57 @@ void ControlManager::shutdown() {
 
 //}
 
+/* parachuteSrv() //{ */
+
+bool ControlManager::parachuteSrv(void) {
+
+  ROS_INFO("[ControlManager]: calling for parachute deployment");
+
+  std_srvs::Trigger srv;
+
+  bool res = service_client_parachute_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_WARN("[ControlManager]: service call for parachute deployment returned: '%s'", srv.response.message.c_str());
+    }
+
+    return srv.response.success;
+
+  } else {
+
+    ROS_ERROR("[ControlManager]: service call for parachute deployment failed!");
+
+    return false;
+  }
+}
+
+//}
+
+/* ungripSrv() //{ */
+
+void ControlManager::ungripSrv(void) {
+
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: ungripping payload");
+
+  std_srvs::Trigger srv;
+
+  bool res = service_client_ungrip_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: '%s'", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+  }
+}
+
+//}
+
 // | ------------------------ routines ------------------------ |
 
 /* switchMotors() //{ */
@@ -8297,24 +8390,46 @@ double ControlManager::RCChannelToRange(double rc_value, double range, double de
 
 //}
 
-/* ungrip() //{ */
+/* deployParachute() //{ */
 
-void ControlManager::ungrip(void) {
+std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: ungripping payload");
+  // if not enabled, return false
+  if (!_parachute_enabled_) {
 
-  std_srvs::Trigger srv;
+    std::stringstream ss;
+    ss << "can not deploy parachute, it is disabled";
+    return std::tuple(false, ss.str());
+  }
 
-  bool res = service_client_ungrip_.call(srv);
+  // we can not disarm if the drone is not in offboard mode
+  // this is super important!
+  if (!isOffboard()) {
 
-  if (res) {
+    std::stringstream ss;
+    ss << "can not deploy parachute, not in offboard mode";
+    return std::tuple(false, ss.str());
+  }
 
-    if (!srv.response.success) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload returned: '%s'", srv.response.message.c_str());
-    }
+  // call the parachute service
+  bool succ = parachuteSrv();
+
+  // if the deployment was successful,
+  if (succ) {
+
+    arming(false);
+
+    std::stringstream ss;
+    ss << "parachute deployed";
+
+    return std::tuple(true, ss.str());
 
   } else {
-    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: service call for ungripping payload failed!");
+
+    std::stringstream ss;
+    ss << "error during deployment of parachute";
+
+    return std::tuple(false, ss.str());
   }
 }
 

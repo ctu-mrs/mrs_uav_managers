@@ -80,6 +80,10 @@ safety:
     threshold: 1500 # [us]
     action: "eland" # {eland, escalating_failsafe, failsafe}
 
+  parachute:
+
+    enabled: true
+
 # Those are normally overridden by the ConstraintManager.
 default_constraints:
 
