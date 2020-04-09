@@ -695,7 +695,7 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::Joy> sh_joystick_;
 
-  void callbackJoystick(const sensor_msgs::JoyConstPtr& msg);
+  void callbackJoystick(mrs_lib::MessageWrapper<sensor_msgs::Joy>& msg);
   bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
@@ -3275,7 +3275,7 @@ void ControlManager::callbackOdometry(mrs_lib::MessageWrapper<nav_msgs::Odometry
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(mrs_lib::MessageWrapper<mrs_msgs::UavState> wrp) {
+void ControlManager::callbackUavState(mrs_lib::MessageWrapper<mrs_msgs::UavState>& wrp) {
 
   if (!is_initialized_)
     return;
@@ -3442,7 +3442,7 @@ void ControlManager::callbackMavrosGps(mrs_lib::MessageWrapper<sensor_msgs::NavS
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
+void ControlManager::callbackJoystick(mrs_lib::MessageWrapper<sensor_msgs::Joy>& wrp) {
 
   if (!is_initialized_)
     return;
@@ -3453,7 +3453,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::JoyConstPtr& msg) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  sensor_msgs::JoyConstPtr joystick_data = msg;
+  sensor_msgs::JoyConstPtr joystick_data = wrp.get_data();
 
   // | ---- switching back to fallback tracker and controller --- |
 
