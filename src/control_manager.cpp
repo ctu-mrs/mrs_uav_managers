@@ -27,10 +27,10 @@
 #include <geometry_msgs/PoseArray.h>
 #include <nav_msgs/Odometry.h>
 
-#include <mrs_lib/SafetyZone/SafetyZone.h>
-#include <mrs_lib/Profiler.h>
-#include <mrs_lib/ParamLoader.h>
-#include <mrs_lib/Utils.h>
+#include <mrs_lib/safety_zone/safety_zone.h>
+#include <mrs_lib/profiler.h>
+#include <mrs_lib/param_loader.h>
+#include <mrs_lib/utils.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/geometry_utils.h>
@@ -825,7 +825,7 @@ void ControlManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
 
-  param_loader.load_param("version", _version_);
+  param_loader.loadParam("version", _version_);
 
   if (_version_ != VERSION) {
 
@@ -833,126 +833,126 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
-  param_loader.load_param("uav_name", _uav_name_);
+  param_loader.loadParam("uav_name", _uav_name_);
 
-  param_loader.load_param("enable_profiler", _profiler_enabled_);
+  param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.load_param("state_input", _state_input_);
+  param_loader.loadParam("state_input", _state_input_);
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
     ros::shutdown();
   }
 
-  param_loader.load_param("safety/min_thrust_null_tracker", _min_thrust_null_tracker_);
-  param_loader.load_param("safety/ehover_tracker", _ehover_tracker_name_);
-  param_loader.load_param("safety/failsafe_controller", _failsafe_controller_name_);
+  param_loader.loadParam("safety/min_thrust_null_tracker", _min_thrust_null_tracker_);
+  param_loader.loadParam("safety/ehover_tracker", _ehover_tracker_name_);
+  param_loader.loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
-  param_loader.load_param("safety/eland/controller", _eland_controller_name_);
-  param_loader.load_param("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
-  param_loader.load_param("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
-  param_loader.load_param("safety/eland/timer_rate", _elanding_timer_rate_);
-  param_loader.load_param("safety/eland/disarm", _eland_disarm_enabled_);
+  param_loader.loadParam("safety/eland/controller", _eland_controller_name_);
+  param_loader.loadParam("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
+  param_loader.loadParam("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
+  param_loader.loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
+  param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
-  param_loader.load_param("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
+  param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
 
-  param_loader.load_param("safety/tilt_limit_eland", _tilt_limit_eland_);
+  param_loader.loadParam("safety/tilt_limit_eland", _tilt_limit_eland_);
   _tilt_limit_eland_ = (_tilt_limit_eland_ / 180.0) * M_PI;
-  param_loader.load_param("safety/tilt_limit_disarm", _tilt_limit_disarm_);
+  param_loader.loadParam("safety/tilt_limit_disarm", _tilt_limit_disarm_);
   _tilt_limit_disarm_ = (_tilt_limit_disarm_ / 180.0) * M_PI;
-  param_loader.load_param("safety/yaw_limit_eland", _yaw_error_eland_threshold_);
+  param_loader.loadParam("safety/yaw_limit_eland", _yaw_error_eland_threshold_);
   _yaw_error_eland_threshold_ = (_yaw_error_eland_threshold_ / 180.0) * M_PI;
 
-  param_loader.load_param("status_timer_rate", _status_timer_rate_);
-  param_loader.load_param("safety/safety_timer_rate", _safety_timer_rate_);
-  param_loader.load_param("safety/failsafe_timer_rate", _failsafe_timer_rate_);
+  param_loader.loadParam("status_timer_rate", _status_timer_rate_);
+  param_loader.loadParam("safety/safety_timer_rate", _safety_timer_rate_);
+  param_loader.loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
 
-  param_loader.load_param("uav_mass", _uav_mass_);
-  param_loader.load_param("hover_thrust/a", _motor_params_.A);
-  param_loader.load_param("hover_thrust/b", _motor_params_.B);
-  param_loader.load_param("g", _g_);
+  param_loader.loadParam("uav_mass", _uav_mass_);
+  param_loader.loadParam("hover_thrust/a", _motor_params_.A);
+  param_loader.loadParam("hover_thrust/b", _motor_params_.B);
+  param_loader.loadParam("g", _g_);
 
-  param_loader.load_param("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
+  param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
 
-  param_loader.load_param("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
-  param_loader.load_param("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
-  param_loader.load_param("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+  param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
+  param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
+  param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
   _tilt_error_disarm_threshold_ = (_tilt_error_disarm_threshold_ / 180.0) * M_PI;
 
   // default constraints
 
-  param_loader.load_param("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
-  param_loader.load_param("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
-  param_loader.load_param("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
-  param_loader.load_param("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
+  param_loader.loadParam("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
+  param_loader.loadParam("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
+  param_loader.loadParam("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
+  param_loader.loadParam("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
 
-  param_loader.load_param("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
-  param_loader.load_param("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
-  param_loader.load_param("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
-  param_loader.load_param("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
+  param_loader.loadParam("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
+  param_loader.loadParam("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
+  param_loader.loadParam("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
+  param_loader.loadParam("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
 
-  param_loader.load_param("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
-  param_loader.load_param("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
-  param_loader.load_param("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
-  param_loader.load_param("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
+  param_loader.loadParam("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
+  param_loader.loadParam("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
+  param_loader.loadParam("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
+  param_loader.loadParam("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
 
-  param_loader.load_param("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
-  param_loader.load_param("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
-  param_loader.load_param("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
-  param_loader.load_param("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
+  param_loader.loadParam("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
+  param_loader.loadParam("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
+  param_loader.loadParam("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
+  param_loader.loadParam("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
 
   // joystick
 
-  param_loader.load_param("joystick/enabled", _joystick_enabled_);
-  param_loader.load_param("joystick/mode", _joystick_mode_);
-  param_loader.load_param("joystick/carrot_distance", _joystick_carrot_distance_);
-  param_loader.load_param("joystick/joystick_timer_rate", _joystick_timer_rate_);
-  param_loader.load_param("joystick/attitude_control/tracker", _joystick_tracker_name_);
-  param_loader.load_param("joystick/attitude_control/controller", _joystick_controller_name_);
-  param_loader.load_param("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
-  param_loader.load_param("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
+  param_loader.loadParam("joystick/enabled", _joystick_enabled_);
+  param_loader.loadParam("joystick/mode", _joystick_mode_);
+  param_loader.loadParam("joystick/carrot_distance", _joystick_carrot_distance_);
+  param_loader.loadParam("joystick/joystick_timer_rate", _joystick_timer_rate_);
+  param_loader.loadParam("joystick/attitude_control/tracker", _joystick_tracker_name_);
+  param_loader.loadParam("joystick/attitude_control/controller", _joystick_controller_name_);
+  param_loader.loadParam("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
+  param_loader.loadParam("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
 
-  param_loader.load_param("joystick/channels/A", _channel_A_);
-  param_loader.load_param("joystick/channels/B", _channel_B_);
-  param_loader.load_param("joystick/channels/X", _channel_X_);
-  param_loader.load_param("joystick/channels/Y", _channel_Y_);
-  param_loader.load_param("joystick/channels/start", _channel_start_);
-  param_loader.load_param("joystick/channels/back", _channel_back_);
-  param_loader.load_param("joystick/channels/LT", _channel_LT_);
-  param_loader.load_param("joystick/channels/RT", _channel_RT_);
-  param_loader.load_param("joystick/channels/L_joy", _channel_L_joy_);
-  param_loader.load_param("joystick/channels/R_joy", _channel_R_joy_);
+  param_loader.loadParam("joystick/channels/A", _channel_A_);
+  param_loader.loadParam("joystick/channels/B", _channel_B_);
+  param_loader.loadParam("joystick/channels/X", _channel_X_);
+  param_loader.loadParam("joystick/channels/Y", _channel_Y_);
+  param_loader.loadParam("joystick/channels/start", _channel_start_);
+  param_loader.loadParam("joystick/channels/back", _channel_back_);
+  param_loader.loadParam("joystick/channels/LT", _channel_LT_);
+  param_loader.loadParam("joystick/channels/RT", _channel_RT_);
+  param_loader.loadParam("joystick/channels/L_joy", _channel_L_joy_);
+  param_loader.loadParam("joystick/channels/R_joy", _channel_R_joy_);
 
   // load channels
-  param_loader.load_param("joystick/channels/pitch", _channel_pitch_);
-  param_loader.load_param("joystick/channels/roll", _channel_roll_);
-  param_loader.load_param("joystick/channels/heading", _channel_heading_);
-  param_loader.load_param("joystick/channels/thrust", _channel_thrust_);
+  param_loader.loadParam("joystick/channels/pitch", _channel_pitch_);
+  param_loader.loadParam("joystick/channels/roll", _channel_roll_);
+  param_loader.loadParam("joystick/channels/heading", _channel_heading_);
+  param_loader.loadParam("joystick/channels/thrust", _channel_thrust_);
 
   // load channel multipliers
-  param_loader.load_param("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
-  param_loader.load_param("joystick/channel_multipliers/roll", _channel_mult_roll_);
-  param_loader.load_param("joystick/channel_multipliers/heading", _channel_mult_heading_);
-  param_loader.load_param("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
+  param_loader.loadParam("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
+  param_loader.loadParam("joystick/channel_multipliers/roll", _channel_mult_roll_);
+  param_loader.loadParam("joystick/channel_multipliers/heading", _channel_mult_heading_);
+  param_loader.loadParam("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
-  param_loader.load_param("obstacle_bumper/enabled", bumper_enabled_);
-  param_loader.load_param("obstacle_bumper/timer_rate", _bumper_timer_rate_);
-  param_loader.load_param("obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
-  param_loader.load_param("obstacle_bumper/vertical_distance", bumper_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled_);
+  param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
+  param_loader.loadParam("obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
+  param_loader.loadParam("obstacle_bumper/vertical_distance", bumper_vertical_distance_);
 
-  param_loader.load_param("obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
+  param_loader.loadParam("obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
 
-  param_loader.load_param("obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
+  param_loader.loadParam("obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
 
-  param_loader.load_param("obstacle_bumper/repulsion/horizontal_distance", bumper_repulsion_horizontal_distance_);
-  param_loader.load_param("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
-  param_loader.load_param("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
-  param_loader.load_param("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
+  param_loader.loadParam("obstacle_bumper/repulsion/horizontal_distance", bumper_repulsion_horizontal_distance_);
+  param_loader.loadParam("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
+  param_loader.loadParam("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
 
-  param_loader.load_param("safety/rc_eland/enabled", _rc_eland_enabled_);
-  param_loader.load_param("safety/rc_eland/channel_number", _rc_eland_channel_);
-  param_loader.load_param("safety/rc_eland/threshold", _rc_eland_threshold_);
-  param_loader.load_param("safety/rc_eland/action", _rc_eland_action_);
+  param_loader.loadParam("safety/rc_eland/enabled", _rc_eland_enabled_);
+  param_loader.loadParam("safety/rc_eland/channel_number", _rc_eland_channel_);
+  param_loader.loadParam("safety/rc_eland/threshold", _rc_eland_threshold_);
+  param_loader.loadParam("safety/rc_eland/action", _rc_eland_action_);
 
   // check the values of RC eland action
   if (_rc_eland_action_ != ELAND_STR && _rc_eland_action_ != ESCALATING_FAILSAFE_STR && _rc_eland_action_ != FAILSAFE_STR) {
@@ -961,28 +961,28 @@ void ControlManager::onInit() {
     ros::shutdown();
   }
 
-  param_loader.load_param("rc_joystick/enabled", _rc_goto_enabled_);
-  param_loader.load_param("rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.load_param("rc_joystick/timeout", _rc_joystick_timeout_);
-  param_loader.load_param("rc_joystick/n_switches", _rc_joystick_n_switches_);
-  param_loader.load_param("rc_joystick/carrot_distance", _rc_joystick_carrot_distance_);
+  param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
+  param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
+  param_loader.loadParam("rc_joystick/timeout", _rc_joystick_timeout_);
+  param_loader.loadParam("rc_joystick/n_switches", _rc_joystick_n_switches_);
+  param_loader.loadParam("rc_joystick/carrot_distance", _rc_joystick_carrot_distance_);
 
-  param_loader.load_param("rc_joystick/channels/pitch", _rc_channel_pitch_);
-  param_loader.load_param("rc_joystick/channels/roll", _rc_channel_roll_);
-  param_loader.load_param("rc_joystick/channels/heading", _rc_channel_heading_);
-  param_loader.load_param("rc_joystick/channels/thrust", _rc_channel_thrust_);
+  param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
+  param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
+  param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
+  param_loader.loadParam("rc_joystick/channels/thrust", _rc_channel_thrust_);
 
-  param_loader.load_param("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
+  param_loader.loadParam("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
 
-  param_loader.load_param("pirouette/speed", _pirouette_speed_);
-  param_loader.load_param("pirouette/timer_rate", _pirouette_timer_rate_);
+  param_loader.loadParam("pirouette/speed", _pirouette_speed_);
+  param_loader.loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
 
-  param_loader.load_param("safety/parachute/enabled", _parachute_enabled_);
+  param_loader.loadParam("safety/parachute/enabled", _parachute_enabled_);
 
   // | ------------- load the body integrator values ------------ |
 
-  param_loader.load_param("body_disturbance_x", _initial_body_disturbance_x_);
-  param_loader.load_param("body_disturbance_y", _initial_body_disturbance_y_);
+  param_loader.loadParam("body_disturbance_x", _initial_body_disturbance_x_);
+  param_loader.loadParam("body_disturbance_y", _initial_body_disturbance_y_);
 
   mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
   last_attitude_cmd_ = output_command;
@@ -1016,29 +1016,29 @@ void ControlManager::onInit() {
 
   // | ----------------------- safety area ---------------------- |
 
-  param_loader.load_param("safety_area/use_safety_area", use_safety_area_);
-  param_loader.load_param("safety_area/frame_name", _safety_area_frame_);
-  param_loader.load_param("safety_area/min_height", min_height_);
-  param_loader.load_param("safety_area/max_height", _max_height_);
+  param_loader.loadParam("safety_area/use_safety_area", use_safety_area_);
+  param_loader.loadParam("safety_area/frame_name", _safety_area_frame_);
+  param_loader.loadParam("safety_area/min_height", min_height_);
+  param_loader.loadParam("safety_area/max_height", _max_height_);
 
   if (use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.load_matrix_dynamic2("safety_area/safety_area", -1, 2);
+    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/safety_area", -1, 2);
 
-    param_loader.load_param("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
+    param_loader.loadParam("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
     std::vector<Eigen::MatrixXd> polygon_obstacle_points;
 
     if (_obstacle_polygons_enabled_) {
-      polygon_obstacle_points = param_loader.load_matrix_array2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
+      polygon_obstacle_points = param_loader.loadMatrixArray2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
     } else {
       polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
     }
 
-    param_loader.load_param("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
+    param_loader.loadParam("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
     std::vector<Eigen::MatrixXd> point_obstacle_points;
 
     if (_obstacle_points_enabled_) {
 
-      point_obstacle_points = param_loader.load_matrix_array2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
+      point_obstacle_points = param_loader.loadMatrixArray2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
 
       if (_safety_area_frame_ == "latlon_origin") {
 
@@ -1091,9 +1091,9 @@ void ControlManager::onInit() {
   // |                        load trackers                       |
   // --------------------------------------------------------------
 
-  param_loader.load_param("trackers", _tracker_names_);
-  param_loader.load_param("null_tracker", _null_tracker_name_);
-  param_loader.load_param("landing_takeoff_tracker", _landoff_tracker_name_);
+  param_loader.loadParam("trackers", _tracker_names_);
+  param_loader.loadParam("null_tracker", _null_tracker_name_);
+  param_loader.loadParam("landing_takeoff_tracker", _landoff_tracker_name_);
 
   tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Tracker>>("mrs_uav_manager", "mrs_uav_manager::Tracker");
 
@@ -1103,7 +1103,7 @@ void ControlManager::onInit() {
 
     // load the controller parameters
     std::string address;
-    param_loader.load_param(tracker_name + "/address", address);
+    param_loader.loadParam(tracker_name + "/address", address);
 
     TrackerParams new_tracker(address);
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
@@ -1146,7 +1146,7 @@ void ControlManager::onInit() {
   // |                      load controllers                      |
   // --------------------------------------------------------------
 
-  param_loader.load_param("controllers", _controller_names_);
+  param_loader.loadParam("controllers", _controller_names_);
 
   controller_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Controller>>("mrs_uav_manager", "mrs_uav_manager::Controller");
 
@@ -1159,11 +1159,11 @@ void ControlManager::onInit() {
     std::string address;
     std::string name_space;
     double      eland_threshold, failsafe_threshold, odometry_innovation_threshold;
-    param_loader.load_param(controller_name + "/address", address);
-    param_loader.load_param(controller_name + "/namespace", name_space);
-    param_loader.load_param(controller_name + "/eland_threshold", eland_threshold);
-    param_loader.load_param(controller_name + "/failsafe_threshold", failsafe_threshold);
-    param_loader.load_param(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
+    param_loader.loadParam(controller_name + "/address", address);
+    param_loader.loadParam(controller_name + "/namespace", name_space);
+    param_loader.loadParam(controller_name + "/eland_threshold", eland_threshold);
+    param_loader.loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
+    param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
 
     if (eland_threshold == 0) {
       eland_threshold = 1e6;
@@ -1558,7 +1558,7 @@ void ControlManager::onInit() {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ControlManager]: could not load all parameters!");
     ros::shutdown();
   }

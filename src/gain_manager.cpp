@@ -13,8 +13,8 @@
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
 
-#include <mrs_lib/Profiler.h>
-#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/profiler.h>
+#include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 
 #include <dynamic_reconfigure/ReconfigureRequest.h>
@@ -134,7 +134,7 @@ void GainManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
 
-  param_loader.load_param("version", _version_);
+  param_loader.loadParam("version", _version_);
 
   if (_version_ != VERSION) {
 
@@ -142,14 +142,14 @@ void GainManager::onInit() {
     ros::shutdown();
   }
 
-  param_loader.load_param("enable_profiler", _profiler_enabled_);
+  param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.load_param("gains", _gain_names_);
+  param_loader.loadParam("gains", _gain_names_);
 
-  param_loader.load_param("estimator_types", _estimator_type_names_);
+  param_loader.loadParam("estimator_types", _estimator_type_names_);
 
-  param_loader.load_param("rate", _gain_management_rate_);
-  param_loader.load_param("diagnostics_rate", _diagnostics_rate_);
+  param_loader.loadParam("rate", _gain_management_rate_);
+  param_loader.loadParam("diagnostics_rate", _diagnostics_rate_);
 
   std::vector<std::string>::iterator it;
 
@@ -160,24 +160,24 @@ void GainManager::onInit() {
 
     Gains_t new_gains;
 
-    param_loader.load_param(*it + "/horizontal/kp", new_gains.kpxy);
-    param_loader.load_param(*it + "/horizontal/kv", new_gains.kvxy);
-    param_loader.load_param(*it + "/horizontal/ka", new_gains.kaxy);
-    param_loader.load_param(*it + "/horizontal/attitude/kq", new_gains.kqxy);
-    param_loader.load_param(*it + "/horizontal/attitude/kw", new_gains.kwxy);
-    param_loader.load_param(*it + "/horizontal/kib", new_gains.kibxy);
-    param_loader.load_param(*it + "/horizontal/kiw", new_gains.kiwxy);
-    param_loader.load_param(*it + "/horizontal/kib_lim", new_gains.kibxy_lim);
-    param_loader.load_param(*it + "/horizontal/kiw_lim", new_gains.kiwxy_lim);
+    param_loader.loadParam(*it + "/horizontal/kp", new_gains.kpxy);
+    param_loader.loadParam(*it + "/horizontal/kv", new_gains.kvxy);
+    param_loader.loadParam(*it + "/horizontal/ka", new_gains.kaxy);
+    param_loader.loadParam(*it + "/horizontal/attitude/kq", new_gains.kqxy);
+    param_loader.loadParam(*it + "/horizontal/attitude/kw", new_gains.kwxy);
+    param_loader.loadParam(*it + "/horizontal/kib", new_gains.kibxy);
+    param_loader.loadParam(*it + "/horizontal/kiw", new_gains.kiwxy);
+    param_loader.loadParam(*it + "/horizontal/kib_lim", new_gains.kibxy_lim);
+    param_loader.loadParam(*it + "/horizontal/kiw_lim", new_gains.kiwxy_lim);
 
-    param_loader.load_param(*it + "/vertical/kp", new_gains.kpz);
-    param_loader.load_param(*it + "/vertical/kv", new_gains.kvz);
-    param_loader.load_param(*it + "/vertical/ka", new_gains.kaz);
-    param_loader.load_param(*it + "/vertical/attitude/kq", new_gains.kqz);
-    param_loader.load_param(*it + "/vertical/attitude/kw", new_gains.kwz);
+    param_loader.loadParam(*it + "/vertical/kp", new_gains.kpz);
+    param_loader.loadParam(*it + "/vertical/kv", new_gains.kvz);
+    param_loader.loadParam(*it + "/vertical/ka", new_gains.kaz);
+    param_loader.loadParam(*it + "/vertical/attitude/kq", new_gains.kqz);
+    param_loader.loadParam(*it + "/vertical/attitude/kw", new_gains.kwz);
 
-    param_loader.load_param(*it + "/mass_estimator/km", new_gains.km);
-    param_loader.load_param(*it + "/mass_estimator/km_lim", new_gains.km_lim);
+    param_loader.loadParam(*it + "/mass_estimator/km", new_gains.km);
+    param_loader.loadParam(*it + "/mass_estimator/km_lim", new_gains.km_lim);
 
     _gains_.insert(std::pair<std::string, Gains_t>(*it, new_gains));
   }
@@ -186,7 +186,7 @@ void GainManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.load_param("gain_management/allowed_gains/" + *it, temp_vector);
+    param_loader.loadParam("gain_management/allowed_gains/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -203,7 +203,7 @@ void GainManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.load_param("gain_management/fallback_gains/" + *it, temp_str);
+    param_loader.loadParam("gain_management/fallback_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
@@ -245,7 +245,7 @@ void GainManager::onInit() {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[GainManager]: could not load all parameters!");
     ros::shutdown();
   }

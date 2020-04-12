@@ -24,8 +24,8 @@
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/NavSatFix.h>
 
-#include <mrs_lib/Profiler.h>
-#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/profiler.h>
+#include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/attitude_converter.h>
@@ -232,7 +232,7 @@ void UavManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
-  param_loader.load_param("version", _version_);
+  param_loader.loadParam("version", _version_);
 
   if (_version_ != VERSION) {
 
@@ -240,53 +240,53 @@ void UavManager::onInit() {
     ros::shutdown();
   }
 
-  param_loader.load_param("uav_name", _uav_name_);
+  param_loader.loadParam("uav_name", _uav_name_);
 
-  param_loader.load_param("enable_profiler", _profiler_enabled_);
+  param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.load_param("null_tracker", _null_tracker_name_);
+  param_loader.loadParam("null_tracker", _null_tracker_name_);
 
-  param_loader.load_param("takeoff/rate", _takeoff_timer_rate_);
-  param_loader.load_param("takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
-  param_loader.load_param("takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
-  param_loader.load_param("takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
-  param_loader.load_param("takeoff/during_takeoff/controller", _takeoff_controller_name_);
-  param_loader.load_param("takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
-  param_loader.load_param("takeoff/takeoff_height", _takeoff_height_);
+  param_loader.loadParam("takeoff/rate", _takeoff_timer_rate_);
+  param_loader.loadParam("takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
+  param_loader.loadParam("takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
+  param_loader.loadParam("takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
+  param_loader.loadParam("takeoff/during_takeoff/controller", _takeoff_controller_name_);
+  param_loader.loadParam("takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
+  param_loader.loadParam("takeoff/takeoff_height", _takeoff_height_);
 
-  param_loader.load_param("landing/rate", _landing_timer_rate_);
-  param_loader.load_param("landing/landing_tracker", _landing_tracker_name_);
-  param_loader.load_param("landing/landing_controller", _landing_controller_name_);
-  param_loader.load_param("landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
-  param_loader.load_param("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
-  param_loader.load_param("landing/disarm", _landing_disarm_);
+  param_loader.loadParam("landing/rate", _landing_timer_rate_);
+  param_loader.loadParam("landing/landing_tracker", _landing_tracker_name_);
+  param_loader.loadParam("landing/landing_controller", _landing_controller_name_);
+  param_loader.loadParam("landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
+  param_loader.loadParam("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
+  param_loader.loadParam("landing/disarm", _landing_disarm_);
 
-  param_loader.load_param("uav_mass", _uav_mass_);
-  param_loader.load_param("g", _g_);
+  param_loader.loadParam("uav_mass", _uav_mass_);
+  param_loader.loadParam("g", _g_);
 
-  param_loader.load_param("hover_thrust/a", _hover_thrust_a_);
-  param_loader.load_param("hover_thrust/b", _hover_thrust_b_);
+  param_loader.loadParam("hover_thrust/a", _hover_thrust_a_);
+  param_loader.loadParam("hover_thrust/b", _hover_thrust_b_);
 
-  param_loader.load_param("max_height_checking/enabled", _max_height_enabled_);
-  param_loader.load_param("max_height_checking/rate", _max_height_checking_rate_);
-  param_loader.load_param("max_height_checking/safety_height_offset", _max_height_offset_);
+  param_loader.loadParam("max_height_checking/enabled", _max_height_enabled_);
+  param_loader.loadParam("max_height_checking/rate", _max_height_checking_rate_);
+  param_loader.loadParam("max_height_checking/safety_height_offset", _max_height_offset_);
 
-  param_loader.load_param("safety_area/max_height", _max_height_);
+  param_loader.loadParam("safety_area/max_height", _max_height_);
 
-  param_loader.load_param("require_gain_manager", _gain_manager_required_);
-  param_loader.load_param("require_constraint_manager", _constraint_manager_required_);
+  param_loader.loadParam("require_gain_manager", _gain_manager_required_);
+  param_loader.loadParam("require_constraint_manager", _constraint_manager_required_);
 
-  param_loader.load_param("flight_timer/enabled", _flighttime_timer_enabled_);
-  param_loader.load_param("flight_timer/rate", _flighttime_timer_rate_);
-  param_loader.load_param("flight_timer/max_time", _flighttime_max_time_);
+  param_loader.loadParam("flight_timer/enabled", _flighttime_timer_enabled_);
+  param_loader.loadParam("flight_timer/rate", _flighttime_timer_rate_);
+  param_loader.loadParam("flight_timer/max_time", _flighttime_max_time_);
 
-  param_loader.load_param("max_thrust/enabled", _maxthrust_timer_enabled_);
-  param_loader.load_param("max_thrust/rate", _maxthrust_timer_rate_);
-  param_loader.load_param("max_thrust/max_thrust", _maxthrust_max_thrust_);
-  param_loader.load_param("max_thrust/eland_timeout", _maxthrust_eland_timeout_);
-  param_loader.load_param("max_thrust/ungrip_timeout", _maxthrust_ungrip_timeout_);
+  param_loader.loadParam("max_thrust/enabled", _maxthrust_timer_enabled_);
+  param_loader.loadParam("max_thrust/rate", _maxthrust_timer_rate_);
+  param_loader.loadParam("max_thrust/max_thrust", _maxthrust_max_thrust_);
+  param_loader.loadParam("max_thrust/eland_timeout", _maxthrust_eland_timeout_);
+  param_loader.loadParam("max_thrust/ungrip_timeout", _maxthrust_ungrip_timeout_);
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
     ros::shutdown();
   }

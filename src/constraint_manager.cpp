@@ -14,8 +14,8 @@
 #include <mrs_msgs/TrackerConstraintsSrvRequest.h>
 #include <mrs_msgs/String.h>
 
-#include <mrs_lib/Profiler.h>
-#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/profiler.h>
+#include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 
 #include <dynamic_reconfigure/ReconfigureRequest.h>
@@ -115,7 +115,7 @@ void ConstraintManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
 
-  param_loader.load_param("version", _version_);
+  param_loader.loadParam("version", _version_);
 
   if (_version_ != VERSION) {
 
@@ -123,14 +123,14 @@ void ConstraintManager::onInit() {
     ros::shutdown();
   }
 
-  param_loader.load_param("enable_profiler", _profiler_enabled_);
+  param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.load_param("constraints", _constraint_names_);
+  param_loader.loadParam("constraints", _constraint_names_);
 
-  param_loader.load_param("estimator_types", _estimator_type_names_);
+  param_loader.loadParam("estimator_types", _estimator_type_names_);
 
-  param_loader.load_param("rate", _constraint_management_rate_);
-  param_loader.load_param("diagnostics_rate", _diagnostics_rate_);
+  param_loader.loadParam("rate", _constraint_management_rate_);
+  param_loader.loadParam("diagnostics_rate", _diagnostics_rate_);
 
   std::vector<std::string>::iterator it;
 
@@ -141,25 +141,25 @@ void ConstraintManager::onInit() {
 
     mrs_msgs::TrackerConstraintsSrvRequest new_constraints;
 
-    param_loader.load_param(*it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
-    param_loader.load_param(*it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
-    param_loader.load_param(*it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
-    param_loader.load_param(*it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
+    param_loader.loadParam(*it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
+    param_loader.loadParam(*it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
+    param_loader.loadParam(*it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
+    param_loader.loadParam(*it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
 
-    param_loader.load_param(*it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
-    param_loader.load_param(*it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
-    param_loader.load_param(*it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
-    param_loader.load_param(*it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
+    param_loader.loadParam(*it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
+    param_loader.loadParam(*it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
+    param_loader.loadParam(*it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
+    param_loader.loadParam(*it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
 
-    param_loader.load_param(*it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
-    param_loader.load_param(*it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
-    param_loader.load_param(*it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
-    param_loader.load_param(*it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
+    param_loader.loadParam(*it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
+    param_loader.loadParam(*it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
+    param_loader.loadParam(*it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
+    param_loader.loadParam(*it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
 
-    param_loader.load_param(*it + "/heading/speed", new_constraints.constraints.heading_speed);
-    param_loader.load_param(*it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
-    param_loader.load_param(*it + "/heading/jerk", new_constraints.constraints.heading_jerk);
-    param_loader.load_param(*it + "/heading/snap", new_constraints.constraints.heading_snap);
+    param_loader.loadParam(*it + "/heading/speed", new_constraints.constraints.heading_speed);
+    param_loader.loadParam(*it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
+    param_loader.loadParam(*it + "/heading/jerk", new_constraints.constraints.heading_jerk);
+    param_loader.loadParam(*it + "/heading/snap", new_constraints.constraints.heading_snap);
 
     _constraints_.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsSrvRequest>(*it, new_constraints));
   }
@@ -168,7 +168,7 @@ void ConstraintManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.load_param("constraint_management/allowed_constraints/" + *it, temp_vector);
+    param_loader.loadParam("constraint_management/allowed_constraints/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -185,7 +185,7 @@ void ConstraintManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.load_param("constraint_management/fallback_constraints/" + *it, temp_str);
+    param_loader.loadParam("constraint_management/fallback_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
       ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
@@ -225,7 +225,7 @@ void ConstraintManager::onInit() {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ConstraintManager]: Could not load all parameters!");
     ros::shutdown();
   }
