@@ -6403,8 +6403,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // disable the callbacks back again
       req_enable_callbacks.data = false;
       tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-
-      // TODO check responses?
     }
   }
 
@@ -6423,8 +6421,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
       for (int i = 0; i < int(tracker_list_.size()); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
-
-      // TODO check responses?
     }
 
     callbacks_enabled_ = true;
@@ -7381,7 +7377,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
                  _tracker_names_[active_tracker_idx_].c_str());
 
         // reactivate the current tracker
-        // TODO this is not the most elegant way to handle the tracker after a controller switch
+        // TODO this is not the most elegant way to restart the tracker after a controller switch
         // but it serves the purpose
         {
           std::scoped_lock lock(mutex_tracker_list_);
@@ -7686,15 +7682,30 @@ void ControlManager::publish(void) {
       cmd_odom.pose.pose.position.z = uav_state.pose.position.z;
     }
 
-    // TODO should be in the child frame
-    if (last_position_cmd->use_velocity_horizontal) {
-      cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
-      cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
-    }
+    // transform the velocity in the reference to the child_frame
+    if (last_position_cmd->use_velocity_horizontal || last_position_cmd->use_velocity_vertical) {
+      cmd_odom.child_frame_id = _uav_name_ + "/fcu";
 
-    // TODO should be in the child frame
-    if (last_position_cmd->use_velocity_vertical) {
-      cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
+      geometry_msgs::Vector3Stamped velocity;
+      velocity.header = last_position_cmd->header;
+
+      if (last_position_cmd->use_velocity_horizontal) {
+        velocity.vector.x = last_position_cmd->velocity.x;
+        velocity.vector.y = last_position_cmd->velocity.y;
+      }
+
+      if (last_position_cmd->use_velocity_vertical) {
+        velocity.vector.z = last_position_cmd->velocity.z;
+      }
+
+      auto res = transformer_->transformSingle(cmd_odom.child_frame_id, velocity);
+
+      if (res) {
+
+        cmd_odom.twist.twist.linear.x = res.value().vector.x;
+        cmd_odom.twist.twist.linear.y = res.value().vector.y;
+        cmd_odom.twist.twist.linear.z = res.value().vector.z;
+      }
     }
 
     // | -------------- prepared desired orientation -------------- |
@@ -7702,6 +7713,10 @@ void ControlManager::publish(void) {
     if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
       cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
+
+      cmd_odom.twist.twist.angular.x = last_attitude_cmd->attitude_rate.x;
+      cmd_odom.twist.twist.angular.y = last_attitude_cmd->attitude_rate.y;
+      cmd_odom.twist.twist.angular.z = last_attitude_cmd->attitude_rate.z;
 
       // use just the heading from position command
     } else {
