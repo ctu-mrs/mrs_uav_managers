@@ -467,9 +467,6 @@ private:
   double     position_error_x_ = 0;
   double     position_error_y_ = 0;
   double     position_error_z_ = 0;
-  double     velocity_error_x_ = 0;
-  double     velocity_error_y_ = 0;
-  double     velocity_error_z_ = 0;
   std::mutex mutex_attitude_error_;
   std::mutex mutex_control_error_;
 
@@ -2290,10 +2287,6 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     position_error_x_ = last_position_cmd->position.x - uav_state.pose.position.x;
     position_error_y_ = last_position_cmd->position.y - uav_state.pose.position.y;
     position_error_z_ = last_position_cmd->position.z - uav_state.pose.position.z;
-
-    velocity_error_x_ = last_position_cmd->velocity.x - uav_state.velocity.linear.x;
-    velocity_error_y_ = last_position_cmd->velocity.y - uav_state.velocity.linear.y;
-    velocity_error_z_ = last_position_cmd->velocity.z - uav_state.velocity.linear.z;
   }
 
   // rotate the drone's z axis
@@ -2325,8 +2318,20 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw(), uav_yaw);
   }
 
+
   // do not have to mutex the position error, since I am filling it in this function
-  double control_error = sqrt(pow(position_error_x_, 2) + pow(position_error_y_, 2) + pow(position_error_z_, 2));
+  double control_error = 0;
+
+  auto [position_error_x, position_error_y, position_error_z] =
+      mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
+
+  if (last_position_cmd->use_position_horizontal && last_position_cmd->use_position_vertical) {
+    control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
+  } else if (last_position_cmd->use_position_horizontal) {
+    control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2));
+  } else if (last_position_cmd->use_position_vertical) {
+    control_error = fabs(position_error_z);
+  }
 
   // --------------------------------------------------------------
   // |   activate the failsafe controller in case of large error  |
@@ -2341,7 +2346,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       if (!failsafe_triggered_) {
 
         ROS_ERROR("[ControlManager]: activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _failsafe_threshold_,
-                  position_error_x_, position_error_y_, position_error_z_);
+                  position_error_x, position_error_y, position_error_z);
 
         failsafe();
       }
@@ -2415,7 +2420,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       if (!failsafe_triggered_ && !eland_triggered_) {
 
         ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
-                           _eland_threshold_ / 2.0, position_error_x_, position_error_y_, position_error_z_);
+                           _eland_threshold_ / 2.0, position_error_x, position_error_y, position_error_z);
 
         ungripSrv();
       }
@@ -2431,7 +2436,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       if (!failsafe_triggered_ && !eland_triggered_) {
 
         ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
-                  position_error_x_, position_error_y_, position_error_z_);
+                  position_error_x, position_error_y, position_error_z);
 
         eland();
       }

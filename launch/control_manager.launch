@@ -28,7 +28,6 @@
   <arg name="custom_config_uav_names" default="" />
 
     <!-- custom configs for controllers -->
-  <arg name="custom_config_acceleration_controller" default="" />
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
@@ -109,13 +108,6 @@
       <remap from="~mpc_controller/profiler" to="profiler" />
       <remap from="~mpc_controller/set_integral_terms_in" to="~mpc_controller/set_integral_terms" />
 
-      <!-- Acceleration Controller -->
-      <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/default/acceleration.yaml" />
-      <rosparam ns="acceleration_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/acceleration.yaml" />
-      <rosparam if="$(eval not arg('custom_config_acceleration_controller') == '')" ns="acceleration_controller" file="$(arg custom_config_acceleration_controller)" />
-      <param name="acceleration_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~acceleration_controller/profiler" to="profiler" />
-
       <!-- Failsafe controller -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
@@ -188,7 +180,6 @@
       <param name="mpc_tracker/predicted_trajectory_topic" value="control_manager/mpc_tracker/predicted_trajectory" />
       <param name="mpc_tracker/diagnostics_topic" value="control_manager/mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/profiler" to="profiler" />
-      <remap from="~mpc_tracker/odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
