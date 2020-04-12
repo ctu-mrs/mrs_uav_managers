@@ -13,7 +13,6 @@ trackers : [
 controllers : [
   "So3Controller",
   "MpcController",
-  "AttitudeController",
   "FailsafeController",
   "EmergencyController",
 ]
@@ -158,7 +157,7 @@ joystick:
 
     # tracker and controller used to control the drone using a joystick
     tracker: "JoyTracker"
-    controller: "AttitudeController"
+    controller: "So3Controller"
 
     # what tracker and controller should be activate when
     # switching back from joystick control?

@@ -2297,7 +2297,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   // rotate the drone's z axis
-  tf2::Vector3 uav_z_in_world = tf2::Transform(mrs_lib::AttitudeConverter(uav_state.pose.orientation)) * tf2::Vector3(0, 0, 1);
+  tf2::Transform uav_state_transform = mrs_lib::AttitudeConverter(uav_state.pose.orientation);
+  tf2::Vector3   uav_z_in_world      = uav_state_transform * tf2::Vector3(0, 0, 1);
 
   // calculate the angle between the drone's z axis and the world's z axis
   double tilt_angle = acos(uav_z_in_world.dot(tf2::Vector3(0, 0, 1)));
@@ -2306,10 +2307,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | --------------------- the tilt error --------------------- |
 
-  tf2::Quaternion attitude_cmd_quaternion = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
-
   // calculate the desired drone's z axis in the world frame
-  tf2::Vector3 uav_z_in_world_desired = tf2::Transform(attitude_cmd_quaternion) * tf2::Vector3(0, 0, 1);
+  tf2::Transform attitude_cmd_transform = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
+  tf2::Vector3   uav_z_in_world_desired = attitude_cmd_transform * tf2::Vector3(0, 0, 1);
 
   // calculate the angle between the drone's z axis and the world's z axis
   {
@@ -2710,9 +2710,6 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
   auto joystick_data = sh_joystick_.getMsg();
 
-  // copy member variables
-  mavros_msgs::RCInConstPtr rc_channels = sh_rc_.getMsg();
-
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
 
@@ -2831,6 +2828,9 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     double des_heading = 0;
 
     bool nothing_to_do = true;
+
+    // copy member variables
+    mavros_msgs::RCInConstPtr rc_channels = sh_rc_.getMsg();
 
     if (rc_channels->channels.size() < 4) {
 
@@ -7670,23 +7670,26 @@ void ControlManager::publish(void) {
     if (last_position_cmd->use_position_horizontal) {
       cmd_odom.pose.pose.position.x = last_position_cmd->position.x;
       cmd_odom.pose.pose.position.y = last_position_cmd->position.y;
+    } else {
+      cmd_odom.pose.pose.position.x = uav_state.pose.position.x;
+      cmd_odom.pose.pose.position.y = uav_state.pose.position.y;
     }
 
     if (last_position_cmd->use_position_vertical) {
       cmd_odom.pose.pose.position.z = last_position_cmd->position.z;
+    } else {
+      cmd_odom.pose.pose.position.z = uav_state.pose.position.z;
     }
 
+    // TODO should be in the child frame
     if (last_position_cmd->use_velocity_horizontal) {
       cmd_odom.twist.twist.linear.x = last_position_cmd->velocity.x;
       cmd_odom.twist.twist.linear.y = last_position_cmd->velocity.y;
     }
 
+    // TODO should be in the child frame
     if (last_position_cmd->use_velocity_vertical) {
       cmd_odom.twist.twist.linear.z = last_position_cmd->velocity.z;
-    }
-
-    if (last_position_cmd->use_heading_rate) {
-      cmd_odom.twist.twist.angular.z = last_position_cmd->heading_rate;
     }
 
     // | -------------- prepared desired orientation -------------- |

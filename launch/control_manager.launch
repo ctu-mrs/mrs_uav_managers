@@ -29,7 +29,6 @@
 
     <!-- custom configs for controllers -->
   <arg name="custom_config_acceleration_controller" default="" />
-  <arg name="custom_config_attitude_controller" default="" />
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
@@ -116,13 +115,6 @@
       <rosparam if="$(eval not arg('custom_config_acceleration_controller') == '')" ns="acceleration_controller" file="$(arg custom_config_acceleration_controller)" />
       <param name="acceleration_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~acceleration_controller/profiler" to="profiler" />
-
-      <!-- Attitude controller -->
-      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/default/attitude.yaml" />
-      <rosparam ns="attitude_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/attitude.yaml" />
-      <rosparam if="$(eval not arg('custom_config_attitude_controller') == '')" ns="attitude_controller" file="$(arg custom_config_attitude_controller)" />
-      <param name="attitude_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~attitude_controller/profiler" to="profiler" />
 
       <!-- Failsafe controller -->
       <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
