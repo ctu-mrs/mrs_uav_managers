@@ -155,6 +155,7 @@ public:
   bool _constraint_manager_required_ = false;
 
   std::tuple<bool, std::string> landImpl(void);
+  std::tuple<bool, std::string> landWithDescendImpl(void);
 
   // saved takeoff coordinates
   mrs_msgs::ReferenceStamped land_there_reference_;
@@ -186,6 +187,7 @@ public:
   double      _landing_cutoff_mass_factor_;
   double      _landing_cutoff_mass_timeout_;
   double      _landing_timer_rate_;
+  double      _landing_descend_height_;
   bool        landing_ = false;
   double      _uav_mass_;
   double      _g_;
@@ -260,6 +262,7 @@ void UavManager::onInit() {
   param_loader.loadParam("landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
   param_loader.loadParam("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
   param_loader.loadParam("landing/disarm", _landing_disarm_);
+  param_loader.loadParam("landing/descend_height", _landing_descend_height_);
 
   param_loader.loadParam("uav_mass", _uav_mass_);
   param_loader.loadParam("g", _g_);
@@ -419,7 +422,6 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   mrs_msgs::ReferenceStamped land_there_current_frame;
 
   if (res) {
-
     land_there_current_frame = res.value();
   } else {
 
@@ -446,14 +448,11 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
       return;
     }
 
-    if (mrs_lib::dist3d(odom_x, odom_y, odom_z, ref_x, ref_y, ref_z) < 0.5 && mrs_lib::angleBetween(odom_heading, ref_heading)) {
+    if (mrs_lib::dist3d(odom_x, odom_y, odom_z, ref_x, ref_y, ref_z) < 0.5 && mrs_lib::angleBetween(odom_heading, ref_heading) < 0.5) {
 
-      auto [success, message] = landImpl();
+      auto [success, message] = landWithDescendImpl();
 
-      if (success) {
-
-        changeLandingState(LANDING_STATE);
-      } else {
+      if (!success) {
 
         ROS_ERROR_THROTTLE(1.0, "[UavManager]: call for landing failed: '%s', not doing anything", message.c_str());
 
@@ -469,7 +468,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
     if (_landing_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
 
       // recalculate the mass based on the thrust
-      thrust_mass_estimate_ = pow((desired_thrust - _hover_thrust_b_) / _hover_thrust_a_, 2) / _g_;
+      thrust_mass_estimate_ = pow((desired_thrust - _hover_thrust_b_) / _hover_thrust_a_, 2.0) / _g_;
       ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
       // condition for automatic motor turn off
@@ -1072,7 +1071,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
 
   //}
 
-  auto [success, message] = landImpl();
+  auto [success, message] = landWithDescendImpl();
 
   res.message = message;
   res.success = success;
@@ -1374,6 +1373,63 @@ std::tuple<bool, std::string> UavManager::landImpl(void) {
       return std::tuple(false, ss.str());
     }
   }
+}
+
+//}
+
+/* landWithDescendImpl() //{ */
+
+std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
+
+  // if the height information is available
+  if (sh_height_.hasMsg()) {
+
+    double height = sh_height_.getMsg()->value;
+
+    if (height >= _landing_descend_height_ + 1.0) {
+
+      auto odometry = sh_odometry_.getMsg();
+
+      ungripSrv();
+
+      land_there_reference_.header.frame_id      = "";
+      land_there_reference_.header.stamp         = ros::Time::now();
+      land_there_reference_.reference.position.x = odometry->pose.pose.position.x;
+      land_there_reference_.reference.position.y = odometry->pose.pose.position.y;
+      land_there_reference_.reference.position.z = odometry->pose.pose.position.z - (height - _landing_descend_height_);
+      land_there_reference_.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
+
+      bool service_success = emergencyReferenceSrv(land_there_reference_);
+
+      if (service_success) {
+
+        std::stringstream ss;
+        ss << "flying down for landing";
+        ROS_INFO_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+
+        // stop the eventual takeoff
+        waiting_for_takeoff_ = false;
+        takingoff_           = false;
+        timer_takeoff_.stop();
+
+        changeLandingState(FLY_THERE_STATE);
+
+        timer_landing_.start();
+
+        return std::tuple(true, ss.str());
+
+      } else {
+
+        std::stringstream ss;
+        ss << "can not fly down for landing";
+        ROS_ERROR_STREAM("[UavManager]: " << ss.str());
+      }
+    }
+  }
+
+  auto [success, message] = landImpl();
+
+  return std::tuple(success, message);
 }
 
 //}

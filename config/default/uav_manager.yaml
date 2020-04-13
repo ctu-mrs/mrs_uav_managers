@@ -42,6 +42,12 @@ landing:
 
   disarm: true
 
+  # if the UAV height is available and
+  # if the UAV higher than this:
+  # it will first descend to this height
+  # and then land slowly and safely
+  descend_height: 2.0 # [m]
+
 flight_timer:
 
   enabled: false
