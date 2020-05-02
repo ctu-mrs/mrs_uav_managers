@@ -7,7 +7,6 @@ supersoft:
 
     attitude:
       kq: 5.0
-      kw: 0.0
 
     kib: 0.1
     kib_lim: 10.0
@@ -22,7 +21,6 @@ supersoft:
 
     attitude:
       kq: 3.0
-      kw: 1.0
 
   mass_estimator:
     km: 1.0
@@ -37,7 +35,6 @@ soft:
 
     attitude:
       kq: 5.5
-      kw: 0.0
 
     kib: 0.1
     kib_lim: 10.0
@@ -52,7 +49,6 @@ soft:
 
     attitude:
       kq: 5.0
-      kw: 1.0
 
   mass_estimator:
     km: 1.0

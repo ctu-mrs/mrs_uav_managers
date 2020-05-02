@@ -34,8 +34,8 @@ namespace gain_manager
 typedef struct
 {
 
-  double kpxy, kiwxy, kibxy, kvxy, kaxy, kqxy, kwxy;
-  double kpz, kvz, kaz, kqz, kwz;
+  double kpxy, kiwxy, kibxy, kvxy, kaxy, kqxy;
+  double kpz, kvz, kaz, kqz;
   double kiwxy_lim, kibxy_lim;
   double km, km_lim;
 
@@ -164,7 +164,6 @@ void GainManager::onInit() {
     param_loader.loadParam(*it + "/horizontal/kv", new_gains.kvxy);
     param_loader.loadParam(*it + "/horizontal/ka", new_gains.kaxy);
     param_loader.loadParam(*it + "/horizontal/attitude/kq", new_gains.kqxy);
-    param_loader.loadParam(*it + "/horizontal/attitude/kw", new_gains.kwxy);
     param_loader.loadParam(*it + "/horizontal/kib", new_gains.kibxy);
     param_loader.loadParam(*it + "/horizontal/kiw", new_gains.kiwxy);
     param_loader.loadParam(*it + "/horizontal/kib_lim", new_gains.kibxy_lim);
@@ -174,7 +173,6 @@ void GainManager::onInit() {
     param_loader.loadParam(*it + "/vertical/kv", new_gains.kvz);
     param_loader.loadParam(*it + "/vertical/ka", new_gains.kaz);
     param_loader.loadParam(*it + "/vertical/attitude/kq", new_gains.kqz);
-    param_loader.loadParam(*it + "/vertical/attitude/kw", new_gains.kwz);
 
     param_loader.loadParam(*it + "/mass_estimator/km", new_gains.km);
     param_loader.loadParam(*it + "/mass_estimator/km_lim", new_gains.km_lim);
@@ -292,10 +290,6 @@ bool GainManager::setGains(std::string gains_name) {
   param.value = it->second.kqxy;
   conf.doubles.push_back(param);
 
-  param.name  = "kwxy";
-  param.value = it->second.kwxy;
-  conf.doubles.push_back(param);
-
   param.name  = "kibxy";
   param.value = it->second.kibxy;
   conf.doubles.push_back(param);
@@ -326,10 +320,6 @@ bool GainManager::setGains(std::string gains_name) {
 
   param.name  = "kqz";
   param.value = it->second.kqz;
-  conf.doubles.push_back(param);
-
-  param.name  = "kwz";
-  param.value = it->second.kwz;
   conf.doubles.push_back(param);
 
   param.name  = "km";
