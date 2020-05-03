@@ -1,11 +1,11 @@
-#ifndef TRACKER_H_
-#define TRACKER_H_
+#ifndef MRS_UAV_TRACKER_H
+#define MRS_UAV_TRACKER_H
 
 /* includes //{ */
 
 #include <ros/ros.h>
 
-#include <mrs_uav_manager/common_handlers.h>
+#include <mrs_uav_managers/common_handlers.h>
 
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
@@ -41,7 +41,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 class Tracker {
@@ -56,7 +56,8 @@ public:
    * @param uav_name the UAV name (e.g., "uav1")
    * @param common_handlers handlers shared between trackers and controllers
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name,
+                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
 
   /**
    * @brief It is called before the trackers output will be required and used. Should not take much time (within miliseconds).
@@ -188,6 +189,6 @@ public:
    */
   virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #endif

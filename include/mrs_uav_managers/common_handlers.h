@@ -3,7 +3,7 @@
 
 #include <mrs_lib/transformer.h>
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 /* safety area handler //{ */
@@ -15,10 +15,10 @@ typedef boost::function<double(void)>                                 getMinHeig
 
 struct SafetyArea_t
 {
-  mrs_uav_manager::isPointInSafetyArea3d_t isPointInSafetyArea3d;
-  mrs_uav_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
-  mrs_uav_manager::getMaxHeight_t          getMaxHeight;
-  mrs_uav_manager::getMinHeight_t          getMinHeight;
+  mrs_uav_managers::isPointInSafetyArea3d_t isPointInSafetyArea3d;
+  mrs_uav_managers::isPointInSafetyArea2d_t isPointInSafetyArea2d;
+  mrs_uav_managers::getMaxHeight_t          getMaxHeight;
+  mrs_uav_managers::getMinHeight_t          getMinHeight;
   std::string                              frame_id;
   bool                                     use_safety_area;
 };
@@ -32,7 +32,7 @@ typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidateP
 struct Bumper_t
 {
   bool                                   enabled;
-  mrs_uav_manager::bumperValidatePoint_t bumperValidatePoint;
+  mrs_uav_managers::bumperValidatePoint_t bumperValidatePoint;
 };
 
 //}
@@ -45,6 +45,6 @@ struct CommonHandlers_t
 };
 
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #endif  // COMMON_HANDLERS_H

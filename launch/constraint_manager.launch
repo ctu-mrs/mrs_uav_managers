@@ -22,15 +22,15 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- Constraint Manager -->
-    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_manager/ConstraintManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_managers/ConstraintManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/default/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/constraint_manager/constraints.yaml" />
 
         <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
 
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />

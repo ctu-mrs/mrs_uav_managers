@@ -1,5 +1,5 @@
 So3Controller:
-  address: "mrs_controllers/So3Controller"
+  address: "mrs_uav_controllers/So3Controller"
   namespace: "so3_controller"
   eland_threshold: 3.0 # [m], position error triggering eland
   failsafe_threshold: 6.0 # [m], position error triggering failsafe land

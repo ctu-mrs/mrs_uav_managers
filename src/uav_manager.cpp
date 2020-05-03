@@ -35,7 +35,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 namespace uav_manager
@@ -1731,7 +1731,7 @@ bool UavManager::emergencyReferenceSrv(const mrs_msgs::ReferenceStamped& goal) {
 
 }  // namespace uav_manager
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::uav_manager::UavManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::uav_manager::UavManager, nodelet::Nodelet)

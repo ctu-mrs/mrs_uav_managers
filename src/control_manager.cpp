@@ -6,8 +6,8 @@
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
 
-#include <mrs_uav_manager/Controller.h>
-#include <mrs_uav_manager/Tracker.h>
+#include <mrs_uav_managers/controller.h>
+#include <mrs_uav_managers/tracker.h>
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/Float64Stamped.h>
@@ -111,7 +111,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 namespace control_manager
@@ -200,19 +200,19 @@ private:
 
   // | --------------- dynamic loading of trackers -------------- |
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_manager::Tracker>> tracker_loader_;  // pluginlib loader of dynamically loaded trackers
-  std::vector<std::string>                                          _tracker_names_;  // list of tracker names
-  std::map<std::string, TrackerParams>                              trackers_;        // map between tracker names and tracker param
-  std::vector<boost::shared_ptr<mrs_uav_manager::Tracker>>          tracker_list_;    // list of trackers, routines are callable from this
-  std::mutex                                                        mutex_tracker_list_;
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Tracker>> tracker_loader_;  // pluginlib loader of dynamically loaded trackers
+  std::vector<std::string>                                           _tracker_names_;  // list of tracker names
+  std::map<std::string, TrackerParams>                               trackers_;        // map between tracker names and tracker param
+  std::vector<boost::shared_ptr<mrs_uav_managers::Tracker>>          tracker_list_;    // list of trackers, routines are callable from this
+  std::mutex                                                         mutex_tracker_list_;
 
   // | ------------- dynamic loading of controllers ------------- |
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_manager::Controller>> controller_loader_;  // pluginlib loader of dynamically loaded controllers
-  std::vector<std::string>                                             _controller_names_;  // list of controller names
-  std::map<std::string, ControllerParams>                              controllers_;        // map between controller names and controller params
-  std::vector<boost::shared_ptr<mrs_uav_manager::Controller>>          controller_list_;    // list of controllers, routines are callable from this
-  std::mutex                                                           mutex_controller_list_;
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Controller>> controller_loader_;  // pluginlib loader of dynamically loaded controllers
+  std::vector<std::string>                                              _controller_names_;  // list of controller names
+  std::map<std::string, ControllerParams>                               controllers_;        // map between controller names and controller params
+  std::vector<boost::shared_ptr<mrs_uav_managers::Controller>>          controller_list_;    // list of controllers, routines are callable from this
+  std::mutex                                                            mutex_controller_list_;
 
   // | ------------ tracker and controller switching ------------ |
 
@@ -304,7 +304,7 @@ private:
 
   // contains handlers that are shared with trackers and controllers
   // safety area, tf transformer and bumper
-  std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers_;
+  std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers_;
 
   // | --------------- tracker and controller IDs --------------- |
 
@@ -433,8 +433,8 @@ private:
   // | --------------------- thrust and mass -------------------- |
 
   // parameters of the motor model, magnitude of gravity
-  mrs_uav_manager::MotorParams _motor_params_;
-  double                       _g_ = 9.8;
+  mrs_uav_managers::MotorParams _motor_params_;
+  double                        _g_ = 9.8;
 
   // thrust mass estimation during eland
   double    thrust_mass_estimate_   = 0;
@@ -1005,7 +1005,7 @@ void ControlManager::onInit() {
   // |         common handler for trackers and controllers        |
   // --------------------------------------------------------------
 
-  common_handlers_ = std::make_shared<mrs_uav_manager::CommonHandlers_t>();
+  common_handlers_ = std::make_shared<mrs_uav_managers::CommonHandlers_t>();
 
   // | --------------------- tf transformer --------------------- |
 
@@ -1095,7 +1095,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("null_tracker", _null_tracker_name_);
   param_loader.loadParam("landing_takeoff_tracker", _landoff_tracker_name_);
 
-  tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Tracker>>("mrs_uav_manager", "mrs_uav_manager::Tracker");
+  tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::Tracker>>("mrs_uav_managers", "mrs_uav_managers::Tracker");
 
   for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
@@ -1148,7 +1148,7 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("controllers", _controller_names_);
 
-  controller_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_manager::Controller>>("mrs_uav_manager", "mrs_uav_manager::Controller");
+  controller_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::Controller>>("mrs_uav_managers", "mrs_uav_managers::Controller");
 
   // for each controller in the list
   for (int i = 0; i < int(_controller_names_.size()); i++) {
@@ -8459,7 +8459,7 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
 }  // namespace control_manager
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::control_manager::ControlManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::control_manager::ControlManager, nodelet::Nodelet)

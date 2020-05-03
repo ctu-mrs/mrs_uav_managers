@@ -22,7 +22,7 @@
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'eaglemk2')" name="UAV_MASS" default="10.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
+  <arg name="motor_params_file" default="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
 
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
@@ -40,13 +40,13 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- UAV manager -->
-    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_manager/UavManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_managers/UavManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/default/uav_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/uav_manager.yaml" />
 
         <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />

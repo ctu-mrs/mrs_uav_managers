@@ -1,16 +1,16 @@
 #include <ros/ros.h>
 
-#include <mrs_uav_manager/Tracker.h>
+#include <mrs_uav_managers/tracker.h>
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 /* //{ class NullTracker */
 
-class NullTracker : public mrs_uav_manager::Tracker {
+class NullTracker : public mrs_uav_managers::Tracker {
 
 public:
-  void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers);
+  void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers);
   bool activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd);
   void deactivate(void);
   bool resetStatic(void);
@@ -37,7 +37,7 @@ private:
   bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 
-  std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers;
+  std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers;
 };
 
 //}
@@ -47,7 +47,7 @@ private:
 /* //{ initialize() */
 
 void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] const std::string uav_name,
-                             [[maybe_unused]] std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) {
+                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -221,7 +221,7 @@ const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr NullTracker::setConstrai
 
 //}
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::NullTracker, mrs_uav_manager::Tracker)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::NullTracker, mrs_uav_managers::Tracker)

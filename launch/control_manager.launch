@@ -34,8 +34,8 @@
   <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_so3_controller" default="" />
 
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_general)/config/worlds/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.0" />
@@ -45,7 +45,7 @@
   <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'eaglemk2')" name="UAV_MASS" default="10.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
-  <arg name="motor_params_file" default="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
+  <arg name="motor_params_file" default="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.8" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
@@ -59,17 +59,17 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- Control manager -->
-    <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_uav_manager/ControlManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_uav_managers/ControlManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/default/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/default/trackers.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/default/controllers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/controllers.yaml" />
 
         <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/control_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
 
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
@@ -87,39 +87,39 @@
       <!-- Controller's configs -->
 
       <!-- NSF -->
-      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/default/nsf.yaml" />
-      <rosparam ns="nsf_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/nsf.yaml" />
+      <rosparam ns="nsf_controller" file="$(find mrs_uav_controllers)/config/default/nsf.yaml" />
+      <rosparam ns="nsf_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/nsf.yaml" />
       <rosparam if="$(eval not arg('custom_config_nsf_controller') == '')" ns="nsf_controller" file="$(arg custom_config_nsf_controller)" />
       <param name="nsf_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- SO3 -->
-      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/default/so3.yaml" />
-      <rosparam ns="so3_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/so3.yaml" />
+      <rosparam ns="so3_controller" file="$(find mrs_uav_controllers)/config/default/so3.yaml" />
+      <rosparam ns="so3_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/so3.yaml" />
       <rosparam if="$(eval not arg('custom_config_so3_controller') == '')" ns="so3_controller" file="$(arg custom_config_so3_controller)" />
       <param name="so3_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~so3_controller/profiler" to="profiler" />
 
       <!-- MPC controller -->
-      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
-      <rosparam ns="mpc_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc.yaml" />
+      <rosparam ns="mpc_controller" file="$(find mrs_uav_controllers)/config/default/mpc.yaml" />
+      <rosparam ns="mpc_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc.yaml" />
       <rosparam if="$(eval not arg('custom_config_mpc_controller') == '')" ns="mpc_controller" file="$(arg custom_config_mpc_controller)" />
       <param name="mpc_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~mpc_controller/profiler" to="profiler" />
       <remap from="~mpc_controller/set_integral_terms_in" to="~mpc_controller/set_integral_terms" />
 
       <!-- Failsafe controller -->
-      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/default/failsafe.yaml" />
-      <rosparam ns="failsafe_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
+      <rosparam ns="failsafe_controller" file="$(find mrs_uav_controllers)/config/default/failsafe.yaml" />
+      <rosparam ns="failsafe_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/failsafe.yaml" />
       <rosparam if="$(eval not arg('custom_config_failsafe_controller') == '')" ns="failsafe_controller" file="$(arg custom_config_failsafe_controller)" />
       <param name="failsafe_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~failsafe_controller/profiler" to="profiler" />
       <remap from="~failsafe_controller/arm_out" to="~/arm" />
 
       <!-- Emergency controller -->
-      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/mpc.yaml" />
-      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/default/emergency.yaml" />
-      <rosparam ns="emergency_controller" file="$(find mrs_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergency.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/default/mpc.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/default/emergency.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergency.yaml" />
       <rosparam if="$(eval not arg('custom_config_emergency_controller') == '')" ns="emergency_controller" file="$(arg custom_config_emergency_controller)" />
       <param name="emergency_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~emergency_controller/profiler" to="profiler" />
@@ -128,39 +128,39 @@
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/default/line_tracker.yaml" />
-      <rosparam ns="line_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_uav_trackers)/config/default/line_tracker.yaml" />
+      <rosparam ns="line_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/line_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_line_tracker') == '')" ns="line_tracker" file="$(arg custom_config_line_tracker)" />
       <param name="line_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~line_tracker/profiler" to="profiler" />
 
       <!-- JoyTracker -->
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/default/joy_tracker.yaml" />
-      <rosparam ns="joy_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_uav_trackers)/config/default/joy_tracker.yaml" />
+      <rosparam ns="joy_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/joy_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_joy_tracker') == '')" ns="joy_tracker" file="$(arg custom_config_joy_tracker)" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
       <remap from="~joy_tracker/joystick_in" to="/joy" />
 
       <!-- MatlabTracker -->
-      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/default/matlab_tracker.yaml" />
-      <rosparam ns="matlab_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/matlab_tracker.yaml" />
+      <rosparam ns="matlab_tracker" file="$(find mrs_uav_trackers)/config/default/matlab_tracker.yaml" />
+      <rosparam ns="matlab_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/matlab_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_matlab_tracker') == '')" ns="matlab_tracker" file="$(arg custom_config_matlab_tracker)" />
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
 
       <!-- SpeedTracker -->
-      <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/default/speed_tracker.yaml" />
-      <rosparam ns="speed_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/speed_tracker.yaml" />
+      <rosparam ns="speed_tracker" file="$(find mrs_uav_trackers)/config/default/speed_tracker.yaml" />
+      <rosparam ns="speed_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/speed_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_speed_tracker') == '')" ns="speed_tracker" file="$(arg custom_config_speed_tracker)" />
       <param name="speed_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~speed_tracker/profiler" to="profiler" />
       <remap from="~speed_tracker/command_in" to="~speed_tracker/command" />
 
       <!-- LandoffTracker -->
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/default/landoff_tracker.yaml" />
-      <rosparam ns="landoff_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_uav_trackers)/config/default/landoff_tracker.yaml" />
+      <rosparam ns="landoff_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/landoff_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_landoff_tracker') == '')" ns="landoff_tracker" file="$(arg custom_config_landoff_tracker)" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
@@ -170,10 +170,10 @@
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
 
       <!-- MpcTracker -->
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/default/mpc_tracker.yaml" />
-      <rosparam ns="mpc_tracker" file="$(find mrs_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
-      <rosparam if="$(eval arg('RUN_TYPE') == 'uav')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names.yaml" />
-      <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" ns="mpc_tracker" file="$(find mrs_general)/config/uav_names_simulation.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_uav_trackers)/config/default/mpc_tracker.yaml" />
+      <rosparam ns="mpc_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc_tracker.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'uav')" ns="mpc_tracker" file="$(find mrs_uav_general)/config/uav_names.yaml" />
+      <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" ns="mpc_tracker" file="$(find mrs_uav_general)/config/uav_names_simulation.yaml" />
       <rosparam if="$(eval not arg('custom_config_mpc_tracker') == '')" ns="mpc_tracker" file="$(arg custom_config_mpc_tracker)" />
       <rosparam if="$(eval not arg('custom_config_uav_names') == '')" ns="mpc_tracker" file="$(arg custom_config_uav_names)" />
       <param name="mpc_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />

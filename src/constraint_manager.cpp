@@ -24,7 +24,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 namespace constraint_manager
@@ -506,7 +506,7 @@ bool ConstraintManager::stringInVector(const std::string &value, const std::vect
 
 }  // namespace constraint_manager
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::constraint_manager::ConstraintManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::constraint_manager::ConstraintManager, nodelet::Nodelet)

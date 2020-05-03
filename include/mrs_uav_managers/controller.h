@@ -1,11 +1,11 @@
-#ifndef CONTROLLER_H_
-#define CONTROLLER_H_
+#ifndef MRS_UAV_CONTROLLER_H
+#define MRS_UAV_CONTROLLER_H
 
 /* includes //{ */
 
 #include <ros/ros.h>
 
-#include <mrs_uav_manager/common_handlers.h>
+#include <mrs_uav_managers/common_handlers.h>
 
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/ControllerStatus.h>
@@ -14,7 +14,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 // parameters of the propulsion thrust curve
@@ -43,8 +43,8 @@ public:
    * @param common_handlers handlers shared between trackers and controllers
    */
   virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space,
-                          const mrs_uav_manager::MotorParams motor_params, const double uav_mass, const double g,
-                          std::shared_ptr<mrs_uav_manager::CommonHandlers_t> common_handlers) = 0;
+                          const mrs_uav_managers::MotorParams motor_params, const double uav_mass, const double g,
+                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
 
   /**
    * @brief It is called before the controller output will be required and used. Should not take much time (within miliseconds).
@@ -92,6 +92,6 @@ public:
    */
   virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
 };
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #endif

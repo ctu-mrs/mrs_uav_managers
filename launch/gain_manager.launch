@@ -22,15 +22,15 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- Gain Manager -->
-    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_manager/GainManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_managers/GainManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/default/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/gain_manager/gains.yaml" />
 
         <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_manager)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
 
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />

@@ -1,23 +1,23 @@
 MpcTracker:
-  address: "mrs_trackers/MpcTracker"
+  address: "mrs_uav_trackers/MpcTracker"
 
 LandoffTracker:
-  address: "mrs_trackers/LandoffTracker"
+  address: "mrs_uav_trackers/LandoffTracker"
 
 LineTracker:
-  address: "mrs_trackers/LineTracker"
+  address: "mrs_uav_trackers/LineTracker"
 
 JoyTracker:
-  address: "mrs_trackers/JoyTracker"
+  address: "mrs_uav_trackers/JoyTracker"
 
 MatlabTracker:
-  address: "mrs_trackers/MatlabTracker"
+  address: "mrs_uav_trackers/MatlabTracker"
 
 SpeedTracker:
-  address: "mrs_trackers/SpeedTracker"
+  address: "mrs_uav_trackers/SpeedTracker"
 
 CsvTracker:
-  address: "mrs_trackers/CsvTracker"
+  address: "mrs_uav_trackers/CsvTracker"
 
 NullTracker:
-  address: "mrs_uav_manager/NullTracker"
+  address: "mrs_uav_managers/NullTracker"

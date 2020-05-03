@@ -23,7 +23,7 @@
 
 //}
 
-namespace mrs_uav_manager
+namespace mrs_uav_managers
 {
 
 namespace gain_manager
@@ -624,7 +624,7 @@ bool GainManager::stringInVector(const std::string &value, const std::vector<std
 
 }  // namespace gain_manager
 
-}  // namespace mrs_uav_manager
+}  // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_manager::gain_manager::GainManager, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::gain_manager::GainManager, nodelet::Nodelet)
