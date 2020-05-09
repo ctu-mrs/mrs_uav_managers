@@ -22,12 +22,12 @@ This package contains *high-level* flight managers.
 * provides common services for
   * setting a **reference**
   * setting a **trajectory reference**
-  * human-callabale **goto**, **goto relative**, **goto altitude**, **set heading** and **set relative heading**
+  * human-callable **goto**, **goto relative**, **goto altitude**, **set heading** and **set relative heading**
   * **hover**
   * **emergency hover** after which most of the provided services are disabled
   * **emergency landing** - switches to emergency controller and tracker and lands as fast as possible
   * **failsafe landing** - feedforward landing, only effective in small heights and low speeds
-  * **escalating failsafe** - the measures escalate when call repeatedly
+  * **escalating failsafe** - the measures escalate when calling it repeatedly
     1. emergency landing
     2. failsafe landing
     2. disarm
@@ -41,9 +41,9 @@ This package contains *high-level* flight managers.
   * missing estimator data
   * the validity of desired references
 * allows controlling the UAV using a ROS-compatible joystick
-* allows controlling the UAV using the **RC controller** throught our pipeline
+* allows controlling the UAV using the **RC controller** through our pipeline
   * the RC channels are picked up from [Mavros](http://wiki.ros.org/mavros)
-  * a relative reference is gererated for the active tracker
+  * a relative reference is generated for the active tracker
   * **emergency landing** can be triggered by a dedicated switch
 * provides an **obstacle bumper** feature
   * has priority over user-provided references
@@ -66,7 +66,7 @@ This package contains *high-level* flight managers.
 * provides a **land home** feature
   * the UAV flies in the current altitude to its **takeoff** location and lands
 * provides a **land there** feature
-  * the UAV flies to a desired position at which it lands
+  * the UAV flies to the desired position at which it lands
 * monitors exceeding the **maximum altitude**
   * triggers a priority descend if it exceeds the safety area ceiling
 * monitors exceeding the **maximum thrust**
