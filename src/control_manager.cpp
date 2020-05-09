@@ -42,7 +42,7 @@
 #include <sensor_msgs/NavSatFix.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
-#include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/RCIn.h>
 
@@ -403,7 +403,7 @@ private:
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
-  ros::ServiceClient service_client_arm_;
+  ros::ServiceClient service_client_mavros_command_long_;
   ros::ServiceClient service_client_eland_;
   ros::ServiceClient service_client_shutdown_;
   ros::ServiceClient service_client_set_odometry_callbacks_;
@@ -784,7 +784,7 @@ private:
   void                          setCallbacks(bool in);
   bool                          isOffboard(void);
   bool                          elandSrv(void);
-  std::tuple<bool, std::string> arming(bool input);
+  std::tuple<bool, std::string> arming(const bool input);
 
   // safety functions impl
   std::tuple<bool, std::string> ehover(void);
@@ -1516,7 +1516,7 @@ void ControlManager::onInit() {
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking", &ControlManager::callbackResumeTrajectoryTracking, this);
   service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start", &ControlManager::callbackGotoTrajectoryStart, this);
 
-  service_client_arm_                    = nh_.serviceClient<mavros_msgs::CommandBool>("arm_out");
+  service_client_mavros_command_long_    = nh_.serviceClient<mavros_msgs::CommandLong>("mavros_command_long_out");
   service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
   service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
   service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
@@ -6945,53 +6945,68 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 
 /* arming() //{ */
 
-std::tuple<bool, std::string> ControlManager::arming(bool input) {
-
-  mavros_msgs::CommandBool srv_out;
-  srv_out.request.value = input;
-
-  // if disarming, switch motors_ off
-  if (!input) {
-    switchMotors(false);
-  }
-
-  timer_failsafe_.stop();
-  timer_eland_.stop();
+std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
   std::stringstream ss;
 
-  // we can not disarm if the drone is not in offboard mode
-  // this is super important!
-  if (isOffboard()) {
+  if (input) {
 
-    ROS_INFO("[ControlManager]: calling for disarming");
+    ss << "not allowed to arm using the ControlManager, maybe later when we don't do bugs";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
 
-    if (service_client_arm_.call(srv_out)) {
-
-      if (srv_out.response.success) {
-        ss << "service call for disarm was successful";
-        ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      } else {
-        ss << "service call for disarm failed";
-        ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      }
-
-    } else {
-      ss << "calling for disarm resulted in failure: '" << srv_out.response.result << "'";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    }
-
-    shutdown();
-
-    return std::tuple(srv_out.response.success, ss.str());
-
-  } else {
+  if (!input && !isOffboard()) {
 
     ss << "can not disarm, not in OFFBOARD mode";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-
     return std::tuple(false, ss.str());
   }
+
+  mavros_msgs::CommandLong srv_out;
+
+  srv_out.request.broadcast    = false;
+  srv_out.request.command      = 400;  // the code for arming
+  srv_out.request.confirmation = true;
+
+  srv_out.request.param1 = input ? 1 : 0;      // arm or disarm?
+  srv_out.request.param2 = input ? 0 : 21196;  // 21196 allows to disarm even in mid-flight
+  srv_out.request.param3 = 0;
+  srv_out.request.param4 = 0;
+  srv_out.request.param5 = 0;
+  srv_out.request.param6 = 0;
+  srv_out.request.param7 = 0;
+
+  ROS_INFO("[ControlManager]: calling for %s", input ? "arming" : "disarming");
+
+  if (service_client_mavros_command_long_.call(srv_out)) {
+
+    if (srv_out.response.success) {
+
+      ss << "service call for " << (input ? "arming" : "disarming") << " was successful";
+      ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+      if (!input) {
+
+        switchMotors(false);
+
+        timer_failsafe_.stop();
+        timer_eland_.stop();
+
+        shutdown();
+      }
+
+    } else {
+      ss << "service call for " << (input ? "arming" : "disarming") << " failed";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    }
+
+  } else {
+    ss << "calling for " << (input ? "arming" : "disarming") << " resulted in failure: '" << srv_out.response.result << "'";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+  }
+
+  return std::tuple(srv_out.response.success, ss.str());
 }
 
 //}
