@@ -2707,13 +2707,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!sh_joystick_.hasMsg()) {
-    return;
-  }
-
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
-
-  auto joystick_data = sh_joystick_.getMsg();
 
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
@@ -2765,7 +2759,9 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   }
 
   // if the GOTO functionality is enabled...
-  if (joystick_goto_enabled_) {
+  if (joystick_goto_enabled_ && sh_joystick_.hasMsg()) {
+
+    auto joystick_data = sh_joystick_.getMsg();
 
     // create the reference
 
@@ -2821,7 +2817,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+  if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr() && sh_rc_.hasMsg()) {
 
     // create the reference
 
