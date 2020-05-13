@@ -29,7 +29,7 @@ struct MotorParams
 
 class Controller {
 public:
-  virtual ~Controller(void) = 0;
+  virtual ~Controller() = 0;
 
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
@@ -92,6 +92,10 @@ public:
    */
   virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
 };
+
+// A pure virtual destructor requires a function body.
+Controller::~Controller(){};
+
 }  // namespace mrs_uav_managers
 
 #endif
