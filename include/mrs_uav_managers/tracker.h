@@ -47,7 +47,7 @@ namespace mrs_uav_managers
 class Tracker {
 
 public:
-  virtual ~Tracker(void) = 0;
+  virtual ~Tracker() = 0;
 
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
@@ -189,6 +189,10 @@ public:
    */
   virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
+
+// A pure virtual destructor requires a function body.
+Tracker::~Tracker(){};
+
 }  // namespace mrs_uav_managers
 
 #endif
