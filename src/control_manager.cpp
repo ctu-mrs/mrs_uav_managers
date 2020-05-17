@@ -5439,10 +5439,28 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     // transform the current state to the safety area frame
     mrs_msgs::ReferenceStamped x_current_frame;
-    x_current_frame.header               = uav_state.header;
-    x_current_frame.reference.position.x = last_position_cmd->position.x;
-    x_current_frame.reference.position.y = last_position_cmd->position.y;
-    x_current_frame.reference.position.z = last_position_cmd->position.z;
+    x_current_frame.header = uav_state.header;
+
+    if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+
+      x_current_frame.reference.position.x = last_position_cmd->position.x;
+      x_current_frame.reference.position.y = last_position_cmd->position.y;
+      x_current_frame.reference.position.z = last_position_cmd->position.z;
+
+    } else if (got_uav_state_) {
+
+      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+      x_current_frame.reference.position.x = uav_state.pose.position.x;
+      x_current_frame.reference.position.y = uav_state.pose.position.y;
+      x_current_frame.reference.position.z = uav_state.pose.position.z;
+
+    } else {
+
+      ss << "cannot check agains safety area, missing odometry";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+    }
 
     auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
 
