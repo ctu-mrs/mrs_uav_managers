@@ -81,7 +81,7 @@ safety:
 
   parachute:
 
-    enabled: true
+    enabled: false
 
 # Those are normally overridden by the ConstraintManager.
 default_constraints:

@@ -21,3 +21,7 @@ controllers : [
 safety:
 
   min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
+
+  parachute:
+
+    enabled: true
