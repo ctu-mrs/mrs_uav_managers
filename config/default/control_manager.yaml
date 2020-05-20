@@ -82,7 +82,7 @@ safety:
 
   parachute:
 
-    enabled: true
+    enabled: false
 
   # when the active tracker returns empty command
   tracker_error_action: "eland" # {eland, ehover}

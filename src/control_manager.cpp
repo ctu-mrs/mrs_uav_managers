@@ -95,9 +95,10 @@
 /* defines //{ */
 
 #define TAU 2 * M_PI
-#define PWM_MIDDLE 1500.0
-#define PWM_MIN 1000.0
-#define PWM_MAX 2000.0
+#define PWM_MIDDLE 1500
+#define PWM_MIN 1000
+#define PWM_MAX 2000
+#define PWM_DEADBAND 200
 #define PWM_RANGE PWM_MAX - PWM_MIN
 #define REF_X 0
 #define REF_Y 1
@@ -3667,8 +3668,8 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
     } else {
 
       // detect the switch of a switch on the RC
-      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - 200) && rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + 200)) ||
-          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + 200) && rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - 200))) {
+      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) ||
+          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
 
         // enter an event to the std vector
         std::scoped_lock lock(mutex_rc_channel_switch_time_);
@@ -3677,7 +3678,10 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
       }
 
       // do not forget to update the last... variable
-      rc_joystick_channel_last_value_ = rc->channels[_rc_joystick_channel_];
+      // only do that if its out of the deadband
+      if ((rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) || (rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
+        rc_joystick_channel_last_value_ = rc->channels[_rc_joystick_channel_];
+      }
     }
   }
 
@@ -5474,10 +5478,28 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     // transform the current state to the safety area frame
     mrs_msgs::ReferenceStamped x_current_frame;
-    x_current_frame.header               = uav_state.header;
-    x_current_frame.reference.position.x = last_position_cmd->position.x;
-    x_current_frame.reference.position.y = last_position_cmd->position.y;
-    x_current_frame.reference.position.z = last_position_cmd->position.z;
+    x_current_frame.header = uav_state.header;
+
+    if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+
+      x_current_frame.reference.position.x = last_position_cmd->position.x;
+      x_current_frame.reference.position.y = last_position_cmd->position.y;
+      x_current_frame.reference.position.z = last_position_cmd->position.z;
+
+    } else if (got_uav_state_) {
+
+      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+      x_current_frame.reference.position.x = uav_state.pose.position.x;
+      x_current_frame.reference.position.y = uav_state.pose.position.y;
+      x_current_frame.reference.position.z = uav_state.pose.position.z;
+
+    } else {
+
+      ss << "cannot check agains safety area, missing odometry";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str(), false);
+    }
 
     auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
 
@@ -8455,7 +8477,7 @@ bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTar
 
 double ControlManager::RCChannelToRange(double rc_value, double range, double deadband) {
 
-  double tmp_0_to_1    = (rc_value - PWM_MIN) / (PWM_RANGE);
+  double tmp_0_to_1    = (rc_value - double(PWM_MIN)) / (double(PWM_RANGE));
   double tmp_neg1_to_1 = (tmp_0_to_1 - 0.5) * 2.0;
 
   if (tmp_neg1_to_1 > 1.0) {
