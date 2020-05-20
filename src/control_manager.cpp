@@ -104,6 +104,7 @@
 #define REF_Z 2
 #define REF_HEADING 3
 #define ELAND_STR "eland"
+#define EHOVER_STR "ehover"
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
 #define INPUT_UAV_STATE 0
@@ -619,6 +620,10 @@ private:
   // bumper subscriber
   mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors> sh_bumper_;
 
+  bool        _bumper_switch_tracker_ = false;
+  std::string _bumper_tracker_name_;
+  std::string bumper_previous_tracker_;
+
   bool bumper_enabled_           = false;
   bool _bumper_hugging_enabled_  = false;
   bool bumper_repulsion_enabled_ = false;
@@ -649,6 +654,8 @@ private:
   int         _rc_eland_threshold_;
   std::string _rc_eland_action_;
   bool        rc_eland_triggered_ = false;
+
+  std::string _tracker_error_action_;
 
   // emergancy landing state machine
   LandingStates_t current_state_landing_  = IDLE_STATE;
@@ -936,6 +943,8 @@ void ControlManager::onInit() {
   param_loader.loadParam("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
 
   param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled_);
+  param_loader.loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
+  param_loader.loadParam("obstacle_bumper/tracker", _bumper_tracker_name_);
   param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
   param_loader.loadParam("obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
   param_loader.loadParam("obstacle_bumper/vertical_distance", bumper_vertical_distance_);
@@ -958,6 +967,15 @@ void ControlManager::onInit() {
   if (_rc_eland_action_ != ELAND_STR && _rc_eland_action_ != ESCALATING_FAILSAFE_STR && _rc_eland_action_ != FAILSAFE_STR) {
     ROS_ERROR("[ControlManager]: the rc_eland/action parameter (%s) is not correct, requires {%s, %s, %s}", _rc_eland_action_.c_str(), ELAND_STR,
               ESCALATING_FAILSAFE_STR, FAILSAFE_STR);
+    ros::shutdown();
+  }
+
+  param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
+
+  // check the values of tracker error action
+  if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
+    ROS_ERROR("[ControlManager]: the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
+              EHOVER_STR);
     ros::shutdown();
   }
 
@@ -1355,6 +1373,23 @@ void ControlManager::onInit() {
     }
     if (!joystick_controller_check) {
       ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
+      ros::shutdown();
+    }
+
+    // check if the tracker for bumper exists
+    bool bumper_tracker_check = false;
+
+    for (int i = 0; i < int(_tracker_names_.size()); i++) {
+
+      std::string tracker_name = _tracker_names_[i];
+
+      if (tracker_name == _bumper_tracker_name_) {
+        bumper_tracker_check = true;
+        break;
+      }
+    }
+    if (!bumper_tracker_check) {
+      ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
       ros::shutdown();
     }
 
@@ -6323,6 +6358,20 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was initiated");
 
+    if (_bumper_switch_tracker_) {
+
+      auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+      std::string active_tracker_name = _tracker_names_[active_tracker_idx];
+
+      if (active_tracker_name != _bumper_tracker_name_) {
+
+        // remember the previously active tracker
+        bumper_previous_tracker_ = active_tracker_name;
+
+        auto [success, message] = switchTracker(_bumper_tracker_name_);
+      }
+    }
+
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = true;
     try {
@@ -6406,6 +6455,17 @@ bool ControlManager::bumperPushFromObstacle(void) {
   if ((repulsing_ && !horizontal_collision_detected && !vertical_collision_detected)) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was stopped");
+
+    if (_bumper_switch_tracker_) {
+
+      auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+      std::string active_tracker_name = _tracker_names_[active_tracker_idx];
+
+      if (active_tracker_name != bumper_previous_tracker_) {
+
+        auto [success, message] = switchTracker(bumper_previous_tracker_);
+      }
+    }
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
@@ -7513,9 +7573,13 @@ void ControlManager::updateTrackers(void) {
 
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
-        std::string ehover_message;
-
-        ehover();
+        if (_tracker_error_action_ == ELAND_STR) {
+          eland();
+        } else if (_tracker_error_action_ == EHOVER_STR) {
+          ehover();
+        } else {
+          failsafe();
+        }
       }
 
     } else {

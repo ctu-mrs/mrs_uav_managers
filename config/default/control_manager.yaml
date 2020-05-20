@@ -7,6 +7,7 @@ trackers : [
   "LandoffTracker",
   "JoyTracker",
   "NullTracker",
+  "SpeedTracker",
 ]
 
 # - list of names of dynamically loaded controllers
@@ -83,6 +84,9 @@ safety:
 
     enabled: true
 
+  # when the active tracker returns empty command
+  tracker_error_action: "eland" # {eland, ehover}
+
 # Those are normally overridden by the ConstraintManager.
 default_constraints:
 
@@ -113,6 +117,9 @@ default_constraints:
     snap: 5.0
 
 obstacle_bumper:
+
+  switch_tracker: true
+  tracker: "MpcTracker"
 
   enabled: false
   timer_rate: 20 # [Hz]

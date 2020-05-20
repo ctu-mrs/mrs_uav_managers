@@ -21,3 +21,6 @@ controllers : [
 safety:
 
   min_thrust_null_tracker: 0.15 # [] minimum thrust when not flying
+
+  # when the active tracker returns empty command
+  tracker_error_action: "ehover" # {eland, ehover}
