@@ -6390,7 +6390,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
         // remember the previously active tracker
         bumper_previous_tracker_ = active_tracker_name;
 
-        auto [success, message] = switchTracker(_bumper_tracker_name_);
+        switchTracker(_bumper_tracker_name_);
       }
     }
 
@@ -6485,7 +6485,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       if (active_tracker_name != bumper_previous_tracker_) {
 
-        auto [success, message] = switchTracker(bumper_previous_tracker_);
+        switchTracker(bumper_previous_tracker_);
       }
     }
 
