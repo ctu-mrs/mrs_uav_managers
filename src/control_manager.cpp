@@ -7301,9 +7301,11 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
       ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx].c_str());
 
-      if (!tracker_list_[new_tracker_idx]->activate(last_position_cmd)) {
+      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_position_cmd);
 
-        ss << "the tracker '" << tracker_name << "' was not activated";
+      if (!success) {
+
+        ss << "the tracker '" << tracker_name << "' could not be activated: '" << message << "'";
         ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
         return std::tuple(false, ss.str());
 

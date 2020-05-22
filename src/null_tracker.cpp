@@ -11,9 +11,9 @@ class NullTracker : public mrs_uav_managers::Tracker {
 
 public:
   void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers);
-  bool activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd);
-  void deactivate(void);
-  bool resetStatic(void);
+  std::tuple<bool, std::string> activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd);
+  void                          deactivate(void);
+  bool                          resetStatic(void);
 
   const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &uav_state, const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd);
   const mrs_msgs::TrackerStatus             getStatus();
@@ -64,11 +64,15 @@ void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] 
 
 /* //{ activate() */
 
-bool NullTracker::activate([[maybe_unused]] const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) {
+std::tuple<bool, std::string> NullTracker::activate([[maybe_unused]] const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) {
 
-  ROS_INFO("[NullTracker]: activated");
+  std::stringstream ss;
+  ss << "activated";
+
+  ROS_INFO_STREAM("[NullTracker]: " << ss.str());
   is_active = true;
-  return true;
+
+  return std::tuple(true, ss.str());
 }
 
 //}
