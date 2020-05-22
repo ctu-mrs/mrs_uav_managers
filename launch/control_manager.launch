@@ -211,6 +211,7 @@
       <remap from="~transform_pose_in" to="~transform_pose" />
       <remap from="~transform_vector3_in" to="~transform_vector3" />
       <remap from="~validate_reference_in" to="~validate_reference" />
+      <remap from="~validate_reference_2d_in" to="~validate_reference_2d" />
       <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->

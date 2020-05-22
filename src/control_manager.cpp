@@ -397,6 +397,7 @@ private:
 
   // safety area services
   ros::ServiceServer service_server_validate_reference_;
+  ros::ServiceServer service_server_validate_reference_2d_;
   ros::ServiceServer service_server_validate_reference_list_;
 
   // bumper service servers
@@ -502,6 +503,7 @@ private:
   // those are passed to trackers using the common_handlers object
   bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
   bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   double getMinHeight(void);
   double getMaxHeight(void);
@@ -560,6 +562,7 @@ private:
   bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
   bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
+  bool callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
   bool callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res);
 
   // transformation callbacks
@@ -1546,6 +1549,7 @@ void ControlManager::onInit() {
   service_server_set_min_height_             = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
   service_server_get_min_height_             = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
+  service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
   service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
   service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking", &ControlManager::callbackStartTrajectoryTracking, this);
   service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking", &ControlManager::callbackStopTrajectoryTracking, this);
@@ -4769,6 +4773,103 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
 //}
 
+/* //{ callbackValidateReference2d() */
+
+bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.y'!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.position.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.z'!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  if (!std::isfinite(req.reference.reference.heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.heading'!!!");
+    res.message = "NaNs/infs in the goal!";
+    res.success = false;
+    return true;
+  }
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  // transform the reference to the current frame
+  mrs_msgs::ReferenceStamped original_reference;
+  original_reference.header    = req.reference.header;
+  original_reference.reference = req.reference.reference;
+
+  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+
+  if (!ret) {
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the reference could not be transformed");
+    res.message = "the reference could not be transformed";
+    res.success = false;
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+
+  // check the obstacle bumper
+  if (!bumperValidatePoint(transformed_reference)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, potential collision with an obstacle!");
+    res.message = "potential collision with an obstacle";
+    res.success = false;
+    return true;
+  }
+
+  if (!isPointInSafetyArea2d(transformed_reference)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
+    res.message = "the point is outside of the safety area";
+    res.success = false;
+    return true;
+  }
+
+  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+    mrs_msgs::ReferenceStamped from_point;
+    from_point.header.frame_id      = uav_state.header.frame_id;
+    from_point.reference.position.x = last_position_cmd->position.x;
+    from_point.reference.position.y = last_position_cmd->position.y;
+    from_point.reference.position.z = last_position_cmd->position.z;
+
+    if (!isPathToPointInSafetyArea2d(from_point, transformed_reference)) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the path is going outside the safety area!");
+      res.message = "the path is going outside the safety area";
+      res.success = false;
+      return true;
+    }
+  }
+
+  res.message = "the reference is ok";
+  res.success = true;
+  return true;
+}
+
+//}
+
 /* //{ callbackValidateReferenceList() */
 
 bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res) {
@@ -5938,7 +6039,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
-  if (safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
+  if (safety_zone_->isPointValid3d(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
       point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= getMaxHeight()) {
     return true;
   }
@@ -5967,7 +6068,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
-  return safety_zone_->isPointValid(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z);
+  return safety_zone_->isPointValid2d(point_transformed.reference.position.x, point_transformed.reference.position.y);
 }
 
 //}
@@ -6008,8 +6109,50 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
-                                   end_transformed.reference.position.x, end_transformed.reference.position.y, end_transformed.reference.position.z);
+  return safety_zone_->isPathValid3d(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
+                                     end_transformed.reference.position.x, end_transformed.reference.position.y, end_transformed.reference.position.z);
+}
+
+//}
+
+/* //{ isPathToPointInSafetyArea2d() */
+
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+
+  if (!use_safety_area_) {
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, start);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    start_transformed = ret.value();
+  }
+
+  {
+    auto ret = transformer_->transformSingle(_safety_area_frame_, end);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
+  }
+
+  return safety_zone_->isPathValid2d(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                     end_transformed.reference.position.y);
 }
 
 //}
