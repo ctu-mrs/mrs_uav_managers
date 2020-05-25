@@ -35,7 +35,7 @@ safety:
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
 
-  tilt_limit_eland: 60 # [deg]
+  tilt_limit_eland: 75 # [deg]
   yaw_limit_eland: 90 # [deg]
   tilt_limit_disarm: 90 # [deg]
 
