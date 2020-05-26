@@ -121,6 +121,9 @@ obstacle_bumper:
   switch_tracker: true
   tracker: "MpcTracker"
 
+  switch_controller: true
+  controller: "So3Controller"
+
   enabled: false
   timer_rate: 20 # [Hz]
 

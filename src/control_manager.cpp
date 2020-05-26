@@ -624,9 +624,12 @@ private:
   // bumper subscriber
   mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors> sh_bumper_;
 
-  bool        _bumper_switch_tracker_ = false;
+  bool        _bumper_switch_tracker_    = false;
+  bool        _bumper_switch_controller_ = false;
   std::string _bumper_tracker_name_;
+  std::string _bumper_controller_name_;
   std::string bumper_previous_tracker_;
+  std::string bumper_previous_controller_;
 
   bool bumper_enabled_           = false;
   bool _bumper_hugging_enabled_  = false;
@@ -948,7 +951,9 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
+  param_loader.loadParam("obstacle_bumper/switch_controller", _bumper_switch_controller_);
   param_loader.loadParam("obstacle_bumper/tracker", _bumper_tracker_name_);
+  param_loader.loadParam("obstacle_bumper/controller", _bumper_controller_name_);
   param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
   param_loader.loadParam("obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
   param_loader.loadParam("obstacle_bumper/vertical_distance", bumper_vertical_distance_);
@@ -1380,21 +1385,44 @@ void ControlManager::onInit() {
       ros::shutdown();
     }
 
-    // check if the tracker for bumper exists
-    bool bumper_tracker_check = false;
+    if (_bumper_switch_tracker_) {
 
-    for (int i = 0; i < int(_tracker_names_.size()); i++) {
+      // check if the tracker for bumper exists
+      bool bumper_tracker_check = false;
 
-      std::string tracker_name = _tracker_names_[i];
+      for (int i = 0; i < int(_tracker_names_.size()); i++) {
 
-      if (tracker_name == _bumper_tracker_name_) {
-        bumper_tracker_check = true;
-        break;
+        std::string tracker_name = _tracker_names_[i];
+
+        if (tracker_name == _bumper_tracker_name_) {
+          bumper_tracker_check = true;
+          break;
+        }
+      }
+      if (!bumper_tracker_check) {
+        ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
+        ros::shutdown();
       }
     }
-    if (!bumper_tracker_check) {
-      ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
-      ros::shutdown();
+
+    if (_bumper_switch_controller_) {
+
+      // check if the controller for bumper exists
+      bool bumper_controller_check = false;
+
+      for (int i = 0; i < int(_controller_names_.size()); i++) {
+
+        std::string controller_name = _controller_names_[i];
+
+        if (controller_name == _bumper_controller_name_) {
+          bumper_controller_check = true;
+          break;
+        }
+      }
+      if (!bumper_controller_check) {
+        ROS_ERROR("[ControlManager]: the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
+        ros::shutdown();
+      }
     }
 
     // check if the fallback tracker for joystick control exists
@@ -6537,6 +6565,20 @@ bool ControlManager::bumperPushFromObstacle(void) {
       }
     }
 
+    if (_bumper_switch_controller_) {
+
+      auto        active_controller_idx  = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+      std::string active_controller_name = _controller_names_[active_controller_idx];
+
+      if (active_controller_name != _bumper_controller_name_) {
+
+        // remember the previously active controller
+        bumper_previous_controller_ = active_controller_name;
+
+        switchController(_bumper_controller_name_);
+      }
+    }
+
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = true;
     try {
@@ -6629,6 +6671,17 @@ bool ControlManager::bumperPushFromObstacle(void) {
       if (active_tracker_name != bumper_previous_tracker_) {
 
         switchTracker(bumper_previous_tracker_);
+      }
+    }
+
+    if (_bumper_switch_controller_) {
+
+      auto        active_controller_idx  = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+      std::string active_controller_name = _controller_names_[active_controller_idx];
+
+      if (active_controller_name != bumper_previous_controller_) {
+
+        switchController(bumper_previous_controller_);
       }
     }
 
