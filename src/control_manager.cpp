@@ -5540,7 +5540,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     if (!ret) {
 
-      ss << "coult not create TF transformer from the trajectory frame to the safety area frame";
+      ss << "could not create TF transformer from the trajectory frame to the safety area frame";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str(), false);
     }
@@ -5763,7 +5763,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
   if (!ret) {
 
-    ss << "coult not create TF transformer for the trajectory";
+    ss << "could not create TF transformer for the trajectory";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str(), false);
   }
