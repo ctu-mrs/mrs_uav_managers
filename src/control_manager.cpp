@@ -5759,7 +5759,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
   /* transform the trajectory to the current control frame //{ */
 
-  auto ret = transformer_->getTransform(uav_state.header.frame_id, "", uav_state_.header.stamp);
+  auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
 
   if (!ret) {
 
