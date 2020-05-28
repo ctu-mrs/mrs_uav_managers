@@ -24,3 +24,7 @@ safety:
 
   # when the active tracker returns empty command
   tracker_error_action: "ehover" # {eland, ehover}
+
+  parachute:
+
+    enabled: true

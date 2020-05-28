@@ -268,7 +268,7 @@
       <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~use_safety_area_in" to="~use_safety_area" />
-      <remap from="~parachute_out" to="parachute/deploy" />
+      <remap from="~parachute_out" to="parachute_driver/fire_parachute" />
       <remap from="~parachute_in" to="~parachute" />
 
     </node>
