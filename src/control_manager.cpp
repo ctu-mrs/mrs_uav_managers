@@ -3726,27 +3726,33 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
     } else {
 
-      if (_rc_eland_action_ == ELAND_STR) {
+      if (rc->channels[_rc_eland_channel_] >= _rc_eland_threshold_) {
 
-        if (rc->channels[_rc_eland_channel_] >= _rc_eland_threshold_ && !eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
+        if (_rc_eland_action_ == ELAND_STR) {
 
-          ROS_WARN("[ControlManager]: triggering eland by RC");
+          if (!eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
 
-          rc_eland_triggered_ = true;
+            ROS_WARN("[ControlManager]: triggering eland by RC");
 
-          eland();
-        }
-      } else if (_rc_eland_action_ == ESCALATING_FAILSAFE_STR) {
+            rc_eland_triggered_ = true;
 
-        escalatingFailsafe();
+            eland();
+          }
 
-      } else if (_rc_eland_action_ == FAILSAFE_STR) {
+        } else if (_rc_eland_action_ == ESCALATING_FAILSAFE_STR) {
 
-        if (!failsafe_triggered_) {
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering escalating failsafe by RC");
 
-          ROS_WARN("[ControlManager]: triggering failsafe by RC");
+          escalatingFailsafe();
 
-          failsafe();
+        } else if (_rc_eland_action_ == FAILSAFE_STR) {
+
+          if (!failsafe_triggered_) {
+
+            ROS_WARN("[ControlManager]: triggering failsafe by RC");
+
+            failsafe();
+          }
         }
       }
     }
