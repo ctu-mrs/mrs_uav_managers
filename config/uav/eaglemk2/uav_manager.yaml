@@ -1,0 +1,11 @@
+takeoff:
+
+  during_takeoff:
+    controller: "MpcController"
+    tracker: "LandoffTracker"
+
+  after_takeoff:
+    controller: "MpcController"
+    tracker: "MpcTracker"
+
+  takeoff_height: 2.5
