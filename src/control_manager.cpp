@@ -6982,6 +6982,26 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     return std::tuple(false, ss.str());
   }
 
+  if (_parachute_enabled_) {
+
+    auto [success, message] = deployParachute();
+
+    if (success) {
+
+      std::stringstream ss;
+      ss << "failsafe activated (parachute): '" << message << "'";
+      ROS_INFO_STREAM("[ControlManager]: " << ss.str());
+
+      return std::tuple(true, ss.str());
+
+    } else {
+
+      std::stringstream ss;
+      ss << "could not deploy parachute: '" << message << "', continuing with normal failsafe";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    }
+  }
+
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
