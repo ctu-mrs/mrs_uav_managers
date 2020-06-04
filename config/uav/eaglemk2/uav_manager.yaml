@@ -9,3 +9,7 @@ takeoff:
     tracker: "MpcTracker"
 
   takeoff_height: 2.5
+
+landing:
+
+  disarm: true
