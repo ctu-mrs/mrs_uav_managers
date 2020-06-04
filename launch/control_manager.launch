@@ -118,6 +118,7 @@
 
       <!-- Emergency controller -->
       <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/default/mpc.yaml" />
+      <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mpc.yaml" />
       <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/default/emergency.yaml" />
       <rosparam ns="emergency_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/emergency.yaml" />
       <rosparam if="$(eval not arg('custom_config_emergency_controller') == '')" ns="emergency_controller" file="$(arg custom_config_emergency_controller)" />

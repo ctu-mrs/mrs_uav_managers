@@ -1,7 +1,6 @@
 gains: [
   "supersoft",
   "soft",
-  "tight",
 ]
 
 gain_management:
@@ -12,13 +11,13 @@ gain_management:
     VSLAM: ["supersoft", "soft"]
     BRICKFLOW: ["supersoft", "soft"]
     BRICK: ["supersoft", "soft"]
-    T265: ["supersoft", "soft", "tight"]
+    T265: ["supersoft", "soft"]
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     LIDAR: ["supersoft"]
-    RTK: ["supersoft", "soft", "tight"]
+    RTK: ["supersoft", "soft"]
     OPTFLOWGPS: ["supersoft"]
-    GPS: ["supersoft", "soft", "tight"]
+    GPS: ["supersoft", "soft"]
     OPTFLOW: ["supersoft", "soft"]
     OTHER: ["supersoft"]
     HECTOR: ["supersoft"]
@@ -36,9 +35,9 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     LIDAR: "supersoft"
-    RTK: "soft"
+    RTK: "supersoft"
     OPTFLOWGPS: "supersoft"
-    GPS: "soft"
+    GPS: "supersoft"
     OPTFLOW: "supersoft"
     HECTOR: "supersoft"
     ALOAM: "supersoft"
