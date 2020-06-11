@@ -5443,10 +5443,6 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     debug_trajectory_out.header.frame_id = transformer_->resolveFrameName(debug_trajectory_out.header.frame_id);
 
-    if (debug_trajectory_out.header.frame_id == "") {
-      debug_trajectory_out.header.frame_id = uav_state.header.frame_id;
-    }
-
     if (debug_trajectory_out.header.stamp == ros::Time(0)) {
       debug_trajectory_out.header.stamp = ros::Time::now();
     }
@@ -5803,6 +5799,8 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   }
 
   mrs_lib::TransformStamped tf = ret.value();
+
+  processed_trajectory.header.frame_id = tf.to();
 
   for (int i = 0; i < trajectory_size; i++) {
 
