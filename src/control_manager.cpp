@@ -6560,10 +6560,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
       auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
       std::string active_tracker_name = _tracker_names_[active_tracker_idx];
 
-      if (active_tracker_name != _bumper_tracker_name_) {
+      // remember the previously active tracker
+      bumper_previous_tracker_ = active_tracker_name;
 
-        // remember the previously active tracker
-        bumper_previous_tracker_ = active_tracker_name;
+      if (active_tracker_name != _bumper_tracker_name_) {
 
         switchTracker(_bumper_tracker_name_);
       }
@@ -6574,10 +6574,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
       auto        active_controller_idx  = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
       std::string active_controller_name = _controller_names_[active_controller_idx];
 
-      if (active_controller_name != _bumper_controller_name_) {
+      // remember the previously active controller
+      bumper_previous_controller_ = active_controller_name;
 
-        // remember the previously active controller
-        bumper_previous_controller_ = active_controller_name;
+      if (active_controller_name != _bumper_controller_name_) {
 
         switchController(_bumper_controller_name_);
       }
