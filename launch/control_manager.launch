@@ -233,6 +233,7 @@
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~bumper_status_out" to="~bumper_status" />
       <remap from="~current_constraints_out" to="~current_constraints" />
+      <remap from="~heading_out" to="~heading" />
       <remap from="~trajectory_original/poses_out" to="~trajectory_original/poses" />
       <remap from="~trajectory_original/markers_out" to="~trajectory_original/markers" />
       <remap from="~profiler" to="profiler" />

@@ -349,6 +349,7 @@ private:
   ros::Publisher publisher_disturbances_markers_;
   ros::Publisher publisher_bumper_status_;
   ros::Publisher publisher_current_constraints_;
+  ros::Publisher publisher_heading_;
 
   // | --------------------- service servers -------------------- |
 
@@ -1516,6 +1517,7 @@ void ControlManager::onInit() {
   publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
   publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
+  publisher_heading_                         = nh_.advertise<mrs_msgs::Float64Stamped>("heading_out", 1);
   pub_debug_original_trajectory_poses_       = nh_.advertise<geometry_msgs::PoseArray>("trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_     = nh_.advertise<visualization_msgs::MarkerArray>("trajectory_original/markers_out", 1, true);
 
@@ -1781,6 +1783,34 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_mass_estimate_.getTopic().c_str());
+    }
+  }
+
+  // --------------------------------------------------------------
+  // |                 publish the current heading                |
+  // --------------------------------------------------------------
+
+  if (sh_uav_state_.hasMsg()) {
+
+    try {
+
+      double heading;
+
+      heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+
+      mrs_msgs::Float64Stamped heading_out;
+      heading_out.header = uav_state.header;
+      heading_out.value  = heading;
+
+      try {
+        publisher_heading_.publish(heading_out);
+      }
+      catch (...) {
+        ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_heading_.getTopic().c_str());
+      }
+    }
+    catch (...) {
+      ROS_ERROR("exception caught, could not transform heading");
     }
   }
 
