@@ -72,7 +72,6 @@
       <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
-      <remap from="~attitude_cmd_out" to="mavros/setpoint_raw/attitude" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->
