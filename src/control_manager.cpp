@@ -2491,7 +2491,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | ------------------- tilt control error ------------------- |
 
-  if (tilt_angle > _tilt_limit_eland_) {
+  if (fabs(_tilt_limit_eland_) > 1e-3 && tilt_angle > _tilt_limit_eland_) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2544,7 +2544,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // | -------------------- yaw control error ------------------- |
   // do not have to mutex the yaw_error_ here since I am filling it in this function
 
-  if (yaw_error_ > _yaw_error_eland_threshold_ / 2.0) {
+  if (fabs(_yaw_error_eland_threshold_) > 1e-3 && yaw_error_ > (_yaw_error_eland_threshold_ / 2.0)) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2560,7 +2560,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     }
   }
 
-  if (yaw_error_ > _yaw_error_eland_threshold_) {
+  if (fabs(_yaw_error_eland_threshold_) > 1e-3 && yaw_error_ > _yaw_error_eland_threshold_) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2579,7 +2579,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   // |      disarm the drone when the tilt exceeds the limit      |
   // --------------------------------------------------------------
-  if (tilt_angle > _tilt_limit_disarm_) {
+  if (fabs(_tilt_limit_disarm_) > 1e-3 && tilt_angle > _tilt_limit_disarm_) {
 
     ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
 
