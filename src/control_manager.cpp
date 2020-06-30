@@ -3554,6 +3554,11 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
   sensor_msgs::JoyConstPtr joystick_data = wrp.getMsg();
 
+  // TODO check if the array is smaller than the largest idx
+  if (joystick_data->buttons.size() == 0 || joystick_data->axes.size() == 0) {
+    return; 
+  }
+
   // | ---- switching back to fallback tracker and controller --- |
 
   // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
