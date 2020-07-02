@@ -32,7 +32,7 @@
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
   <arg name="custom_config_nsf_controller" default="" />
-  <arg name="custom_config_so3_controller" default="" />
+  <arg name="custom_config_se3_controller" default="" />
 
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
@@ -93,12 +93,12 @@
       <param name="nsf_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~nsf_controller/profiler" to="profiler" />
 
-      <!-- SO3 -->
-      <rosparam ns="so3_controller" file="$(find mrs_uav_controllers)/config/default/so3.yaml" />
-      <rosparam ns="so3_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/so3.yaml" />
-      <rosparam if="$(eval not arg('custom_config_so3_controller') == '')" ns="so3_controller" file="$(arg custom_config_so3_controller)" />
-      <param name="so3_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~so3_controller/profiler" to="profiler" />
+      <!-- SE3 -->
+      <rosparam ns="se3_controller" file="$(find mrs_uav_controllers)/config/default/se3.yaml" />
+      <rosparam ns="se3_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/se3.yaml" />
+      <rosparam if="$(eval not arg('custom_config_se3_controller') == '')" ns="se3_controller" file="$(arg custom_config_se3_controller)" />
+      <param name="se3_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~se3_controller/profiler" to="profiler" />
 
       <!-- MPC controller -->
       <rosparam ns="mpc_controller" file="$(find mrs_uav_controllers)/config/default/mpc.yaml" />

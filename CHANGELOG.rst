@@ -149,7 +149,7 @@ Changelog for package mrs_uav_managers
 * fixed crashing of ControlManager while retarding during eland
 * fixed the activation of the first controller -> eland controller
 * typo in NullTracker
-* default controller for simulation is So3
+* default controller for simulation is Se3
 * height checking is optional, eland disarm is optional, minor changes
 * added constraint override feature for controllers
 * added supersoft gains for optflow for simulated uavs
@@ -241,7 +241,7 @@ Changelog for package mrs_uav_managers
 * BRICK + BRICKFLOW estimators
 * uav manager triggers eland when takeoff fails
 * removed the acceleration publisher
-* switched to so3 controller after takeoff
+* switched to se3 controller after takeoff
 * increased the odometry missing timeout
 * fixed failsafe heading bug, fixed deadlock with safety timeout
 * fixed reactivation of trackers and controllers during ehover and eland
@@ -264,17 +264,17 @@ Changelog for package mrs_uav_managers
 * updated remaps for mpc tracker
 * added NullTracker activation in the init
 * reworked loading of trackers' and controllers' parameters
-* split failsafe and eland conditions for so3, mpc and other
+* split failsafe and eland conditions for se3, mpc and other
 * changed the number of "rc control" channel
 * improved comments for the control error failsafe in control_manager.yml
-* switched SO3 back to default for takeoff and after takeoff
-* switched eland controller to So3
+* switched SE3 back to default for takeoff and after takeoff
+* switched eland controller to Se3
 * added mass estimator publisher to control manager
 * constraints are passed to controllers
 * increased the odom timeout for simulation
 * added rc_joystics wiggle switch
-* uav_manager needs SO(3)'s gain manager for takeoff
-* gain manager will publish status when SO(3) is not active
+* uav_manager needs SE(3)'s gain manager for takeoff
+* gain manager will publish status when SE(3) is not active
 * tracker is reactivated upon controller switch
 * refurbished failsafes for hector slam
 * updating takeoff routine with new control switching

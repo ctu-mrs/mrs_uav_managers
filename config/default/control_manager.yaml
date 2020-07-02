@@ -12,7 +12,7 @@ trackers : [
 
 # - list of names of dynamically loaded controllers
 controllers : [
-  "So3Controller",
+  "Se3Controller",
   "MpcController",
   "FailsafeController",
   "EmergencyController",
@@ -122,7 +122,7 @@ obstacle_bumper:
   tracker: "MpcTracker"
 
   switch_controller: true
-  controller: "So3Controller"
+  controller: "Se3Controller"
 
   enabled: false
   timer_rate: 20 # [Hz]

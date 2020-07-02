@@ -441,7 +441,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request &req, mrs_msgs::Str
   // try to set the gains
   if (!setGains(req.value)) {
 
-    ss << "the So3Controller could not set the gains";
+    ss << "the Se3Controller could not set the gains";
 
     ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
 

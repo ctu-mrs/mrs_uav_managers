@@ -87,7 +87,7 @@ This package contains *high-level* flight managers.
 * **launch file**: [constraint_manager.launch](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/launch/constraint_manager.launch)
 
 ## GainManager
-* stores and provides sets of gains for the [So3Controller](https://github.com/ctu-mrs/mrs_uav_controllers)
+* stores and provides sets of gains for the [Se3Controller](https://github.com/ctu-mrs/mrs_uav_controllers)
 * allows mapping each set of gains to only some state estimators of [mrs_uav_odometry](https://github.com/ctu-mrs/mrs_uav_odometry)
 * automatically switches to a fallback set of gains if the current ones are not allowed
 * provides a service for switching to a desired set of gains

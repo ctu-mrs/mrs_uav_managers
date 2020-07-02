@@ -1,6 +1,6 @@
-So3Controller:
-  address: "mrs_uav_controllers/So3Controller"
-  namespace: "so3_controller"
+Se3Controller:
+  address: "mrs_uav_controllers/Se3Controller"
+  namespace: "se3_controller"
   eland_threshold: 1.5 # [m], position error triggering eland
   failsafe_threshold: 2.5 # [m], position error triggering failsafe land
   odometry_innovation_threshold: 1.5 # [m], position odometry innovation threshold
@@ -28,7 +28,7 @@ EmergencyController:
 
 ## ############### here starts the non-conventional stuff ###############
 
-# This is here for debugging purposes only! The So3Controller is superb to the NsfController
+# This is here for debugging purposes only! The Se3Controller is superb to the NsfController
 # in all ways. The Nsf can't be used with other than GPS+COMPASS estimator, since the attiude
 # is controlled by the FlightController. Never activate the NSF controller on a real UAV,
 # unless you are Tomas Baca.
