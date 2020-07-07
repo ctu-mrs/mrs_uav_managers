@@ -3135,31 +3135,42 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
     return;
   }
 
+  // set the reference
+  mrs_msgs::ReferenceStamped reference_request;
+
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  reference_request.header.frame_id      = "";
+  reference_request.header.stamp         = ros::Time(0);
+  reference_request.reference.position.x = last_position_cmd->position.x;
+  reference_request.reference.position.y = last_position_cmd->position.y;
+  reference_request.reference.position.z = last_position_cmd->position.z;
+  reference_request.reference.heading    = pirouette_initial_heading_ + pirouette_iterator_ * pirouette_step_size;
+
+  // enable the callbacks for the active tracker
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    // enable the callbacks for the active tracker
     std_srvs::SetBoolRequest req_enable_callbacks;
     req_enable_callbacks.data = true;
+
     tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
-    // set the reference
-    mrs_msgs::ReferenceStamped reference_request;
+    callbacks_enabled_ = true;
+  }
 
-    auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  setReference(reference_request);
 
-    reference_request.header.frame_id      = "";
-    reference_request.header.stamp         = ros::Time(0);
-    reference_request.reference.position.x = last_position_cmd->position.x;
-    reference_request.reference.position.y = last_position_cmd->position.y;
-    reference_request.reference.position.z = last_position_cmd->position.z;
-    reference_request.reference.heading    = pirouette_initial_heading_ + pirouette_iterator_ * pirouette_step_size;
-
-    setReference(reference_request);
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
 
     // disable the callbacks for the active tracker
+    std_srvs::SetBoolRequest req_enable_callbacks;
     req_enable_callbacks.data = false;
+
     tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+
+    callbacks_enabled_ = false;
   }
 }
 
@@ -3556,7 +3567,7 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
   // TODO check if the array is smaller than the largest idx
   if (joystick_data->buttons.size() == 0 || joystick_data->axes.size() == 0) {
-    return; 
+    return;
   }
 
   // | ---- switching back to fallback tracker and controller --- |
