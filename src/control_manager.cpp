@@ -6601,44 +6601,47 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was initiated");
 
-    if (_bumper_switch_tracker_) {
+    if (!repulsing_) {
 
-      auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-      std::string active_tracker_name = _tracker_names_[active_tracker_idx];
+      if (_bumper_switch_tracker_) {
 
-      // remember the previously active tracker
-      bumper_previous_tracker_ = active_tracker_name;
+        auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+        std::string active_tracker_name = _tracker_names_[active_tracker_idx];
 
-      if (active_tracker_name != _bumper_tracker_name_) {
+        // remember the previously active tracker
+        bumper_previous_tracker_ = active_tracker_name;
 
-        switchTracker(_bumper_tracker_name_);
+        if (active_tracker_name != _bumper_tracker_name_) {
+
+          switchTracker(_bumper_tracker_name_);
+        }
+      }
+
+      if (_bumper_switch_controller_) {
+
+        auto        active_controller_idx  = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+        std::string active_controller_name = _controller_names_[active_controller_idx];
+
+        // remember the previously active controller
+        bumper_previous_controller_ = active_controller_name;
+
+        if (active_controller_name != _bumper_controller_name_) {
+
+          switchController(_bumper_controller_name_);
+        }
       }
     }
 
-    if (_bumper_switch_controller_) {
-
-      auto        active_controller_idx  = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
-      std::string active_controller_name = _controller_names_[active_controller_idx];
-
-      // remember the previously active controller
-      bumper_previous_controller_ = active_controller_name;
-
-      if (active_controller_name != _bumper_controller_name_) {
-
-        switchController(_bumper_controller_name_);
-      }
-    }
+    repulsing_ = true;
 
     mrs_msgs::BumperStatus bumper_status;
-    bumper_status.repulsing = true;
+    bumper_status.repulsing = repulsing_;
     try {
       publisher_bumper_status_.publish(bumper_status);
     }
     catch (...) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
     }
-
-    repulsing_ = true;
 
     callbacks_enabled_ = false;
 
