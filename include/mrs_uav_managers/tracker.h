@@ -33,9 +33,9 @@
 #include <std_srvs/SetBoolRequest.h>
 #include <std_srvs/SetBoolResponse.h>
 
-#include <mrs_msgs/TrackerConstraintsSrv.h>
-#include <mrs_msgs/TrackerConstraintsSrvRequest.h>
-#include <mrs_msgs/TrackerConstraintsSrvResponse.h>
+#include <mrs_msgs/DynamicsConstraintsSrv.h>
+#include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
+#include <mrs_msgs/DynamicsConstraintsSrvResponse.h>
 
 #include <mrs_msgs/AttitudeCommand.h>
 
@@ -187,7 +187,7 @@ public:
    *
    * @return a service response
    */
-  virtual const mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr &constraints) = 0;
+  virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 
 // A pure virtual destructor requires a function body.

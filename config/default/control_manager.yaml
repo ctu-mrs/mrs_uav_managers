@@ -116,6 +116,13 @@ default_constraints:
     jerk: 3.0
     snap: 5.0
 
+  angular_speed:
+    roll: 10.0
+    pitch: 10.0
+    yaw: 1.0
+
+  tilt: deg(60)
+
 obstacle_bumper:
 
   switch_tracker: true

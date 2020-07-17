@@ -15,7 +15,7 @@
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
-#include <mrs_msgs/TrackerConstraints.h>
+#include <mrs_msgs/DynamicsConstraints.h>
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
@@ -574,16 +574,16 @@ private:
   // | ----------------------- constraints ---------------------- |
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res);
+  bool callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Request& req, mrs_msgs::DynamicsConstraintsSrv::Response& res);
 
   // constraints management
   bool       got_constraints_ = false;
   std::mutex mutex_constraints_;
-  void       setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints);
-  bool       enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints);
+  void       setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest constraints);
+  bool       enforceControllersConstraints(mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
 
-  mrs_msgs::TrackerConstraintsSrvRequest current_constraints_;
-  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints_;
+  mrs_msgs::DynamicsConstraintsSrvRequest current_constraints_;
+  mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints_;
 
   // | ------------------------- timers ------------------------- |
 
@@ -915,6 +915,12 @@ void ControlManager::onInit() {
   param_loader.loadParam("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
   param_loader.loadParam("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
   param_loader.loadParam("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
+
+  param_loader.loadParam("default_constraints/angular_speed/roll", current_constraints_.constraints.roll_rate);
+  param_loader.loadParam("default_constraints/angular_speed/pitch", current_constraints_.constraints.pitch_rate);
+  param_loader.loadParam("default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
+
+  param_loader.loadParam("default_constraints/tilt", current_constraints_.constraints.tilt);
 
   // joystick
 
@@ -1516,7 +1522,7 @@ void ControlManager::onInit() {
   publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
   publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
   publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
-  publisher_current_constraints_             = nh_.advertise<mrs_msgs::TrackerConstraints>("current_constraints_out", 1);
+  publisher_current_constraints_             = nh_.advertise<mrs_msgs::DynamicsConstraints>("current_constraints_out", 1);
   publisher_heading_                         = nh_.advertise<mrs_msgs::Float64Stamped>("heading_out", 1);
   pub_debug_original_trajectory_poses_       = nh_.advertise<geometry_msgs::PoseArray>("trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_     = nh_.advertise<visualization_msgs::MarkerArray>("trajectory_original/markers_out", 1, true);
@@ -2313,7 +2319,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
 
-    mrs_msgs::TrackerConstraints constraints = sanitized_constraints.constraints;
+    mrs_msgs::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
     try {
       publisher_current_constraints_.publish(constraints);
@@ -4217,7 +4223,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
 /* callbackSetConstraints() //{ */
 
-bool ControlManager::callbackSetConstraints(mrs_msgs::TrackerConstraintsSrv::Request& req, mrs_msgs::TrackerConstraintsSrv::Response& res) {
+bool ControlManager::callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Request& req, mrs_msgs::DynamicsConstraintsSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -6003,11 +6009,11 @@ void ControlManager::publishDiagnostics(void) {
 
 /* setConstraints() //{ */
 
-void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest constraints) {
+void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest constraints) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("setConstraints");
 
-  mrs_msgs::TrackerConstraintsSrvResponse::ConstPtr tracker_response;
+  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -6016,8 +6022,20 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest const
     for (int i = 0; i < int(tracker_list_.size()); i++) {
 
       // if it is the active one, update and retrieve the command
-      tracker_response = tracker_list_[i]->setConstraints(
-          mrs_msgs::TrackerConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrackerConstraintsSrvRequest>(constraints)));
+      response = tracker_list_[i]->setConstraints(
+          mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::DynamicsConstraintsSrvRequest>(constraints)));
+    }
+  }
+
+  {
+    std::scoped_lock lock(mutex_controller_list_);
+
+    // for each controller
+    for (int i = 0; i < int(controller_list_.size()); i++) {
+
+      // if it is the active one, update and retrieve the command
+      response = controller_list_[i]->setConstraints(
+          mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -6026,7 +6044,7 @@ void ControlManager::setConstraints(mrs_msgs::TrackerConstraintsSrvRequest const
 
 /* enforceControllerConstraints() //{ */
 
-bool ControlManager::enforceControllersConstraints(mrs_msgs::TrackerConstraintsSrvRequest& constraints) {
+bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -7774,7 +7792,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     }
   }
 
-  mrs_msgs::TrackerConstraintsSrvRequest sanitized_constraints;
+  mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints;
   {
     std::scoped_lock lock(mutex_constraints_);
 

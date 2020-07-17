@@ -26,6 +26,13 @@ slow:
     jerk: 10.0
     snap: 10.0
 
+  angular_speed:
+    roll: 10.0
+    pitch: 10.0
+    yaw: 1.0
+
+  tilt: deg(60)
+
 medium:
 
   horizontal:
@@ -54,6 +61,13 @@ medium:
     jerk: 10.0
     snap: 10.0
 
+  angular_speed:
+    roll: 60.0
+    pitch: 60.0
+    yaw: 10.0
+
+  tilt: deg(60)
+
 fast:
 
   horizontal:
@@ -81,3 +95,10 @@ fast:
     acceleration: 2.0
     jerk: 10.0
     snap: 10.0
+
+  angular_speed:
+    roll: 60.0
+    pitch: 60.0
+    yaw: 10.0
+
+  tilt: deg(60)

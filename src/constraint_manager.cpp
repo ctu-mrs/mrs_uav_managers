@@ -10,8 +10,8 @@
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/OdometryDiag.h>
 #include <mrs_msgs/EstimatorType.h>
-#include <mrs_msgs/TrackerConstraintsSrv.h>
-#include <mrs_msgs/TrackerConstraintsSrvRequest.h>
+#include <mrs_msgs/DynamicsConstraintsSrv.h>
+#include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/String.h>
 
 #include <mrs_lib/profiler.h>
@@ -46,8 +46,8 @@ private:
 
   std::vector<std::string> _estimator_type_names_;
 
-  std::vector<std::string>                                      _constraint_names_;
-  std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest> _constraints_;
+  std::vector<std::string>                                       _constraint_names_;
+  std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest> _constraints_;
 
   std::map<std::string, std::vector<std::string>> _map_type_allowed_constraints_;
   std::map<std::string, std::string>              _map_type_fallback_constraints_;
@@ -139,7 +139,7 @@ void ConstraintManager::onInit() {
 
     ROS_INFO_STREAM("[ConstraintManager]: loading constraints '" << *it << "'");
 
-    mrs_msgs::TrackerConstraintsSrvRequest new_constraints;
+    mrs_msgs::DynamicsConstraintsSrvRequest new_constraints;
 
     param_loader.loadParam(*it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
     param_loader.loadParam(*it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
@@ -161,7 +161,13 @@ void ConstraintManager::onInit() {
     param_loader.loadParam(*it + "/heading/jerk", new_constraints.constraints.heading_jerk);
     param_loader.loadParam(*it + "/heading/snap", new_constraints.constraints.heading_snap);
 
-    _constraints_.insert(std::pair<std::string, mrs_msgs::TrackerConstraintsSrvRequest>(*it, new_constraints));
+    param_loader.loadParam(*it + "/angular_speed/roll", new_constraints.constraints.roll_rate);
+    param_loader.loadParam(*it + "/angular_speed/pitch", new_constraints.constraints.pitch_rate);
+    param_loader.loadParam(*it + "/angular_speed/yaw", new_constraints.constraints.yaw_rate);
+
+    param_loader.loadParam(*it + "/tilt", new_constraints.constraints.tilt);
+
+    _constraints_.insert(std::pair<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>(*it, new_constraints));
   }
 
   // loading the allowed constraints lists
@@ -204,7 +210,7 @@ void ConstraintManager::onInit() {
 
   service_server_set_constraints_ = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
 
-  service_client_set_constraints_ = nh_.serviceClient<mrs_msgs::TrackerConstraintsSrv>("set_constraints_out");
+  service_client_set_constraints_ = nh_.serviceClient<mrs_msgs::DynamicsConstraintsSrv>("set_constraints_out");
 
   // | ----------------------- subscribers ---------------------- |
   subscriber_odometry_diagnostics_ =
@@ -245,7 +251,7 @@ void ConstraintManager::onInit() {
 
 bool ConstraintManager::setConstraints(std::string constraints_name) {
 
-  std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest>::iterator it;
+  std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>::iterator it;
   it = _constraints_.find(constraints_name);
 
   if (it == _constraints_.end()) {
@@ -253,7 +259,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
     return false;
   }
 
-  mrs_msgs::TrackerConstraintsSrv srv_call;
+  mrs_msgs::DynamicsConstraintsSrv srv_call;
 
   srv_call.request = it->second;
 
@@ -471,7 +477,7 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
 
   // get the current constraint values
   {
-    std::map<std::string, mrs_msgs::TrackerConstraintsSrvRequest>::iterator it;
+    std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>::iterator it;
     it = _constraints_.find(current_constraints);
 
     diagnostics.current_values = it->second.constraints;

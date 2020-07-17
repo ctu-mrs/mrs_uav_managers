@@ -12,6 +12,10 @@
 #include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/UavState.h>
 
+#include <mrs_msgs/DynamicsConstraintsSrv.h>
+#include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
+#include <mrs_msgs/DynamicsConstraintsSrvResponse.h>
+
 //}
 
 namespace mrs_uav_managers
@@ -91,6 +95,15 @@ public:
    * @param new_uav_state the new UavState which will come in the next update()
    */
   virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+
+  /**
+   * @brief Request for setting new constraints.
+   *
+   * @param constraints to be set
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 
 // A pure virtual destructor requires a function body.
