@@ -585,6 +585,12 @@ private:
   mrs_msgs::DynamicsConstraintsSrvRequest current_constraints_;
   mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints_;
 
+  // | ------------------ emergency triggered? ------------------ |
+
+  bool ehover_triggered_   = false;
+  bool failsafe_triggered_ = false;
+  bool eland_triggered_    = false;
+
   // | ------------------------- timers ------------------------- |
 
   // timer for regular status publishing
@@ -594,7 +600,6 @@ private:
   // timer for issuing the failsafe landing
   ros::Timer timer_failsafe_;
   void       timerFailsafe(const ros::TimerEvent& event);
-  bool       failsafe_triggered_ = false;
 
   // oneshot timer for running controllers and trackers
   ros::Timer timer_control_;
@@ -604,7 +609,6 @@ private:
   // timer for issuing emergancy landing
   ros::Timer timer_eland_;
   void       timerEland(const ros::TimerEvent& event);
-  bool       eland_triggered_ = false;
 
   // timer for regular checking of controller errors
   ros::Timer timer_safety_;
@@ -655,6 +659,10 @@ private:
   // escalating failsafe (eland -> failsafe -> disarm)
   double    _escalating_failsafe_timeout_ = 0;
   ros::Time escalating_failsafe_time_;
+  bool      _escalating_failsafe_ehover_   = false;
+  bool      _escalating_failsafe_eland_    = false;
+  bool      _escalating_failsafe_failsafe_ = false;
+  bool      _escalating_failsafe_disarm_   = false;
 
   // rc control
   bool        _rc_eland_enabled_ = false;
@@ -870,6 +878,10 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
   param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
+  param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
+  param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
+  param_loader.loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
+  param_loader.loadParam("safety/escalating_failsafe/disarm", _escalating_failsafe_disarm_);
 
   param_loader.loadParam("safety/tilt_limit_eland", _tilt_limit_eland_);
   _tilt_limit_eland_ = (_tilt_limit_eland_ / 180.0) * M_PI;
@@ -6936,6 +6948,8 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
   ss << "ehover activated";
   ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
+  ehover_triggered_ = true;
+
   return std::tuple(true, ss.str());
 }
 
@@ -7145,15 +7159,25 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   ROS_WARN("[ControlManager]: escalating failsafe triggered");
 
-  if (!eland_triggered_ && !failsafe_triggered_ && motors_) {
+  if (_escalating_failsafe_ehover_ && (!ehover_triggered_ && !eland_triggered_ && !failsafe_triggered_ && motors_)) {
 
     escalating_failsafe_time_ = ros::Time::now();
 
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: escalating failsafe calls for eland");
+    ss << "escalating failsafe escalates to ehover";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+    return ehover();
+
+  } else if (_escalating_failsafe_eland_ && (!eland_triggered_ && !failsafe_triggered_ && motors_)) {
+
+    escalating_failsafe_time_ = ros::Time::now();
+
+    ss << "escalating failsafe escalates to eland";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
     return eland();
 
-  } else if (eland_triggered_) {
+  } else if (_escalating_failsafe_failsafe_ && (eland_triggered_)) {
 
     escalating_failsafe_time_ = ros::Time::now();
 
@@ -7162,7 +7186,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
     return failsafe();
 
-  } else if (failsafe_triggered_) {
+  } else if (_escalating_failsafe_disarm_ && (failsafe_triggered_)) {
 
     escalating_failsafe_time_ = ros::Time::now();
 
@@ -7172,7 +7196,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     return arming(false);
   }
 
-  return std::tuple(false, "escalating failsafe reached an improper state");
+  return std::tuple(false, "escalating failsafe has nothing more to do");
 }
 
 //}

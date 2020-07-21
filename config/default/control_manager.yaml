@@ -67,6 +67,11 @@ safety:
     # how often does it allow to escalate
     timeout: 2.0 # [s]
 
+    ehover: true
+    eland: true
+    failsafe: true
+    disarm: true
+
   tilt_error_disarm:
 
     enabled: true
