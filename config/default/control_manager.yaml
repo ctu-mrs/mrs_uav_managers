@@ -3,7 +3,6 @@ version: "0.0.5.0"
 # - list of names of dynamically loaded trackers
 trackers : [
   "MpcTracker",
-  "LineTracker",
   "LandoffTracker",
   "JoyTracker",
   "NullTracker",
