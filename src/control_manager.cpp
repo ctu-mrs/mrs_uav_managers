@@ -587,7 +587,6 @@ private:
 
   // | ------------------ emergency triggered? ------------------ |
 
-  bool ehover_triggered_   = false;
   bool failsafe_triggered_ = false;
   bool eland_triggered_    = false;
 
@@ -5970,6 +5969,10 @@ void ControlManager::setCallbacks(bool in) {
 
 void ControlManager::publishDiagnostics(void) {
 
+  if (!is_initialized_) {
+    return;
+  }
+
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
 
   std::scoped_lock lock(mutex_diagnostics_);
@@ -6008,6 +6011,24 @@ void ControlManager::publishDiagnostics(void) {
     diagnostics_msg.active_controller = _controller_names_[active_controller_idx_];
     diagnostics_msg.controller_status = controller_list_[active_controller_idx_]->getStatus();
   }
+
+  // | ------------ fill in the available controllers ----------- |
+
+  for (int i = 0; i < int(_controller_names_.size()); i++) {
+    if ((_controller_names_[i] != _failsafe_controller_name_) && (_controller_names_[i] != _eland_controller_name_)) {
+      diagnostics_msg.available_controllers.push_back(_controller_names_[i]);
+    }
+  }
+
+  // | ------------- fill in the available trackers ------------- |
+
+  for (int i = 0; i < int(_tracker_names_.size()); i++) {
+    if ((_tracker_names_[i] != _null_tracker_name_) && (_tracker_names_[i] != _landoff_tracker_name_)) {
+      diagnostics_msg.available_trackers.push_back(_tracker_names_[i]);
+    }
+  }
+
+  // | ------------------------- publish ------------------------ |
 
   try {
     publisher_diagnostics_.publish(diagnostics_msg);
@@ -6948,8 +6969,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
   ss << "ehover activated";
   ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
-  ehover_triggered_ = true;
-
   return std::tuple(true, ss.str());
 }
 
@@ -7159,7 +7178,15 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   ROS_WARN("[ControlManager]: escalating failsafe triggered");
 
-  if (_escalating_failsafe_ehover_ && (!ehover_triggered_ && !eland_triggered_ && !failsafe_triggered_ && motors_)) {
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+
+  std::string active_tracker_name    = _tracker_names_[active_tracker_idx];
+  std::string active_controller_name = _controller_names_[active_controller_idx];
+
+  bool ehovering = (active_tracker_name == _landoff_tracker_name_) && (active_controller_name == _eland_controller_name_);
+
+  if (_escalating_failsafe_ehover_ && (!ehovering && !eland_triggered_ && !failsafe_triggered_ && motors_)) {
 
     escalating_failsafe_time_ = ros::Time::now();
 
