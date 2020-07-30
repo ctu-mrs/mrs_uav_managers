@@ -109,7 +109,7 @@
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
 #define INPUT_UAV_STATE 0
-#define INPUT_ODOMETY 1
+#define INPUT_ODOMETRY 1
 
 //}
 
@@ -861,7 +861,7 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("state_input", _state_input_);
 
-  if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETY)) {
+  if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
     ros::shutdown();
   }
@@ -1554,7 +1554,7 @@ void ControlManager::onInit() {
   if (_state_input_ == INPUT_UAV_STATE) {
     sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
                                                                   &ControlManager::callbackUavState, this);
-  } else if (_state_input_ == INPUT_ODOMETY) {
+  } else if (_state_input_ == INPUT_ODOMETRY) {
     sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
                                                                  &ControlManager::callbackOdometry, this);
   }
@@ -1807,7 +1807,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |                 publish the current heading                |
   // --------------------------------------------------------------
 
-  if (sh_uav_state_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && sh_uav_state_.hasMsg()) {
 
     try {
 
