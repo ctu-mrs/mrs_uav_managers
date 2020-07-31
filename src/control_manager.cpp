@@ -478,6 +478,7 @@ private:
   // this filled with the current controllers failsafe threshold
   double _failsafe_threshold_            = 0;  // control error for triggering failsafe
   double _eland_threshold_               = 0;  // control error for triggering eland
+  bool   _odometry_innovation_enabled_   = false;
   double _odometry_innovation_threshold_ = 0;  // innovation size for triggering eland
 
   // are callbacks enabled to trackers?
@@ -899,6 +900,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("g", _g_);
 
   param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
+  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_enabled_);
 
   param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
@@ -1559,13 +1561,16 @@ void ControlManager::onInit() {
                                                                  &ControlManager::callbackOdometry, this);
   }
 
-  sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
-  sh_pixhawk_odometry_    = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
-  sh_bumper_              = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_height_          = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_joystick_            = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_mavros_gps_          = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
-  sh_rc_                  = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
+  if (_odometry_innovation_enabled_) {
+    sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
+  }
+
+  sh_pixhawk_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
+  sh_bumper_           = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_height_       = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_joystick_         = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_mavros_gps_       = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
+  sh_rc_               = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
 
   sh_mavros_state_ = mrs_lib::SubscribeHandler<mavros_msgs::State>(shopts, "mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
                                                                    &ControlManager::callbackMavrosState, this);
@@ -2361,7 +2366,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) || !sh_pixhawk_odometry_.hasMsg() ||
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) || !sh_pixhawk_odometry_.hasMsg() ||
       active_tracker_idx == _null_tracker_idx_) {
     return;
   }
@@ -2472,31 +2477,33 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // |     activate emergency land in case of large innovation    |
   // --------------------------------------------------------------
 
-  {
-    auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
+  if (_odometry_innovation_enabled_) {
+    {
+      auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
 
-    double heading = 0;
-    try {
-      heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
-    }
-    catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
-    }
+      double heading = 0;
+      try {
+        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
+      }
+      catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
+      }
 
-    double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
+      double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
 
-    if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
+      if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
 
-      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+        auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+        if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        if (!failsafe_triggered_ && !eland_triggered_) {
+          if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
-                    last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
+                      last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
-          eland();
+            eland();
+          }
         }
       }
     }
@@ -7594,7 +7601,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -7751,7 +7758,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
