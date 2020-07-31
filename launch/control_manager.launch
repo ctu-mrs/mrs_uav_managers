@@ -16,6 +16,7 @@
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
+  <arg name="body_frame" default="fcu" />
 
     <!-- custom configs for trackers -->
   <arg name="custom_config_csv_tracker" default="" />
@@ -79,6 +80,7 @@
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
+      <param name="body_frame" type="string" value="$(arg body_frame)" />
       <param name="g" value="$(arg g)" />
       <param name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="body_disturbance_x" value="$(arg BODY_DISTURBANCE_X)" />

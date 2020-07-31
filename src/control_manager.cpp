@@ -199,6 +199,7 @@ private:
   std::string     _version_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
+  std::string     _body_frame_;
 
   // | --------------- dynamic loading of trackers -------------- |
 
@@ -338,6 +339,7 @@ private:
   ros::Publisher publisher_attitude_cmd_;
   ros::Publisher publisher_thrust_force_;
   ros::Publisher publisher_cmd_odom_;
+  ros::Publisher publisher_cmd_twist_;
   ros::Publisher publisher_diagnostics_;
   ros::Publisher publisher_motors_;
   ros::Publisher publisher_offboard_on_;
@@ -857,6 +859,8 @@ void ControlManager::onInit() {
   }
 
   param_loader.loadParam("uav_name", _uav_name_);
+
+  param_loader.loadParam("body_frame", _body_frame_);
 
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
@@ -1525,6 +1529,7 @@ void ControlManager::onInit() {
   publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
   publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
   publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_cmd_twist_                       = nh_.advertise<geometry_msgs::Twist>("cmd_twist_out", 1);
   publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_offboard_on_                     = nh_.advertise<std_msgs::Empty>("offboard_on_out", 1);
@@ -2366,8 +2371,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) || !sh_pixhawk_odometry_.hasMsg() ||
-      active_tracker_idx == _null_tracker_idx_) {
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
+      !sh_pixhawk_odometry_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -8128,7 +8133,7 @@ void ControlManager::publish(void) {
 
     // transform the velocity in the reference to the child_frame
     if (last_position_cmd->use_velocity_horizontal || last_position_cmd->use_velocity_vertical) {
-      cmd_odom.child_frame_id = _uav_name_ + "/fcu";
+      cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_;
 
       geometry_msgs::Vector3Stamped velocity;
       velocity.header = last_position_cmd->header;
@@ -8149,6 +8154,9 @@ void ControlManager::publish(void) {
         cmd_odom.twist.twist.linear.x = res.value().vector.x;
         cmd_odom.twist.twist.linear.y = res.value().vector.y;
         cmd_odom.twist.twist.linear.z = res.value().vector.z;
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the cmd odom speed from '%s' to '%s'", velocity.header.frame_id.c_str(),
+                           cmd_odom.child_frame_id.c_str());
       }
     }
 
@@ -8180,6 +8188,17 @@ void ControlManager::publish(void) {
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_position_cmd_.getTopic().c_str());
+    }
+
+    // publish the twist topic (velocity command in body frame for external controllers)
+    geometry_msgs::Twist cmd_twist;
+    cmd_twist = cmd_odom.twist.twist;
+
+    try {
+      publisher_cmd_twist_.publish(cmd_twist);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_cmd_twist_.getTopic().c_str());
     }
   }
 
