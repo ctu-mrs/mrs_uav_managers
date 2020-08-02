@@ -109,7 +109,7 @@
 #define ESCALATING_FAILSAFE_STR "escalating_failsafe"
 #define FAILSAFE_STR "failsafe"
 #define INPUT_UAV_STATE 0
-#define INPUT_ODOMETY 1
+#define INPUT_ODOMETRY 1
 
 //}
 
@@ -199,6 +199,7 @@ private:
   std::string     _version_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
+  std::string     _body_frame_;
 
   // | --------------- dynamic loading of trackers -------------- |
 
@@ -338,6 +339,7 @@ private:
   ros::Publisher publisher_attitude_cmd_;
   ros::Publisher publisher_thrust_force_;
   ros::Publisher publisher_cmd_odom_;
+  ros::Publisher publisher_cmd_twist_;
   ros::Publisher publisher_diagnostics_;
   ros::Publisher publisher_motors_;
   ros::Publisher publisher_offboard_on_;
@@ -478,6 +480,7 @@ private:
   // this filled with the current controllers failsafe threshold
   double _failsafe_threshold_            = 0;  // control error for triggering failsafe
   double _eland_threshold_               = 0;  // control error for triggering eland
+  bool   _odometry_innovation_enabled_   = false;
   double _odometry_innovation_threshold_ = 0;  // innovation size for triggering eland
 
   // are callbacks enabled to trackers?
@@ -857,11 +860,13 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("uav_name", _uav_name_);
 
+  param_loader.loadParam("body_frame", _body_frame_);
+
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
   param_loader.loadParam("state_input", _state_input_);
 
-  if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETY)) {
+  if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
     ros::shutdown();
   }
@@ -899,6 +904,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("g", _g_);
 
   param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
+  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_enabled_);
 
   param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
@@ -1523,6 +1529,7 @@ void ControlManager::onInit() {
   publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
   publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
   publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
+  publisher_cmd_twist_                       = nh_.advertise<geometry_msgs::Twist>("cmd_twist_out", 1);
   publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_offboard_on_                     = nh_.advertise<std_msgs::Empty>("offboard_on_out", 1);
@@ -1554,18 +1561,21 @@ void ControlManager::onInit() {
   if (_state_input_ == INPUT_UAV_STATE) {
     sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
                                                                   &ControlManager::callbackUavState, this);
-  } else if (_state_input_ == INPUT_ODOMETY) {
+  } else if (_state_input_ == INPUT_ODOMETRY) {
     sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
                                                                  &ControlManager::callbackOdometry, this);
   }
 
-  sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
-  sh_pixhawk_odometry_    = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
-  sh_bumper_              = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_height_          = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_joystick_            = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_mavros_gps_          = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
-  sh_rc_                  = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
+  if (_odometry_innovation_enabled_) {
+    sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
+  }
+
+  sh_pixhawk_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
+  sh_bumper_           = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_height_       = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_joystick_         = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_mavros_gps_       = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
+  sh_rc_               = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
 
   sh_mavros_state_ = mrs_lib::SubscribeHandler<mavros_msgs::State>(shopts, "mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
                                                                    &ControlManager::callbackMavrosState, this);
@@ -1807,7 +1817,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |                 publish the current heading                |
   // --------------------------------------------------------------
 
-  if (sh_uav_state_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && sh_uav_state_.hasMsg()) {
 
     try {
 
@@ -2361,8 +2371,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) || !sh_pixhawk_odometry_.hasMsg() ||
-      active_tracker_idx == _null_tracker_idx_) {
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
+      !sh_pixhawk_odometry_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -2472,31 +2482,33 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // |     activate emergency land in case of large innovation    |
   // --------------------------------------------------------------
 
-  {
-    auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
+  if (_odometry_innovation_enabled_) {
+    {
+      auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
 
-    double heading = 0;
-    try {
-      heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
-    }
-    catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
-    }
+      double heading = 0;
+      try {
+        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
+      }
+      catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
+      }
 
-    double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
+      double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
 
-    if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
+      if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
 
-      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+        auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+        if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        if (!failsafe_triggered_ && !eland_triggered_) {
+          if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
-                    last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
+                      last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
-          eland();
+            eland();
+          }
         }
       }
     }
@@ -7594,7 +7606,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -7751,7 +7763,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -8121,7 +8133,7 @@ void ControlManager::publish(void) {
 
     // transform the velocity in the reference to the child_frame
     if (last_position_cmd->use_velocity_horizontal || last_position_cmd->use_velocity_vertical) {
-      cmd_odom.child_frame_id = _uav_name_ + "/fcu";
+      cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_;
 
       geometry_msgs::Vector3Stamped velocity;
       velocity.header = last_position_cmd->header;
@@ -8142,6 +8154,9 @@ void ControlManager::publish(void) {
         cmd_odom.twist.twist.linear.x = res.value().vector.x;
         cmd_odom.twist.twist.linear.y = res.value().vector.y;
         cmd_odom.twist.twist.linear.z = res.value().vector.z;
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the cmd odom speed from '%s' to '%s'", velocity.header.frame_id.c_str(),
+                           cmd_odom.child_frame_id.c_str());
       }
     }
 
@@ -8173,6 +8188,17 @@ void ControlManager::publish(void) {
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_position_cmd_.getTopic().c_str());
+    }
+
+    // publish the twist topic (velocity command in body frame for external controllers)
+    geometry_msgs::Twist cmd_twist;
+    cmd_twist = cmd_odom.twist.twist;
+
+    try {
+      publisher_cmd_twist_.publish(cmd_twist);
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_cmd_twist_.getTopic().c_str());
     }
   }
 
