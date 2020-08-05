@@ -1533,7 +1533,7 @@ void ControlManager::onInit() {
   publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
   publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
   publisher_offboard_on_                     = nh_.advertise<std_msgs::Empty>("offboard_on_out", 1);
-  publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64>("tilt_error_out", 1);
+  publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64Stamped>("tilt_error_out", 1);
   publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
   publisher_control_error_                   = nh_.advertise<mrs_msgs::ControlError>("control_error_out", 1);
   publisher_safety_area_markers_             = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
@@ -1755,8 +1755,10 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   {
     std::scoped_lock lock(mutex_attitude_error_);
 
-    mrs_msgs::Float64 tilt_error_out;
-    tilt_error_out.value = (180.0 / M_PI) * tilt_error_;
+    mrs_msgs::Float64Stamped tilt_error_out;
+    tilt_error_out.header.stamp    = ros::Time::now();
+    tilt_error_out.header.frame_id = uav_state.header.frame_id;
+    tilt_error_out.value           = (180.0 / M_PI) * tilt_error_;
 
     try {
       publisher_tilt_error_.publish(tilt_error_out);
