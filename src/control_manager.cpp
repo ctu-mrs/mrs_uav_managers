@@ -659,19 +659,17 @@ private:
   // | --------------- safety checks and failsafes -------------- |
 
   // escalating failsafe (eland -> failsafe -> disarm)
-  double    _escalating_failsafe_timeout_ = 0;
+  bool      _service_escalating_failsafe_enabled_ = false;
+  bool      _rc_escalating_failsafe_enabled_      = false;
+  double    _escalating_failsafe_timeout_         = 0;
   ros::Time escalating_failsafe_time_;
   bool      _escalating_failsafe_ehover_   = false;
   bool      _escalating_failsafe_eland_    = false;
   bool      _escalating_failsafe_failsafe_ = false;
   bool      _escalating_failsafe_disarm_   = false;
-
-  // rc control
-  bool        _rc_eland_enabled_ = false;
-  int         _rc_eland_channel_;
-  int         _rc_eland_threshold_;
-  std::string _rc_eland_action_;
-  bool        rc_eland_triggered_ = false;
+  int       _rc_escalating_failsafe_threshold_;
+  int       _rc_escalating_failsafe_channel_  = 0;
+  bool      rc_escalating_failsafe_triggered_ = false;
 
   std::string _tracker_error_action_;
 
@@ -879,6 +877,10 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
   param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
+  param_loader.loadParam("safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
   param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
   param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
   param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
@@ -988,18 +990,6 @@ void ControlManager::onInit() {
   param_loader.loadParam("obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
   param_loader.loadParam("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
   param_loader.loadParam("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
-
-  param_loader.loadParam("safety/rc_eland/enabled", _rc_eland_enabled_);
-  param_loader.loadParam("safety/rc_eland/channel_number", _rc_eland_channel_);
-  param_loader.loadParam("safety/rc_eland/threshold", _rc_eland_threshold_);
-  param_loader.loadParam("safety/rc_eland/action", _rc_eland_action_);
-
-  // check the values of RC eland action
-  if (_rc_eland_action_ != ELAND_STR && _rc_eland_action_ != ESCALATING_FAILSAFE_STR && _rc_eland_action_ != FAILSAFE_STR) {
-    ROS_ERROR("[ControlManager]: the rc_eland/action parameter (%s) is not correct, requires {%s, %s, %s}", _rc_eland_action_.c_str(), ELAND_STR,
-              ESCALATING_FAILSAFE_STR, FAILSAFE_STR);
-    ros::shutdown();
-  }
 
   param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
 
@@ -3090,7 +3080,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
   double pirouette_n_steps   = pirouette_duration * _pirouette_timer_rate_;
   double pirouette_step_size = (2 * M_PI) / pirouette_n_steps;
 
-  if (rc_eland_triggered_ || failsafe_triggered_ || eland_triggered_ || (pirouette_iterator_ > pirouette_duration * _pirouette_timer_rate_)) {
+  if (rc_escalating_failsafe_triggered_ || failsafe_triggered_ || eland_triggered_ || (pirouette_iterator_ > pirouette_duration * _pirouette_timer_rate_)) {
 
     _pirouette_enabled_ = false;
     timer_pirouette_.stop();
@@ -3688,10 +3678,6 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
   if (!is_initialized_)
     return;
 
-  if (rc_eland_triggered_) {
-    return;
-  }
-
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackRC");
 
   mavros_msgs::RCInConstPtr rc = wrp.getMsg();
@@ -3790,41 +3776,23 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
   }
 
   // | ------------------------ rc eland ------------------------ |
-  if (_rc_eland_enabled_) {
+  if (_rc_escalating_failsafe_enabled_) {
 
-    if (_rc_eland_channel_ >= int(rc->channels.size())) {
+    if (_rc_escalating_failsafe_channel_ >= int(rc->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, int(rc->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_escalating_failsafe_channel_,
+                         int(rc->channels.size()));
 
     } else {
 
-      if (rc->channels[_rc_eland_channel_] >= _rc_eland_threshold_) {
+      if (rc->channels[_rc_escalating_failsafe_channel_] >= _rc_escalating_failsafe_threshold_) {
 
-        if (_rc_eland_action_ == ELAND_STR) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering escalating failsafe by RC");
 
-          if (!eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
+        auto [success, message] = escalatingFailsafe();
 
-            ROS_WARN("[ControlManager]: triggering eland by RC");
-
-            rc_eland_triggered_ = true;
-
-            eland();
-          }
-
-        } else if (_rc_eland_action_ == ESCALATING_FAILSAFE_STR) {
-
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering escalating failsafe by RC");
-
-          escalatingFailsafe();
-
-        } else if (_rc_eland_action_ == FAILSAFE_STR) {
-
-          if (!failsafe_triggered_) {
-
-            ROS_WARN("[ControlManager]: triggering failsafe by RC");
-
-            failsafe();
-          }
+        if (success) {
+          rc_escalating_failsafe_triggered_ = true;
         }
       }
     }
@@ -3874,7 +3842,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch tracker, eland or failsafe active";
@@ -3904,7 +3872,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
@@ -3936,7 +3904,7 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigg
 
   std::stringstream message;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     message << "can not reset tracker, eland or failsafe active";
 
@@ -3980,7 +3948,7 @@ bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request&
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
@@ -4044,12 +4012,25 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
   if (!is_initialized_)
     return false;
 
-  ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
+  if (_service_escalating_failsafe_enabled_) {
 
-  auto [success, message] = escalatingFailsafe();
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
 
-  res.success = success;
-  res.message = message;
+    auto [success, message] = escalatingFailsafe();
+
+    res.success = success;
+    res.message = message;
+
+  } else {
+
+    std::stringstream ss;
+    ss << "escalating failsafe is disabled";
+
+    res.success = false;
+    res.message = ss.str();
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: %s", ss.str().c_str());
+  }
 
   return true;
 }
@@ -4129,7 +4110,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     }
   }
 
-  if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_)) {
+  if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_escalating_failsafe_triggered_)) {
     ss << "can not switch motors ON, we landed in emergency";
     prereq_check = false;
   }
@@ -4175,7 +4156,7 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
   std::stringstream ss;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     ss << "can not " << (req.data ? "arm" : "disarm") << ", eland or failsafe active";
 
@@ -4383,7 +4364,7 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
     return true;
   }
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_ || rc_escalating_failsafe_triggered_) {
 
     std::stringstream ss;
     ss << "can not activate the pirouette, eland or failsafe active";

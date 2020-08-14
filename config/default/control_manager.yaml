@@ -68,26 +68,27 @@ safety:
 
   escalating_failsafe:
 
+    service:
+      enabled: true # can be called by a service
+
+    rc:
+      enabled: true # can be triggered by RC button
+      channel_number: 7 # [-],  activation RC channel
+      threshold: 1500 # [us]
+
     # how often does it allow to escalate
     timeout: 2.0 # [s]
 
-    ehover: true
+    ehover: false
     eland: true
-    failsafe: true
-    disarm: true
+    failsafe: false
+    disarm: false
 
   tilt_error_disarm:
 
     enabled: true
     timeout: 0.5 # [s] # for how long the error has to be present to disarm
     error_threshold: 20 # [deg]
-
-  rc_eland:
-
-    enabled: true
-    channel_number: 7 # [-],  activation RC channel
-    threshold: 1500 # [us]
-    action: "eland" # {eland, escalating_failsafe, failsafe}
 
   parachute:
 
