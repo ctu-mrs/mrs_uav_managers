@@ -5894,6 +5894,23 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
+    // set the trajectory to the non-active trackers
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
+
+      if (i != active_tracker_idx_) {
+
+        response = tracker_list_[i]->setTrajectoryReference(
+            mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+
+        if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr() && response->success) {
+          std::stringstream ss;
+          ss << "trajectory loaded to non-active tracker '" << _tracker_names_[i];
+          ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+        }
+      }
+    }
+
+    // set the trajectory to the currently active tracker
     response = tracker_list_[active_tracker_idx_]->setTrajectoryReference(
         mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
 
@@ -5903,7 +5920,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
+      ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
       return std::tuple(false, ss.str(), false);
     }
