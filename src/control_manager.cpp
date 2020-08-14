@@ -703,6 +703,8 @@ private:
   void               ungripSrv(void);
   ros::ServiceClient service_client_ungrip_;
 
+  bool isFlyingNormally(void);
+
   // | ------------------------ pirouette ----------------------- |
 
   bool       _pirouette_enabled_ = false;
@@ -751,19 +753,15 @@ private:
   // listening to the RC channels as told by pixhawk
   mrs_lib::SubscribeHandler<mavros_msgs::RCIn> sh_rc_;
 
-  std::list<ros::Time> rc_channel_switch_time_;
-  std::mutex           mutex_rc_channel_switch_time_;
-
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
   bool   _rc_goto_enabled_               = false;
   bool   rc_goto_active_                 = false;
-  int    rc_joystick_channel_last_value_ = 0;
+  int    rc_joystick_channel_last_value_ = PWM_MIDDLE;
+  bool   rc_joystick_channel_was_low_    = false;
   int    _rc_joystick_channel_;
-  int    _rc_joystick_n_switches_;
   double _rc_joystick_carrot_distance_ = 0;
-  int    _rc_joystick_timeout_;
 
   // | ------------------- trajectory loading ------------------- |
 
@@ -1014,8 +1012,6 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
   param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.loadParam("rc_joystick/timeout", _rc_joystick_timeout_);
-  param_loader.loadParam("rc_joystick/n_switches", _rc_joystick_n_switches_);
   param_loader.loadParam("rc_joystick/carrot_distance", _rc_joystick_carrot_distance_);
 
   param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
@@ -3037,68 +3033,6 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
       }
     }
   }
-
-  if (_rc_goto_enabled_ && sh_rc_.hasMsg()) {
-
-    // prune the list of rc_channel_switches
-    std::list<ros::Time>::iterator it;
-    for (it = rc_channel_switch_time_.begin(); it != rc_channel_switch_time_.end();) {
-      if ((ros::Time::now() - *it).toSec() > _rc_joystick_timeout_) {
-        it = rc_channel_switch_time_.erase(it);
-      } else {
-        it++;
-      }
-    }
-
-    if (int(rc_channel_switch_time_.size()) >= _rc_joystick_n_switches_) {
-
-      if (rc_goto_active_ == false) {
-
-        ROS_INFO("[ControlManager]: activating RC joystick");
-
-        callbacks_enabled_ = false;
-
-        std_srvs::SetBoolRequest req_goto_out;
-        req_goto_out.data = false;
-
-        std_srvs::SetBoolRequest req_enable_callbacks;
-        req_enable_callbacks.data = callbacks_enabled_;
-
-        {
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          // disable callbacks of all trackers
-          for (int i = 0; i < int(tracker_list_.size()); i++) {
-            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-          }
-        }
-
-      } else if (rc_goto_active_ == true) {
-
-        ROS_INFO("[ControlManager]: deactivating RC joystick");
-
-        callbacks_enabled_ = true;
-
-        std_srvs::SetBoolRequest req_goto_out;
-        req_goto_out.data = true;
-
-        std_srvs::SetBoolRequest req_enable_callbacks;
-        req_enable_callbacks.data = callbacks_enabled_;
-
-        {
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          // enable callbacks of all trackers
-          for (int i = 0; i < int(tracker_list_.size()); i++) {
-            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-          }
-        }
-      }
-
-      rc_goto_active_ = !rc_goto_active_;
-      rc_channel_switch_time_.clear();
-    }
-  }
 }
 
 //}
@@ -3776,19 +3710,80 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
     } else {
 
-      // detect the switch of a switch on the RC
-      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) ||
-          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
+      bool channel_low  = rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND) ? true : false;
+      bool channel_high = rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND) ? true : false;
 
-        // enter an event to the std vector
-        std::scoped_lock lock(mutex_rc_channel_switch_time_);
+      if (channel_low) {
+        rc_joystick_channel_was_low_ = true;
+      }
 
-        rc_channel_switch_time_.insert(rc_channel_switch_time_.begin(), ros::Time::now());
+      // rc control activation
+      if (!rc_goto_active_) {
+
+        if (rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && channel_high) {
+
+          if (isFlyingNormally()) {
+
+            ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating RC joystick");
+
+            callbacks_enabled_ = false;
+
+            std_srvs::SetBoolRequest req_goto_out;
+            req_goto_out.data = false;
+
+            std_srvs::SetBoolRequest req_enable_callbacks;
+            req_enable_callbacks.data = callbacks_enabled_;
+
+            {
+              std::scoped_lock lock(mutex_tracker_list_);
+
+              // disable callbacks of all trackers
+              for (int i = 0; i < int(tracker_list_.size()); i++) {
+                tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+              }
+            }
+
+            rc_goto_active_ = true;
+
+          } else {
+
+            ROS_WARN_THROTTLE(1.0, "[ControlManager]: can not activate RC joystick, not flying normally");
+          }
+
+        } else if (channel_high && !rc_joystick_channel_was_low_) {
+
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: can not activate RC joystick, the switch is ON from the beginning");
+        }
+      }
+
+      // rc control deactivation
+      if (rc_goto_active_ && channel_low) {
+
+        ROS_INFO("[ControlManager]: deactivating RC joystick");
+
+        callbacks_enabled_ = true;
+
+        std_srvs::SetBoolRequest req_goto_out;
+        req_goto_out.data = true;
+
+        std_srvs::SetBoolRequest req_enable_callbacks;
+        req_enable_callbacks.data = callbacks_enabled_;
+
+        {
+          std::scoped_lock lock(mutex_tracker_list_);
+
+          // enable callbacks of all trackers
+          for (int i = 0; i < int(tracker_list_.size()); i++) {
+            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+          }
+        }
+
+        rc_goto_active_ = false;
       }
 
       // do not forget to update the last... variable
       // only do that if its out of the deadband
-      if ((rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) || (rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
+      if (channel_high || channel_low) {
         rc_joystick_channel_last_value_ = rc->channels[_rc_joystick_channel_];
       }
     }
@@ -6000,8 +5995,7 @@ void ControlManager::publishDiagnostics(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
 
-    diagnostics_msg.flying_normally = (motors_) && (offboard_mode_) && (armed_) && (active_controller_idx_ != _eland_controller_idx_) &&
-                                      (active_controller_idx_ != _failsafe_controller_idx_) && (active_tracker_idx_ != _null_tracker_idx_);
+    diagnostics_msg.flying_normally = isFlyingNormally();
   }
 
   // | ----------------- fill the tracker status ---------------- |
@@ -6154,6 +6148,16 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraints
   }
 
   return enforcing;
+}
+
+//}
+
+/* isFlyingNormally() //{ */
+
+bool ControlManager::isFlyingNormally(void) {
+
+  return (motors_) && (offboard_mode_) && (armed_) && (active_controller_idx_ != _eland_controller_idx_) &&
+         (active_controller_idx_ != _failsafe_controller_idx_) && (active_tracker_idx_ != _null_tracker_idx_);
 }
 
 //}

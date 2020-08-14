@@ -242,11 +242,6 @@ rc_joystick:
   # activation channel
   channel_number: 6 # indexed from 0
 
-  # switch the chanel repeatedly to enable the joystic control
-  # n_switches need to occur within a time timeout
-  timeout: 2.0 # [s]
-  n_switches: 4 # [-]
-
   carrot_distance: 0.50 # [m]
 
   channels:
