@@ -45,7 +45,7 @@ This package contains *high-level* flight managers.
 * allows controlling the UAV using the **RC controller** through our pipeline
   * the RC channels are picked up from [Mavros](http://wiki.ros.org/mavros)
   * a relative reference is generated for the active tracker
-  * **emergency landing** can be triggered by a dedicated switch
+  * **escalating failsafe** can be triggered by a dedicated switch
 * provides an **obstacle bumper** feature
   * has priority over user-provided references
   * for slow-flight only
