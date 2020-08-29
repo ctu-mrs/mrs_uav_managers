@@ -1,5 +1,0 @@
-<library path="lib/libTfManager">
-  <class name="mrs_uav_tf_manager/TfManager" type="mrs_uav_tf_manager::TfManager" base_class_type="nodelet::Nodelet">
-    <description>TfManager nodelet</description>
-  </class>
-</library>

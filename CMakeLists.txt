@@ -28,7 +28,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES GainManager ConstraintManager ControlManager UavManager
+  LIBRARIES GainManager ConstraintManager ControlManager UavManager TfManager
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
   DEPENDS mavros_msgs
   )
@@ -114,4 +114,17 @@ add_dependencies(ConstraintManager
 target_link_libraries(ConstraintManager
   ${catkin_LIBRARIES}
   ${mavros_msgs_LIBRARIES}
+  )
+
+# TfManager
+add_library(TfManager src/tf_manager.cpp)
+
+add_dependencies(TfManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(TfManager
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
   )
