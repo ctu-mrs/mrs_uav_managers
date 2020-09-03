@@ -781,7 +781,8 @@ private:
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
 
   // sets the reference trajectory to the active tracker
-  std::tuple<bool, std::string, bool> setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in);
+  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
+      const mrs_msgs::TrajectoryReference trajectory_in);
 
   // this publishes the control commands
   void publish(void);
@@ -5103,11 +5104,17 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
 
-  auto [success, message, modified] = setTrajectoryReference(req.trajectory);
+  auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = setTrajectoryReference(req.trajectory);
 
-  res.success  = success;
-  res.message  = message;
-  res.modified = modified;
+  res.success          = success;
+  res.message          = message;
+  res.modified         = modified;
+  res.tracker_names    = tracker_names;
+  res.tracker_messages = tracker_messages;
+
+  for (size_t i = 0; i < tracker_successes.size(); i++) {
+    res.tracker_successes.push_back(tracker_successes[i]);
+  }
 
   return true;
 }
@@ -5429,7 +5436,8 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
 /* setTrajectoryReference() //{ */
 
-std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in) {
+std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
+    const mrs_msgs::TrajectoryReference trajectory_in) {
 
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -5439,7 +5447,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   if (!callbacks_enabled_) {
     ss << "can not set the reference, the callbacks are disabled";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   /* validate the size and check for NaNs //{ */
@@ -5449,7 +5457,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "can not load trajectory with size 0";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   for (int i = 0; i < int(trajectory_in.points.size()); i++) {
@@ -5481,7 +5489,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "trajectory contains NaNs/infs.";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
   }
 
@@ -5610,7 +5618,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "the whole trajectory violates bumper, can not execute it!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   //}
@@ -5625,7 +5633,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "could not create TF transformer from the trajectory frame to the safety area frame";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     mrs_lib::TransformStamped tf = ret.value();
@@ -5642,7 +5650,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
         ss << "the trajectory can not be transformed to the safety area frame";
         ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false);
+        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
       } else {
 
@@ -5682,7 +5690,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "cannot check agains safety area, missing odometry";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
@@ -5695,7 +5703,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "could not transform current state to safety area frame!";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     int last_valid_idx    = 0;
@@ -5758,7 +5766,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
             if (dist_two_points > 1.0) {
               ss << "the trajectory starts outside of the safety area!";
               ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-              return std::tuple(false, ss.str(), false);
+              return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
             }
 
             double step = dist_two_points / i;
@@ -5819,7 +5827,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
         ss << "the whole trajectory is outside of the safety area!";
         ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false);
+        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
         // there is a good portion of the trajectory in the beginning
       } else {
@@ -5835,7 +5843,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "the trajectory somehow happened to be empty after all the checks! This message should not appear!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   //}
@@ -5848,7 +5856,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "could not create TF transformer for the trajectory";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   mrs_lib::TransformStamped tf = ret.value();
@@ -5867,7 +5875,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "trajectory cannnot be transformed";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
     } else {
 
@@ -5885,46 +5893,81 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   if (processed_trajectory.points.size() == 0) {
     ss << "reference trajectory was processing and it is now empty, this should not happen!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   // prepare the message for current tracker
   request.trajectory = processed_trajectory;
 
+  bool                     success;
+  std::string              message;
+  bool                     modified;
+  std::vector<std::string> tracker_names;
+  std::vector<bool>        tracker_successes;
+  std::vector<std::string> tracker_messages;
+
   {
     std::scoped_lock lock(mutex_tracker_list_);
+
+    // set the trajectory to the currently active tracker
+    response = tracker_list_[active_tracker_idx_]->setTrajectoryReference(
+        mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+
+    tracker_names.push_back(_tracker_names_[active_tracker_idx_]);
+
+    if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+
+      success  = response->success;
+      message  = response->message;
+      modified = response->modified || trajectory_modified;
+      tracker_successes.push_back(response->success);
+      tracker_messages.push_back(response->message);
+
+    } else {
+
+      ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
+
+      success  = false;
+      message  = ss.str();
+      modified = false;
+      tracker_successes.push_back(false);
+      tracker_messages.push_back(ss.str());
+    }
 
     // set the trajectory to the non-active trackers
     for (int i = 0; i < int(tracker_list_.size()); i++) {
 
       if (i != active_tracker_idx_) {
 
+        tracker_names.push_back(_tracker_names_[i]);
+
         response = tracker_list_[i]->setTrajectoryReference(
             mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
 
-        if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr() && response->success) {
+        if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+
+          tracker_successes.push_back(response->success);
+          tracker_messages.push_back(response->message);
+
+          if (response->success) {
+            std::stringstream ss;
+            ss << "trajectory loaded to non-active tracker '" << _tracker_names_[i];
+            ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+          }
+
+        } else {
+
           std::stringstream ss;
-          ss << "trajectory loaded to non-active tracker '" << _tracker_names_[i];
-          ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+          ss << "the tracker \"" << _tracker_names_[i] << "\" does not implement setTrajectoryReference()";
+          tracker_successes.push_back(false);
+          tracker_messages.push_back(ss.str());
         }
       }
     }
-
-    // set the trajectory to the currently active tracker
-    response = tracker_list_[active_tracker_idx_]->setTrajectoryReference(
-        mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
-
-    if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
-
-      return std::tuple(response->success, response->message, response->modified || trajectory_modified);
-
-    } else {
-
-      ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
-      return std::tuple(false, ss.str(), false);
-    }
   }
+
+  return std::tuple(success, message, modified, tracker_names, tracker_successes, tracker_messages);
 }
 
 //}
