@@ -6371,7 +6371,11 @@ double ControlManager::getMaxHeight(void) {
 
 double ControlManager::getMinHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+  if (use_safety_area_) {
+    return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+  } else {
+    return std::numeric_limits<double>::lowest();
+  }
 }
 
 //}
