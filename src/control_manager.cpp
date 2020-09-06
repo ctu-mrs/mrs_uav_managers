@@ -659,19 +659,17 @@ private:
   // | --------------- safety checks and failsafes -------------- |
 
   // escalating failsafe (eland -> failsafe -> disarm)
-  double    _escalating_failsafe_timeout_ = 0;
+  bool      _service_escalating_failsafe_enabled_ = false;
+  bool      _rc_escalating_failsafe_enabled_      = false;
+  double    _escalating_failsafe_timeout_         = 0;
   ros::Time escalating_failsafe_time_;
   bool      _escalating_failsafe_ehover_   = false;
   bool      _escalating_failsafe_eland_    = false;
   bool      _escalating_failsafe_failsafe_ = false;
   bool      _escalating_failsafe_disarm_   = false;
-
-  // rc control
-  bool        _rc_eland_enabled_ = false;
-  int         _rc_eland_channel_;
-  int         _rc_eland_threshold_;
-  std::string _rc_eland_action_;
-  bool        rc_eland_triggered_ = false;
+  int       _rc_escalating_failsafe_threshold_;
+  int       _rc_escalating_failsafe_channel_  = 0;
+  bool      rc_escalating_failsafe_triggered_ = false;
 
   std::string _tracker_error_action_;
 
@@ -702,6 +700,8 @@ private:
 
   void               ungripSrv(void);
   ros::ServiceClient service_client_ungrip_;
+
+  bool isFlyingNormally(void);
 
   // | ------------------------ pirouette ----------------------- |
 
@@ -751,19 +751,15 @@ private:
   // listening to the RC channels as told by pixhawk
   mrs_lib::SubscribeHandler<mavros_msgs::RCIn> sh_rc_;
 
-  std::list<ros::Time> rc_channel_switch_time_;
-  std::mutex           mutex_rc_channel_switch_time_;
-
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
   bool   _rc_goto_enabled_               = false;
   bool   rc_goto_active_                 = false;
-  int    rc_joystick_channel_last_value_ = 0;
+  int    rc_joystick_channel_last_value_ = PWM_MIDDLE;
+  bool   rc_joystick_channel_was_low_    = false;
   int    _rc_joystick_channel_;
-  int    _rc_joystick_n_switches_;
   double _rc_joystick_carrot_distance_ = 0;
-  int    _rc_joystick_timeout_;
 
   // | ------------------- trajectory loading ------------------- |
 
@@ -785,7 +781,8 @@ private:
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
 
   // sets the reference trajectory to the active tracker
-  std::tuple<bool, std::string, bool> setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in);
+  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
+      const mrs_msgs::TrajectoryReference trajectory_in);
 
   // this publishes the control commands
   void publish(void);
@@ -881,6 +878,10 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
   param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
+  param_loader.loadParam("safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
   param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
   param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
   param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
@@ -991,18 +992,6 @@ void ControlManager::onInit() {
   param_loader.loadParam("obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
   param_loader.loadParam("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
 
-  param_loader.loadParam("safety/rc_eland/enabled", _rc_eland_enabled_);
-  param_loader.loadParam("safety/rc_eland/channel_number", _rc_eland_channel_);
-  param_loader.loadParam("safety/rc_eland/threshold", _rc_eland_threshold_);
-  param_loader.loadParam("safety/rc_eland/action", _rc_eland_action_);
-
-  // check the values of RC eland action
-  if (_rc_eland_action_ != ELAND_STR && _rc_eland_action_ != ESCALATING_FAILSAFE_STR && _rc_eland_action_ != FAILSAFE_STR) {
-    ROS_ERROR("[ControlManager]: the rc_eland/action parameter (%s) is not correct, requires {%s, %s, %s}", _rc_eland_action_.c_str(), ELAND_STR,
-              ESCALATING_FAILSAFE_STR, FAILSAFE_STR);
-    ros::shutdown();
-  }
-
   param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
 
   // check the values of tracker error action
@@ -1014,8 +1003,6 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
   param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.loadParam("rc_joystick/timeout", _rc_joystick_timeout_);
-  param_loader.loadParam("rc_joystick/n_switches", _rc_joystick_n_switches_);
   param_loader.loadParam("rc_joystick/carrot_distance", _rc_joystick_carrot_distance_);
 
   param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
@@ -3037,68 +3024,6 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
       }
     }
   }
-
-  if (_rc_goto_enabled_ && sh_rc_.hasMsg()) {
-
-    // prune the list of rc_channel_switches
-    std::list<ros::Time>::iterator it;
-    for (it = rc_channel_switch_time_.begin(); it != rc_channel_switch_time_.end();) {
-      if ((ros::Time::now() - *it).toSec() > _rc_joystick_timeout_) {
-        it = rc_channel_switch_time_.erase(it);
-      } else {
-        it++;
-      }
-    }
-
-    if (int(rc_channel_switch_time_.size()) >= _rc_joystick_n_switches_) {
-
-      if (rc_goto_active_ == false) {
-
-        ROS_INFO("[ControlManager]: activating RC joystick");
-
-        callbacks_enabled_ = false;
-
-        std_srvs::SetBoolRequest req_goto_out;
-        req_goto_out.data = false;
-
-        std_srvs::SetBoolRequest req_enable_callbacks;
-        req_enable_callbacks.data = callbacks_enabled_;
-
-        {
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          // disable callbacks of all trackers
-          for (int i = 0; i < int(tracker_list_.size()); i++) {
-            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-          }
-        }
-
-      } else if (rc_goto_active_ == true) {
-
-        ROS_INFO("[ControlManager]: deactivating RC joystick");
-
-        callbacks_enabled_ = true;
-
-        std_srvs::SetBoolRequest req_goto_out;
-        req_goto_out.data = true;
-
-        std_srvs::SetBoolRequest req_enable_callbacks;
-        req_enable_callbacks.data = callbacks_enabled_;
-
-        {
-          std::scoped_lock lock(mutex_tracker_list_);
-
-          // enable callbacks of all trackers
-          for (int i = 0; i < int(tracker_list_.size()); i++) {
-            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-          }
-        }
-      }
-
-      rc_goto_active_ = !rc_goto_active_;
-      rc_channel_switch_time_.clear();
-    }
-  }
 }
 
 //}
@@ -3156,7 +3081,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
   double pirouette_n_steps   = pirouette_duration * _pirouette_timer_rate_;
   double pirouette_step_size = (2 * M_PI) / pirouette_n_steps;
 
-  if (rc_eland_triggered_ || failsafe_triggered_ || eland_triggered_ || (pirouette_iterator_ > pirouette_duration * _pirouette_timer_rate_)) {
+  if (rc_escalating_failsafe_triggered_ || failsafe_triggered_ || eland_triggered_ || (pirouette_iterator_ > pirouette_duration * _pirouette_timer_rate_)) {
 
     _pirouette_enabled_ = false;
     timer_pirouette_.stop();
@@ -3754,10 +3679,6 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
   if (!is_initialized_)
     return;
 
-  if (rc_eland_triggered_) {
-    return;
-  }
-
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackRC");
 
   mavros_msgs::RCInConstPtr rc = wrp.getMsg();
@@ -3776,60 +3697,103 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
     } else {
 
-      // detect the switch of a switch on the RC
-      if ((rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) ||
-          (rc_joystick_channel_last_value_ > (PWM_MIDDLE + PWM_DEADBAND) && rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
+      bool channel_low  = rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND) ? true : false;
+      bool channel_high = rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND) ? true : false;
 
-        // enter an event to the std vector
-        std::scoped_lock lock(mutex_rc_channel_switch_time_);
+      if (channel_low) {
+        rc_joystick_channel_was_low_ = true;
+      }
 
-        rc_channel_switch_time_.insert(rc_channel_switch_time_.begin(), ros::Time::now());
+      // rc control activation
+      if (!rc_goto_active_) {
+
+        if (rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && channel_high) {
+
+          if (isFlyingNormally()) {
+
+            ROS_INFO_THROTTLE(1.0, "[ControlManager]: activating RC joystick");
+
+            callbacks_enabled_ = false;
+
+            std_srvs::SetBoolRequest req_goto_out;
+            req_goto_out.data = false;
+
+            std_srvs::SetBoolRequest req_enable_callbacks;
+            req_enable_callbacks.data = callbacks_enabled_;
+
+            {
+              std::scoped_lock lock(mutex_tracker_list_);
+
+              // disable callbacks of all trackers
+              for (int i = 0; i < int(tracker_list_.size()); i++) {
+                tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+              }
+            }
+
+            rc_goto_active_ = true;
+
+          } else {
+
+            ROS_WARN_THROTTLE(1.0, "[ControlManager]: can not activate RC joystick, not flying normally");
+          }
+
+        } else if (channel_high && !rc_joystick_channel_was_low_) {
+
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: can not activate RC joystick, the switch is ON from the beginning");
+        }
+      }
+
+      // rc control deactivation
+      if (rc_goto_active_ && channel_low) {
+
+        ROS_INFO("[ControlManager]: deactivating RC joystick");
+
+        callbacks_enabled_ = true;
+
+        std_srvs::SetBoolRequest req_goto_out;
+        req_goto_out.data = true;
+
+        std_srvs::SetBoolRequest req_enable_callbacks;
+        req_enable_callbacks.data = callbacks_enabled_;
+
+        {
+          std::scoped_lock lock(mutex_tracker_list_);
+
+          // enable callbacks of all trackers
+          for (int i = 0; i < int(tracker_list_.size()); i++) {
+            tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+          }
+        }
+
+        rc_goto_active_ = false;
       }
 
       // do not forget to update the last... variable
       // only do that if its out of the deadband
-      if ((rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND)) || (rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND))) {
+      if (channel_high || channel_low) {
         rc_joystick_channel_last_value_ = rc->channels[_rc_joystick_channel_];
       }
     }
   }
 
   // | ------------------------ rc eland ------------------------ |
-  if (_rc_eland_enabled_) {
+  if (_rc_escalating_failsafe_enabled_) {
 
-    if (_rc_eland_channel_ >= int(rc->channels.size())) {
+    if (_rc_escalating_failsafe_channel_ >= int(rc->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_eland_channel_, int(rc->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_escalating_failsafe_channel_,
+                         int(rc->channels.size()));
 
     } else {
 
-      if (rc->channels[_rc_eland_channel_] >= _rc_eland_threshold_) {
+      if (rc->channels[_rc_escalating_failsafe_channel_] >= _rc_escalating_failsafe_threshold_) {
 
-        if (_rc_eland_action_ == ELAND_STR) {
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering escalating failsafe by RC");
 
-          if (!eland_triggered_ && !failsafe_triggered_ && !rc_eland_triggered_) {
+        auto [success, message] = escalatingFailsafe();
 
-            ROS_WARN("[ControlManager]: triggering eland by RC");
-
-            rc_eland_triggered_ = true;
-
-            eland();
-          }
-
-        } else if (_rc_eland_action_ == ESCALATING_FAILSAFE_STR) {
-
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: triggering escalating failsafe by RC");
-
-          escalatingFailsafe();
-
-        } else if (_rc_eland_action_ == FAILSAFE_STR) {
-
-          if (!failsafe_triggered_) {
-
-            ROS_WARN("[ControlManager]: triggering failsafe by RC");
-
-            failsafe();
-          }
+        if (success) {
+          rc_escalating_failsafe_triggered_ = true;
         }
       }
     }
@@ -3879,7 +3843,7 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch tracker, eland or failsafe active";
@@ -3909,7 +3873,7 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
@@ -3941,7 +3905,7 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigg
 
   std::stringstream message;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     message << "can not reset tracker, eland or failsafe active";
 
@@ -3985,7 +3949,7 @@ bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request&
   if (!is_initialized_)
     return false;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
@@ -4049,12 +4013,25 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
   if (!is_initialized_)
     return false;
 
-  ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
+  if (_service_escalating_failsafe_enabled_) {
 
-  auto [success, message] = escalatingFailsafe();
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: escalating failsafe triggered by callback");
 
-  res.success = success;
-  res.message = message;
+    auto [success, message] = escalatingFailsafe();
+
+    res.success = success;
+    res.message = message;
+
+  } else {
+
+    std::stringstream ss;
+    ss << "escalating failsafe is disabled";
+
+    res.success = false;
+    res.message = ss.str();
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: %s", ss.str().c_str());
+  }
 
   return true;
 }
@@ -4134,7 +4111,7 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     }
   }
 
-  if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_)) {
+  if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_escalating_failsafe_triggered_)) {
     ss << "can not switch motors ON, we landed in emergency";
     prereq_check = false;
   }
@@ -4180,7 +4157,7 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
   std::stringstream ss;
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_) {
 
     ss << "can not " << (req.data ? "arm" : "disarm") << ", eland or failsafe active";
 
@@ -4388,7 +4365,7 @@ bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Reque
     return true;
   }
 
-  if (failsafe_triggered_ || eland_triggered_ || rc_eland_triggered_) {
+  if (failsafe_triggered_ || eland_triggered_ || rc_escalating_failsafe_triggered_) {
 
     std::stringstream ss;
     ss << "can not activate the pirouette, eland or failsafe active";
@@ -5127,11 +5104,17 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
 
-  auto [success, message, modified] = setTrajectoryReference(req.trajectory);
+  auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = setTrajectoryReference(req.trajectory);
 
-  res.success  = success;
-  res.message  = message;
-  res.modified = modified;
+  res.success          = success;
+  res.message          = message;
+  res.modified         = modified;
+  res.tracker_names    = tracker_names;
+  res.tracker_messages = tracker_messages;
+
+  for (size_t i = 0; i < tracker_successes.size(); i++) {
+    res.tracker_successes.push_back(tracker_successes[i]);
+  }
 
   return true;
 }
@@ -5453,7 +5436,8 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
 /* setTrajectoryReference() //{ */
 
-std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const mrs_msgs::TrajectoryReference trajectory_in) {
+std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
+    const mrs_msgs::TrajectoryReference trajectory_in) {
 
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -5463,7 +5447,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   if (!callbacks_enabled_) {
     ss << "can not set the reference, the callbacks are disabled";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   /* validate the size and check for NaNs //{ */
@@ -5473,7 +5457,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "can not load trajectory with size 0";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   for (int i = 0; i < int(trajectory_in.points.size()); i++) {
@@ -5505,7 +5489,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "trajectory contains NaNs/infs.";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
   }
 
@@ -5634,7 +5618,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "the whole trajectory violates bumper, can not execute it!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   //}
@@ -5649,7 +5633,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "could not create TF transformer from the trajectory frame to the safety area frame";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     mrs_lib::TransformStamped tf = ret.value();
@@ -5666,7 +5650,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
         ss << "the trajectory can not be transformed to the safety area frame";
         ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false);
+        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
       } else {
 
@@ -5706,7 +5690,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "cannot check agains safety area, missing odometry";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
@@ -5719,7 +5703,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "could not transform current state to safety area frame!";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     int last_valid_idx    = 0;
@@ -5782,7 +5766,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
             if (dist_two_points > 1.0) {
               ss << "the trajectory starts outside of the safety area!";
               ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-              return std::tuple(false, ss.str(), false);
+              return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
             }
 
             double step = dist_two_points / i;
@@ -5843,7 +5827,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
         ss << "the whole trajectory is outside of the safety area!";
         ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false);
+        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
         // there is a good portion of the trajectory in the beginning
       } else {
@@ -5859,7 +5843,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "the trajectory somehow happened to be empty after all the checks! This message should not appear!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   //}
@@ -5872,7 +5856,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
     ss << "could not create TF transformer for the trajectory";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   mrs_lib::TransformStamped tf = ret.value();
@@ -5891,7 +5875,7 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
 
       ss << "trajectory cannnot be transformed";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
     } else {
 
@@ -5909,29 +5893,81 @@ std::tuple<bool, std::string, bool> ControlManager::setTrajectoryReference(const
   if (processed_trajectory.points.size() == 0) {
     ss << "reference trajectory was processing and it is now empty, this should not happen!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false);
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   // prepare the message for current tracker
   request.trajectory = processed_trajectory;
 
+  bool                     success;
+  std::string              message;
+  bool                     modified;
+  std::vector<std::string> tracker_names;
+  std::vector<bool>        tracker_successes;
+  std::vector<std::string> tracker_messages;
+
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
+    // set the trajectory to the currently active tracker
     response = tracker_list_[active_tracker_idx_]->setTrajectoryReference(
         mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
 
+    tracker_names.push_back(_tracker_names_[active_tracker_idx_]);
+
     if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
 
-      return std::tuple(response->success, response->message, response->modified || trajectory_modified);
+      success  = response->success;
+      message  = response->message;
+      modified = response->modified || trajectory_modified;
+      tracker_successes.push_back(response->success);
+      tracker_messages.push_back(response->message);
 
     } else {
 
-      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
+      ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
-      return std::tuple(false, ss.str(), false);
+
+      success  = false;
+      message  = ss.str();
+      modified = false;
+      tracker_successes.push_back(false);
+      tracker_messages.push_back(ss.str());
+    }
+
+    // set the trajectory to the non-active trackers
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
+
+      if (i != active_tracker_idx_) {
+
+        tracker_names.push_back(_tracker_names_[i]);
+
+        response = tracker_list_[i]->setTrajectoryReference(
+            mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+
+        if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+
+          tracker_successes.push_back(response->success);
+          tracker_messages.push_back(response->message);
+
+          if (response->success) {
+            std::stringstream ss;
+            ss << "trajectory loaded to non-active tracker '" << _tracker_names_[i];
+            ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+          }
+
+        } else {
+
+          std::stringstream ss;
+          ss << "the tracker \"" << _tracker_names_[i] << "\" does not implement setTrajectoryReference()";
+          tracker_successes.push_back(false);
+          tracker_messages.push_back(ss.str());
+        }
+      }
     }
   }
+
+  return std::tuple(success, message, modified, tracker_names, tracker_successes, tracker_messages);
 }
 
 //}
@@ -6000,8 +6036,7 @@ void ControlManager::publishDiagnostics(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
 
-    diagnostics_msg.flying_normally = (motors_) && (offboard_mode_) && (armed_) && (active_controller_idx_ != _eland_controller_idx_) &&
-                                      (active_controller_idx_ != _failsafe_controller_idx_) && (active_tracker_idx_ != _null_tracker_idx_);
+    diagnostics_msg.flying_normally = isFlyingNormally();
   }
 
   // | ----------------- fill the tracker status ---------------- |
@@ -6154,6 +6189,16 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraints
   }
 
   return enforcing;
+}
+
+//}
+
+/* isFlyingNormally() //{ */
+
+bool ControlManager::isFlyingNormally(void) {
+
+  return (motors_) && (offboard_mode_) && (armed_) && (active_controller_idx_ != _eland_controller_idx_) &&
+         (active_controller_idx_ != _failsafe_controller_idx_) && (active_tracker_idx_ != _null_tracker_idx_);
 }
 
 //}
@@ -6326,7 +6371,11 @@ double ControlManager::getMaxHeight(void) {
 
 double ControlManager::getMinHeight(void) {
 
-  return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+  if (use_safety_area_) {
+    return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+  } else {
+    return std::numeric_limits<double>::lowest();
+  }
 }
 
 //}
