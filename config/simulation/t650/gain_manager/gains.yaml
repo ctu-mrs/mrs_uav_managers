@@ -6,7 +6,7 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 5.0
 
     kib: 0.5
     kib_lim: 10.0
@@ -20,7 +20,7 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 2.0
 
   mass_estimator:
     km: 1.0
@@ -34,7 +34,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 5.0
 
     kib: 0.7
     kib_lim: 10.0
@@ -48,7 +48,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 2.0
 
   mass_estimator:
     km: 1.0
@@ -62,7 +62,7 @@ tight:
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 5.0
 
     kib: 1.0
     kib_lim: 10.0
@@ -76,7 +76,7 @@ tight:
     ka: 1.0
 
     attitude:
-      kq: 8.0
+      kq: 2.0
 
   mass_estimator:
     km: 1.0
