@@ -3828,6 +3828,7 @@ void ControlManager::timeoutMavrosState([[maybe_unused]] const std::string& topi
   ros::Duration time = ros::Time::now() - last_msg;
 
   ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Not recieving Mavros state message for '%.3f s'! Setup the PixHawk SD card!!", time.toSec());
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: This could be also caused by the not being PixHawk booted properly due to, e.g., antispark connector jerkyness.");
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: The Mavros state should be supplied at 100 Hz to provided fast refresh rate on the state of the OFFBOARD mode.");
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: If missing, the UAV could be disarmed by safety routines while not knowing it has switched to the MANUAL mode.");
 }
