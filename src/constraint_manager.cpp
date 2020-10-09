@@ -239,6 +239,8 @@ void ConstraintManager::onInit() {
   is_initialized_ = true;
 
   ROS_INFO("[ConstraintManager]: initialized, version %s", VERSION);
+
+  ROS_DEBUG("[ConstraintManager]: debug output is enabled");
 }
 
 //}

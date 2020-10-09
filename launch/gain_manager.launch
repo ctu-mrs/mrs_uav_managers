@@ -5,11 +5,14 @@
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
   <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+  <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
     <!-- other args -->
   <arg name="custom_config" default="" />
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
+
+  <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />

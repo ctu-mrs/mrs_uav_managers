@@ -2346,6 +2346,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
 void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
+  ros::Time start = ros::Time::now();
+
   mrs_lib::ScopeUnset unset_running(running_safety_timer_);
 
   if (!is_initialized_)
@@ -2418,17 +2420,13 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   tf2::Transform attitude_cmd_transform = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
   tf2::Vector3   uav_z_in_world_desired = attitude_cmd_transform * tf2::Vector3(0, 0, 1);
 
-  // calculate the angle between the drone's z axis and the world's z axis
   {
     std::scoped_lock lock(mutex_attitude_error_);
 
+    // calculate the angle between the drone's z axis and the world's z axis
     tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
-  }
 
-  // | ---------------------- the yaw error --------------------- |
-  {
-    std::scoped_lock lock(mutex_attitude_error_);
-
+    // calculate the yaw error
     yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw(), uav_yaw);
   }
 
@@ -2682,6 +2680,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     ROS_ERROR("[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
 
     switchMotors(false);
+  }
+
+  ros::Time end = ros::Time::now();
+
+  if ((end - start).toSec() > 0.001) {
+    ROS_DEBUG("[ControlManager]: safety timer took %.3f s", (end - start).toSec());
   }
 }
 

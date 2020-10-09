@@ -66,7 +66,7 @@ void TfManager::onInit() {
 
   ros::Time::waitForValid();
 
-  ROS_INFO("[TfManager]: TfManager node initializing");
+  ROS_INFO("[TfManager]: initializing");
 
   // --------------------------------------------------------------
   // |                         parameters                         |
@@ -122,10 +122,14 @@ void TfManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[TfManager]: initialized");
+  ROS_INFO("[TfManager]: initialized, version %s", VERSION);
+
+  ROS_DEBUG("[TfManager]: debug output is enabled");
 }
 
 //}
+
+// | ------------------------ callbacks ----------------------- |
 
 /* //{ callbackMavrosOdometry() */
 void TfManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr& msg) {
@@ -152,6 +156,8 @@ void TfManager::callbackImu(const sensor_msgs::ImuConstPtr& msg) {
 }
 
 //}
+
+// | ------------------------ routines ------------------------ |
 
 /* publishTf() //{ */
 

@@ -365,6 +365,8 @@ void UavManager::onInit() {
   is_initialized_ = true;
 
   ROS_INFO("[UavManager]: initialized, version %s", VERSION);
+
+  ROS_DEBUG("[UavManager]: debug output is enabled");
 }
 
 //}

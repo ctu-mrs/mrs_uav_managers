@@ -11,12 +11,15 @@
   <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
+  <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
     <!-- other args -->
-  <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
   <arg name="body_frame" default="fcu" />
+  <arg name="standalone" default="true" />
+
+  <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
     <!-- custom configs for trackers -->
   <arg name="custom_config_csv_tracker" default="" />

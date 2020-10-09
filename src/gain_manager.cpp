@@ -251,6 +251,8 @@ void GainManager::onInit() {
   is_initialized_ = true;
 
   ROS_INFO("[GainManager]: initialized, version %s", VERSION);
+
+  ROS_DEBUG("[GainManager]: debug output is enabled");
 }
 
 //}
