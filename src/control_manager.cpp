@@ -2346,8 +2346,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
 void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
-  ros::Time start = ros::Time::now();
-
   mrs_lib::ScopeUnset unset_running(running_safety_timer_);
 
   if (!is_initialized_)
@@ -2680,12 +2678,6 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     ROS_ERROR("[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
 
     switchMotors(false);
-  }
-
-  ros::Time end = ros::Time::now();
-
-  if ((end - start).toSec() > 0.001) {
-    ROS_DEBUG("[ControlManager]: safety timer took %.3f s", (end - start).toSec());
   }
 }
 
