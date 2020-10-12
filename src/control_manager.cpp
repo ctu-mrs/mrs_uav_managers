@@ -6997,6 +6997,8 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
     return std::tuple(false, ss.str());
   }
 
+  ungripSrv();
+
   {
 
     auto [success, message] = switchTracker(_ehover_tracker_name_);
