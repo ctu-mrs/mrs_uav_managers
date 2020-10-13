@@ -2,7 +2,7 @@ safety:
 
   parachute:
 
-    enabled: true
+    enabled: false
 
 rc_joystick:
 
