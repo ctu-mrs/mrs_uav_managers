@@ -18,7 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   )
 
-find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
+# find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
