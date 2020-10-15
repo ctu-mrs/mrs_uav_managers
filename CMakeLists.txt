@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   )
 
 # find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
+find_package(mavros_msgs REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
