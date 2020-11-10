@@ -1388,7 +1388,7 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
 
     double height = sh_height_.getMsg()->value;
 
-    if (height >= _landing_descend_height_ + 1.0) {
+    if (height > 0 && height >= _landing_descend_height_ + 1.0) {
 
       auto odometry = sh_odometry_.getMsg();
 
