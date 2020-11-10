@@ -69,7 +69,7 @@
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
-      <remap from="~height_in" to="odometry/altitude" />
+      <remap from="~height_in" to="odometry/height" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />
