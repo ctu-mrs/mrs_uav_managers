@@ -31,7 +31,18 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
-#include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/geometry/cyclic.h>
+#include <mrs_lib/geometry/misc.h>
+
+//}
+
+/* using //{ */
+
+using vec2_t = mrs_lib::geometry::vec_t<2>;
+using vec3_t = mrs_lib::geometry::vec_t<3>;
+
+using radians  = mrs_lib::geometry::radians;
+using sradians = mrs_lib::geometry::sradians;
 
 //}
 
@@ -450,7 +461,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
       return;
     }
 
-    if (mrs_lib::dist3d(odom_x, odom_y, odom_z, ref_x, ref_y, ref_z) < 0.5 && mrs_lib::angleBetween(odom_heading, ref_heading) < 0.5) {
+    if (mrs_lib::geometry::dist(vec3_t(odom_x, odom_y, odom_z), vec3_t(ref_x, ref_y, ref_z)) < 0.5 && radians::diff(odom_heading, ref_heading) < 0.5) {
 
       auto [success, message] = landWithDescendImpl();
 
