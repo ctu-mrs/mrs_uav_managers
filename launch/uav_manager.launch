@@ -75,6 +75,7 @@
       <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
+      <remap from="~flight_time" to="~flight_time" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->

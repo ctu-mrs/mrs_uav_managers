@@ -15,6 +15,7 @@
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/Float64.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
@@ -87,6 +88,9 @@ public:
 
   void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
+
+  // publisher
+  ros::Publisher publisher_flight_time_;
 
   // service servers
   ros::ServiceServer service_server_takeoff_;
@@ -319,6 +323,10 @@ void UavManager::onInit() {
   sh_constraints_diag_     = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_mavros_gps_           = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &UavManager::callbackMavrosGps, this);
   sh_max_height_           = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+
+  // | ----------------------- publishers ----------------------- |
+
+  publisher_flight_time_ = nh_.advertise<mrs_msgs::Float64>("flight_time", 1);
 
   // | --------------------- service servers -------------------- |
 
@@ -669,14 +677,28 @@ void UavManager::timerFlighttime(const ros::TimerEvent& event) {
 
   flighttime_ += 1.0 / _flighttime_timer_rate_;
 
-  if (flighttime_ > _flighttime_max_time_) {
+  mrs_msgs::Float64 flight_time;
+  flight_time.value = flighttime_;
 
-    flighttime_ = 0;
-    timer_flighttime_.stop();
+  try {
+    publisher_flight_time_.publish(flight_time);
+  }
+  catch (...) {
+    ROS_ERROR("exception caught during publishing topic '%s'", publisher_flight_time_.getTopic().c_str());
+  }
 
-    ROS_INFO("[UavManager]: max flight time reached, landing");
+  // if enabled, start the timer for measuring the flight time
+  if (_flighttime_timer_enabled_) {
 
-    landImpl();
+    if (flighttime_ > _flighttime_max_time_) {
+
+      flighttime_ = 0;
+      timer_flighttime_.stop();
+
+      ROS_INFO("[UavManager]: max flight time reached, landing");
+
+      landImpl();
+    }
   }
 }
 
@@ -987,11 +1009,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       land_there_reference_.reference.position.z = odom_z;
       land_there_reference_.reference.heading    = odom_heading;
 
-      // if enabled, start the timer for measuring the flight time
-      if (_flighttime_timer_enabled_) {
-
-        timer_flighttime_.start();
-      }
+      timer_flighttime_.start();
 
       std::stringstream ss;
       ss << "taking off";
