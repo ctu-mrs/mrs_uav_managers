@@ -19,6 +19,7 @@ estimator_types: [
   "OPTFLOW",
   "OTHER",
   "ALOAM",
+  "ALOAMGARM"
 ]
 
 constraints: [
@@ -37,6 +38,7 @@ constraint_management:
     OPTFLOW: ["slow", "medium"]
     HECTOR: ["slow"]
     ALOAM: ["slow"]
+    ALOAMGARM: ["slow"]
     TOWER: ["slow"]
     T265: ["slow"]
     BRICK: ["slow"]
@@ -56,6 +58,7 @@ constraint_management:
     BRICKFLOW: "slow"
     HECTOR: "slow"
     ALOAM: "slow"
+    ALOAMGARM: "slow"
     TOWER: "slow"
     T265: "slow"
     BRICK: "slow"

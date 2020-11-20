@@ -23,6 +23,7 @@ gain_management:
     HECTOR: ["supersoft"]
     TOWER: ["supersoft", "soft"]
     ALOAM: ["supersoft"]
+    ALOAMGARM: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -42,4 +43,5 @@ gain_management:
     OTHER: "supersoft"
     HECTOR: "supersoft"
     ALOAM: "supersoft"
+    ALOAMGARM: "supersoft"
     TOWER: "supersoft"

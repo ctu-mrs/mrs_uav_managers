@@ -11,6 +11,7 @@ gain_management:
     BRICKFLOW: ["default"]
     HECTOR: ["default"]
     ALOAM: ["default"]
+    ALOAMGARM: ["default"]
     T265: ["default"]
     BRICK: ["default"]
     VIO: ["default"]
@@ -30,6 +31,7 @@ gain_management:
     BRICKFLOW: "default"
     HECTOR: "default"
     ALOAM: "default"
+    ALOAMGARM: "default"
     T265: "default"
     BRICK: "default"
     VIO: "default"

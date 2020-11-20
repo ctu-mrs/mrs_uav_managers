@@ -33,7 +33,8 @@
 #include <mrs_lib/utils.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
-#include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/geometry/misc.h>
+#include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
@@ -110,6 +111,16 @@
 #define FAILSAFE_STR "failsafe"
 #define INPUT_UAV_STATE 0
 #define INPUT_ODOMETRY 1
+
+//}
+
+/* using //{ */
+
+using vec2_t = mrs_lib::geometry::vec_t<2>;
+using vec3_t = mrs_lib::geometry::vec_t<3>;
+
+using radians  = mrs_lib::geometry::radians;
+using sradians = mrs_lib::geometry::sradians;
 
 //}
 
@@ -2425,7 +2436,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
 
     // calculate the yaw error
-    yaw_error_ = mrs_lib::angleBetween(mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw(), uav_yaw);
+    double cmd_yaw = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw();
+    yaw_error_     = radians::diff(cmd_yaw, uav_yaw);
   }
 
 
@@ -2479,9 +2491,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
       }
 
-      double last_innovation = mrs_lib::dist3d(x, y, z, 0, 0, 0);
+      double last_innovation = mrs_lib::geometry::dist(vec3_t(x, y, z), vec3_t(0, 0, 0));
 
-      if (last_innovation > _odometry_innovation_threshold_ || mrs_lib::angleBetween(heading, 0) > M_PI_2) {
+      if (last_innovation > _odometry_innovation_threshold_ || radians::diff(heading, 0) > M_PI_2) {
 
         auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -5757,8 +5769,8 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
             // interpolate between the current position and the valid point
             double angle           = atan2(processed_trajectory.points[i].position.y - x_area_frame.reference.position.y,
                                  processed_trajectory.points[i].position.x - x_area_frame.reference.position.x);
-            double dist_two_points = mrs_lib::dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
-                                                     x_area_frame.reference.position.x, x_area_frame.reference.position.y);
+            double dist_two_points = mrs_lib::geometry::dist(vec2_t(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y),
+                                                             vec2_t(x_area_frame.reference.position.x, x_area_frame.reference.position.y));
 
             if (dist_two_points > 1.0) {
               ss << "the trajectory starts outside of the safety area!";
@@ -5783,8 +5795,8 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
                                  (processed_trajectory.points[i].position.x - processed_trajectory.points[last_valid_idx].position.x));
 
             double dist_two_points =
-                mrs_lib::dist2d(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y,
-                                processed_trajectory.points[last_valid_idx].position.x, processed_trajectory.points[last_valid_idx].position.y);
+                mrs_lib::geometry::dist(vec2_t(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y),
+                                        vec2_t(processed_trajectory.points[last_valid_idx].position.x, processed_trajectory.points[last_valid_idx].position.y));
             double step = dist_two_points / (i - last_valid_idx);
 
             for (int j = last_valid_idx; j < i; j++) {
