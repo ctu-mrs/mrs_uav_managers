@@ -17,10 +17,21 @@
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
+#include <mrs_lib/timer.h>
 
 #include <dynamic_reconfigure/ReconfigureRequest.h>
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
+
+//}
+
+/* using //{ */
+
+#if ROS_VERSION_MINIMUM(1, 15, 8)
+using Timer = mrs_lib::ThreadTimer;
+#else
+using Timer = mrs_lib::ROSTimer;
+#endif
 
 //}
 
@@ -76,7 +87,7 @@ private:
   std::mutex                          mutex_last_estimator_type_;
 
   void       timerConstraintManagement(const ros::TimerEvent &event);
-  ros::Timer timer_constraint_management_;
+  Timer timer_constraint_management_;
   int        _constraint_management_rate_;
 
   std::string current_constraints_;
@@ -86,7 +97,7 @@ private:
 
   void           timerDiagnostics(const ros::TimerEvent &event);
   ros::Publisher publisher_diagnostics_;
-  ros::Timer     timer_diagnostics_;
+  Timer     timer_diagnostics_;
   int            _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
@@ -222,8 +233,8 @@ void ConstraintManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  timer_constraint_management_ = nh_.createTimer(ros::Rate(_constraint_management_rate_), &ConstraintManager::timerConstraintManagement, this);
-  timer_diagnostics_           = nh_.createTimer(ros::Rate(_diagnostics_rate_), &ConstraintManager::timerDiagnostics, this);
+  timer_constraint_management_ = Timer(nh_, ros::Rate(_constraint_management_rate_), &ConstraintManager::timerConstraintManagement, this);
+  timer_diagnostics_           = Timer(nh_, ros::Rate(_diagnostics_rate_), &ConstraintManager::timerDiagnostics, this);
 
   // | ------------------------ profiler ------------------------ |
 
