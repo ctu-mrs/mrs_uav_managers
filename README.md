@@ -1,4 +1,4 @@
-# MRS UAV Managers [![Build Status](https://travis-ci.com/ctu-mrs/mrs_uav_managers.svg?branch=master)](https://travis-ci.com/ctu-mrs/mrs_uav_managers)
+# MRS UAV Managers [![Build Status](https://github.com/ctu-mrs/mrs_uav_managers/workflows/CI/badge.svg)](https://github.com/ctu-mrs/mrs_uav_managers/actions)
 
 ![](.fig/thumbnail.jpg)
 
