@@ -16,6 +16,10 @@ PACKAGE_NAME=${PWD##*/}
 sudo apt-get -y update -qq
 sudo apt-mark hold openssh-server
 
+# 20.04 problem fix
+sudo apt-get -y install grub-efi
+update-grub
+
 # the "gce-compute-image-packages" package often freezes the installation at some point
 # the installation freezes when it tries to manage some systemd services
 # this attempts to install the package and stop the problematic service during the process
