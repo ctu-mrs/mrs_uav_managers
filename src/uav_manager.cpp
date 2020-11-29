@@ -34,6 +34,7 @@
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/geometry/misc.h>
+#include <mrs_lib/timer.h>
 
 //}
 
@@ -44,6 +45,12 @@ using vec3_t = mrs_lib::geometry::vec_t<3>;
 
 using radians  = mrs_lib::geometry::radians;
 using sradians = mrs_lib::geometry::sradians;
+
+#if ROS_VERSION_MINIMUM(1, 15, 8)
+using Timer = mrs_lib::ThreadTimer;
+#else
+using Timer = mrs_lib::ROSTimer;
+#endif
 
 //}
 
@@ -141,11 +148,11 @@ public:
   void ungripSrv(void);
   void pirouetteSrv(void);
 
-  ros::Timer timer_takeoff_;
-  ros::Timer timer_max_height_;
-  ros::Timer timer_landing_;
-  ros::Timer timer_maxthrust_;
-  ros::Timer timer_flighttime_;
+  Timer timer_takeoff_;
+  Timer timer_max_height_;
+  Timer timer_landing_;
+  Timer timer_maxthrust_;
+  Timer timer_flighttime_;
 
   // timer callbacks
   void timerLanding(const ros::TimerEvent& event);
@@ -370,13 +377,13 @@ void UavManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  timer_landing_    = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
-  timer_takeoff_    = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
-  timer_flighttime_ = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
-  timer_maxthrust_  = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
+  timer_landing_    = Timer(nh_, ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
+  timer_takeoff_    = Timer(nh_, ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
+  timer_flighttime_ = Timer(nh_, ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
+  timer_maxthrust_  = Timer(nh_, ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
 
   if (_max_height_enabled_) {
-    timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
+    timer_max_height_ = Timer(nh_, ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
   }
 
   // | ----------------------- finish init ---------------------- |
