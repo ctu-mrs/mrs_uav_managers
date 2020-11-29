@@ -38,7 +38,6 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
-#include <mrs_lib/timer.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -122,12 +121,6 @@ using vec3_t = mrs_lib::geometry::vec_t<3>;
 
 using radians  = mrs_lib::geometry::radians;
 using sradians = mrs_lib::geometry::sradians;
-
-#if ROS_VERSION_MINIMUM(1, 15, 8)
-using Timer = mrs_lib::ThreadTimer;
-#else
-using Timer = mrs_lib::ROSTimer;
-#endif
 
 //}
 
@@ -614,36 +607,36 @@ private:
   // | ------------------------- timers ------------------------- |
 
   // timer for regular status publishing
-  Timer timer_status_;
+  ros::Timer timer_status_;
   void       timerStatus(const ros::TimerEvent& event);
 
   // timer for issuing the failsafe landing
-  Timer timer_failsafe_;
+  ros::Timer timer_failsafe_;
   void       timerFailsafe(const ros::TimerEvent& event);
 
   // oneshot timer for running controllers and trackers
-  Timer timer_control_;
+  ros::Timer timer_control_;
   void       timerControl(const ros::TimerEvent& event);
   bool       running_control_timer_ = false;
 
   // timer for issuing emergancy landing
-  Timer timer_eland_;
+  ros::Timer timer_eland_;
   void       timerEland(const ros::TimerEvent& event);
 
   // timer for regular checking of controller errors
-  Timer timer_safety_;
+  ros::Timer timer_safety_;
   void       timerSafety(const ros::TimerEvent& event);
   bool       running_safety_timer_        = false;
   double     odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
-  Timer timer_pirouette_;
+  ros::Timer timer_pirouette_;
   void       timerPirouette(const ros::TimerEvent& event);
 
   // | --------------------- obstacle bumper -------------------- |
 
   // bumper timer
-  Timer timer_bumper_;
+  ros::Timer timer_bumper_;
   void       timerBumper(const ros::TimerEvent& event);
 
   // bumper subscriber
@@ -745,7 +738,7 @@ private:
   int _channel_pitch_, _channel_roll_, _channel_heading_, _channel_thrust_;
   int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_thrust_;
 
-  Timer timer_joystick_;
+  ros::Timer timer_joystick_;
   void       timerJoystick(const ros::TimerEvent& event);
   double     _joystick_timer_rate_ = 0;
 
@@ -1649,14 +1642,14 @@ void ControlManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  timer_status_    = Timer(nh_, ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
-  timer_safety_    = Timer(nh_, ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = Timer(nh_, ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this);
-  timer_eland_     = Timer(nh_, ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
-  timer_failsafe_  = Timer(nh_, ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
-  timer_pirouette_ = Timer(nh_, ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
-  timer_joystick_  = Timer(nh_, ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
-  timer_control_   = Timer(nh_, ros::Duration(0.0), &ControlManager::timerControl, this, true, false);  // oneshot timer
+  timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
+  timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
+  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this);
+  timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
+  timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
+  timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
+  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
+  timer_control_   = nh_.createTimer(ros::Duration(0.0), &ControlManager::timerControl, this, true, false);  // oneshot timer
 
   // | ----------------------- finish init ---------------------- |
 
