@@ -188,6 +188,7 @@
       <remap from="~mpc_tracker/profiler" to="profiler" />
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/string_out" to="mrs_uav_status/display_string" />
+      <remap from="~mpc_tracker/current_trajectory_point_out" to="~mpc_tracker/current_trajectory_point" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
       <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
