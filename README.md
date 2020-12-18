@@ -1,6 +1,9 @@
-# MRS UAV Managers [![Build Status](https://github.com/ctu-mrs/mrs_uav_managers/workflows/CI/badge.svg)](https://github.com/ctu-mrs/mrs_uav_managers/actions)
+# MRS UAV Managers
 
 ![](.fig/thumbnail.jpg)
+
+| Build status | [![Build Status](https://github.com/ctu-mrs/mrs_uav_managers/workflows/Melodic/badge.svg)](https://github.com/ctu-mrs/mrs_uav_managers/actions) | [![Build Status](https://github.com/ctu-mrs/mrs_uav_managers/workflows/Noetic/badge.svg)](https://github.com/ctu-mrs/mrs_simulation/actions) |
+|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
 
 This package contains *high-level* flight managers.
 
