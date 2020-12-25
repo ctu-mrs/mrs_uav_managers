@@ -41,13 +41,10 @@ public:
    * @param parent_nh the node handle of the ControlManager
    * @param name of the controller for distinguishing multiple running instances of the same code
    * @param name_space the parameter namespace of the controller, can be used during initialization of the private node handle
-   * @param motor_params parameters of the propulsion thrust curve
    * @param uav_mass the net mass of the UAV
-   * @param g the gravity acceleration
    * @param common_handlers handlers shared between trackers and controllers
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space,
-                          const mrs_uav_managers::MotorParams motor_params, const double uav_mass, const double g,
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space, const double uav_mass,
                           std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
 
   /**

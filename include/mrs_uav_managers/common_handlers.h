@@ -2,6 +2,7 @@
 #define COMMON_HANDLERS_H
 
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/quadratic_thrust_model.h>
 
 namespace mrs_uav_managers
 {
@@ -19,8 +20,8 @@ struct SafetyArea_t
   mrs_uav_managers::isPointInSafetyArea2d_t isPointInSafetyArea2d;
   mrs_uav_managers::getMaxHeight_t          getMaxHeight;
   mrs_uav_managers::getMinHeight_t          getMinHeight;
-  std::string                              frame_id;
-  bool                                     use_safety_area;
+  std::string                               frame_id;
+  bool                                      use_safety_area;
 };
 
 //}
@@ -31,17 +32,22 @@ typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidateP
 
 struct Bumper_t
 {
-  bool                                   enabled;
+  bool                                    enabled;
   mrs_uav_managers::bumperValidatePoint_t bumperValidatePoint;
 };
 
 //}
 
+typedef boost::function<double(void)> getMass_t;
+
 struct CommonHandlers_t
 {
-  SafetyArea_t                          safety_area;
-  std::shared_ptr<mrs_lib::Transformer> transformer;
-  Bumper_t                              bumper;
+  SafetyArea_t                                   safety_area;
+  std::shared_ptr<mrs_lib::Transformer>          transformer;
+  Bumper_t                                       bumper;
+  getMass_t                                      getMass;
+  mrs_lib::quadratic_thrust_model::MotorParams_t motor_params;
+  double                                         g;
 };
 
 

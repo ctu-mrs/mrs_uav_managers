@@ -38,6 +38,7 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
+#include <mrs_lib/quadratic_thrust_model.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -449,10 +450,6 @@ private:
 
   // | --------------------- thrust and mass -------------------- |
 
-  // parameters of the motor model, magnitude of gravity
-  mrs_uav_managers::MotorParams _motor_params_;
-  double                        _g_ = 9.8;
-
   // thrust mass estimation during eland
   double    thrust_mass_estimate_   = 0;
   bool      thrust_under_threshold_ = false;
@@ -522,6 +519,7 @@ private:
   bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   double getMinHeight(void);
   double getMaxHeight(void);
+  double getMass(void);
 
   // | ------------------------ callbacks ----------------------- |
 
@@ -911,9 +909,6 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
 
   param_loader.loadParam("uav_mass", _uav_mass_);
-  param_loader.loadParam("hover_thrust/a", _motor_params_.A);
-  param_loader.loadParam("hover_thrust/b", _motor_params_.B);
-  param_loader.loadParam("g", _g_);
 
   param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
   param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_enabled_);
@@ -1133,8 +1128,15 @@ void ControlManager::onInit() {
   common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
   common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
 
+  common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
+
   common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
   common_handlers_->bumper.enabled             = bumper_enabled_;
+
+  param_loader.loadParam("motor_params/a", common_handlers_->motor_params.A);
+  param_loader.loadParam("motor_params/b", common_handlers_->motor_params.B);
+  param_loader.loadParam("motor_params/n_motors", common_handlers_->motor_params.n_motors);
+  param_loader.loadParam("g", common_handlers_->g);
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1254,7 +1256,7 @@ void ControlManager::onInit() {
       it = controllers_.find(_controller_names_[i]);
 
       ROS_INFO("[ControlManager]: initializing the controller '%s'", it->second.address.c_str());
-      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _motor_params_, _uav_mass_, _g_, common_handlers_);
+      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _uav_mass_, common_handlers_);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: exception caught during controller initialization: '%s'", ex.what());
@@ -2720,12 +2722,11 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     }
 
     // recalculate the mass based on the thrust
-    thrust_mass_estimate_ = pow((last_attitude_cmd->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_;
+    thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust) / common_handlers_->g;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
     // condition for automatic motor turn off
     if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_attitude_cmd->thrust < 0.01)) {
-
       if (!thrust_under_threshold_) {
 
         thrust_mass_estimate_first_time_ = ros::Time::now();
@@ -2735,13 +2736,11 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
       ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time_).toSec());
 
     } else {
-
       thrust_mass_estimate_first_time_ = ros::Time::now();
       thrust_under_threshold_          = false;
     }
 
     if (thrust_under_threshold_ && ((ros::Time::now() - thrust_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
-
       // enable callbacks? ... NO
 
       ROS_INFO("[ControlManager]: reached cutoff thrust, setting motors OFF");
@@ -2792,7 +2791,8 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     return;
   }
 
-  double thrust_mass_estimate_ = pow((last_attitude_cmd_->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_;
+  double thrust_mass_estimate_ =
+      mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd_->thrust) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
   // condition for automatic motor turn off
@@ -6390,6 +6390,21 @@ double ControlManager::getMinHeight(void) {
 
 //}
 
+/* //{ getMass() */
+
+double ControlManager::getMass(void) {
+
+  std::scoped_lock lock(mutex_last_attitude_cmd_);
+
+  if (last_attitude_cmd_ != mrs_msgs::AttitudeCommand::Ptr()) {
+    return _uav_mass_ + last_attitude_cmd_->mass_difference;
+  } else {
+    return _uav_mass_;
+  }
+}
+
+//}
+
 // | --------------------- obstacle bumper -------------------- |
 
 /* bumperValidatePoint() //{ */
@@ -8379,12 +8394,13 @@ void ControlManager::publish(void) {
 
   if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    mrs_msgs::Float64Stamped thrust_out;
-    thrust_out.header.stamp = ros::Time::now();
-    thrust_out.value        = (pow((last_attitude_cmd->thrust - _motor_params_.B) / _motor_params_.A, 2) / _g_) * 10.0;
+    mrs_msgs::Float64Stamped thrust_force;
+    thrust_force.header.stamp = ros::Time::now();
+
+    thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust);
 
     try {
-      publisher_thrust_force_.publish(thrust_out);
+      publisher_thrust_force_.publish(thrust_force);
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_thrust_force_.getTopic().c_str());

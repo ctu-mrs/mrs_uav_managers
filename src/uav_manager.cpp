@@ -34,6 +34,7 @@
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/geometry/misc.h>
+#include <mrs_lib/quadratic_thrust_model.h>
 
 //}
 
@@ -208,8 +209,8 @@ public:
   double      _g_;
   double      landing_uav_mass_;
   bool        _landing_disarm_ = false;
-  double      _hover_thrust_a_;
-  double      _hover_thrust_b_;
+
+  mrs_lib::quadratic_thrust_model::MotorParams_t _motor_params_;
 
   // landing state machine states
   LandingStates_t current_state_landing_  = IDLE_STATE;
@@ -282,8 +283,9 @@ void UavManager::onInit() {
   param_loader.loadParam("uav_mass", _uav_mass_);
   param_loader.loadParam("g", _g_);
 
-  param_loader.loadParam("hover_thrust/a", _hover_thrust_a_);
-  param_loader.loadParam("hover_thrust/b", _hover_thrust_b_);
+  param_loader.loadParam("motor_params/n_motors", _motor_params_.n_motors);
+  param_loader.loadParam("motor_params/a", _motor_params_.A);
+  param_loader.loadParam("motor_params/b", _motor_params_.B);
 
   param_loader.loadParam("max_height_checking/enabled", _max_height_enabled_);
   param_loader.loadParam("max_height_checking/rate", _max_height_checking_rate_);
@@ -489,7 +491,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
     if (_landing_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
 
       // recalculate the mass based on the thrust
-      thrust_mass_estimate_ = pow((desired_thrust - _hover_thrust_b_) / _hover_thrust_a_, 2.0) / _g_;
+      thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(_motor_params_, desired_thrust) / _g_;
       ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
       // condition for automatic motor turn off
