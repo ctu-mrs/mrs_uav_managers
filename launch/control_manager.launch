@@ -35,7 +35,6 @@
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
-  <arg name="custom_config_nsf_controller" default="" />
   <arg name="custom_config_se3_controller" default="" />
 
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
@@ -91,13 +90,6 @@
       <param name="body_disturbance_y" value="$(arg BODY_DISTURBANCE_Y)" />
 
       <!-- Controller's configs -->
-
-      <!-- NSF -->
-      <rosparam ns="nsf_controller" file="$(find mrs_uav_controllers)/config/default/nsf.yaml" />
-      <rosparam ns="nsf_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/nsf.yaml" />
-      <rosparam if="$(eval not arg('custom_config_nsf_controller') == '')" ns="nsf_controller" file="$(arg custom_config_nsf_controller)" />
-      <param name="nsf_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
-      <remap from="~nsf_controller/profiler" to="profiler" />
 
       <!-- SE3 -->
       <rosparam ns="se3_controller" file="$(find mrs_uav_controllers)/config/default/se3.yaml" />
