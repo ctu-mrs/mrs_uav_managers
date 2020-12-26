@@ -2439,7 +2439,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     // calculate the yaw error
     double cmd_yaw = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw();
-    yaw_error_     = radians::diff(cmd_yaw, uav_yaw);
+    yaw_error_     = fabs(radians::diff(cmd_yaw, uav_yaw));
   }
 
 
