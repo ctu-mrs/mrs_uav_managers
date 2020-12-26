@@ -1,9 +1,6 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1.2)
 project(mrs_uav_managers)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   geometry_msgs
@@ -21,11 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
 # find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
 find_package(mavros_msgs REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-
-###################################
-## catkin specific configuration ##
-###################################
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -34,13 +28,6 @@ catkin_package(
   DEPENDS mavros_msgs
   )
 
-###########
-## Build ##
-###########
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-# include_directories(include)
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
@@ -70,7 +57,7 @@ add_dependencies(NullTracker
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
 
-target_link_libraries(NullTracker 
+target_link_libraries(NullTracker
   ${catkin_LIBRARIES}
   ${mavros_msgs_LIBRARIES}
   )
