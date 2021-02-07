@@ -1,6 +1,6 @@
 version: "0.0.5.0"
 
-# - list of names of dynamically loaded trackers
+#- list of names of dynamically loaded trackers
 trackers : [
   "MpcTracker",
   "LandoffTracker",
@@ -9,7 +9,7 @@ trackers : [
   "SpeedTracker",
 ]
 
-# - list of names of dynamically loaded controllers
+#- list of names of dynamically loaded controllers
 controllers : [
   "Se3Controller",
   "MpcController",
@@ -17,10 +17,10 @@ controllers : [
   "EmergencyController",
 ]
 
-# - this is the "do nothing tracker", which is active when no other is
+#- this is the "do nothing tracker", which is active when no other is
 null_tracker: "NullTracker"
 
-# tracker used for landing and takeoff
+#tracker used for landing and takeoff
 landing_takeoff_tracker: "LandoffTracker"
 
 status_timer_rate:  10 # [Hz]
@@ -34,11 +34,26 @@ safety:
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
 
-  tilt_limit_eland: 75 # [deg]
-  yaw_limit_eland: 90 # [deg]
-  tilt_limit_disarm: 90 # [deg]
+  tilt_limit:
 
-  # tracker used for emergency hover routine
+    eland:
+      enabled: true
+      limit: deg(75) # [rad]
+
+    disarm:
+      enabled: true
+      limit: deg(75) # [rad]
+
+  tilt_error_disarm:
+    enabled: true
+    timeout: 0.5 # [s] # for how long the error has to be present to disarm
+    error_threshold: deg(20) # [rad]
+
+  yaw_error_eland:
+    enabled: true
+    limit: deg(90) # [rad]
+
+#tracker used for emergency hover routine
   ehover_tracker: "LandoffTracker"
 
   # controller used for safety landing (feed forward)
@@ -83,12 +98,6 @@ safety:
     eland: true
     failsafe: false
     disarm: false
-
-  tilt_error_disarm:
-
-    enabled: true
-    timeout: 0.5 # [s] # for how long the error has to be present to disarm
-    error_threshold: 20 # [deg]
 
   parachute:
 

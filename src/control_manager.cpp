@@ -458,22 +458,24 @@ private:
   // | ---------------------- safety params --------------------- |
 
   // failsafe when tilt error is too large
-  bool   _tilt_error_disarm_enabled_ = false;
+  bool   _tilt_error_disarm_enabled_;
   double _tilt_error_disarm_timeout_;
-  double _tilt_error_disarm_threshold_ = 0;
+  double _tilt_error_disarm_threshold_;
 
   ros::Time tilt_error_disarm_time_;
   bool      tilt_error_disarm_over_thr_ = false;
 
   // elanding when tilt error is too large
-  double _tilt_limit_eland_ = 0;  // tilt error for triggering eland
+  bool   _tilt_limit_eland_enabled_;
+  double _tilt_limit_eland_ = 0;  // [rad]
 
   // disarming when tilt error is too large
-  double _tilt_limit_disarm_ = 0;  // tilt error for triggering disarm
+  bool   _tilt_limit_disarm_enabled_;
+  double _tilt_limit_disarm_ = 0;  // [rad]
 
   // elanding when yaw error is too large
-  bool   _yaw_error_eland_enabled_   = false;
-  double _yaw_error_eland_threshold_ = 0;
+  bool   _yaw_error_eland_enabled_;
+  double _yaw_error_eland_ = 0;  // [rad]
 
   // keeping track of control errors
   double     tilt_error_       = 0;
@@ -897,12 +899,26 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
   param_loader.loadParam("safety/escalating_failsafe/disarm", _escalating_failsafe_disarm_);
 
-  param_loader.loadParam("safety/tilt_limit_eland", _tilt_limit_eland_);
-  _tilt_limit_eland_ = (_tilt_limit_eland_ / 180.0) * M_PI;
-  param_loader.loadParam("safety/tilt_limit_disarm", _tilt_limit_disarm_);
-  _tilt_limit_disarm_ = (_tilt_limit_disarm_ / 180.0) * M_PI;
-  param_loader.loadParam("safety/yaw_limit_eland", _yaw_error_eland_threshold_);
-  _yaw_error_eland_threshold_ = (_yaw_error_eland_threshold_ / 180.0) * M_PI;
+  param_loader.loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
+  param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
+  if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
+    ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
+    ros::shutdown();
+  }
+
+  param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
+  param_loader.loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
+  if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
+    ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
+    ros::shutdown();
+  }
+
+  param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
+  param_loader.loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
+  if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
+    ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
+    ros::shutdown();
+  }
 
   param_loader.loadParam("status_timer_rate", _status_timer_rate_);
   param_loader.loadParam("safety/safety_timer_rate", _safety_timer_rate_);
@@ -916,7 +932,10 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
   param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
-  _tilt_error_disarm_threshold_ = (_tilt_error_disarm_threshold_ / 180.0) * M_PI;
+  if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
+    ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
+    ros::shutdown();
+  }
 
   // default constraints
 
@@ -2519,7 +2538,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | ------------------- tilt control error ------------------- |
 
-  if (fabs(_tilt_limit_eland_) > 1e-3 && tilt_angle > _tilt_limit_eland_) {
+  if (_tilt_limit_eland_enabled_ && tilt_angle > _tilt_limit_eland_) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2572,34 +2591,36 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // | -------------------- yaw control error ------------------- |
   // do not have to mutex the yaw_error_ here since I am filling it in this function
 
-  if (fabs(_yaw_error_eland_threshold_) > 1e-3 && yaw_error_ > (_yaw_error_eland_threshold_ / 2.0)) {
+  if (_yaw_error_eland_enabled_) {
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+    if (yaw_error_ > (_yaw_error_eland_ / 2.0)) {
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if (!failsafe_triggered_ && !eland_triggered_) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
-                           (180.0 / M_PI) * _yaw_error_eland_threshold_ / 2.0);
+        if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ungripSrv();
+          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
+                             (180.0 / M_PI) * _yaw_error_eland_ / 2.0);
+
+          ungripSrv();
+        }
       }
     }
-  }
 
-  if (fabs(_yaw_error_eland_threshold_) > 1e-3 && yaw_error_ > _yaw_error_eland_threshold_) {
+    if (yaw_error_ > _yaw_error_eland_) {
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-      if (!failsafe_triggered_ && !eland_triggered_) {
+        if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
-                  (180.0 / M_PI) * _yaw_error_eland_threshold_);
+          ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_, (180.0 / M_PI) * _yaw_error_eland_);
 
-        eland();
+          eland();
+        }
       }
     }
   }
@@ -2607,9 +2628,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   // |      disarm the drone when the tilt exceeds the limit      |
   // --------------------------------------------------------------
-  if (fabs(_tilt_limit_disarm_) > 1e-3 && tilt_angle > _tilt_limit_disarm_) {
+  if (_tilt_limit_disarm_enabled_ && tilt_angle > _tilt_limit_disarm_) {
 
-    ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
+    ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_disarm_);
 
     arming(false);
   }

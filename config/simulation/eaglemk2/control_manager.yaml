@@ -6,6 +6,7 @@ trackers : [
   "JoyTracker",
   "MatlabTracker",
   "SpeedTracker",
+  "FlipTracker",
   "NullTracker",
 ]
 

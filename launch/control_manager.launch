@@ -29,6 +29,7 @@
   <arg name="custom_config_matlab_tracker" default="" />
   <arg name="custom_config_speed_tracker" default="" />
   <arg name="custom_config_mpc_tracker" default="" />
+  <arg name="custom_config_flip_tracker" default="" />
   <arg name="custom_config_uav_names" default="" />
 
     <!-- custom configs for controllers -->
@@ -187,6 +188,14 @@
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
       <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
       <remap from="~mpc_tracker/collision_avoidance_in" to="~mpc_tracker/collision_avoidance" />
+
+      <!-- FlipTracker -->
+      <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/default/flip_tracker.yaml" />
+      <!-- <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/flip_tracker.yaml" /> -->
+      <rosparam if="$(eval not arg('custom_config_flip_tracker') == '')" ns="flip_tracker" file="$(arg custom_config_flip_tracker)" />
+      <param name="flip_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~flip_tracker/profiler" to="profiler" />
+      <remap from="~flip_tracker/flip_in" to="~flip_tracker/flip" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
