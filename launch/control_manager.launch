@@ -191,7 +191,7 @@
 
       <!-- FlipTracker -->
       <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/default/flip_tracker.yaml" />
-      <!-- <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/flip_tracker.yaml" /> -->
+      <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/flip_tracker.yaml" />
       <rosparam if="$(eval not arg('custom_config_flip_tracker') == '')" ns="flip_tracker" file="$(arg custom_config_flip_tracker)" />
       <param name="flip_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~flip_tracker/profiler" to="profiler" />
