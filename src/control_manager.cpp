@@ -2504,17 +2504,20 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     {
       auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
 
-      double heading = 0;
-      try {
-        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
-      }
-      catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
-      }
+      // TODO the heading in the innovation is not filled in!
+      /* double heading = 0; */
+      /* try { */
+      /*   heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg()); */
+      /* } */
+      /* catch (mrs_lib::AttitudeConverter::GetHeadingException e) { */
+      /*   ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what()); */
+      /* } */
 
       double last_innovation = mrs_lib::geometry::dist(vec3_t(x, y, z), vec3_t(0, 0, 0));
 
-      if (last_innovation > _odometry_innovation_threshold_ || radians::diff(heading, 0) > M_PI_2) {
+      // TODO the heading in the innovation is not filled in!
+      /* if (last_innovation > _odometry_innovation_threshold_ || radians::diff(heading, 0) > M_PI_2) { */
+      if (last_innovation > _odometry_innovation_threshold_) {
 
         auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2522,8 +2525,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
           if (!failsafe_triggered_ && !eland_triggered_) {
 
-            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
-                      last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+            // TODO the heading in the innovation is not filled in!
+            /* ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)", */
+            /*           last_innovation, _odometry_innovation_threshold_, x, y, z, heading); */
+
+            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f)", last_innovation,
+                      _odometry_innovation_threshold_, x, y, z);
 
             eland();
           }
