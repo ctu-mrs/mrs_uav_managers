@@ -488,10 +488,10 @@ private:
 
   // control error for triggering failsafe, eland, etc.
   // this filled with the current controllers failsafe threshold
-  double _failsafe_threshold_            = 0;  // control error for triggering failsafe
-  double _eland_threshold_               = 0;  // control error for triggering eland
-  bool   _odometry_innovation_enabled_   = false;
-  double _odometry_innovation_threshold_ = 0;  // innovation size for triggering eland
+  double _failsafe_threshold_                = 0;  // control error for triggering failsafe
+  double _eland_threshold_                   = 0;  // control error for triggering eland
+  bool   _odometry_innovation_check_enabled_ = false;
+  double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
 
   // are callbacks enabled to trackers?
   bool callbacks_enabled_ = true;
@@ -927,7 +927,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("uav_mass", _uav_mass_);
 
   param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
-  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_enabled_);
+  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_check_enabled_);
 
   param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
@@ -1585,7 +1585,7 @@ void ControlManager::onInit() {
                                                                  &ControlManager::callbackOdometry, this);
   }
 
-  if (_odometry_innovation_enabled_) {
+  if (_odometry_innovation_check_enabled_) {
     sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
   }
 
@@ -2392,7 +2392,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
       !sh_pixhawk_odometry_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
     return;
   }
@@ -2500,24 +2500,21 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // |     activate emergency land in case of large innovation    |
   // --------------------------------------------------------------
 
-  if (_odometry_innovation_enabled_) {
+  if (_odometry_innovation_check_enabled_) {
     {
       auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
 
-      // TODO the heading in the innovation is not filled in!
-      /* double heading = 0; */
-      /* try { */
-      /*   heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg()); */
-      /* } */
-      /* catch (mrs_lib::AttitudeConverter::GetHeadingException e) { */
-      /*   ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what()); */
-      /* } */
+      double heading = 0;
+      try {
+        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
+      }
+      catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
+      }
 
       double last_innovation = mrs_lib::geometry::dist(vec3_t(x, y, z), vec3_t(0, 0, 0));
 
-      // TODO the heading in the innovation is not filled in!
-      /* if (last_innovation > _odometry_innovation_threshold_ || radians::diff(heading, 0) > M_PI_2) { */
-      if (last_innovation > _odometry_innovation_threshold_) {
+      if (last_innovation > _odometry_innovation_threshold_ || radians::diff(heading, 0) > M_PI_2) {
 
         auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2525,12 +2522,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
           if (!failsafe_triggered_ && !eland_triggered_) {
 
-            // TODO the heading in the innovation is not filled in!
-            /* ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)", */
-            /*           last_innovation, _odometry_innovation_threshold_, x, y, z, heading); */
-
-            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f)", last_innovation,
-                      _odometry_innovation_threshold_, x, y, z);
+            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
+                      last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
             eland();
           }
@@ -7712,7 +7705,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch tracker, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -7869,7 +7862,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_enabled_ && !sh_odometry_innovation_.hasMsg()) {
+  if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());

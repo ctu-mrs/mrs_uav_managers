@@ -53,7 +53,7 @@ safety:
     enabled: true
     limit: deg(90) # [rad]
 
-#tracker used for emergency hover routine
+  # tracker used for emergency hover routine
   ehover_tracker: "LandoffTracker"
 
   # controller used for safety landing (feed forward)
@@ -63,7 +63,8 @@ safety:
   odometry_max_missing_time: 0.1 # [s]
 
   # trigger eland when the odometry corrections are too unreliable
-  # should be false when using custom odometry source without available innovation values
+  # - should be false when using custom odometry source without available innovation values
+  # - the innovation limit is set per-controller in the controllers.yaml file
   odometry_innovation_eland:
     enabled: true
 
