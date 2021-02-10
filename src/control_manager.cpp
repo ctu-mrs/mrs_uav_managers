@@ -8572,6 +8572,13 @@ bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::Co
     return false;
   }
 
+  // check thrust
+
+  if (!std::isfinite(position_command->thrust)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->thrust'!!!");
+    return false;
+  }
+
   return true;
 }
 
