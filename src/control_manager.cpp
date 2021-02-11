@@ -615,19 +615,19 @@ private:
   void       timerFailsafe(const ros::TimerEvent& event);
 
   // oneshot timer for running controllers and trackers
-  ros::Timer timer_control_;
-  void       timerControl(const ros::TimerEvent& event);
-  bool       running_control_timer_ = false;
+  ros::Timer        timer_control_;
+  void              timerControl(const ros::TimerEvent& event);
+  std::atomic<bool> running_control_timer_ = false;
 
   // timer for issuing emergancy landing
   ros::Timer timer_eland_;
   void       timerEland(const ros::TimerEvent& event);
 
   // timer for regular checking of controller errors
-  ros::Timer timer_safety_;
-  void       timerSafety(const ros::TimerEvent& event);
-  bool       running_safety_timer_        = false;
-  double     odometry_switch_in_progress_ = false;
+  ros::Timer        timer_safety_;
+  void              timerSafety(const ros::TimerEvent& event);
+  std::atomic<bool> running_safety_timer_        = false;
+  double            odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
   ros::Timer timer_pirouette_;
@@ -2378,7 +2378,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
 void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
-  mrs_lib::ScopeUnset unset_running(running_safety_timer_);
+  mrs_lib::AtomicScopeFlag unset_running(running_safety_timer_);
 
   if (!is_initialized_)
     return;
@@ -3168,7 +3168,7 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
   if (!is_initialized_)
     return;
 
-  mrs_lib::ScopeUnset unset_running(running_control_timer_);
+  mrs_lib::AtomicScopeFlag unset_running(running_control_timer_);
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerControl");
 
