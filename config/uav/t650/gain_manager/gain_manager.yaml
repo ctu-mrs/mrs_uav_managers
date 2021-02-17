@@ -11,6 +11,10 @@ gain_management:
     ICP: ["supersoft", "soft"]
     VSLAM: ["supersoft", "soft"]
     BRICKFLOW: ["supersoft", "soft"]
+    HECTOR: ["supersoft"]
+    ALOAM: ["supersoft"]
+    ALOAMGARM: ["supersoft"]
+    ALOAMREP: ["soft"]
     BRICK: ["supersoft", "soft"]
     T265: ["supersoft", "soft", "tight"]
     OBJECT: ["supersoft"]
@@ -20,11 +24,8 @@ gain_management:
     OPTFLOWGPS: ["supersoft"]
     GPS: ["supersoft", "soft", "tight"]
     OPTFLOW: ["supersoft", "soft"]
-    OTHER: ["supersoft"]
-    HECTOR: ["supersoft"]
-    ALOAM: ["supersoft"]
-    ALOAMGARM: ["supersoft"]
     TOWER: ["supersoft", "soft"]
+    OTHER: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -32,6 +33,10 @@ gain_management:
     ICP: "supersoft"
     VSLAM: "supersoft"
     BRICKFLOW: "supersoft"
+    HECTOR: "supersoft"
+    ALOAM: "supersoft"
+    ALOAMGARM: "supersoft"
+    ALOAMREP: "soft"
     BRICK: "supersoft"
     T265: "supersoft"
     OBJECT: "supersoft"
@@ -41,8 +46,5 @@ gain_management:
     OPTFLOWGPS: "supersoft"
     GPS: "soft"
     OPTFLOW: "supersoft"
-    HECTOR: "supersoft"
-    ALOAM: "supersoft"
-    ALOAMGARM: "supersoft"
     TOWER: "supersoft"
     OTHER: "supersoft"

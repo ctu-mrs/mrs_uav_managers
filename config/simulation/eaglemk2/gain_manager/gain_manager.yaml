@@ -14,8 +14,10 @@ gain_management:
     HECTOR: ["soft"]
     ALOAM: ["soft"]
     ALOAMGARM: ["soft"]
-    T265: ["soft"]
+    ALOAMREP: ["soft"]
     BRICK: ["supersoft"]
+    T265: ["soft"]
+    OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     LIDAR: ["supersoft"]
     RTK: ["supersoft", "soft", "tight"]
@@ -34,8 +36,10 @@ gain_management:
     HECTOR: "soft"
     ALOAM: "soft"
     ALOAMGARM: "soft"
-    T265: "soft"
+    ALOAMREP: "soft"
     BRICK: "supersoft"
+    T265: "soft"
+    OBJECT: "supersoft"
     VIO: "supersoft"
     LIDAR: "supersoft"
     RTK: "soft"

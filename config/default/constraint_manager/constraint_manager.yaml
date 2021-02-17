@@ -40,6 +40,7 @@ constraint_management:
     HECTOR: ["slow"]
     ALOAM: ["slow"]
     ALOAMGARM: ["slow"]
+    ALOAMREP: ["slow"]
     TOWER: ["slow"]
     T265: ["slow"]
     BRICK: ["slow"]
@@ -60,6 +61,7 @@ constraint_management:
     HECTOR: "slow"
     ALOAM: "slow"
     ALOAMGARM: "slow"
+    ALOAMREP: "slow"
     TOWER: "slow"
     T265: "slow"
     BRICK: "slow"

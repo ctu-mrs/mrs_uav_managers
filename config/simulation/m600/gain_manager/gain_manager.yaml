@@ -2,6 +2,8 @@ gains: [
   "default",
 ]
 
+
+
 gain_management:
 
   # list of allowed gains per odometry mode
@@ -12,8 +14,10 @@ gain_management:
     HECTOR: ["default"]
     ALOAM: ["default"]
     ALOAMGARM: ["default"]
-    T265: ["default"]
+    ALOAMREP: ["soft"]
     BRICK: ["default"]
+    T265: ["default"]
+    OBJECT: ["supersoft"]
     VIO: ["default"]
     LIDAR: ["default"]
     RTK: ["default"]
@@ -32,8 +36,10 @@ gain_management:
     HECTOR: "default"
     ALOAM: "default"
     ALOAMGARM: "default"
-    T265: "default"
+    ALOAMREP: "soft"
     BRICK: "default"
+    T265: "default"
+    OBJECT: "supersoft"
     VIO: "default"
     LIDAR: "default"
     RTK: "default"

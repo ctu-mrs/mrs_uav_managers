@@ -37,6 +37,7 @@ gain_management:
     HECTOR: ["default"]
     ALOAM: ["default"]
     ALOAMGARM: ["default"]
+    ALOAMREP: ["default"]
     TOWER: ["default"]
     T265: ["default"]
     BRICK: ["default"]
@@ -57,6 +58,7 @@ gain_management:
     HECTOR: "default"
     ALOAM: "default"
     ALOAMGARM: "default"
+    ALOAMREP: "default"
     TOWER: "default"
     T265: "default"
     BRICK: "default"

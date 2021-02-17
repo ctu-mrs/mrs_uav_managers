@@ -3,6 +3,7 @@ gains: [
   "soft",
 ]
 
+
 gain_management:
 
   # list of allowed gains per odometry mode
@@ -10,6 +11,10 @@ gain_management:
     ICP: ["supersoft", "soft"]
     VSLAM: ["supersoft", "soft"]
     BRICKFLOW: ["supersoft", "soft"]
+    HECTOR: ["soft"]
+    ALOAM: ["soft"]
+    ALOAMGARM: ["soft"]
+    ALOAMREP: ["soft"]
     BRICK: ["supersoft", "soft"]
     T265: ["supersoft", "soft"]
     OBJECT: ["supersoft"]
@@ -28,6 +33,10 @@ gain_management:
     ICP: "supersoft"
     VSLAM: "supersoft"
     BRICKFLOW: "supersoft"
+    HECTOR: "soft"
+    ALOAM: "soft"
+    ALOAMGARM: "soft"
+    ALOAMREP: "soft"
     BRICK: "supersoft"
     T265: "supersoft"
     OBJECT: "supersoft"
