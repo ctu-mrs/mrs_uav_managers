@@ -19,7 +19,8 @@ estimator_types: [
   "OPTFLOW",
   "OTHER",
   "ALOAM",
-  "ALOAMGARM"
+  "ALOAMGARM",
+  "ALOAMREP"
 ]
 
 constraints: [

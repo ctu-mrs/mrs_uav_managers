@@ -19,6 +19,7 @@ estimator_types: [
   "OTHER",
   "ALOAM",
   "ALOAMGARM",
+  "ALOAMREP",
   "TOWER",
 ]
 
