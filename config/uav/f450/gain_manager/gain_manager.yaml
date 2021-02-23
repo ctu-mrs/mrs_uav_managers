@@ -20,7 +20,7 @@ gain_management:
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     LIDAR: ["supersoft"]
-    RTK: ["supersoft"]
+    RTK: ["supersoft", "soft"]
     OPTFLOWGPS: ["supersoft"]
     GPS: ["supersoft", "soft"]
     OPTFLOW: ["supersoft"]
@@ -42,7 +42,7 @@ gain_management:
     OBJECT: "supersoft"
     VIO: "supersoft"
     LIDAR: "supersoft"
-    RTK: "supersoft"
+    RTK: "soft"
     OPTFLOWGPS: "supersoft"
     GPS: "soft"
     OPTFLOW: "supersoft"
