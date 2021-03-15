@@ -25,6 +25,7 @@ gain_management:
     GPS: ["default"]
     OPTFLOW: ["default"]
     TOWER: ["default"]
+    LIOSAM: ["default"]
     OTHER: ["default"]
 
   # those gains will be used automatically when a localization mode switches
@@ -47,4 +48,5 @@ gain_management:
     GPS: "default"
     OPTFLOW: "default"
     TOWER: "default"
+    LIOSAM: "default"
     OTHER: "default"

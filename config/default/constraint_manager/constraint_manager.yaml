@@ -20,7 +20,8 @@ estimator_types: [
   "OTHER",
   "ALOAM",
   "ALOAMGARM",
-  "ALOAMREP"
+  "ALOAMREP",
+  "LIOSAM"
 ]
 
 constraints: [
@@ -50,6 +51,7 @@ constraint_management:
     OPTFLOWGPS: ["slow"]
     GPS: ["slow", "medium", "fast"]
     OPTFLOW: ["slow", "medium"]
+    LIOSAM: ["slow", "medium"]
     OTHER: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
@@ -71,4 +73,5 @@ constraint_management:
     OPTFLOWGPS: "slow"
     GPS: "medium"
     OPTFLOW: "slow"
+    LIOSAM: "slow"
     OTHER: "slow"

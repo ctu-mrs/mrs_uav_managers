@@ -21,6 +21,7 @@ estimator_types: [
   "ALOAMGARM",
   "ALOAMREP",
   "TOWER",
+  "LIOSAM",
 ]
 
 gains: [
@@ -47,6 +48,7 @@ gain_management:
     OPTFLOWGPS: ["default"]
     GPS: ["default"]
     OPTFLOW: ["default"]
+    LIOSAM: ["default"]
     OTHER: ["default"]
 
   # those gains will be used automatically when a localization mode switches
@@ -68,4 +70,5 @@ gain_management:
     OPTFLOWGPS: "default"
     GPS: "default"
     OPTFLOW: "default"
+    LIOSAM: "default"
     OTHER: "default"
