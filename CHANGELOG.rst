@@ -2,6 +2,16 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* major control pipeline refactoring
+* c++ refactoring
+* Noetic-compatible
+* updated controller and tracker interface
+* updated safety features
+* dynamic constraints update
+* Contributors: Daniel Hert, Matej Petrlik, Matej@NUC, Matouš Vrba, Pavel Petracek, Robert Penicka, Tomas Baca, Tomáš Báča, Viktor Walter, eaglemk2, klaxalk, mergify[bot], mrs, uav20, uav35, uav45, uav46, uav49
+
 0.0.5 (2020-02-26)
 ------------------
 * added deadband around retard mode
