@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.6 (2021-03-16)
+------------------
 * major control pipeline refactoring
 * c++ refactoring
 * Noetic-compatible
