@@ -62,3 +62,7 @@ max_thrust:
   max_thrust: 0.80 # [-]
   eland_timeout: 1.0 # [s]
   ungrip_timeout: 0.5 # [s]
+
+diagnostics:
+
+  rate: 1.0 # [Hz]

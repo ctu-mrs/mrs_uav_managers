@@ -1126,15 +1126,15 @@ void ControlManager::onInit() {
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
     }
 
-    catch (mrs_lib::SafetyZone::BorderError) {
+    catch (mrs_lib::SafetyZone::BorderError &e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
       ros::shutdown();
     }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError) {
+    catch (mrs_lib::SafetyZone::PolygonObstacleError &e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone polygon obstacles");
       ros::shutdown();
     }
-    catch (mrs_lib::SafetyZone::PointObstacleError) {
+    catch (mrs_lib::SafetyZone::PointObstacleError &e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
       ros::shutdown();
     }
@@ -2508,7 +2508,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       try {
         heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
       }
-      catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+      catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
       }
 
@@ -6060,6 +6060,7 @@ void ControlManager::publishDiagnostics(void) {
   mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
 
   diagnostics_msg.stamp = ros::Time::now();
+  diagnostics_msg.uav_name = _uav_name_;
 
   diagnostics_msg.motors = motors_;
 

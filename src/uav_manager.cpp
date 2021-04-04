@@ -21,6 +21,7 @@
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
+#include <mrs_msgs/UavManagerDiagnostics.h>
 
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -101,9 +102,6 @@ public:
   void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
 
-  // publisher
-  ros::Publisher publisher_flight_time_;
-
   // service servers
   ros::ServiceServer service_server_takeoff_;
   ros::ServiceServer service_server_land_;
@@ -147,6 +145,7 @@ public:
   ros::Timer timer_landing_;
   ros::Timer timer_maxthrust_;
   ros::Timer timer_flighttime_;
+  ros::Timer timer_diagnostics_;
 
   // timer callbacks
   void timerLanding(const ros::TimerEvent& event);
@@ -154,13 +153,17 @@ public:
   void timerMaxHeight(const ros::TimerEvent& event);
   void timerFlighttime(const ros::TimerEvent& event);
   void timerMaxthrust(const ros::TimerEvent& event);
+  void timerDiagnostics(const ros::TimerEvent& event);
+
+  // publishers
+  ros::Publisher publisher_diagnostics_;
 
   // max height checking
-  bool   _max_height_enabled_ = false;
-  int    _max_height_checking_rate_;
-  double _max_height_offset_;
-  double _max_height_;
-  bool   fixing_max_height_ = false;
+  bool              _max_height_enabled_ = false;
+  int               _max_height_checking_rate_;
+  double            _max_height_offset_;
+  double            _max_height_;
+  std::atomic<bool> fixing_max_height_ = false;
 
   // mass estimation during landing
   double    thrust_mass_estimate_;
@@ -173,11 +176,14 @@ public:
   std::tuple<bool, std::string> landImpl(void);
   std::tuple<bool, std::string> landWithDescendImpl(void);
 
-  // saved takeoff coordinates
+  // saved takeoff coordinates and allows to land there again
   mrs_msgs::ReferenceStamped land_there_reference_;
+  std::mutex                 mutex_land_there_reference_;
 
   // to which height to takeoff
   double _takeoff_height_;
+
+  std::atomic<bool> takeoff_successful_;
 
   // names of important trackers
   std::string _null_tracker_name_;
@@ -210,6 +216,9 @@ public:
   double      landing_uav_mass_;
   bool        _landing_disarm_ = false;
 
+  // diagnostics timer
+  double _diagnostics_timer_rate_;
+
   mrs_lib::quadratic_thrust_model::MotorParams_t _motor_params_;
 
   // landing state machine states
@@ -217,10 +226,11 @@ public:
   LandingStates_t previous_state_landing_ = IDLE_STATE;
 
   // Timer for checking max flight time
-  double _flighttime_timer_rate_;
-  double _flighttime_max_time_;
-  bool   _flighttime_timer_enabled_ = false;
-  double flighttime_                = 0;
+  double     _flighttime_timer_rate_;
+  double     _flighttime_max_time_;
+  bool       _flighttime_timer_enabled_ = false;
+  double     flighttime_                = 0;
+  std::mutex mutex_flighttime_;
 
   // Timer for checking maximum thrust
   bool      _maxthrust_timer_enabled_ = false;
@@ -306,6 +316,8 @@ void UavManager::onInit() {
   param_loader.loadParam("max_thrust/eland_timeout", _maxthrust_eland_timeout_);
   param_loader.loadParam("max_thrust/ungrip_timeout", _maxthrust_ungrip_timeout_);
 
+  param_loader.loadParam("diagnostics/rate", _diagnostics_timer_rate_);
+
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
     ros::shutdown();
@@ -339,7 +351,7 @@ void UavManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_flight_time_ = nh_.advertise<mrs_msgs::Float64>("flight_time", 1);
+  publisher_diagnostics_ = nh_.advertise<mrs_msgs::UavManagerDiagnostics>("diagnostics_out", 1);
 
   // | --------------------- service servers -------------------- |
 
@@ -372,10 +384,11 @@ void UavManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  timer_landing_    = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
-  timer_takeoff_    = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
-  timer_flighttime_ = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
-  timer_maxthrust_  = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
+  timer_landing_     = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
+  timer_takeoff_     = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
+  timer_flighttime_  = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
+  timer_maxthrust_   = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
+  timer_diagnostics_ = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
 
   if (_max_height_enabled_) {
     timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
@@ -435,12 +448,14 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerLanding", _landing_timer_rate_, 0.1, event);
 
+  auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
+
   // copy member variables
   auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
   double desired_thrust              = sh_attitude_cmd_.getMsg()->thrust;
   auto   odometry                    = sh_odometry_.getMsg();
 
-  auto res = transformer_->transformSingle(odometry->header.frame_id, land_there_reference_);
+  auto res = transformer_->transformSingle(odometry->header.frame_id, land_there_reference);
 
   mrs_msgs::ReferenceStamped land_there_current_frame;
 
@@ -466,7 +481,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
       odom_heading = mrs_lib::getHeading(odometry);
       ref_heading  = mrs_lib::getHeading(land_there_current_frame);
     }
-    catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+    catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
       ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
       return;
     }
@@ -613,7 +628,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   try {
     odometry_heading = mrs_lib::getHeading(odometry);
   }
-  catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
     ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
     return;
   }
@@ -688,24 +703,19 @@ void UavManager::timerFlighttime(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerFlighttime", _flighttime_timer_rate_, 0.1, event);
 
-  flighttime_ += 1.0 / _flighttime_timer_rate_;
+  auto flighttime = mrs_lib::get_mutexed(mutex_flighttime_, flighttime_);
+
+  flighttime += 1.0 / _flighttime_timer_rate_;
 
   mrs_msgs::Float64 flight_time;
-  flight_time.value = flighttime_;
-
-  try {
-    publisher_flight_time_.publish(flight_time);
-  }
-  catch (...) {
-    ROS_ERROR("exception caught during publishing topic '%s'", publisher_flight_time_.getTopic().c_str());
-  }
+  flight_time.value = flighttime;
 
   // if enabled, start the timer for measuring the flight time
   if (_flighttime_timer_enabled_) {
 
-    if (flighttime_ > _flighttime_max_time_) {
+    if (flighttime > _flighttime_max_time_) {
 
-      flighttime_ = 0;
+      flighttime = 0;
       timer_flighttime_.stop();
 
       ROS_INFO("[UavManager]: max flight time reached, landing");
@@ -713,6 +723,8 @@ void UavManager::timerFlighttime(const ros::TimerEvent& event) {
       landImpl();
     }
   }
+
+  mrs_lib::set_mutexed(mutex_flighttime_, flighttime, flighttime_);
 }
 
 //}
@@ -767,6 +779,59 @@ void UavManager::timerMaxthrust(const ros::TimerEvent& event) {
                        _maxthrust_max_thrust_, _maxthrust_eland_timeout_);
 
     elandSrv();
+  }
+}
+
+//}
+
+/* //{ timerDiagnostics() */
+
+void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
+
+  if (!is_initialized_)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _maxthrust_timer_rate_, 0.03, event);
+
+  mrs_msgs::UavManagerDiagnostics diag;
+
+  auto flighttime = mrs_lib::get_mutexed(mutex_flighttime_, flighttime_);
+
+  // fill in the acumulated flight time
+  diag.flight_time = flighttime;
+
+  if (sh_odometry_.hasMsg()) {  // get current position in lat-lon
+
+    nav_msgs::Odometry odom = *sh_odometry_.getMsg();
+
+    geometry_msgs::PoseStamped uav_pose;
+    uav_pose.pose = mrs_lib::getPose(odom);
+
+    auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+
+    if (res) {
+      diag.cur_latitude  = res.value().pose.position.x;
+      diag.cur_longitude = res.value().pose.position.y;
+    }
+  }
+
+  if (takeoff_successful_) {
+
+    auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
+
+    auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+
+    if (res) {
+      diag.cur_latitude  = res.value().reference.position.x;
+      diag.cur_longitude = res.value().reference.position.y;
+    }
+  }
+
+  try {
+    publisher_diagnostics_.publish(diag);
+  }
+  catch (...) {
+    ROS_ERROR("exception caught during publishing topic '%s'", publisher_diagnostics_.getTopic().c_str());
   }
 }
 
@@ -947,7 +1012,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
   try {
     odom_heading = mrs_lib::getHeading(sh_odometry_.getMsg());
   }
-  catch (mrs_lib::AttitudeConverter::GetHeadingException e) {
+  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
     ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
 
     std::stringstream ss;
@@ -1016,11 +1081,15 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     if (takeoff_successful) {
 
       // save the current spot for later landing
-      land_there_reference_.header               = odometry->header;
-      land_there_reference_.reference.position.x = odom_x;
-      land_there_reference_.reference.position.y = odom_y;
-      land_there_reference_.reference.position.z = odom_z;
-      land_there_reference_.reference.heading    = odom_heading;
+      {
+        std::scoped_lock lock(mutex_land_there_reference_);
+
+        land_there_reference_.header               = odometry->header;
+        land_there_reference_.reference.position.x = odom_x;
+        land_there_reference_.reference.position.y = odom_y;
+        land_there_reference_.reference.position.z = odom_z;
+        land_there_reference_.reference.heading    = odom_heading;
+      }
 
       timer_flighttime_.start();
 
@@ -1036,6 +1105,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
 
       // start the takeoff timer
       timer_takeoff_.start();
+
+      takeoff_successful_ = takeoff_successful;
 
     } else {
 
@@ -1173,13 +1244,15 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
   ungripSrv();
 
+  auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
+
   mrs_msgs::ReferenceStamped reference_out;
 
-  land_there_reference_.reference.position.z = sh_odometry_.getMsg()->pose.pose.position.z;
+  land_there_reference.reference.position.z = sh_odometry_.getMsg()->pose.pose.position.z;
 
-  reference_out.header.frame_id = land_there_reference_.header.frame_id;
+  reference_out.header.frame_id = land_there_reference.header.frame_id;
   reference_out.header.stamp    = ros::Time::now();
-  reference_out.reference       = land_there_reference_.reference;
+  reference_out.reference       = land_there_reference.reference;
 
   bool service_success = emergencyReferenceSrv(reference_out);
 
@@ -1277,12 +1350,16 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
   mrs_msgs::ReferenceStamped reference_out;
 
-  land_there_reference_.header    = req.header;
-  land_there_reference_.reference = req.reference;
+  {
+    std::scoped_lock lock(mutex_land_there_reference_);
 
-  reference_out.header.frame_id = land_there_reference_.header.frame_id;
-  reference_out.header.stamp    = ros::Time::now();
-  reference_out.reference       = land_there_reference_.reference;
+    land_there_reference_.header    = req.header;
+    land_there_reference_.reference = req.reference;
+
+    reference_out.header.frame_id = land_there_reference_.header.frame_id;
+    reference_out.header.stamp    = ros::Time::now();
+    reference_out.reference       = land_there_reference_.reference;
+  }
 
   bool service_success = emergencyReferenceSrv(reference_out);
 
@@ -1425,14 +1502,16 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
 
       ungripSrv();
 
-      land_there_reference_.header.frame_id      = "";
-      land_there_reference_.header.stamp         = ros::Time::now();
-      land_there_reference_.reference.position.x = odometry->pose.pose.position.x;
-      land_there_reference_.reference.position.y = odometry->pose.pose.position.y;
-      land_there_reference_.reference.position.z = odometry->pose.pose.position.z - (height - _landing_descend_height_);
-      land_there_reference_.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
+      mrs_msgs::ReferenceStamped new_reference;
 
-      bool service_success = emergencyReferenceSrv(land_there_reference_);
+      new_reference.header.frame_id      = "";
+      new_reference.header.stamp         = ros::Time::now();
+      new_reference.reference.position.x = odometry->pose.pose.position.x;
+      new_reference.reference.position.y = odometry->pose.pose.position.y;
+      new_reference.reference.position.z = odometry->pose.pose.position.z - (height - _landing_descend_height_);
+      new_reference.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
+
+      bool service_success = emergencyReferenceSrv(new_reference);
 
       if (service_success) {
 
