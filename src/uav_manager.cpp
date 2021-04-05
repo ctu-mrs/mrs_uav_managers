@@ -463,7 +463,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
     land_there_current_frame = res.value();
   } else {
 
-    ROS_ERROR("[UavManager]: could not transform the reference into the current frame! land by yourselve pls.");
+    ROS_ERROR("[UavManager]: could not transform the reference into the current frame! land by yourself pls.");
     return;
   }
 
@@ -795,6 +795,9 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   mrs_msgs::UavManagerDiagnostics diag;
 
+  diag.stamp    = ros::Time::now();
+  diag.uav_name = _uav_name_;
+
   auto flighttime = mrs_lib::get_mutexed(mutex_flighttime_, flighttime_);
 
   // fill in the acumulated flight time
@@ -822,8 +825,8 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
     auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
 
     if (res) {
-      diag.cur_latitude  = res.value().reference.position.x;
-      diag.cur_longitude = res.value().reference.position.y;
+      diag.home_latitude  = res.value().reference.position.x;
+      diag.home_longitude = res.value().reference.position.y;
     }
   }
 
@@ -1238,21 +1241,31 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       return true;
     }
+
+    if (current_state_landing_ != IDLE_STATE) {
+      ss << "can not land, already landing!";
+      res.message = ss.str();
+      res.success = false;
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      return true;
+    }
   }
 
   //}
 
   ungripSrv();
 
-  auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
-
   mrs_msgs::ReferenceStamped reference_out;
 
-  land_there_reference.reference.position.z = sh_odometry_.getMsg()->pose.pose.position.z;
+  {
+    std::scoped_lock lock(mutex_land_there_reference_);
 
-  reference_out.header.frame_id = land_there_reference.header.frame_id;
-  reference_out.header.stamp    = ros::Time::now();
-  reference_out.reference       = land_there_reference.reference;
+    land_there_reference_.reference.position.z = sh_odometry_.getMsg()->pose.pose.position.z;
+
+    reference_out.header.frame_id = land_there_reference_.header.frame_id;
+    reference_out.header.stamp    = ros::Time::now();
+    reference_out.reference       = land_there_reference_.reference;
+  }
 
   bool service_success = emergencyReferenceSrv(reference_out);
 
@@ -1502,16 +1515,19 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
 
       ungripSrv();
 
-      mrs_msgs::ReferenceStamped new_reference;
+      {
+        std::scoped_lock lock(mutex_land_there_reference_);
 
-      new_reference.header.frame_id      = "";
-      new_reference.header.stamp         = ros::Time::now();
-      new_reference.reference.position.x = odometry->pose.pose.position.x;
-      new_reference.reference.position.y = odometry->pose.pose.position.y;
-      new_reference.reference.position.z = odometry->pose.pose.position.z - (height - _landing_descend_height_);
-      new_reference.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
+        // FOR FUTURE ME: Do not change this, we need it to be filled for the final check later
+        land_there_reference_.header.frame_id      = "";
+        land_there_reference_.header.stamp         = ros::Time::now();
+        land_there_reference_.reference.position.x = odometry->pose.pose.position.x;
+        land_there_reference_.reference.position.y = odometry->pose.pose.position.y;
+        land_there_reference_.reference.position.z = odometry->pose.pose.position.z - (height - _landing_descend_height_);
+        land_there_reference_.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
+      }
 
-      bool service_success = emergencyReferenceSrv(new_reference);
+      bool service_success = emergencyReferenceSrv(land_there_reference_);
 
       if (service_success) {
 
