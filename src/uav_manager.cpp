@@ -1260,7 +1260,32 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
   {
     std::scoped_lock lock(mutex_land_there_reference_);
 
-    land_there_reference_.reference.position.z = sh_odometry_.getMsg()->pose.pose.position.z;
+    // get the current altitude in land_there_reference_.header.frame_id;
+    geometry_msgs::PoseStamped current_pose;
+    current_pose.header.stamp     = ros::Time::now();
+    current_pose.header.frame_id  = _uav_name_ + "/fcu";
+    current_pose.pose.position.x  = 0;
+    current_pose.pose.position.y  = 0;
+    current_pose.pose.position.z  = 0;
+    current_pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
+
+    auto response = transformer_->transformSingle(land_there_reference_.header.frame_id, current_pose);
+
+    if (response) {
+
+      land_there_reference_.reference.position.z = response.value().pose.position.z;
+      ROS_DEBUG("[UavManager]: current altitude is %.2f m", land_there_reference_.reference.position.z);
+
+    } else {
+
+      std::stringstream ss;
+      ss << "could not transform current height to " << land_there_reference_.header.frame_id;
+      ROS_ERROR_STREAM("[UavManager]: " << ss.str());
+
+      res.success = false;
+      res.message = ss.str();
+      return true;
+    }
 
     reference_out.header.frame_id = land_there_reference_.header.frame_id;
     reference_out.header.stamp    = ros::Time::now();
