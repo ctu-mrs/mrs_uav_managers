@@ -6103,7 +6103,7 @@ void ControlManager::publishDiagnostics(void) {
   // | ------------- fill in the available trackers ------------- |
 
   for (int i = 0; i < int(_tracker_names_.size()); i++) {
-    if ((_tracker_names_[i] != _null_tracker_name_) && (_tracker_names_[i] != _landoff_tracker_name_)) {
+    if (_tracker_names_[i] != _null_tracker_name_) {
       diagnostics_msg.available_trackers.push_back(_tracker_names_[i]);
     }
   }
