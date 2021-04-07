@@ -50,6 +50,8 @@
 
 #include <std_msgs/Float64.h>
 
+#include <future>
+
 #include <pluginlib/class_loader.h>
 
 #include <nodelet/loader.h>
@@ -305,8 +307,7 @@ private:
   // | ------------------ max height subscriber ----------------- |
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_height_;
-  double                                              max_height_safety_area_ = 0;
-  double                                              _max_height_            = 0;
+  double                                              _max_height_ = 0;
   std::mutex                                          mutex_min_height_;
 
   // | ------------- odometry innovation subscriber ------------- |
@@ -615,9 +616,9 @@ private:
   void       timerFailsafe(const ros::TimerEvent& event);
 
   // oneshot timer for running controllers and trackers
-  ros::Timer        timer_control_;
-  void              timerControl(const ros::TimerEvent& event);
-  std::atomic<bool> running_control_timer_ = false;
+  void              asyncControl(void);
+  std::atomic<bool> running_async_control_ = false;
+  std::future<void> async_control_result_;
 
   // timer for issuing emergancy landing
   ros::Timer timer_eland_;
@@ -627,7 +628,7 @@ private:
   ros::Timer        timer_safety_;
   void              timerSafety(const ros::TimerEvent& event);
   std::atomic<bool> running_safety_timer_        = false;
-  double            odometry_switch_in_progress_ = false;
+  std::atomic<bool> odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
   ros::Timer timer_pirouette_;
@@ -1126,15 +1127,15 @@ void ControlManager::onInit() {
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
     }
 
-    catch (mrs_lib::SafetyZone::BorderError &e) {
+    catch (mrs_lib::SafetyZone::BorderError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
       ros::shutdown();
     }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError &e) {
+    catch (mrs_lib::SafetyZone::PolygonObstacleError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone polygon obstacles");
       ros::shutdown();
     }
-    catch (mrs_lib::SafetyZone::PointObstacleError &e) {
+    catch (mrs_lib::SafetyZone::PointObstacleError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
       ros::shutdown();
     }
@@ -1670,7 +1671,6 @@ void ControlManager::onInit() {
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
   timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
-  timer_control_   = nh_.createTimer(ros::Duration(0.0), &ControlManager::timerControl, this, true, false);  // oneshot timer
 
   // | ----------------------- finish init ---------------------- |
 
@@ -2508,7 +2508,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       try {
         heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
       }
-      catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
+      catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
       }
 
@@ -2780,7 +2780,9 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
       ROS_WARN("[ControlManager]: emergency landing finished");
 
+      ROS_DEBUG("[ControlManager]: stopping eland timer");
       timer_eland_.stop();
+      ROS_DEBUG("[ControlManager]: eland timer stopped");
 
       // we should NOT set eland_triggered_=true
     }
@@ -3161,16 +3163,20 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
 
 //}
 
-/* timerControl() //{ */
+// --------------------------------------------------------------
+// |                           asyncs                           |
+// --------------------------------------------------------------
 
-void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event) {
+/* asyncControl() //{ */
+
+void ControlManager::asyncControl(void) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::AtomicScopeFlag unset_running(running_control_timer_);
+  mrs_lib::AtomicScopeFlag unset_running(running_async_control_);
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerControl");
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("asyncControl");
 
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -3181,9 +3187,15 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
     while (running_safety_timer_) {
+
       ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
       ros::Duration wait(0.001);
       wait.sleep();
+
+      if (!running_safety_timer_) {
+        ROS_DEBUG("[ControlManager]: safety timer finished");
+        break;
+      }
     }
 
     ros::TimerEvent safety_timer_event;
@@ -3213,7 +3225,9 @@ void ControlManager::timerControl([[maybe_unused]] const ros::TimerEvent& event)
   // if odometry switch happened, we finish it here and turn the safety timer back on
   if (odometry_switch_in_progress_) {
 
+    ROS_DEBUG("[ControlManager]: starting safety timer");
     timer_safety_.start();
+    ROS_DEBUG("[ControlManager]: safety timer started");
     odometry_switch_in_progress_ = false;
 
     {
@@ -3268,6 +3282,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
+
     if (odom->header.frame_id != uav_state_.header.frame_id) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
@@ -3281,19 +3296,34 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
       odometry_switch_in_progress_ = true;
 
       // we have to stop safety timer, otherwise it will interfere
+      ROS_DEBUG("[ControlManager]: stopping the safety timer");
       timer_safety_.stop();
+      ROS_DEBUG("[ControlManager]: safety timer stopped");
+
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
+
         ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
+
+        if (!running_safety_timer_) {
+          ROS_DEBUG("[ControlManager]: safety timer finished");
+          break;
+        }
       }
 
       // we have to also for the oneshot control timer to finish
-      while (running_control_timer_) {
+      while (running_async_control_) {
+
         ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
+
+        if (!running_async_control_) {
+          ROS_DEBUG("[ControlManager]: control timer finished");
+          break;
+        }
       }
 
       {
@@ -3360,9 +3390,11 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
 
   // run the control loop asynchronously in an OneShotTimer
   // but only if its not already running
-  if (!running_control_timer_) {
-    timer_control_.stop();
-    timer_control_.start();
+  if (!running_async_control_) {
+
+    running_async_control_ = true;
+
+    async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this);
   }
 }
 
@@ -3445,6 +3477,7 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
+
     if (uav_state->estimator_iteration != uav_state_.estimator_iteration) {
 
       ROS_INFO("[ControlManager]: detecting switch of odometry frame");
@@ -3458,19 +3491,34 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
       odometry_switch_in_progress_ = true;
 
       // we have to stop safety timer, otherwise it will interfere
+      ROS_DEBUG("[ControlManager]: stopping the safety timer");
       timer_safety_.stop();
+      ROS_DEBUG("[ControlManager]: safety timer stopped");
+
       // wait for the safety timer to stop if its running
       while (running_safety_timer_) {
+
         ROS_DEBUG("[ControlManager]: waiting for safety timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
+
+        if (!running_safety_timer_) {
+          ROS_DEBUG("[ControlManager]: safety timer finished");
+          break;
+        }
       }
 
       // we have to also for the oneshot control timer to finish
-      while (running_control_timer_) {
+      while (running_async_control_) {
+
         ROS_DEBUG("[ControlManager]: waiting for control timer to finish");
         ros::Duration wait(0.001);
         wait.sleep();
+
+        if (!running_async_control_) {
+          ROS_DEBUG("[ControlManager]: control timer finished");
+          break;
+        }
       }
 
       {
@@ -3511,9 +3559,11 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
 
   // run the control loop asynchronously in an OneShotTimer
   // but only if its not already running
-  if (!running_control_timer_) {
-    timer_control_.stop();
-    timer_control_.start();
+  if (!running_async_control_) {
+
+    running_async_control_ = true;
+
+    async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this);
   }
 }
 
@@ -6059,7 +6109,7 @@ void ControlManager::publishDiagnostics(void) {
 
   mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
 
-  diagnostics_msg.stamp = ros::Time::now();
+  diagnostics_msg.stamp    = ros::Time::now();
   diagnostics_msg.uav_name = _uav_name_;
 
   diagnostics_msg.motors = motors_;
@@ -6647,12 +6697,12 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double direction                     = 0;
   double repulsion_distance            = std::numeric_limits<double>::max();
-  double horizontal_collision_detected = false;
+  bool   horizontal_collision_detected = false;
 
   // TODO why is this not used?
   /* double min_distance                  = std::numeric_limits<double>::max(); */
 
-  double vertical_collision_detected = false;
+  bool vertical_collision_detected = false;
 
   for (int i = 0; i < int(bumper_data->n_horizontal_sectors); i++) {
 
@@ -6660,7 +6710,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       continue;
     }
 
-    double wall_locked_horizontal = false;
+    bool wall_locked_horizontal = false;
 
     // if the sector is under critical distance
     if (bumper_data->sectors[i] <= bumper_repulsion_horizontal_distance && bumper_data->sectors[i] < repulsion_distance) {
@@ -6975,7 +7025,9 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       break;
     case LANDING_STATE: {
 
+      ROS_DEBUG("[ControlManager]: starting eland timer");
       timer_eland_.start();
+      ROS_DEBUG("[ControlManager]: eland timer started");
       eland_triggered_ = true;
       bumper_enabled_  = false;
 
@@ -7236,7 +7288,9 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       }
 
       failsafe_triggered_ = true;
+      ROS_DEBUG("[ControlManager]: stopping eland timer");
       timer_eland_.stop();
+      ROS_DEBUG("[ControlManager]: eland timer stopped");
 
       if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
         landing_uav_mass_ = _uav_mass_;
@@ -7245,7 +7299,9 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       }
 
       eland_triggered_ = false;
+      ROS_DEBUG("[ControlManager]: starting failsafe timer");
       timer_failsafe_.start();
+      ROS_DEBUG("[ControlManager]: failsafe timer started");
 
       bumper_enabled_ = false;
 
@@ -7518,8 +7574,13 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
         switchMotors(false);
 
+        ROS_DEBUG("[ControlManager]: stopping failsafe timer");
         timer_failsafe_.stop();
+        ROS_DEBUG("[ControlManager]: failsafe timer stopped");
+
+        ROS_DEBUG("[ControlManager]: stopping the eland timer");
         timer_eland_.stop();
+        ROS_DEBUG("[ControlManager]: eland timer stopped");
 
         shutdown();
       }
