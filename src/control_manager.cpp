@@ -1139,6 +1139,12 @@ void ControlManager::onInit() {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
       ros::shutdown();
     }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: SafetyArea: unhandler exception!");
+      ros::shutdown();
+    }
+
+    ROS_INFO("[ControlManager]: safety area initialized");
   }
 
   common_handlers_->safety_area.use_safety_area       = use_safety_area_;
@@ -1868,17 +1874,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (use_safety_area_) {
 
-    visualization_msgs::MarkerArray safety_area_marker_array;
-    visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
-
-    mrs_lib::Polygon border = safety_zone_->getBorder();
-
-    std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinHeight());
-    std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxHeight());
-
-    std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
-    std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
-
     mrs_msgs::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_frame_;
 
@@ -1889,6 +1884,17 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     if (ret) {
 
       ROS_INFO_ONCE("[ControlManager]: got TFs, publishing safety area markers");
+
+      visualization_msgs::MarkerArray safety_area_marker_array;
+      visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
+
+      mrs_lib::Polygon border = safety_zone_->getBorder();
+
+      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinHeight());
+      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxHeight());
+
+      std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
+      std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
 
       // if we fail in transforming the area at some point
       // do not publish it at all
