@@ -1884,7 +1884,9 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     mrs_lib::TransformStamped tf;
 
-    if (auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0))) {
+    auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0));
+
+    if (ret) {
 
       ROS_INFO_ONCE("[ControlManager]: got TFs, publishing safety area markers");
 
