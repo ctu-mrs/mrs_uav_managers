@@ -188,6 +188,7 @@
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
       <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
       <remap from="~mpc_tracker/collision_avoidance_in" to="~mpc_tracker/collision_avoidance" />
+      <remap from="~mpc_tracker/odometry_diagnostics_in" to="odometry/diagnostics" />
 
       <!-- FlipTracker -->
       <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/default/flip_tracker.yaml" />
