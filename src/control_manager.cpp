@@ -6288,7 +6288,7 @@ bool ControlManager::isFlyingNormally(void) {
 
   return (motors_) && (offboard_mode_) && (armed_) &&
          (((active_controller_idx_ != _eland_controller_idx_) && (active_controller_idx_ != _failsafe_controller_idx_)) || _controller_names_.size() == 1) &&
-         (active_tracker_idx_ != _null_tracker_idx_);
+         (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
 }
 
 //}

@@ -14,6 +14,15 @@ max_height_checking:
   rate: 10 # [Hz]
   safety_height_offset: 0.5 # how much lower to descend bellow the max height
 
+# periodically checks if min height was exceeded
+# if so, retakes control and descends below it
+min_height_checking:
+
+  enabled: false
+  rate: 10 # [Hz]
+  min_height: 1.5 # [m]
+  safety_height_offset: 1.0 # how much higher to ascend above the min height
+
 takeoff:
 
   rate: 10 # [Hz]

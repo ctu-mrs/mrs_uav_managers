@@ -142,6 +142,7 @@ public:
 
   ros::Timer timer_takeoff_;
   ros::Timer timer_max_height_;
+  ros::Timer timer_min_height_;
   ros::Timer timer_landing_;
   ros::Timer timer_maxthrust_;
   ros::Timer timer_flighttime_;
@@ -151,6 +152,7 @@ public:
   void timerLanding(const ros::TimerEvent& event);
   void timerTakeoff(const ros::TimerEvent& event);
   void timerMaxHeight(const ros::TimerEvent& event);
+  void timerMinHeight(const ros::TimerEvent& event);
   void timerFlighttime(const ros::TimerEvent& event);
   void timerMaxthrust(const ros::TimerEvent& event);
   void timerDiagnostics(const ros::TimerEvent& event);
@@ -164,6 +166,13 @@ public:
   double            _max_height_offset_;
   double            _max_height_;
   std::atomic<bool> fixing_max_height_ = false;
+
+  // min height checking
+  bool              _min_height_enabled_ = false;
+  int               _min_height_checking_rate_;
+  double            _min_height_offset_;
+  double            _min_height_;
+  std::atomic<bool> fixing_min_height_ = false;
 
   // mass estimation during landing
   double    thrust_mass_estimate_;
@@ -301,6 +310,11 @@ void UavManager::onInit() {
   param_loader.loadParam("max_height_checking/rate", _max_height_checking_rate_);
   param_loader.loadParam("max_height_checking/safety_height_offset", _max_height_offset_);
 
+  param_loader.loadParam("min_height_checking/enabled", _min_height_enabled_);
+  param_loader.loadParam("min_height_checking/rate", _min_height_checking_rate_);
+  param_loader.loadParam("min_height_checking/safety_height_offset", _min_height_offset_);
+  param_loader.loadParam("min_height_checking/min_height", _min_height_);
+
   param_loader.loadParam("safety_area/max_height", _max_height_);
 
   param_loader.loadParam("require_gain_manager", _gain_manager_required_);
@@ -392,6 +406,10 @@ void UavManager::onInit() {
 
   if (_max_height_enabled_) {
     timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
+  }
+
+  if (_min_height_enabled_) {
+    timer_min_height_ = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this);
   }
 
   // | ----------------------- finish init ---------------------- |
@@ -685,9 +703,105 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
       setControlCallbacksSrv(true);
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: safety height reached");
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
 
       fixing_max_height_ = false;
+    }
+  }
+}
+
+//}
+
+/* //{ timerMinHeight() */
+
+void UavManager::timerMinHeight(const ros::TimerEvent& event) {
+
+  if (!is_initialized_)
+    return;
+
+  ROS_INFO_ONCE("[UavManager]: min height timer spinning");
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMinHeight", _min_height_checking_rate_, 0.1, event);
+
+  if (!sh_height_.hasMsg() || !sh_odometry_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
+    return;
+  }
+
+  auto control_manager_diag = sh_control_manager_diag_.getMsg();
+
+  if (!control_manager_diag->flying_normally) {
+    return;
+  }
+
+  auto   odometry = sh_odometry_.getMsg();
+  double height   = sh_height_.getMsg()->value;
+
+  auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
+
+  double odometry_heading = 0;
+  try {
+    odometry_heading = mrs_lib::getHeading(odometry);
+  }
+  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+    ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
+    return;
+  }
+
+  double odometry_x_speed = odometry->twist.twist.linear.x;
+  double odometry_y_speed = odometry->twist.twist.linear.y;
+
+  if (!fixing_min_height_) {
+
+    if (height < _min_height_) {
+
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height exceeded: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
+
+      // get the current odometry
+      double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
+      double current_heading          = atan2(odometry_y_speed, odometry_x_speed);
+
+      double horizontal_t_stop    = current_horizontal_speed / 1.0;
+      double horizontal_stop_dist = (horizontal_t_stop * current_horizontal_speed) / 2.0;
+      double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
+      double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
+
+      mrs_msgs::ReferenceStamped reference_out;
+      reference_out.header.frame_id = odometry->header.frame_id;
+      reference_out.header.stamp    = ros::Time::now();
+
+      reference_out.reference.position.x = odometry_x + stop_dist_x;
+      reference_out.reference.position.y = odometry_y + stop_dist_y;
+      reference_out.reference.position.z = _min_height_ + fabs(_min_height_offset_);
+
+      reference_out.reference.heading = odometry_heading;
+
+      setControlCallbacksSrv(false);
+
+      bool success = emergencyReferenceSrv(reference_out);
+
+      if (success) {
+
+        ROS_INFO("[UavManager]: descending");
+
+        fixing_min_height_ = true;
+
+      } else {
+
+        ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not ascend");
+
+        setControlCallbacksSrv(true);
+      }
+    }
+
+  } else {
+
+    if (height > _min_height_) {
+
+      setControlCallbacksSrv(true);
+
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
+
+      fixing_min_height_ = false;
     }
   }
 }
@@ -1235,7 +1349,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     }
 
     if (fixing_max_height_) {
-      ss << "can not land, descedning to safety height!";
+      ss << "can not land, descedning to safe height!";
       res.message = ss.str();
       res.success = false;
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
@@ -1374,7 +1488,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
     }
 
     if (fixing_max_height_) {
-      ss << "can not land, descedning to safety height!";
+      ss << "can not land, descedning to safe height!";
       res.message = ss.str();
       res.success = false;
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
