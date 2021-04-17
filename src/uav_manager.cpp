@@ -513,7 +513,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
         ROS_ERROR_THROTTLE(1.0, "[UavManager]: call for landing failed: '%s'", message.c_str());
       }
 
-    } else if (!control_manager_diagnostics->tracker_status.have_goal) {
+    } else if (!control_manager_diagnostics->tracker_status.have_goal && control_manager_diagnostics->flying_normally) {
 
       ROS_WARN_THROTTLE(1.0, "[UavManager]: the tracker does not have a goal while flying home, setting the reference again");
 
