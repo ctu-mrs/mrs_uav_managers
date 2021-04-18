@@ -22,6 +22,7 @@
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
 #include <mrs_msgs/UavManagerDiagnostics.h>
+#include <mrs_msgs/OdometryDiag.h>
 
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -89,6 +90,7 @@ public:
 
   // subscribers
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                     sh_odometry_;
+  mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>                 sh_odometry_diagnostics_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>    sh_control_manager_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>                  sh_motors_;
   mrs_lib::SubscribeHandler<mrs_msgs::AttitudeCommand>              sh_attitude_cmd_;
@@ -353,6 +355,7 @@ void UavManager::onInit() {
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   sh_odometry_             = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &UavManager::callbackOdometry, this);
+  sh_odometry_diagnostics_ = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_motors_               = mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>(shopts, "motors_in");
   sh_attitude_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::AttitudeCommand>(shopts, "attitude_cmd_in");
@@ -942,6 +945,18 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _maxthrust_timer_rate_, 0.03, event);
 
+  bool got_gps_est = false;
+  bool got_rtk_est = false;
+
+  if (sh_odometry_diagnostics_.hasMsg()) {  // get current position in lat-lon
+
+    auto                     odom_diag      = sh_odometry_diagnostics_.getMsg();
+    std::vector<std::string> lat_estimators = odom_diag.get()->available_lat_estimators;
+
+    got_gps_est = std::find(lat_estimators.begin(), lat_estimators.end(), "GPS") != lat_estimators.end();
+    got_rtk_est = std::find(lat_estimators.begin(), lat_estimators.end(), "RTK") != lat_estimators.end();
+  }
+
   mrs_msgs::UavManagerDiagnostics diag;
 
   diag.stamp    = ros::Time::now();
@@ -954,28 +969,34 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   if (sh_odometry_.hasMsg()) {  // get current position in lat-lon
 
-    nav_msgs::Odometry odom = *sh_odometry_.getMsg();
+    if (got_gps_est || got_rtk_est) {
 
-    geometry_msgs::PoseStamped uav_pose;
-    uav_pose.pose = mrs_lib::getPose(odom);
+      nav_msgs::Odometry odom = *sh_odometry_.getMsg();
 
-    auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+      geometry_msgs::PoseStamped uav_pose;
+      uav_pose.pose = mrs_lib::getPose(odom);
 
-    if (res) {
-      diag.cur_latitude  = res.value().pose.position.x;
-      diag.cur_longitude = res.value().pose.position.y;
+      auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+
+      if (res) {
+        diag.cur_latitude  = res.value().pose.position.x;
+        diag.cur_longitude = res.value().pose.position.y;
+      }
     }
   }
 
   if (takeoff_successful_) {
 
-    auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
+    if (got_gps_est || got_rtk_est) {
 
-    auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+      auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
 
-    if (res) {
-      diag.home_latitude  = res.value().reference.position.x;
-      diag.home_longitude = res.value().reference.position.y;
+      auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+
+      if (res) {
+        diag.home_latitude  = res.value().reference.position.x;
+        diag.home_longitude = res.value().reference.position.y;
+      }
     }
   }
 

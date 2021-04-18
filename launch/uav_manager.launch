@@ -66,6 +66,7 @@
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
