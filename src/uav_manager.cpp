@@ -792,7 +792,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
     if (height < _min_height_) {
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height exceeded: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height breached: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
 
       // get the current odometry
       double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
@@ -819,7 +819,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
       if (success) {
 
-        ROS_INFO("[UavManager]: descending");
+        ROS_INFO("[UavManager]: ascending");
 
         fixing_min_height_ = true;
 
