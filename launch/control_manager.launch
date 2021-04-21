@@ -212,6 +212,7 @@
 
       <!-- Subscribers and Services -->
       <remap from="~reference_in" to="~reference" />
+      <remap from="~velocity_reference_in" to="~velocity_reference" />
       <remap from="~trajectory_reference_in" to="~trajectory_reference" />
       <remap from="~goto_in" to="~goto" />
       <remap from="~goto_fcu_in" to="~goto_fcu" />

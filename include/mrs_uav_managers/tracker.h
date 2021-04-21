@@ -21,6 +21,10 @@
 #include <mrs_msgs/ReferenceSrvRequest.h>
 #include <mrs_msgs/ReferenceSrvResponse.h>
 
+#include <mrs_msgs/VelocityReferenceSrv.h>
+#include <mrs_msgs/VelocityReferenceSrvRequest.h>
+#include <mrs_msgs/VelocityReferenceSrvResponse.h>
+
 #include <mrs_msgs/TrajectoryReferenceSrv.h>
 #include <mrs_msgs/TrajectoryReferenceSrvRequest.h>
 #include <mrs_msgs/TrajectoryReferenceSrvResponse.h>
@@ -116,6 +120,15 @@ public:
    * @return a service response
    */
   virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
+
+  /**
+   * @brief Request for desired velocity reference
+   *
+   * @param cmd the reference
+   *
+   * @return a service response
+   */
+  virtual const mrs_msgs::VelocityReferenceSrvResponse::ConstPtr setVelocityReference(const mrs_msgs::VelocityReferenceSrvRequest::ConstPtr &cmd) = 0;
 
   /**
    * @brief Request for a flight along a given trajectory

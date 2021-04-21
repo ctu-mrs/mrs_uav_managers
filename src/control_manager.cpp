@@ -1,3 +1,4 @@
+#include "geometry_msgs/Vector3Stamped.h"
 #define VERSION "1.0.0.0"
 
 /* includes //{ */
@@ -69,6 +70,10 @@
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/ReferenceStampedSrvRequest.h>
 #include <mrs_msgs/ReferenceStampedSrvResponse.h>
+
+#include <mrs_msgs/VelocityReferenceStampedSrv.h>
+#include <mrs_msgs/VelocityReferenceStampedSrvRequest.h>
+#include <mrs_msgs/VelocityReferenceStampedSrvResponse.h>
 
 #include <mrs_msgs/TransformReferenceSrv.h>
 #include <mrs_msgs/TransformReferenceSrvRequest.h>
@@ -398,6 +403,10 @@ private:
   ros::ServiceServer service_server_reference_;
   ros::Subscriber    subscriber_reference_;
 
+  // the velocity reference service and subscriber
+  ros::ServiceServer service_server_velocity_reference_;
+  ros::Subscriber    subscriber_velocity_reference_;
+
   // trajectory tracking
   ros::ServiceServer service_server_trajectory_reference_;
   ros::Subscriber    subscriber_trajectory_reference_;
@@ -544,6 +553,7 @@ private:
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
+  void callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg);
   void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg);
   bool callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
@@ -552,6 +562,7 @@ private:
   bool callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  bool callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request& req, mrs_msgs::VelocityReferenceStampedSrv::Response& res);
   bool callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res);
   bool callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
@@ -792,6 +803,9 @@ private:
   // sets the reference to the active tracker
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
 
+  // sets the velocity reference to the active tracker
+  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::VelocityReferenceStamped& reference_in);
+
   // sets the reference trajectory to the active tracker
   std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
       const mrs_msgs::TrajectoryReference trajectory_in);
@@ -804,15 +818,18 @@ private:
   bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
 
   // checks for invalid messages in/out
-  bool validateOdometry(const nav_msgs::OdometryConstPtr odometry);
-  bool validateUavState(const mrs_msgs::UavStateConstPtr odometry);
-  bool validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget attitude_target);
+  bool validateOdometry(const nav_msgs::Odometry& odometry);
+  bool validateUavState(const mrs_msgs::UavState& uav_state);
+  bool validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget& attitude_target);
+  bool validateVelocityReference(const mrs_msgs::VelocityReference& reference);
 
   // translates the PWM raw value to a desired range
   double RCChannelToRange(double rc_value, double range, double deadband);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
+
+  mrs_msgs::ReferenceStamped velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference);
 
   void                          shutdown();
   void                          setCallbacks(bool in);
@@ -1658,6 +1675,10 @@ void ControlManager::onInit() {
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
   subscriber_reference_     = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+
+  service_server_velocity_reference_ = nh_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
+  subscriber_velocity_reference_ =
+      nh_.subscribe("velocity_reference_in", 1, &ControlManager::callbackVelocityReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   service_server_trajectory_reference_ = nh_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
   subscriber_trajectory_reference_ =
@@ -3268,7 +3289,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
 
   // | --------------------- check for nans --------------------- |
 
-  if (!validateOdometry(odom)) {
+  if (!validateOdometry(*odom)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: incoming 'odometry' contains invalid values, throwing it away");
     return;
   }
@@ -3421,7 +3442,7 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
 
   // | --------------------- check for nans --------------------- |
 
-  if (!validateUavState(uav_state)) {
+  if (!validateUavState(*uav_state)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: incoming 'uav_state' contains invalid values, throwing it away");
     return;
   }
@@ -5180,6 +5201,46 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 //}
 
+/* //{ callbackVelocityReferenceService() */
+
+bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request&  req,
+                                                      mrs_msgs::VelocityReferenceStampedSrv::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
+
+  mrs_msgs::VelocityReferenceStamped des_reference;
+  des_reference = req.reference;
+
+  auto [success, message] = setVelocityReference(des_reference);
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackVelocityReferenceTopic() */
+
+void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg) {
+
+  if (!is_initialized_)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
+
+  setVelocityReference(*msg);
+}
+
+//}
+
 /* //{ callbackTrajectoryReferenceService() */
 
 bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res) {
@@ -5515,6 +5576,156 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
       ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setReference()' function!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the reference: " << ss.str());
+      return std::tuple(false, ss.str());
+    }
+  }
+}
+
+//}
+
+/* setVelocityReference() //{ */
+
+std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::VelocityReferenceStamped& reference_in) {
+
+  std::stringstream ss;
+
+  if (!callbacks_enabled_) {
+    ss << "can not set the reference, the callbacks are disabled";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
+  if (!validateVelocityReference(reference_in.reference)) {
+    ss << "velocity command is not valid!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
+  // copy member variables
+  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  // | -- transform the velocity reference to the current frame - |
+
+  mrs_msgs::VelocityReferenceStamped transformed_reference = reference_in;
+
+  auto                      ret = transformer_->getTransform(reference_in.header.frame_id, uav_state.header.frame_id, reference_in.header.stamp);
+  mrs_lib::TransformStamped tf;
+
+  if (!ret) {
+    ss << "could not find tf from " << reference_in.header.frame_id << " to " << uav_state.header.frame_id;
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  } else {
+    tf = ret.value();
+  }
+
+  // transform the velocity
+  {
+    geometry_msgs::Vector3Stamped velocity;
+    velocity.header   = reference_in.header;
+    velocity.vector.x = reference_in.reference.velocity.x;
+    velocity.vector.y = reference_in.reference.velocity.y;
+    velocity.vector.z = reference_in.reference.velocity.z;
+
+    auto ret = transformer_->transform(tf, velocity);
+
+    if (!ret) {
+
+      ss << "the velocity reference could not be transformed";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str());
+
+    } else {
+      transformed_reference.reference.velocity.x = ret->vector.x;
+      transformed_reference.reference.velocity.y = ret->vector.y;
+      transformed_reference.reference.velocity.z = ret->vector.z;
+    }
+  }
+
+  // transform the height and the heading
+  {
+    geometry_msgs::PoseStamped pose;
+    pose.header           = reference_in.header;
+    pose.pose.position.x  = 0;
+    pose.pose.position.y  = 0;
+    pose.pose.position.z  = reference_in.reference.altitude;
+    pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, reference_in.reference.heading);
+
+    auto ret = transformer_->transform(tf, pose);
+
+    if (!ret) {
+
+      ss << "the velocity reference could not be transformed";
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str());
+
+    } else {
+      transformed_reference.reference.altitude = ret->pose.position.z;
+      transformed_reference.reference.heading  = mrs_lib::AttitudeConverter(ret->pose.orientation).getHeading();
+    }
+  }
+
+  // the heading rate doees not need to be transformed
+  transformed_reference.reference.heading_rate = reference_in.reference.heading_rate;
+
+  transformed_reference.header.stamp    = tf.stamp();
+  transformed_reference.header.frame_id = tf.to();
+
+  mrs_msgs::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
+
+  ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
+            eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
+
+  // check the obstacle bumper
+  if (!bumperValidatePoint(eqivalent_reference)) {
+    ss << "failed to set the reference, potential collision with an obstacle!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
+  // safety area check
+  if (!isPointInSafetyArea3d(eqivalent_reference)) {
+    ss << "failed to set the reference, the point is outside of the safety area!";
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
+  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+
+    mrs_msgs::ReferenceStamped from_point;
+    from_point.header.frame_id      = uav_state.header.frame_id;
+    from_point.reference.position.x = last_position_cmd->position.x;
+    from_point.reference.position.y = last_position_cmd->position.y;
+    from_point.reference.position.z = last_position_cmd->position.z;
+
+    if (!isPathToPointInSafetyArea3d(from_point, eqivalent_reference)) {
+      ss << "failed to set the reference, the path is going outside the safety area!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str());
+    }
+  }
+
+  mrs_msgs::VelocityReferenceSrvResponse::ConstPtr tracker_response;
+
+  // prepare the message for current tracker
+  mrs_msgs::VelocityReferenceSrvRequest reference_request;
+  reference_request.reference = transformed_reference.reference;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    tracker_response = tracker_list_[active_tracker_idx_]->setVelocityReference(
+        mrs_msgs::VelocityReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::VelocityReferenceSrvRequest>(reference_request)));
+
+    if (tracker_response != mrs_msgs::VelocityReferenceSrvResponse::Ptr()) {
+
+      return std::tuple(tracker_response->success, tracker_response->message);
+
+    } else {
+
+      ss << "the tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setVelocityReference()' function!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the velocity reference: " << ss.str());
       return std::tuple(false, ss.str());
     }
   }
@@ -8748,61 +8959,102 @@ bool ControlManager::validateAttitudeCommand(const mrs_msgs::AttitudeCommand::Co
 
 /* validateOdometry() //{ */
 
-bool ControlManager::validateOdometry(const nav_msgs::OdometryConstPtr odometry) {
+bool ControlManager::validateOdometry(const nav_msgs::Odometry& odometry) {
 
   // check position
 
-  if (!std::isfinite(odometry->pose.pose.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.x'!!!");
+  if (!std::isfinite(odometry.pose.pose.position.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.position.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->pose.pose.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.y'!!!");
+  if (!std::isfinite(odometry.pose.pose.position.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.position.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->pose.pose.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.position.z'!!!");
+  if (!std::isfinite(odometry.pose.pose.position.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.position.z'!!!");
     return false;
   }
 
   // check orientation
 
-  if (!std::isfinite(odometry->pose.pose.orientation.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.x'!!!");
+  if (!std::isfinite(odometry.pose.pose.orientation.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.orientation.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->pose.pose.orientation.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.y'!!!");
+  if (!std::isfinite(odometry.pose.pose.orientation.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.orientation.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->pose.pose.orientation.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.z'!!!");
+  if (!std::isfinite(odometry.pose.pose.orientation.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.orientation.z'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->pose.pose.orientation.w)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->pose.pose.orientation.w'!!!");
+  if (!std::isfinite(odometry.pose.pose.orientation.w)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.pose.pose.orientation.w'!!!");
     return false;
   }
 
   // check velocity
 
-  if (!std::isfinite(odometry->twist.twist.linear.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.x'!!!");
+  if (!std::isfinite(odometry.twist.twist.linear.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.twist.twist.linear.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->twist.twist.linear.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.y'!!!");
+  if (!std::isfinite(odometry.twist.twist.linear.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.twist.twist.linear.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(odometry->twist.twist.linear.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry->twist.twist.linear.z'!!!");
+  if (!std::isfinite(odometry.twist.twist.linear.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'odometry.twist.twist.linear.z'!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateVelocityReference() //{ */
+
+bool ControlManager::validateVelocityReference(const mrs_msgs::VelocityReference& reference) {
+
+  // check velocity
+
+  if (!std::isfinite(reference.velocity.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.velocity.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(reference.velocity.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.velocity.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(reference.velocity.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.velocity.z'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(reference.altitude)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.altitude'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(reference.heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.heading'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(reference.heading_rate)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.heading_rate'!!!");
     return false;
   }
 
@@ -8813,146 +9065,146 @@ bool ControlManager::validateOdometry(const nav_msgs::OdometryConstPtr odometry)
 
 /* validateUavState() //{ */
 
-bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state) {
+bool ControlManager::validateUavState(const mrs_msgs::UavState& uav_state) {
 
   // check position
 
-  if (!std::isfinite(uav_state->pose.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.x'!!!");
+  if (!std::isfinite(uav_state.pose.position.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.position.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->pose.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.y'!!!");
+  if (!std::isfinite(uav_state.pose.position.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.position.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->pose.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.position.z'!!!");
+  if (!std::isfinite(uav_state.pose.position.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.position.z'!!!");
     return false;
   }
 
   // check orientation
 
-  if (!std::isfinite(uav_state->pose.orientation.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.x'!!!");
+  if (!std::isfinite(uav_state.pose.orientation.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.orientation.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->pose.orientation.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.y'!!!");
+  if (!std::isfinite(uav_state.pose.orientation.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.orientation.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->pose.orientation.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.z'!!!");
+  if (!std::isfinite(uav_state.pose.orientation.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.orientation.z'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->pose.orientation.w)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->pose.orientation.w'!!!");
+  if (!std::isfinite(uav_state.pose.orientation.w)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.pose.orientation.w'!!!");
     return false;
   }
 
   // check linear velocity
 
-  if (!std::isfinite(uav_state->velocity.linear.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.x'!!!");
+  if (!std::isfinite(uav_state.velocity.linear.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.linear.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->velocity.linear.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.y'!!!");
+  if (!std::isfinite(uav_state.velocity.linear.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.linear.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->velocity.linear.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.linear.z'!!!");
+  if (!std::isfinite(uav_state.velocity.linear.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.linear.z'!!!");
     return false;
   }
 
   // check angular velocity
 
-  if (!std::isfinite(uav_state->velocity.angular.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.x'!!!");
+  if (!std::isfinite(uav_state.velocity.angular.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.angular.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->velocity.angular.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.y'!!!");
+  if (!std::isfinite(uav_state.velocity.angular.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.angular.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->velocity.angular.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->velocity.angular.z'!!!");
+  if (!std::isfinite(uav_state.velocity.angular.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.velocity.angular.z'!!!");
     return false;
   }
 
   // check linear acceleration
 
-  if (!std::isfinite(uav_state->acceleration.linear.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.x'!!!");
+  if (!std::isfinite(uav_state.acceleration.linear.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.linear.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration.linear.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.y'!!!");
+  if (!std::isfinite(uav_state.acceleration.linear.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.linear.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration.linear.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.linear.z'!!!");
+  if (!std::isfinite(uav_state.acceleration.linear.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.linear.z'!!!");
     return false;
   }
 
   // check angular acceleration
 
-  if (!std::isfinite(uav_state->acceleration.angular.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.x'!!!");
+  if (!std::isfinite(uav_state.acceleration.angular.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.angular.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration.angular.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.y'!!!");
+  if (!std::isfinite(uav_state.acceleration.angular.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.angular.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration.angular.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration.angular.z'!!!");
+  if (!std::isfinite(uav_state.acceleration.angular.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration.angular.z'!!!");
     return false;
   }
 
   // check acceleration angular disturbance
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.angular.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.x'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.angular.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.angular.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.angular.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.y'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.angular.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.angular.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.angular.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.angular.z'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.angular.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.angular.z'!!!");
     return false;
   }
 
   // check acceleration linear disturbance
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.linear.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.x'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.linear.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.linear.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.linear.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.y'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.linear.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.linear.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(uav_state->acceleration_disturbance.linear.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state->acceleration_disturbance.linear.z'!!!");
+  if (!std::isfinite(uav_state.acceleration_disturbance.linear.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'uav_state.acceleration_disturbance.linear.z'!!!");
     return false;
   }
 
@@ -8963,7 +9215,7 @@ bool ControlManager::validateUavState(const mrs_msgs::UavStateConstPtr uav_state
 
 /* validateMavrosAttitudeTarget() //{ */
 
-bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget attitude_target) {
+bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget& attitude_target) {
 
   // check the orientation
 
@@ -9093,6 +9345,54 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
     return std::tuple(false, ss.str());
   }
+}
+
+//}
+
+/* velocityReferenceToReference() //{ */
+
+mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
+
+  auto last_position_cmd   = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
+
+  mrs_msgs::ReferenceStamped reference_out;
+
+  reference_out.header = vel_reference.header;
+
+  if (vel_reference.reference.use_heading) {
+    reference_out.reference.heading = vel_reference.reference.heading;
+  } else if (vel_reference.reference.use_heading_rate) {
+    reference_out.reference.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading() + vel_reference.reference.use_heading_rate;
+  } else {
+    reference_out.reference.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+  }
+
+  if (vel_reference.reference.use_altitude) {
+    reference_out.reference.position.z = vel_reference.reference.altitude;
+  } else {
+
+    double stopping_time_z = 0;
+
+    if (vel_reference.reference.velocity.x >= 0) {
+      stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_ascending_acceleration) + 1.0;
+    } else {
+      stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_descending_acceleration) + 1.0;
+    }
+
+    reference_out.reference.position.z = last_position_cmd->position.z + vel_reference.reference.velocity.z * stopping_time_z;
+  }
+
+  {
+    double stopping_time_x = 1.5 * (fabs(vel_reference.reference.velocity.x) / current_constraints.constraints.horizontal_acceleration) + 1.0;
+    double stopping_time_y = 1.5 * (fabs(vel_reference.reference.velocity.y) / current_constraints.constraints.horizontal_acceleration) + 1.0;
+
+    reference_out.reference.position.x = last_position_cmd->position.x + vel_reference.reference.velocity.x * stopping_time_x;
+    reference_out.reference.position.y = last_position_cmd->position.y + vel_reference.reference.velocity.y * stopping_time_y;
+  }
+
+  return reference_out;
 }
 
 //}
