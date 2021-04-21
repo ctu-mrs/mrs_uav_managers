@@ -22,6 +22,7 @@
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
 #include <mrs_msgs/UavManagerDiagnostics.h>
+#include <mrs_msgs/OdometryDiag.h>
 
 #include <mavros_msgs/State.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -89,6 +90,7 @@ public:
 
   // subscribers
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                     sh_odometry_;
+  mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>                 sh_odometry_diagnostics_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>    sh_control_manager_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>                  sh_motors_;
   mrs_lib::SubscribeHandler<mrs_msgs::AttitudeCommand>              sh_attitude_cmd_;
@@ -353,6 +355,7 @@ void UavManager::onInit() {
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   sh_odometry_             = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &UavManager::callbackOdometry, this);
+  sh_odometry_diagnostics_ = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_motors_               = mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>(shopts, "motors_in");
   sh_attitude_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::AttitudeCommand>(shopts, "attitude_cmd_in");
@@ -510,12 +513,47 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
       if (!success) {
 
-        ROS_ERROR_THROTTLE(1.0, "[UavManager]: call for landing failed: '%s', not doing anything", message.c_str());
-
-        // we shold go to idle
-        // If landing fails, we attempt eland, which is handled completely by the ControlManager.
-        changeLandingState(IDLE_STATE);
+        ROS_ERROR_THROTTLE(1.0, "[UavManager]: call for landing failed: '%s'", message.c_str());
       }
+
+    } else if (!control_manager_diagnostics->tracker_status.have_goal && control_manager_diagnostics->flying_normally) {
+
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: the tracker does not have a goal while flying home, setting the reference again");
+
+      mrs_msgs::ReferenceStamped reference_out;
+
+      {
+        std::scoped_lock lock(mutex_land_there_reference_);
+
+        // get the current altitude in land_there_reference_.header.frame_id;
+        geometry_msgs::PoseStamped current_pose;
+        current_pose.header.stamp     = ros::Time::now();
+        current_pose.header.frame_id  = _uav_name_ + "/fcu";
+        current_pose.pose.position.x  = 0;
+        current_pose.pose.position.y  = 0;
+        current_pose.pose.position.z  = 0;
+        current_pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
+
+        auto response = transformer_->transformSingle(land_there_reference_.header.frame_id, current_pose);
+
+        if (response) {
+
+          land_there_reference_.reference.position.z = response.value().pose.position.z;
+          ROS_DEBUG("[UavManager]: current altitude is %.2f m", land_there_reference_.reference.position.z);
+
+        } else {
+
+          std::stringstream ss;
+          ss << "could not transform current height to " << land_there_reference_.header.frame_id;
+          ROS_ERROR_STREAM("[UavManager]: " << ss.str());
+        }
+
+        reference_out.header.frame_id = land_there_reference_.header.frame_id;
+        reference_out.header.stamp    = ros::Time::now();
+        reference_out.reference       = land_there_reference_.reference;
+      }
+
+      emergencyReferenceSrv(reference_out);
     }
 
   } else if (current_state_landing_ == LANDING_STATE) {
@@ -754,7 +792,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
     if (height < _min_height_) {
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height exceeded: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height breached: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
 
       // get the current odometry
       double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
@@ -781,7 +819,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
       if (success) {
 
-        ROS_INFO("[UavManager]: descending");
+        ROS_INFO("[UavManager]: ascending");
 
         fixing_min_height_ = true;
 
@@ -907,6 +945,18 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _maxthrust_timer_rate_, 0.03, event);
 
+  bool got_gps_est = false;
+  bool got_rtk_est = false;
+
+  if (sh_odometry_diagnostics_.hasMsg()) {  // get current position in lat-lon
+
+    auto                     odom_diag      = sh_odometry_diagnostics_.getMsg();
+    std::vector<std::string> lat_estimators = odom_diag.get()->available_lat_estimators;
+
+    got_gps_est = std::find(lat_estimators.begin(), lat_estimators.end(), "GPS") != lat_estimators.end();
+    got_rtk_est = std::find(lat_estimators.begin(), lat_estimators.end(), "RTK") != lat_estimators.end();
+  }
+
   mrs_msgs::UavManagerDiagnostics diag;
 
   diag.stamp    = ros::Time::now();
@@ -919,28 +969,34 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   if (sh_odometry_.hasMsg()) {  // get current position in lat-lon
 
-    nav_msgs::Odometry odom = *sh_odometry_.getMsg();
+    if (got_gps_est || got_rtk_est) {
 
-    geometry_msgs::PoseStamped uav_pose;
-    uav_pose.pose = mrs_lib::getPose(odom);
+      nav_msgs::Odometry odom = *sh_odometry_.getMsg();
 
-    auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+      geometry_msgs::PoseStamped uav_pose;
+      uav_pose.pose = mrs_lib::getPose(odom);
 
-    if (res) {
-      diag.cur_latitude  = res.value().pose.position.x;
-      diag.cur_longitude = res.value().pose.position.y;
+      auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+
+      if (res) {
+        diag.cur_latitude  = res.value().pose.position.x;
+        diag.cur_longitude = res.value().pose.position.y;
+      }
     }
   }
 
   if (takeoff_successful_) {
 
-    auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
+    if (got_gps_est || got_rtk_est) {
 
-    auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+      auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
 
-    if (res) {
-      diag.home_latitude  = res.value().reference.position.x;
-      diag.home_longitude = res.value().reference.position.y;
+      auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+
+      if (res) {
+        diag.home_latitude  = res.value().reference.position.x;
+        diag.home_longitude = res.value().reference.position.y;
+      }
     }
   }
 
