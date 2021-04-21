@@ -403,6 +403,10 @@ private:
   ros::ServiceServer service_server_reference_;
   ros::Subscriber    subscriber_reference_;
 
+  // the velocity reference service and subscriber
+  ros::ServiceServer service_server_velocity_reference_;
+  ros::Subscriber    subscriber_velocity_reference_;
+
   // trajectory tracking
   ros::ServiceServer service_server_trajectory_reference_;
   ros::Subscriber    subscriber_trajectory_reference_;
@@ -549,6 +553,7 @@ private:
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
+  void callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg);
   void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg);
   bool callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
@@ -557,6 +562,7 @@ private:
   bool callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
   bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  bool callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request& req, mrs_msgs::VelocityReferenceStampedSrv::Response& res);
   bool callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res);
   bool callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
@@ -1669,6 +1675,10 @@ void ControlManager::onInit() {
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
   subscriber_reference_     = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+
+  service_server_velocity_reference_ = nh_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
+  subscriber_velocity_reference_ =
+      nh_.subscribe("velocity_reference_in", 1, &ControlManager::callbackVelocityReferenceTopic, this, ros::TransportHints().tcpNoDelay());
 
   service_server_trajectory_reference_ = nh_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
   subscriber_trajectory_reference_ =
@@ -5191,6 +5201,46 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
 
 //}
 
+/* //{ callbackVelocityReferenceService() */
+
+bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request&  req,
+                                                      mrs_msgs::VelocityReferenceStampedSrv::Response& res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
+
+  mrs_msgs::VelocityReferenceStamped des_reference;
+  des_reference = req.reference;
+
+  auto [success, message] = setVelocityReference(des_reference);
+
+  res.success = success;
+  res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackVelocityReferenceTopic() */
+
+void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg) {
+
+  if (!is_initialized_)
+    return;
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
+
+  setVelocityReference(*msg);
+}
+
+//}
+
 /* //{ callbackTrajectoryReferenceService() */
 
 bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res) {
@@ -5557,7 +5607,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   // | -- transform the velocity reference to the current frame - |
 
-  mrs_msgs::VelocityReferenceStamped transformed_reference;
+  mrs_msgs::VelocityReferenceStamped transformed_reference = reference_in;
 
   auto                      ret = transformer_->getTransform(reference_in.header.frame_id, uav_state.header.frame_id, reference_in.header.stamp);
   mrs_lib::TransformStamped tf;
@@ -5585,10 +5635,11 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
       ss << "the velocity reference could not be transformed";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str());
+
     } else {
-      transformed_reference.reference.velocity.x = velocity.vector.x;
-      transformed_reference.reference.velocity.y = velocity.vector.y;
-      transformed_reference.reference.velocity.z = velocity.vector.z;
+      transformed_reference.reference.velocity.x = ret->vector.x;
+      transformed_reference.reference.velocity.y = ret->vector.y;
+      transformed_reference.reference.velocity.z = ret->vector.z;
     }
   }
 
@@ -5598,7 +5649,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     pose.header           = reference_in.header;
     pose.pose.position.x  = 0;
     pose.pose.position.y  = 0;
-    pose.pose.position.z  = reference_in.reference.height;
+    pose.pose.position.z  = reference_in.reference.altitude;
     pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, reference_in.reference.heading);
 
     auto ret = transformer_->transform(tf, pose);
@@ -5608,16 +5659,23 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
       ss << "the velocity reference could not be transformed";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str());
+
     } else {
-      transformed_reference.reference.height  = pose.pose.position.z;
-      transformed_reference.reference.heading = mrs_lib::AttitudeConverter(pose.pose.orientation).getHeading();
+      transformed_reference.reference.altitude = ret->pose.position.z;
+      transformed_reference.reference.heading  = mrs_lib::AttitudeConverter(ret->pose.orientation).getHeading();
     }
   }
 
   // the heading rate doees not need to be transformed
   transformed_reference.reference.heading_rate = reference_in.reference.heading_rate;
 
+  transformed_reference.header.stamp    = tf.stamp();
+  transformed_reference.header.frame_id = tf.to();
+
   mrs_msgs::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
+
+  ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
+            eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
 
   // check the obstacle bumper
   if (!bumperValidatePoint(eqivalent_reference)) {
@@ -8985,8 +9043,8 @@ bool ControlManager::validateVelocityReference(const mrs_msgs::VelocityReference
     return false;
   }
 
-  if (!std::isfinite(reference.height)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.height'!!!");
+  if (!std::isfinite(reference.altitude)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'reference.altitude'!!!");
     return false;
   }
 
@@ -9295,8 +9353,9 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_position_cmd   = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
 
   mrs_msgs::ReferenceStamped reference_out;
 
@@ -9310,14 +9369,28 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
     reference_out.reference.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
   }
 
-  if (vel_reference.reference.use_height) {
-    reference_out.reference.position.z = vel_reference.reference.height;
+  if (vel_reference.reference.use_altitude) {
+    reference_out.reference.position.z = vel_reference.reference.altitude;
   } else {
-    reference_out.reference.position.z = last_position_cmd->position.z + vel_reference.reference.velocity.z;
+
+    double stopping_time_z = 0;
+
+    if (vel_reference.reference.velocity.x >= 0) {
+      stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_ascending_acceleration) + 1.0;
+    } else {
+      stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_descending_acceleration) + 1.0;
+    }
+
+    reference_out.reference.position.z = last_position_cmd->position.z + vel_reference.reference.velocity.z * stopping_time_z;
   }
 
-  reference_out.reference.position.x = last_position_cmd->position.x + vel_reference.reference.velocity.x;
-  reference_out.reference.position.y = last_position_cmd->position.y + vel_reference.reference.velocity.y;
+  {
+    double stopping_time_x = 1.5 * (fabs(vel_reference.reference.velocity.x) / current_constraints.constraints.horizontal_acceleration) + 1.0;
+    double stopping_time_y = 1.5 * (fabs(vel_reference.reference.velocity.y) / current_constraints.constraints.horizontal_acceleration) + 1.0;
+
+    reference_out.reference.position.x = last_position_cmd->position.x + vel_reference.reference.velocity.x * stopping_time_x;
+    reference_out.reference.position.y = last_position_cmd->position.y + vel_reference.reference.velocity.y * stopping_time_y;
+  }
 
   return reference_out;
 }
