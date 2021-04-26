@@ -141,7 +141,7 @@
       <rosparam if="$(eval not arg('custom_config_joy_tracker') == '')" ns="joy_tracker" file="$(arg custom_config_joy_tracker)" />
       <param name="joy_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~joy_tracker/profiler" to="profiler" />
-      <remap from="~joy_tracker/joystick_in" to="/joy" />
+      <remap from="~joy_tracker/joystick_in" to="joy" />
 
       <!-- MatlabTracker -->
       <rosparam ns="matlab_tracker" file="$(find mrs_uav_trackers)/config/default/matlab_tracker.yaml" />
@@ -205,7 +205,7 @@
       <remap from="~mavros_odometry_in" to="mavros/local_position/odom" />
       <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
-      <remap from="~joystick_in" to="/joy" />
+      <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~rc_in" to="mavros/rc/in" />
