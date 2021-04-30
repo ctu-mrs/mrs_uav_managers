@@ -440,14 +440,15 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
   switch (current_state_landing_) {
 
-    case IDLE_STATE:
-      break;
-    case FLY_THERE_STATE:
-      break;
     case LANDING_STATE: {
 
       landing_uav_mass_ = _uav_mass_ + attitude_cmd->mass_difference;
-    } break;
+      break;
+    };
+
+    default: {
+      break;
+    }
   }
 
   // just for ROS_INFO

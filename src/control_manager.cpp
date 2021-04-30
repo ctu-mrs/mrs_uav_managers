@@ -1,4 +1,3 @@
-#include "geometry_msgs/Vector3Stamped.h"
 #define VERSION "1.0.0.0"
 
 /* includes //{ */
@@ -26,6 +25,7 @@
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <nav_msgs/Odometry.h>
 
 #include <mrs_lib/safety_zone/safety_zone.h>
@@ -747,8 +747,8 @@ private:
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
 
   // channel numbers and channel multipliers
-  int _channel_pitch_, _channel_roll_, _channel_heading_, _channel_thrust_;
-  int _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_thrust_;
+  int    _channel_pitch_, _channel_roll_, _channel_heading_, _channel_thrust_;
+  double _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_thrust_;
 
   ros::Timer timer_joystick_;
   void       timerJoystick(const ros::TimerEvent& event);
