@@ -19,8 +19,5 @@ SpeedTracker:
 FlipTracker:
   address: "mrs_uav_trackers/FlipTracker"
 
-CsvTracker:
-  address: "mrs_uav_trackers/CsvTracker"
-
 NullTracker:
   address: "mrs_uav_managers/NullTracker"
