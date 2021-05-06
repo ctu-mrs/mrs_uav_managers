@@ -689,7 +689,6 @@ private:
   bool      _escalating_failsafe_ehover_   = false;
   bool      _escalating_failsafe_eland_    = false;
   bool      _escalating_failsafe_failsafe_ = false;
-  bool      _escalating_failsafe_disarm_   = false;
   int       _rc_escalating_failsafe_threshold_;
   int       _rc_escalating_failsafe_channel_  = 0;
   bool      rc_escalating_failsafe_triggered_ = false;
@@ -915,7 +914,6 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
   param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
   param_loader.loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
-  param_loader.loadParam("safety/escalating_failsafe/disarm", _escalating_failsafe_disarm_);
 
   param_loader.loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
   param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
@@ -7599,15 +7597,6 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
     return failsafe();
-
-  } else if (_escalating_failsafe_disarm_ && (failsafe_triggered_)) {
-
-    escalating_failsafe_time_ = ros::Time::now();
-
-    ss << "escalating failsafe escalates to disarm";
-    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
-
-    return arming(false);
   }
 
   return std::tuple(false, "escalating failsafe has nothing more to do");

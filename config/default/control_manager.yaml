@@ -98,7 +98,6 @@ safety:
     ehover: false
     eland: true
     failsafe: false
-    disarm: false
 
   parachute:
 
