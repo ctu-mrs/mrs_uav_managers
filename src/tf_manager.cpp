@@ -86,7 +86,7 @@ void TfManager::onInit() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[TfManager]: Could not load all non-optional parameters. Shutting down.");
-    ros::shutdown();
+    ros::requestShutdown();
   }
   //}
 

@@ -120,7 +120,7 @@ void ConstraintManager::onInit() {
   if (_version_ != VERSION) {
 
     ROS_ERROR("[ConstraintManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::shutdown();
+    ros::requestShutdown();
   }
 
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
@@ -180,7 +180,7 @@ void ConstraintManager::onInit() {
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _constraint_names_)) {
         ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
-        ros::shutdown();
+        ros::requestShutdown();
       }
     }
 
@@ -195,7 +195,7 @@ void ConstraintManager::onInit() {
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
       ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
-      ros::shutdown();
+      ros::requestShutdown();
     }
 
     _map_type_fallback_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
@@ -233,7 +233,7 @@ void ConstraintManager::onInit() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ConstraintManager]: Could not load all parameters!");
-    ros::shutdown();
+    ros::requestShutdown();
   }
 
   is_initialized_ = true;
