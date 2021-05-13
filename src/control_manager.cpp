@@ -6026,7 +6026,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
         trajectory_modified = true;
       }
 
-      // check the point agains the safety area
+      // check the point against the safety area
       mrs_msgs::ReferenceStamped des_reference;
       des_reference.header    = processed_trajectory.header;
       des_reference.reference = processed_trajectory.points[i];
@@ -6047,7 +6047,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
         // the point is ok
       } else {
 
-        // we found a point, which is ok, after founding a point which was not ok
+        // we found a point, which is ok, after finding a point which was not ok
         if (first_invalid_idx != -1) {
 
           // interpolate
