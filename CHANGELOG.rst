@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.1 (2021-05-16)
+------------------
 * version -> 1.0.1
 * updated ros::shutdown
 * fix fallback gains for ALOAMREP and x500 uav type
