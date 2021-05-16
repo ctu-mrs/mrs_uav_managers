@@ -2,6 +2,29 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* version -> 1.0.1
+* updated ros::shutdown
+* fix fallback gains for ALOAMREP and x500 uav type
+* removed disarm from escalating failsafe
+* linted, minor bug fixes
+* removed CsvTracker
+* remapped the joystick topic to be namespaced and command only a single drone
+* added velocity command to control manager
+* UavManager: minor changes in minHeightCheck
+* fixed transfomer warning when not flying on GPS
+* made land_home more insistive
+* added min height checking to uav manager
+* updated safety area loading
+* fixed tf check for safety area publishing
+* updated MpcTracker's topic remaps in control_manager.launch
+* double -> bool fix, controlTimer -> std::async
+* fixed landoff tracker in control manager's diagnostics
+* fixed potential land home altitude discrepancy
+* added diagnostics publisher to UavManager, warning fixes
+* Contributors: Matouš Vrba, Tomas Baca
+
 1.0.0 (2021-03-18)
 ------------------
 * Major release
