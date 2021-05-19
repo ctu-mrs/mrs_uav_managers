@@ -3914,12 +3914,12 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
 void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
 
-  if (failsafe_triggered_) {
+  if (!failsafe_triggered_) {
 
     // We need to fire up timerFailsafe, which will regularly trigger the controllers
     // in place of the callbackUavState/callbackOdometry().
 
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not receiving '%s' for %.3f s, initiating failsafe land", topic.c_str(), (ros::Time::now() - last_msg).toSec());
+    ROS_ERROR_THROTTLE(0.1, "[ControlManager]: not receiving '%s' for %.3f s, initiating failsafe land", topic.c_str(), (ros::Time::now() - last_msg).toSec());
 
     failsafe();
   }
