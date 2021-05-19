@@ -7951,6 +7951,36 @@ void ControlManager::switchMotors(bool input) {
 
     switchController(_eland_controller_name_);
   }
+
+  // | --------- deactivate all trackers and controllers -------- |
+
+  for (int i = 0; i < int(tracker_list_.size()); i++) {
+
+    std::map<std::string, TrackerParams>::iterator it;
+    it = trackers_.find(_tracker_names_[i]);
+
+    try {
+      ROS_INFO("[ControlManager]: deactivating the tracker '%s'", it->second.address.c_str());
+      tracker_list_[i]->deactivate();
+    }
+    catch (std::runtime_error& ex) {
+      ROS_ERROR("[ControlManager]: exception caught during tracker deactivation: '%s'", ex.what());
+    }
+  }
+
+  for (int i = 0; i < int(controller_list_.size()); i++) {
+
+    std::map<std::string, ControllerParams>::iterator it;
+    it = controllers_.find(_controller_names_[i]);
+
+    try {
+      ROS_INFO("[ControlManager]: deactivating the controller '%s'", it->second.address.c_str());
+      controller_list_[i]->deactivate();
+    }
+    catch (std::runtime_error& ex) {
+      ROS_ERROR("[ControlManager]: exception caught during controller deactivation: '%s'", ex.what());
+    }
+  }
 }
 
 //}
