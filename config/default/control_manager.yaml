@@ -142,6 +142,10 @@ default_constraints:
 
   tilt: deg(60)
 
+trajectory_tracking:
+
+  snap_to_safety_area: false
+
 obstacle_bumper:
 
   switch_tracker: true

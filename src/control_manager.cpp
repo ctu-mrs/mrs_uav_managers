@@ -284,6 +284,8 @@ private:
   int _failsafe_timer_rate_ = 0;
   int _bumper_timer_rate_   = 0;
 
+  bool _snap_trajectory_to_safety_area_ = false;
+
   // | -------------- uav_state/odometry subscriber ------------- |
 
   mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
@@ -1034,6 +1036,8 @@ void ControlManager::onInit() {
   param_loader.loadParam("obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
 
   param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
+
+  param_loader.loadParam("trajectory_tracking/snap_to_safety_area", _snap_trajectory_to_safety_area_);
 
   // check the values of tracker error action
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
@@ -6075,6 +6079,10 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
             // we have a valid point in the past
           } else {
+
+            if (!_snap_trajectory_to_safety_area_) {
+              break;
+            }
 
             bool interpolation_success = true;
 
