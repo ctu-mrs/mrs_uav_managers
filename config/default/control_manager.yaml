@@ -106,39 +106,39 @@ safety:
   # when the active tracker returns empty command
   tracker_error_action: "eland" # {eland, ehover}
 
-# Those are normally overridden by the ConstraintManager.
+# these constraints are normally overridden by the ConstraintManager.
 default_constraints:
 
   horizontal:
-    speed: 2.0
+    speed: 1.0
     acceleration: 1.0
-    jerk: 10.0
-    snap: 10.0
+    jerk: 20.0
+    snap: 20.0
 
   vertical:
 
     ascending:
       speed: 1.0
       acceleration: 1.0
-      jerk: 2.0
-      snap: 2.0
+      jerk: 20.0
+      snap: 20.0
 
     descending:
       speed: 1.0
       acceleration: 1.0
-      jerk: 2.0
-      snap: 2.0
+      jerk: 20.0
+      snap: 20.0
 
   heading:
-    speed: 0.5
-    acceleration: 0.5
-    jerk: 3.0
-    snap: 5.0
+    speed: 1.0
+    acceleration: 1.0
+    jerk: 10.0
+    snap: 10.0
 
   angular_speed:
-    roll: 10.0
-    pitch: 10.0
-    yaw: 1.0
+    roll: 20.0
+    pitch: 20.0
+    yaw: 10.0
 
   tilt: deg(60)
 
