@@ -6015,19 +6015,22 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     for (int i = 0; i < trajectory_size; i++) {
 
-      // saturate the trajectory to min and max height
-      if (processed_trajectory.points[i].position.z < min_height) {
+      if (_snap_trajectory_to_safety_area_) {
 
-        processed_trajectory.points[i].position.z = min_height;
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the minimum height!");
-        trajectory_modified = true;
-      }
+        // saturate the trajectory to min and max height
+        if (processed_trajectory.points[i].position.z < min_height) {
 
-      if (processed_trajectory.points[i].position.z > max_height) {
+          processed_trajectory.points[i].position.z = min_height;
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the minimum height!");
+          trajectory_modified = true;
+        }
 
-        processed_trajectory.points[i].position.z = max_height;
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the maximum height!");
-        trajectory_modified = true;
+        if (processed_trajectory.points[i].position.z > max_height) {
+
+          processed_trajectory.points[i].position.z = max_height;
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the maximum height!");
+          trajectory_modified = true;
+        }
       }
 
       // check the point against the safety area
@@ -6035,7 +6038,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       des_reference.header    = processed_trajectory.header;
       des_reference.reference = processed_trajectory.points[i];
 
-      if (!isPointInSafetyArea2d(des_reference)) {
+      if (!isPointInSafetyArea3d(des_reference)) {
 
         ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory contains points outside of the safety area!");
         trajectory_modified = true;
@@ -6054,28 +6057,12 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
         // we found a point, which is ok, after finding a point which was not ok
         if (first_invalid_idx != -1) {
 
-          // interpolate
-          // TODO dont do this when fly_now == true and just start the trajectory in the first valid point
-          if (last_valid_idx == -1) {  // special case, we had no valid point so far
+          // special case, we had no valid point so far
+          if (last_valid_idx == -1) {
 
-            // interpolate between the current position and the valid point
-            double angle           = atan2(processed_trajectory.points[i].position.y - x_area_frame.reference.position.y,
-                                 processed_trajectory.points[i].position.x - x_area_frame.reference.position.x);
-            double dist_two_points = mrs_lib::geometry::dist(vec2_t(processed_trajectory.points[i].position.x, processed_trajectory.points[i].position.y),
-                                                             vec2_t(x_area_frame.reference.position.x, x_area_frame.reference.position.y));
-
-            if (dist_two_points > 1.0) {
-              ss << "the trajectory starts outside of the safety area!";
-              ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-              return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-            }
-
-            double step = dist_two_points / i;
-
-            for (int j = 0; j < i; j++) {
-              processed_trajectory.points[i].position.x = x_area_frame.reference.position.x + j * cos(angle) * step;
-              processed_trajectory.points[i].position.y = x_area_frame.reference.position.y + j * sin(angle) * step;
-            }
+            ss << "the trajectory starts outside of the safety area!";
+            ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+            return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
             // we have a valid point in the past
           } else {
