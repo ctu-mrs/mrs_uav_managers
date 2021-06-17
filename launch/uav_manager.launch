@@ -15,16 +15,10 @@
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
+  <arg name="custom_config_motor_params" default="" />
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f330')" name="UAV_MASS" default="1.35" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f450')" name="UAV_MASS" default="2.0" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'f550')" name="UAV_MASS" default="2.3" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 't650')" name="UAV_MASS" default="3.5" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'x500')" name="UAV_MASS" default="2.0" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'm600')" name="UAV_MASS" default="10.0" />
-  <arg if="$(eval arg('RUN_TYPE') == 'simulation' and arg('UAV_TYPE') == 'eaglemk2')" name="UAV_MASS" default="10.0" />
   <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
   <arg name="motor_params_file" default="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
@@ -53,13 +47,16 @@
         <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
+      <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mass.yaml" />
+
       <rosparam file="$(arg world_file)" />
       <rosparam file="$(arg motor_params_file)" />
+      <rosparam if="$(eval not arg('custom_config_motor_params') == '')" file="$(arg custom_config_motor_params)" />
 
         <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
-      <param name="uav_mass" value="$(arg UAV_MASS)" />
+      <param if="$(eval arg('RUN_TYPE') == 'uav')" name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="g" value="$(arg g)" />
