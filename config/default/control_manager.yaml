@@ -177,7 +177,7 @@ obstacle_bumper:
 
 automatic_pc_shutdown:
 
-  enabled: true
+  enabled: false
 
 joystick:
 

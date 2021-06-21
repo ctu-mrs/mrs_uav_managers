@@ -1,7 +1,7 @@
 slow:
 
   horizontal:
-    speed: 2.0
+    speed: 1.0
     acceleration: 1.0
     jerk: 20.0
     snap: 20.0
@@ -11,52 +11,17 @@ slow:
     ascending:
       speed: 1.0
       acceleration: 1.0
-      jerk: 2.0
-      snap: 2.0
+      jerk: 20.0
+      snap: 20.0
 
     descending:
       speed: 1.0
       acceleration: 1.0
-      jerk: 2.0
-      snap: 2.0
+      jerk: 20.0
+      snap: 20.0
 
   heading:
     speed: 0.5
-    acceleration: 0.5
-    jerk: 10.0
-    snap: 10.0
-
-  angular_speed:
-    roll: 10.0
-    pitch: 10.0
-    yaw: 1.0
-
-  tilt: deg(60)
-
-medium:
-
-  horizontal:
-    speed: 5.0
-    acceleration: 2.5
-    jerk: 20.0
-    snap: 20.0
-
-  vertical:
-
-    ascending:
-      speed: 2.0
-      acceleration: 1.0
-      jerk: 3.0
-      snap: 5.0
-
-    descending:
-      speed: 2.0
-      acceleration: 1.0
-      jerk: 3.0
-      snap: 5.0
-
-  heading:
-    speed: 1.0
     acceleration: 1.0
     jerk: 10.0
     snap: 10.0
@@ -68,33 +33,68 @@ medium:
 
   tilt: deg(60)
 
-fast:
+medium:
 
   horizontal:
-    speed: 9.0
-    acceleration: 4.0
-    jerk: 20.0
-    snap: 20.0
+    speed: 4.0
+    acceleration: 2.0
+    jerk: 40.0
+    snap: 40.0
 
   vertical:
 
     ascending:
       speed: 2.0
-      acceleration: 2.0
-      jerk: 5.0
-      snap: 3.0
+      acceleration: 1.0
+      jerk: 40.0
+      snap: 40.0
 
     descending:
       speed: 2.0
+      acceleration: 1.0
+      jerk: 40.0
+      snap: 40.0
+
+  heading:
+    speed: 1.0
+    acceleration: 1.0
+    jerk: 20.0
+    snap: 20.0
+
+  angular_speed:
+    roll: 60.0
+    pitch: 60.0
+    yaw: 10.0
+
+  tilt: deg(60)
+
+fast:
+
+  horizontal:
+    speed: 8.0
+    acceleration: 4.0
+    jerk: 60.0
+    snap: 60.0
+
+  vertical:
+
+    ascending:
+      speed: 4.0
       acceleration: 2.0
-      jerk: 5.0
-      snap: 3.0
+      jerk: 60.0
+      snap: 60.0
+
+    descending:
+      speed: 4.0
+      acceleration: 2.0
+      jerk: 60.0
+      snap: 60.0
 
   heading:
     speed: 2.0
     acceleration: 2.0
-    jerk: 10.0
-    snap: 10.0
+    jerk: 40.0
+    snap: 40.0
 
   angular_speed:
     roll: 60.0
