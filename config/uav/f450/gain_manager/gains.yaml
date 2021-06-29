@@ -20,7 +20,7 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 5.0
+      kq: 3.0
 
   mass_estimator:
     km: 1.0
@@ -48,7 +48,35 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 3.0
+
+  mass_estimator:
+    km: 1.0
+    km_lim: 3.0 # [kg, at least 1/2 of the UAVs mass to allow landing detection]
+
+tight:
+
+  horizontal:
+    kp: 8.0
+    kv: 3.0
+    ka: 1.0
+
+    attitude:
+      kq: 7.0
+
+    kib: 0.1
+    kib_lim: 10.0
+
+    kiw: 0.1
+    kiw_lim: 10.0
+
+  vertical:
+    kp: 15.0
+    kv: 8.0
+    ka: 1.0
+
+    attitude:
+      kq: 3.0
 
   mass_estimator:
     km: 1.0

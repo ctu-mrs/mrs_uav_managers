@@ -1,6 +1,7 @@
 gains: [
   "supersoft",
   "soft",
+  "tight"
 ]
 
 
@@ -20,9 +21,9 @@ gain_management:
     OBJECT: ["supersoft"]
     VIO: ["supersoft"]
     LIDAR: ["supersoft"]
-    RTK: ["supersoft", "soft"]
+    RTK: ["supersoft", "soft", "tight"]
     OPTFLOWGPS: ["supersoft"]
-    GPS: ["supersoft", "soft"]
+    GPS: ["supersoft", "soft", "tight"]
     OPTFLOW: ["supersoft"]
     TOWER: ["supersoft", "soft"]
     LIOSAM: ["supersoft", "soft"]
