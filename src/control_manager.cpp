@@ -707,7 +707,7 @@ private:
   int                        _rc_escalating_failsafe_threshold_;
   int                        _rc_escalating_failsafe_channel_  = 0;
   bool                       rc_escalating_failsafe_triggered_ = false;
-  EscalatingFailsafeStates_t state_escalating_failsafe_;
+  EscalatingFailsafeStates_t state_escalating_failsafe_        = ESC_NONE_STATE;
 
   std::string _tracker_error_action_;
 
