@@ -163,6 +163,18 @@ typedef enum
 
 } ReferenceFrameType_t;
 
+// state machine
+typedef enum
+{
+
+  ESC_NONE_STATE     = 0,
+  ESC_EHOVER_STATE   = 1,
+  ESC_ELAND_STATE    = 2,
+  ESC_FAILSAFE_STATE = 3,
+  ESC_FINISHED_STATE = 4,
+
+} EscalatingFailsafeStates_t;
+
 /* class ControllerParams() //{ */
 
 class ControllerParams {
@@ -685,16 +697,17 @@ private:
   // | --------------- safety checks and failsafes -------------- |
 
   // escalating failsafe (eland -> failsafe -> disarm)
-  bool      _service_escalating_failsafe_enabled_ = false;
-  bool      _rc_escalating_failsafe_enabled_      = false;
-  double    _escalating_failsafe_timeout_         = 0;
-  ros::Time escalating_failsafe_time_;
-  bool      _escalating_failsafe_ehover_   = false;
-  bool      _escalating_failsafe_eland_    = false;
-  bool      _escalating_failsafe_failsafe_ = false;
-  int       _rc_escalating_failsafe_threshold_;
-  int       _rc_escalating_failsafe_channel_  = 0;
-  bool      rc_escalating_failsafe_triggered_ = false;
+  bool                       _service_escalating_failsafe_enabled_ = false;
+  bool                       _rc_escalating_failsafe_enabled_      = false;
+  double                     _escalating_failsafe_timeout_         = 0;
+  ros::Time                  escalating_failsafe_time_;
+  bool                       _escalating_failsafe_ehover_   = false;
+  bool                       _escalating_failsafe_eland_    = false;
+  bool                       _escalating_failsafe_failsafe_ = false;
+  int                        _rc_escalating_failsafe_threshold_;
+  int                        _rc_escalating_failsafe_channel_  = 0;
+  bool                       rc_escalating_failsafe_triggered_ = false;
+  EscalatingFailsafeStates_t state_escalating_failsafe_;
 
   std::string _tracker_error_action_;
 
@@ -849,6 +862,8 @@ private:
   std::tuple<bool, std::string> eland(void);
   std::tuple<bool, std::string> failsafe(void);
   std::tuple<bool, std::string> escalatingFailsafe(void);
+
+  EscalatingFailsafeStates_t getNextEscFailsafeState(void);
 };
 
 //}
@@ -7318,6 +7333,12 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
+  if (eland_triggered_)
+    return std::tuple(false, "cannot ehover, eland already triggered");
+
+  if (failsafe_triggered_)
+    return std::tuple(false, "cannot ehover, failsafe already triggered");
+
   // copy the member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7379,8 +7400,11 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
-  if (eland_triggered_ || failsafe_triggered_)
-    return std::tuple(false, "eland or failsafe are triggered");
+  if (eland_triggered_)
+    return std::tuple(false, "cannot eland, eland already triggered");
+
+  if (failsafe_triggered_)
+    return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
   auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -7468,7 +7492,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     return std::tuple(false, "the ControlManager is not initialized");
 
   if (failsafe_triggered_)
-    return std::tuple(false, "failsafe already triggered");
+    return std::tuple(false, "cannot, failsafe already triggered");
 
   if (active_tracker_idx == _null_tracker_idx_) {
 
@@ -7578,6 +7602,14 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     return std::tuple(false, ss.str());
   }
 
+  if (!motors_) {
+
+    ss << "not escalating failsafe, motors are off";
+    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+    return std::tuple(false, ss.str());
+  }
+
   ROS_WARN("[ControlManager]: escalating failsafe triggered");
 
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -7586,37 +7618,137 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
   std::string active_tracker_name    = _tracker_names_[active_tracker_idx];
   std::string active_controller_name = _controller_names_[active_controller_idx];
 
-  bool ehovering = (active_tracker_name == _landoff_tracker_name_) && (active_controller_name == _eland_controller_name_);
+  EscalatingFailsafeStates_t next_state = getNextEscFailsafeState();
 
-  if (_escalating_failsafe_ehover_ && (!ehovering && !eland_triggered_ && !failsafe_triggered_ && motors_)) {
+  escalating_failsafe_time_ = ros::Time::now();
 
-    escalating_failsafe_time_ = ros::Time::now();
+  switch (next_state) {
 
-    ss << "escalating failsafe escalates to ehover";
-    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+    case ESC_NONE_STATE: {
 
-    return ehover();
+      ss << "escalating failsafe has run to impossible situation";
+      ROS_ERROR_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
-  } else if (_escalating_failsafe_eland_ && (!eland_triggered_ && !failsafe_triggered_ && motors_)) {
+      return std::tuple(false, "escalating failsafe has run to impossible situation");
 
-    escalating_failsafe_time_ = ros::Time::now();
+      break;
+    }
 
-    ss << "escalating failsafe escalates to eland";
-    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+    case ESC_EHOVER_STATE: {
 
-    return eland();
+      ss << "escalating failsafe escalates to ehover";
+      ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
-  } else if (_escalating_failsafe_failsafe_ && (eland_triggered_)) {
+      state_escalating_failsafe_ = ESC_EHOVER_STATE;
 
-    escalating_failsafe_time_ = ros::Time::now();
+      return ehover();
 
-    ss << "escalating failsafe escalates to failsafe";
-    ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+      break;
+    }
 
-    return failsafe();
+    case ESC_ELAND_STATE: {
+
+      ss << "escalating failsafe escalates to eland";
+      ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+      state_escalating_failsafe_ = ESC_ELAND_STATE;
+
+      return eland();
+
+      break;
+    }
+
+    case ESC_FAILSAFE_STATE: {
+
+      escalating_failsafe_time_ = ros::Time::now();
+
+      ss << "escalating failsafe escalates to failsafe";
+      ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+      state_escalating_failsafe_ = ESC_FINISHED_STATE;
+
+      return failsafe();
+
+      break;
+    }
+
+    case ESC_FINISHED_STATE: {
+
+      escalating_failsafe_time_ = ros::Time::now();
+
+      ss << "escalating failsafe has nothing more to do";
+      ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
+
+      return std::tuple(false, "escalating failsafe has nothing more to do");
+
+      break;
+    }
   }
+}
 
-  return std::tuple(false, "escalating failsafe has nothing more to do");
+//}
+
+/* getNextEscFailsafeState() //{ */
+
+EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
+
+  EscalatingFailsafeStates_t current_state = state_escalating_failsafe_;
+
+  switch (current_state) {
+
+    case ESC_FINISHED_STATE: {
+
+      return ESC_FINISHED_STATE;
+
+      break;
+    }
+
+    case ESC_NONE_STATE: {
+
+      if (_escalating_failsafe_ehover_) {
+        return ESC_EHOVER_STATE;
+      } else if (_escalating_failsafe_eland_) {
+        return ESC_ELAND_STATE;
+      } else if (_escalating_failsafe_failsafe_) {
+        return ESC_FAILSAFE_STATE;
+      } else {
+        return ESC_FINISHED_STATE;
+      }
+
+      break;
+    }
+
+    case ESC_EHOVER_STATE: {
+
+      if (_escalating_failsafe_eland_) {
+        return ESC_ELAND_STATE;
+      } else if (_escalating_failsafe_failsafe_) {
+        return ESC_FAILSAFE_STATE;
+      } else {
+        return ESC_FINISHED_STATE;
+      }
+
+      break;
+    }
+
+    case ESC_ELAND_STATE: {
+
+      if (_escalating_failsafe_failsafe_) {
+        return ESC_FAILSAFE_STATE;
+      } else {
+        return ESC_FINISHED_STATE;
+      }
+
+      break;
+    }
+
+    case ESC_FAILSAFE_STATE: {
+
+      return ESC_FINISHED_STATE;
+
+      break;
+    }
+  }
 }
 
 //}
