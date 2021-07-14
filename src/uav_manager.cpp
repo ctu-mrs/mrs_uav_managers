@@ -276,7 +276,7 @@ void UavManager::onInit() {
   if (_version_ != VERSION) {
 
     ROS_ERROR("[UavManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("uav_name", _uav_name_);
@@ -336,7 +336,7 @@ void UavManager::onInit() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // | --------------------- tf transformer --------------------- |

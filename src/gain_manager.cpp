@@ -139,7 +139,7 @@ void GainManager::onInit() {
   if (_version_ != VERSION) {
 
     ROS_ERROR("[GainManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
@@ -190,7 +190,7 @@ void GainManager::onInit() {
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _gain_names_)) {
         ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
-        ros::requestShutdown();
+        ros::shutdown();
       }
     }
 
@@ -205,7 +205,7 @@ void GainManager::onInit() {
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
-      ros::requestShutdown();
+      ros::shutdown();
     }
 
     _map_type_fallback_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
@@ -245,7 +245,7 @@ void GainManager::onInit() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[GainManager]: could not load all parameters!");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   is_initialized_ = true;

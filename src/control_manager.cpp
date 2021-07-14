@@ -898,7 +898,7 @@ void ControlManager::onInit() {
   if (_version_ != VERSION) {
 
     ROS_ERROR("[ControlManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("uav_name", _uav_name_);
@@ -911,7 +911,7 @@ void ControlManager::onInit() {
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("safety/min_thrust_null_tracker", _min_thrust_null_tracker_);
@@ -937,21 +937,21 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
   param_loader.loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
   param_loader.loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("status_timer_rate", _status_timer_rate_);
@@ -968,7 +968,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // default constraints
@@ -1059,7 +1059,7 @@ void ControlManager::onInit() {
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
     ROS_ERROR("[ControlManager]: the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
               EHOVER_STR);
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
@@ -1164,19 +1164,19 @@ void ControlManager::onInit() {
 
     catch (mrs_lib::SafetyZone::BorderError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
-      ros::requestShutdown();
+      ros::shutdown();
     }
     catch (mrs_lib::SafetyZone::PolygonObstacleError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone polygon obstacles");
-      ros::requestShutdown();
+      ros::shutdown();
     }
     catch (mrs_lib::SafetyZone::PointObstacleError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
-      ros::requestShutdown();
+      ros::shutdown();
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: SafetyArea: unhandler exception!");
-      ros::requestShutdown();
+      ros::shutdown();
     }
 
     ROS_INFO("[ControlManager]: safety area initialized");
@@ -1227,12 +1227,12 @@ void ControlManager::onInit() {
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for the tracker '%s'", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::requestShutdown();
+      ros::shutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for the tracker '%s'", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::requestShutdown();
+      ros::shutdown();
     }
   }
 
@@ -1299,12 +1299,12 @@ void ControlManager::onInit() {
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for the controller '%s'", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::requestShutdown();
+      ros::shutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for the controller '%s'", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::requestShutdown();
+      ros::shutdown();
     }
   }
 
@@ -1345,7 +1345,7 @@ void ControlManager::onInit() {
   }
   if (!hover_tracker_check) {
     ROS_ERROR("[ControlManager]: the safety/hover_tracker (%s) is not within the loaded trackers", _ehover_tracker_name_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // check if the failsafe controller is within the loaded controllers
@@ -1363,7 +1363,7 @@ void ControlManager::onInit() {
   }
   if (!failsafe_controller_check) {
     ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", _failsafe_controller_name_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // check if the eland controller is within the loaded controllers
@@ -1381,7 +1381,7 @@ void ControlManager::onInit() {
   }
   if (!eland_controller_check) {
     ROS_ERROR("[ControlManager]: the eland controller (%s) is not within the loaded controllers", _eland_controller_name_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // --------------------------------------------------------------
@@ -1403,7 +1403,7 @@ void ControlManager::onInit() {
   }
   if (!landoff_tracker_check) {
     ROS_ERROR("[ControlManager]: the landoff tracker (%s) is not within the loaded trackers", _landoff_tracker_name_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // --------------------------------------------------------------
@@ -1425,7 +1425,7 @@ void ControlManager::onInit() {
   }
   if (!null_tracker_check) {
     ROS_ERROR("[ControlManager]: the null tracker (%s) is not within the loaded trackers", _null_tracker_name_.c_str());
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   // --------------------------------------------------------------
@@ -1449,7 +1449,7 @@ void ControlManager::onInit() {
     }
     if (!joystick_tracker_check) {
       ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", _joystick_tracker_name_.c_str());
-      ros::requestShutdown();
+      ros::shutdown();
     }
 
     // check if the controller for joystick control exists
@@ -1467,7 +1467,7 @@ void ControlManager::onInit() {
     }
     if (!joystick_controller_check) {
       ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
-      ros::requestShutdown();
+      ros::shutdown();
     }
 
     if (_bumper_switch_tracker_) {
@@ -1486,7 +1486,7 @@ void ControlManager::onInit() {
       }
       if (!bumper_tracker_check) {
         ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
-        ros::requestShutdown();
+        ros::shutdown();
       }
     }
 
@@ -1506,7 +1506,7 @@ void ControlManager::onInit() {
       }
       if (!bumper_controller_check) {
         ROS_ERROR("[ControlManager]: the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
-        ros::requestShutdown();
+        ros::shutdown();
       }
     }
 
@@ -1525,7 +1525,7 @@ void ControlManager::onInit() {
     }
     if (!joystick_fallback_tracker_check) {
       ROS_ERROR("[ControlManager]: the joystick fallback tracker (%s) is not within the loaded trackers", _joystick_fallback_tracker_name_.c_str());
-      ros::requestShutdown();
+      ros::shutdown();
     }
 
     // check if the fallback controller for joystick control exists
@@ -1543,7 +1543,7 @@ void ControlManager::onInit() {
     }
     if (!joystick_fallback_controller_check) {
       ROS_ERROR("[ControlManager]: the joystick fallback controller (%s) is not within the loaded controllers", _joystick_fallback_controller_name_.c_str());
-      ros::requestShutdown();
+      ros::shutdown();
     }
   }
 
@@ -1722,7 +1722,7 @@ void ControlManager::onInit() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ControlManager]: could not load all parameters!");
-    ros::requestShutdown();
+    ros::shutdown();
   }
 
   is_initialized_ = true;
@@ -7683,7 +7683,16 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
       break;
     }
+
+    default: {
+
+      break;
+    }
   }
+
+  ROS_ERROR("[ControlManager]: escalatingFailsafe() reached the final return, this should not happen!");
+
+  return std::tuple(false, "escalating failsafe exception");
 }
 
 //}
@@ -7749,6 +7758,10 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
       break;
     }
   }
+
+  ROS_ERROR("[ControlManager]: getNextEscFailsafeState() reached the final return, this should not happen!");
+
+  return ESC_NONE_STATE;
 }
 
 //}
