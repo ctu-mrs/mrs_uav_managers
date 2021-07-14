@@ -672,12 +672,13 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
 
-  if (!sh_max_height_.hasMsg() || !sh_odometry_.hasMsg()) {
+  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg()) {
     return;
   }
 
-  auto max_height = sh_max_height_.getMsg()->value;
-  auto odometry   = sh_odometry_.getMsg();
+  double                     max_height = sh_max_height_.getMsg()->value;
+  double                     height     = sh_height_.getMsg()->value;
+  nav_msgs::OdometryConstPtr odometry   = sh_odometry_.getMsg();
 
   auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
 
@@ -695,9 +696,9 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   if (!fixing_max_height_) {
 
-    if (odometry_z > max_height + 0.25) {
+    if (height > max_height + 0.25) {
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", odometry_z, max_height);
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_height);
 
       // get the current odometry
       double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
@@ -714,7 +715,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
       reference_out.reference.position.x = odometry_x + stop_dist_x;
       reference_out.reference.position.y = odometry_y + stop_dist_y;
-      reference_out.reference.position.z = max_height - fabs(_max_height_offset_);
+      reference_out.reference.position.z = odometry_z + (max_height - height);
 
       reference_out.reference.heading = odometry_heading;
 
@@ -738,7 +739,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   } else {
 
-    if (odometry_z < max_height) {
+    if (height < max_height) {
 
       setControlCallbacksSrv(true);
 
