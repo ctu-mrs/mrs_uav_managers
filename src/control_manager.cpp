@@ -8644,9 +8644,18 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
       if (controller_status) {
 
-        ROS_ERROR("[ControlManager]: triggering failsafe, the controller returned empty or invalid command");
+        if (active_controller_idx_ == _eland_controller_idx_) {
 
-        failsafe();
+          ROS_ERROR("[ControlManager]: triggering failsafe, the emergency controller returned empty or invalid command");
+
+          failsafe();
+
+        } else {
+
+          ROS_ERROR("[ControlManager]: triggering eland, the controller returned empty or invalid command");
+
+          eland();
+        }
       }
     }
   }
