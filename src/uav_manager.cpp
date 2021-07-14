@@ -672,7 +672,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
 
-  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg()) {
+  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
     return;
   }
 
