@@ -6,4 +6,4 @@ safety:
 
 rc_joystick:
 
-  carrot_distance: 4.00 # [m]
+  carrot_distance: 2.00 # [m]
