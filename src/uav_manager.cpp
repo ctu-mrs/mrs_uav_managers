@@ -8,6 +8,7 @@
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 #include <std_msgs/String.h>
+#include <geometry_msgs/Vector3Stamped.h>
 
 #include <nav_msgs/Odometry.h>
 #include <mrs_msgs/Vec1.h>
@@ -691,62 +692,45 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
     return;
   }
 
-  double odometry_x_speed = odometry->twist.twist.linear.x;
-  double odometry_y_speed = odometry->twist.twist.linear.y;
+  if (height > max_height) {
 
-  if (!fixing_max_height_) {
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_height);
 
-    if (height > max_height + 0.25) {
+    mrs_msgs::ReferenceStamped reference_out;
+    reference_out.header.frame_id = odometry->header.frame_id;
+    reference_out.header.stamp    = ros::Time::now();
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_height);
+    reference_out.reference.position.x = odometry_x;
+    reference_out.reference.position.y = odometry_y;
+    reference_out.reference.position.z = odometry_z + ((max_height - _max_height_offset_) - height);
 
-      // get the current odometry
-      double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
-      double current_heading          = atan2(odometry_y_speed, odometry_x_speed);
+    reference_out.reference.heading = odometry_heading;
 
-      double horizontal_t_stop    = current_horizontal_speed / 1.0;
-      double horizontal_stop_dist = (horizontal_t_stop * current_horizontal_speed) / 2.0;
-      double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
-      double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
+    setControlCallbacksSrv(false);
 
-      mrs_msgs::ReferenceStamped reference_out;
-      reference_out.header.frame_id = odometry->header.frame_id;
-      reference_out.header.stamp    = ros::Time::now();
+    bool success = emergencyReferenceSrv(reference_out);
 
-      reference_out.reference.position.x = odometry_x + stop_dist_x;
-      reference_out.reference.position.y = odometry_y + stop_dist_y;
-      reference_out.reference.position.z = odometry_z + (max_height - height);
+    if (success) {
 
-      reference_out.reference.heading = odometry_heading;
+      ROS_INFO("[UavManager]: descending");
 
-      setControlCallbacksSrv(false);
+      fixing_max_height_ = true;
 
-      bool success = emergencyReferenceSrv(reference_out);
+    } else {
 
-      if (success) {
-
-        ROS_INFO("[UavManager]: descending");
-
-        fixing_max_height_ = true;
-
-      } else {
-
-        ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not descend");
-
-        setControlCallbacksSrv(true);
-      }
-    }
-
-  } else {
-
-    if (height < max_height) {
+      ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not descend");
 
       setControlCallbacksSrv(true);
-
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
-
-      fixing_max_height_ = false;
     }
+  }
+
+  if (fixing_max_height_ && height < max_height) {
+
+    setControlCallbacksSrv(true);
+
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
+
+    fixing_max_height_ = false;
   }
 }
 
@@ -787,62 +771,45 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
     return;
   }
 
-  double odometry_x_speed = odometry->twist.twist.linear.x;
-  double odometry_y_speed = odometry->twist.twist.linear.y;
+  if (height < _min_height_) {
 
-  if (!fixing_min_height_) {
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: min height breached: %.2f < %.2f, triggering safety goto", height, _min_height_);
 
-    if (height < _min_height_) {
+    mrs_msgs::ReferenceStamped reference_out;
+    reference_out.header.frame_id = odometry->header.frame_id;
+    reference_out.header.stamp    = ros::Time::now();
 
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: min height breached: %.2f < %.2f, triggering safety goto", odometry_z, _min_height_);
+    reference_out.reference.position.x = odometry_x;
+    reference_out.reference.position.y = odometry_y;
+    reference_out.reference.position.z = odometry_z + ((_min_height_ + _min_height_offset_) - height);
 
-      // get the current odometry
-      double current_horizontal_speed = sqrt(pow(odometry_x_speed, 2.0) + pow(odometry_y_speed, 2.0));
-      double current_heading          = atan2(odometry_y_speed, odometry_x_speed);
+    reference_out.reference.heading = odometry_heading;
 
-      double horizontal_t_stop    = current_horizontal_speed / 1.0;
-      double horizontal_stop_dist = (horizontal_t_stop * current_horizontal_speed) / 2.0;
-      double stop_dist_x          = cos(current_heading) * horizontal_stop_dist;
-      double stop_dist_y          = sin(current_heading) * horizontal_stop_dist;
+    setControlCallbacksSrv(false);
 
-      mrs_msgs::ReferenceStamped reference_out;
-      reference_out.header.frame_id = odometry->header.frame_id;
-      reference_out.header.stamp    = ros::Time::now();
+    bool success = emergencyReferenceSrv(reference_out);
 
-      reference_out.reference.position.x = odometry_x + stop_dist_x;
-      reference_out.reference.position.y = odometry_y + stop_dist_y;
-      reference_out.reference.position.z = _min_height_ + fabs(_min_height_offset_);
+    if (success) {
 
-      reference_out.reference.heading = odometry_heading;
+      ROS_INFO("[UavManager]: ascending");
 
-      setControlCallbacksSrv(false);
+      fixing_min_height_ = true;
 
-      bool success = emergencyReferenceSrv(reference_out);
+    } else {
 
-      if (success) {
-
-        ROS_INFO("[UavManager]: ascending");
-
-        fixing_min_height_ = true;
-
-      } else {
-
-        ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not ascend");
-
-        setControlCallbacksSrv(true);
-      }
-    }
-
-  } else {
-
-    if (height > _min_height_) {
+      ROS_ERROR_THROTTLE(1.0, "[UavManager]: could not ascend");
 
       setControlCallbacksSrv(true);
-
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
-
-      fixing_min_height_ = false;
     }
+  }
+
+  if (fixing_min_height_ && height > _min_height_) {
+
+    setControlCallbacksSrv(true);
+
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: safe height reached");
+
+    fixing_min_height_ = false;
   }
 }
 

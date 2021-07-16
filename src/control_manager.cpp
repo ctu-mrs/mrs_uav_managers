@@ -1,3 +1,5 @@
+#include "mrs_msgs/VelocityReferenceSrvRequest.h"
+#include "mrs_msgs/VelocityReferenceStamped.h"
 #define VERSION "1.0.1.0"
 
 /* includes //{ */
@@ -3035,8 +3037,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr() && sh_rc_.hasMsg()) {
 
     // create the reference
-
-    mrs_msgs::Vec4::Request request;
+    mrs_msgs::VelocityReferenceStampedSrv::Request request;
 
     double des_x       = 0;
     double des_y       = 0;
@@ -3084,12 +3085,16 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     if (!nothing_to_do) {
 
-      request.goal[REF_X]       = des_x;
-      request.goal[REF_Y]       = des_y;
-      request.goal[REF_Z]       = des_z;
-      request.goal[REF_HEADING] = des_heading;
+      request.reference.header.frame_id = "fcu_untilted";
 
-      mrs_msgs::Vec4Response response;
+      request.reference.reference.use_heading_rate = true;
+
+      request.reference.reference.velocity.x   = des_x;
+      request.reference.reference.velocity.y   = des_y;
+      request.reference.reference.velocity.z   = des_z;
+      request.reference.reference.heading_rate = des_heading;
+
+      mrs_msgs::VelocityReferenceStampedSrv::Response response;
 
       // disable callbacks of all trackers
       std_srvs::SetBoolRequest req_enable_callbacks;
@@ -3105,13 +3110,11 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
       callbacks_enabled_ = true;
 
-      // call the goto
-      callbackGotoFcu(request, response);
+      callbackVelocityReferenceService(request, response);
 
       callbacks_enabled_ = false;
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: goto by RC by x=%.2f, y=%.2f, z=%.2f, heading=%.2f", request.goal[REF_X], request.goal[REF_Y],
-                        request.goal[REF_Z], request.goal[REF_HEADING]);
+      ROS_INFO_THROTTLE(1.0, "[ControlManager]: goto by RC with speed x=%.2f, y=%.2f, z=%.2f, heading_rate=%.2f", des_x, des_y, des_z, des_heading);
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;

@@ -11,17 +11,17 @@ require_constraint_manager: true
 max_height_checking:
 
   enabled: true
-  rate: 10 # [Hz]
-  safety_height_offset: 0.5 # how much lower to descend bellow the max height
+  rate: 10.0 # [Hz]
+  safety_height_offset: 0.25 # how much lower to descend bellow the max height
 
 # periodically checks if min height was exceeded
 # if so, retakes control and descends below it
 min_height_checking:
 
   enabled: true
-  rate: 10 # [Hz]
+  rate: 10.0 # [Hz]
   min_height: 0.5 # [m]
-  safety_height_offset: 1.0 # how much higher to ascend above the min height
+  safety_height_offset: 0.25 # how much higher to ascend above the min height
 
 takeoff:
 
