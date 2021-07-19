@@ -103,9 +103,6 @@ public:
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 
-// A pure virtual destructor requires a function body.
-Controller::~Controller(){};
-
 }  // namespace mrs_uav_managers
 
 #endif
