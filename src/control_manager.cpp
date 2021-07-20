@@ -5644,9 +5644,9 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   }
 
   {
-    std::scoped_lock lock(mutex_last_attitude_cmd_);
+    std::scoped_lock lock(mutex_last_position_cmd_);
 
-    if (last_attitude_cmd_ == mrs_msgs::AttitudeCommand::Ptr()) {
+    if (last_position_cmd_ == mrs_msgs::PositionCommand::Ptr()) {
       ss << "could not set velocity command, not flying!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str());
@@ -7401,6 +7401,8 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
   ss << "ehover activated";
   ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
+  callbacks_enabled_ = false;
+
   return std::tuple(true, ss.str());
 }
 
@@ -7477,6 +7479,8 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
     success = true;
+
+    callbacks_enabled_ = false;
 
   } else {
 
@@ -7577,6 +7581,8 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       bumper_enabled_ = false;
 
       odometryCallbacksSrv(false);
+
+      callbacks_enabled_ = false;
 
       ROS_INFO_THROTTLE(1.0, "[ControlManager]: the controller '%s' was activated", _failsafe_controller_name_.c_str());
 
