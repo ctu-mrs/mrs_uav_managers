@@ -110,6 +110,7 @@ public:
   ros::ServiceServer service_server_land_;
   ros::ServiceServer service_server_land_home_;
   ros::ServiceServer service_server_land_there_;
+  ros::ServiceServer service_server_midflight_activation_;
 
   // service callbacks
   bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -129,6 +130,7 @@ public:
   ros::ServiceClient service_client_pirouette_;
   ros::ServiceClient service_client_odometry_callbacks_;
   ros::ServiceClient service_client_ungrip_;
+  ros::ServiceClient service_client_motors_;
 
   // service client wrappers
   bool takeoffSrv(void);
@@ -141,6 +143,7 @@ public:
   void setOdometryCallbacksSrv(const bool& input);
   void setControlCallbacksSrv(const bool& input);
   void ungripSrv(void);
+  void motorsSrv(const bool in);
   void pirouetteSrv(void);
 
   ros::Timer timer_takeoff_;
@@ -150,6 +153,7 @@ public:
   ros::Timer timer_maxthrust_;
   ros::Timer timer_flighttime_;
   ros::Timer timer_diagnostics_;
+  ros::Timer timer_midflight_activation_;
 
   // timer callbacks
   void timerLanding(const ros::TimerEvent& event);
@@ -256,6 +260,10 @@ public:
   // profiler
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
+
+  // midflight activation
+  void timerMidFlightActivation(const ros::TimerEvent& event);
+  bool callbackMidflightActivation(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 };
 
 //}
@@ -373,10 +381,11 @@ void UavManager::onInit() {
 
   // | --------------------- service servers -------------------- |
 
-  service_server_takeoff_    = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
-  service_server_land_       = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
-  service_server_land_home_  = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
-  service_server_land_there_ = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
+  service_server_takeoff_              = nh_.advertiseService("takeoff_in", &UavManager::callbackTakeoff, this);
+  service_server_land_                 = nh_.advertiseService("land_in", &UavManager::callbackLand, this);
+  service_server_land_home_            = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
+  service_server_land_there_           = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
+  service_server_midflight_activation_ = nh_.advertiseService("midflight_activation_in", &UavManager::callbackMidflightActivation, this);
 
   // | --------------------- service clients -------------------- |
 
@@ -391,6 +400,7 @@ void UavManager::onInit() {
   service_client_pirouette_           = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
   service_client_odometry_callbacks_  = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
   service_client_ungrip_              = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
+  service_client_motors_              = nh_.serviceClient<std_srvs::SetBool>("motors_out");
 
   // | ---------------------- state machine --------------------- |
 
@@ -402,11 +412,12 @@ void UavManager::onInit() {
 
   // | ------------------------- timers ------------------------- |
 
-  timer_landing_     = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
-  timer_takeoff_     = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
-  timer_flighttime_  = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
-  timer_maxthrust_   = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
-  timer_diagnostics_ = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
+  timer_landing_              = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
+  timer_takeoff_              = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
+  timer_flighttime_           = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
+  timer_maxthrust_            = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
+  timer_diagnostics_          = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
+  timer_midflight_activation_ = nh_.createTimer(ros::Rate(100.0), &UavManager::timerMidFlightActivation, this, false, false);
 
   if (_max_height_enabled_) {
     timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
@@ -974,6 +985,29 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
   }
   catch (...) {
     ROS_ERROR("exception caught during publishing topic '%s'", publisher_diagnostics_.getTopic().c_str());
+  }
+}
+
+//}
+
+/* //{ timerMidFlightActivation() */
+
+void UavManager::timerMidFlightActivation([[maybe_unused]] const ros::TimerEvent& event) {
+
+  if (!is_initialized_)
+    return;
+
+  ROS_INFO_THROTTLE(1.0, "[UavManager]: timer midflight activation spinning");
+
+  if (sh_mavros_state_.getMsg()->mode == "OFFBOARD") {
+
+    ROS_INFO("[UavManager]: offboard detected");
+
+    switchTrackerSrv("MpcTracker");
+
+    switchControllerSrv("Se3Controller");
+
+    timer_midflight_activation_.stop();
   }
 }
 
@@ -1573,6 +1607,24 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
 //}
 
+/* //{ callbackMidflightActivation() */
+
+bool UavManager::callbackMidflightActivation(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  switchControllerSrv("BrusController");
+
+  motorsSrv(true);
+
+  timer_midflight_activation_.start();
+
+  return true;
+}
+
+//}
+
 // | ------------------------ routines ------------------------ |
 
 /* landImpl() //{ */
@@ -1796,6 +1848,31 @@ void UavManager::ungripSrv(void) {
 
   } else {
     ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for ungripping payload failed!");
+  }
+}
+
+//}
+
+/* motorsSrv() //{ */
+
+void UavManager::motorsSrv(const bool in) {
+
+  ROS_DEBUG_THROTTLE(1.0, "[UavManager]: ungripping payload");
+
+  std_srvs::SetBool srv;
+
+  srv.request.data = in;
+
+  bool res = service_client_motors_.call(srv);
+
+  if (res) {
+
+    if (!srv.response.success) {
+      ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for motors returned: %s.", srv.response.message.c_str());
+    }
+
+  } else {
+    ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for motors failed!");
   }
 }
 
