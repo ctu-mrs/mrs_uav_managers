@@ -520,7 +520,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
       return;
     }
 
-    if (mrs_lib::geometry::dist(vec3_t(odom_x, odom_y, odom_z), vec3_t(ref_x, ref_y, ref_z)) < 0.5 && fabs(radians::diff(odom_heading, ref_heading)) < 0.5) {
+    if (mrs_lib::geometry::dist(vec3_t(odom_x, odom_y, odom_z), vec3_t(ref_x, ref_y, ref_z)) < 0.05 && fabs(radians::diff(odom_heading, ref_heading)) < 0.05) {
 
       auto [success, message] = landWithDescendImpl();
 
