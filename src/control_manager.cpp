@@ -5643,6 +5643,16 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     return std::tuple(false, ss.str());
   }
 
+  {
+    std::scoped_lock lock(mutex_last_attitude_cmd_);
+
+    if (last_attitude_cmd_ == mrs_msgs::AttitudeCommand::Ptr()) {
+      ss << "could not set velocity command, not flying!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+      return std::tuple(false, ss.str());
+    }
+  }
+
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
