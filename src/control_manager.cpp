@@ -8117,6 +8117,10 @@ void ControlManager::ungripSrv(void) {
 
 void ControlManager::switchMotors(bool input) {
 
+  if (input != motors_) {
+    ROS_INFO_THROTTLE(0.1, "[ControlManager]: motors already set to %s", input ? "ON" : "OFF"); 
+  }
+
   ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
 
   motors_ = input;

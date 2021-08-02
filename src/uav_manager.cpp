@@ -263,7 +263,7 @@ public:
 
   // midflight activation
   void timerMidFlightActivation(const ros::TimerEvent& event);
-  bool callbackMidflightActivation(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  bool callbackMidflightActivation(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 };
 
 //}
@@ -1609,16 +1609,21 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
 /* //{ callbackMidflightActivation() */
 
-bool UavManager::callbackMidflightActivation(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+bool UavManager::callbackMidflightActivation(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_)
     return false;
 
-  switchControllerSrv("BrusController");
-
   motorsSrv(true);
 
+  switchControllerSrv("MidairActivationController");
+
+  switchTrackerSrv("MidairActivationTracker");
+
   timer_midflight_activation_.start();
+
+  res.message = "gogogo";
+  res.success = true;
 
   return true;
 }
