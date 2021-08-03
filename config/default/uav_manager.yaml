@@ -57,6 +57,18 @@ landing:
   # and then land slowly and safely
   descend_height: 2.0 # [m]
 
+midair_activation:
+
+  rate: 100 # [Hz]
+
+  during_activation:
+    controller: "MidairActivationController"
+    tracker: "MidairActivationTracker"
+
+  after_activation:
+    controller: "Se3Controller"
+    tracker: "MpcTracker"
+
 flight_timer:
 
   enabled: false

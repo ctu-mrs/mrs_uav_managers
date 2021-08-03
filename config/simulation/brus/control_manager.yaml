@@ -8,6 +8,7 @@ trackers : [
   "SpeedTracker",
   "FlipTracker",
   "NullTracker",
+  "MidairActivationTracker",
 ]
 
 # - list of names of dynamically loaded controllers
@@ -16,6 +17,7 @@ controllers : [
   "MpcController",
   "FailsafeController",
   "EmergencyController",
+  "MidairActivationController",
 ]
 
 safety:

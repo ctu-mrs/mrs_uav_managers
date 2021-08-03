@@ -86,6 +86,7 @@
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~eland_out" to="control_manager/eland" />
+      <remap from="~ehover_out" to="control_manager/ehover" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
       <remap from="~motors_out" to="control_manager/motors" />
@@ -95,6 +96,8 @@
       <remap from="~pirouette_out" to="control_manager/pirouette" />
       <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
+      <remap from="~offboard_out" to="mavros/set_mode" />
+      <remap from="~midair_activation_in" to="~midair_activation" />
 
     </node>
 

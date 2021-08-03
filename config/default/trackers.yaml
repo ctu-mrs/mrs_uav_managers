@@ -1,5 +1,6 @@
 MpcTracker:
   address: "mrs_uav_trackers/MpcTracker"
+  human_switchable: true
 
 LandoffTracker:
   address: "mrs_uav_trackers/LandoffTracker"
@@ -18,6 +19,9 @@ SpeedTracker:
 
 FlipTracker:
   address: "mrs_uav_trackers/FlipTracker"
+
+MidairActivationTracker:
+  address: "mrs_uav_trackers/MidairActivationTracker"
 
 NullTracker:
   address: "mrs_uav_managers/NullTracker"

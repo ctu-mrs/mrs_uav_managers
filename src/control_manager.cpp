@@ -1,5 +1,3 @@
-#include "mrs_msgs/VelocityReferenceSrvRequest.h"
-#include "mrs_msgs/VelocityReferenceStamped.h"
 #define VERSION "1.0.1.0"
 
 /* includes //{ */
@@ -182,7 +180,8 @@ typedef enum
 class ControllerParams {
 
 public:
-  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold);
+  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold,
+                   bool human_switchable);
 
 public:
   double      failsafe_threshold;
@@ -190,16 +189,18 @@ public:
   double      odometry_innovation_threshold;
   std::string address;
   std::string name_space;
+  bool        human_switchable;
 };
 
 ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold,
-                                   double odometry_innovation_threshold) {
+                                   double odometry_innovation_threshold, bool human_switchable) {
 
   this->eland_threshold               = eland_threshold;
   this->odometry_innovation_threshold = odometry_innovation_threshold;
   this->failsafe_threshold            = failsafe_threshold;
   this->address                       = address;
   this->name_space                    = name_space;
+  this->human_switchable              = human_switchable;
 }
 
 //}
@@ -209,15 +210,17 @@ ControllerParams::ControllerParams(std::string address, std::string name_space, 
 class TrackerParams {
 
 public:
-  TrackerParams(std::string address);
+  TrackerParams(std::string address, bool human_switchable);
 
 public:
   std::string address;
+  bool        human_switchable;
 };
 
-TrackerParams::TrackerParams(std::string address) {
+TrackerParams::TrackerParams(std::string address, bool human_switchable) {
 
-  this->address = address;
+  this->address          = address;
+  this->human_switchable = human_switchable;
 }
 
 //}
@@ -472,8 +475,9 @@ private:
 
   mrs_lib::SubscribeHandler<mavros_msgs::State> sh_mavros_state_;
 
-  bool offboard_mode_ = false;
-  bool armed_         = false;
+  bool offboard_mode_          = false;
+  bool offboard_mode_was_true_ = false;  // if it was even true
+  bool armed_                  = false;
 
   // | --------------------- thrust and mass -------------------- |
 
@@ -1217,9 +1221,11 @@ void ControlManager::onInit() {
 
     // load the controller parameters
     std::string address;
+    bool        human_switchable;
     param_loader.loadParam(tracker_name + "/address", address);
+    param_loader.loadParam(tracker_name + "/human_switchable", human_switchable, false);
 
-    TrackerParams new_tracker(address);
+    TrackerParams new_tracker(address, human_switchable);
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
 
     try {
@@ -1273,11 +1279,13 @@ void ControlManager::onInit() {
     std::string address;
     std::string name_space;
     double      eland_threshold, failsafe_threshold, odometry_innovation_threshold;
+    bool        human_switchable;
     param_loader.loadParam(controller_name + "/address", address);
     param_loader.loadParam(controller_name + "/namespace", name_space);
     param_loader.loadParam(controller_name + "/eland_threshold", eland_threshold);
     param_loader.loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
     param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
+    param_loader.loadParam(controller_name + "/human_switchable", human_switchable, false);
 
     if (eland_threshold == 0) {
       eland_threshold = 1e6;
@@ -1291,7 +1299,7 @@ void ControlManager::onInit() {
       odometry_innovation_threshold = 1e6;
     }
 
-    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold, odometry_innovation_threshold);
+    ControllerParams new_controller(address, name_space, eland_threshold, failsafe_threshold, odometry_innovation_threshold, human_switchable);
     controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
 
     try {
@@ -2778,9 +2786,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // | --------- dropping out of OFFBOARD in mid flight --------- |
 
   // if we are not in offboard and the drone is in mid air (NullTracker is not active)
-  if (!offboard_mode_ && active_tracker_idx != _null_tracker_idx_) {
+  if (offboard_mode_was_true_ && !offboard_mode_ && active_tracker_idx != _null_tracker_idx_) {
 
-    ROS_ERROR("[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
 
     switchMotors(false);
   }
@@ -3791,7 +3799,8 @@ void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::
   if (state->mode == "OFFBOARD") {
 
     if (!offboard_mode_) {
-      offboard_mode_ = true;
+      offboard_mode_          = true;
+      offboard_mode_was_true_ = true;
       ROS_INFO("[ControlManager]: detected: OFFBOARD mode ON");
     }
 
@@ -5402,6 +5411,12 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+    res.message = "not flying";
+    res.success = false;
+    return true;
+  }
+
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
@@ -5433,6 +5448,12 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+    res.message = "not flying";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
@@ -5466,6 +5487,12 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+    res.message = "not flying";
+    res.success = false;
+    return true;
+  }
+
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
@@ -5494,7 +5521,15 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
     return true;
   }
 
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
+
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+
+  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+    res.message = "not flying";
+    res.success = false;
+    return true;
+  }
 
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
@@ -6192,6 +6227,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   /* transform the trajectory to the current control frame //{ */
 
+  // TODO this should be in the time of the processed_trajectory.header.frame_id
   auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
 
   if (!ret) {
@@ -6409,6 +6445,7 @@ void ControlManager::publishDiagnostics(void) {
   for (int i = 0; i < int(_controller_names_.size()); i++) {
     if ((_controller_names_[i] != _failsafe_controller_name_) && (_controller_names_[i] != _eland_controller_name_)) {
       diagnostics_msg.available_controllers.push_back(_controller_names_[i]);
+      diagnostics_msg.human_switchable_controllers.push_back(controllers_.at(_controller_names_[i]).human_switchable);
     }
   }
 
@@ -6417,6 +6454,7 @@ void ControlManager::publishDiagnostics(void) {
   for (int i = 0; i < int(_tracker_names_.size()); i++) {
     if (_tracker_names_[i] != _null_tracker_name_) {
       diagnostics_msg.available_trackers.push_back(_tracker_names_[i]);
+      diagnostics_msg.human_switchable_trackers.push_back(trackers_.at(_tracker_names_[i]).human_switchable);
     }
   }
 
@@ -8118,7 +8156,7 @@ void ControlManager::ungripSrv(void) {
 void ControlManager::switchMotors(bool input) {
 
   if (input == motors_) {
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: motors already set to %s", input ? "ON" : "OFF"); 
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: motors already set to %s", input ? "ON" : "OFF");
     return;
   }
 
@@ -8136,36 +8174,38 @@ void ControlManager::switchMotors(bool input) {
     ROS_INFO_STREAM("[ControlManager]: switching to the controller '" << _eland_controller_name_ << "' after switching motors off");
 
     switchController(_eland_controller_name_);
-  }
 
-  // | --------- deactivate all trackers and controllers -------- |
+    // | --------- deactivate all trackers and controllers -------- |
 
-  for (int i = 0; i < int(tracker_list_.size()); i++) {
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
 
-    std::map<std::string, TrackerParams>::iterator it;
-    it = trackers_.find(_tracker_names_[i]);
+      std::map<std::string, TrackerParams>::iterator it;
+      it = trackers_.find(_tracker_names_[i]);
 
-    try {
-      ROS_INFO("[ControlManager]: deactivating the tracker '%s'", it->second.address.c_str());
-      tracker_list_[i]->deactivate();
+      try {
+        ROS_INFO("[ControlManager]: deactivating the tracker '%s'", it->second.address.c_str());
+        tracker_list_[i]->deactivate();
+      }
+      catch (std::runtime_error& ex) {
+        ROS_ERROR("[ControlManager]: exception caught during tracker deactivation: '%s'", ex.what());
+      }
     }
-    catch (std::runtime_error& ex) {
-      ROS_ERROR("[ControlManager]: exception caught during tracker deactivation: '%s'", ex.what());
-    }
-  }
 
-  for (int i = 0; i < int(controller_list_.size()); i++) {
+    for (int i = 0; i < int(controller_list_.size()); i++) {
 
-    std::map<std::string, ControllerParams>::iterator it;
-    it = controllers_.find(_controller_names_[i]);
+      std::map<std::string, ControllerParams>::iterator it;
+      it = controllers_.find(_controller_names_[i]);
 
-    try {
-      ROS_INFO("[ControlManager]: deactivating the controller '%s'", it->second.address.c_str());
-      controller_list_[i]->deactivate();
+      try {
+        ROS_INFO("[ControlManager]: deactivating the controller '%s'", it->second.address.c_str());
+        controller_list_[i]->deactivate();
+      }
+      catch (std::runtime_error& ex) {
+        ROS_ERROR("[ControlManager]: exception caught during controller deactivation: '%s'", ex.what());
+      }
     }
-    catch (std::runtime_error& ex) {
-      ROS_ERROR("[ControlManager]: exception caught during controller deactivation: '%s'", ex.what());
-    }
+
+    offboard_mode_was_true_ = false;
   }
 }
 
@@ -8570,6 +8610,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
+  // the trackers are not running
   if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
 
     mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
@@ -8592,6 +8633,16 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
       std::scoped_lock lock(mutex_last_attitude_cmd_);
 
       last_attitude_cmd_ = output_command;
+    }
+
+    // give the controllers current uav state
+    {
+      std::scoped_lock lock(mutex_controller_list_);
+
+      // nonactive controller => just update without retrieving the command
+      for (int i = 0; i < int(controller_list_.size()); i++) {
+        controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
+      }
     }
 
   } else {
