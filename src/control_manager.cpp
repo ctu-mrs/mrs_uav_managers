@@ -8762,6 +8762,14 @@ void ControlManager::publish(void) {
 
     cmd_odom.header = last_position_cmd->header;
 
+    if (cmd_odom.header.frame_id == "") {
+      cmd_odom.header.frame_id = uav_state.header.frame_id;
+    }
+
+    if (cmd_odom.header.stamp == ros::Time(0)) {
+      cmd_odom.header.stamp = ros::Time::now();
+    }
+
     if (last_position_cmd->use_position_horizontal) {
       cmd_odom.pose.pose.position.x = last_position_cmd->position.x;
       cmd_odom.pose.pose.position.y = last_position_cmd->position.y;
