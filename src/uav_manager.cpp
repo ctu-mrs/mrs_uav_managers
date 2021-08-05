@@ -208,7 +208,7 @@ public:
   // to which height to takeoff
   double _takeoff_height_;
 
-  std::atomic<bool> takeoff_successful_;
+  std::atomic<bool> takeoff_successful_ = false;
 
   // names of important trackers
   std::string _null_tracker_name_;
@@ -1453,6 +1453,14 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
   {
     std::stringstream ss;
+
+    if (number_of_takeoffs_ == 0) {
+      ss << "can not land home, did not takeoff before!";
+      res.message = ss.str();
+      res.success = false;
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      return true;
+    }
 
     if (!sh_odometry_.hasMsg()) {
       ss << "can not land, missing odometry!";
