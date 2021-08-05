@@ -66,6 +66,7 @@
       <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
+      <remap from="~position_cmd_in" to="control_manager/position_cmd" />
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~mavros_gps_in" to="mavros/global_position/global" />
       <remap from="~max_height_in" to="odometry/max_altitude" />

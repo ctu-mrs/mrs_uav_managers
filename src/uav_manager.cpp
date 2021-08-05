@@ -15,6 +15,7 @@
 #include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/AttitudeCommand.h>
+#include <mrs_msgs/PositionCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/Float64.h>
 #include <mrs_msgs/BoolStamped.h>
@@ -103,6 +104,7 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_mavros_gps_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
+  mrs_lib::SubscribeHandler<mrs_msgs::PositionCommand>              sh_position_cmd_;
 
   void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
@@ -394,6 +396,7 @@ void UavManager::onInit() {
   sh_constraints_diag_     = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_mavros_gps_           = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &UavManager::callbackMavrosGps, this);
   sh_max_height_           = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_position_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::PositionCommand>(shopts, "position_cmd_in");
 
   // | ----------------------- publishers ----------------------- |
 
@@ -510,6 +513,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
   double desired_thrust              = sh_attitude_cmd_.getMsg()->thrust;
   auto   odometry                    = sh_odometry_.getMsg();
+  auto   position_cmd                = sh_position_cmd_.getMsg();
 
   auto res = transformer_->transformSingle(odometry->header.frame_id, land_there_reference);
 
@@ -529,20 +533,21 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == FLY_THERE_STATE) {
 
-    auto [odom_x, odom_y, odom_z] = mrs_lib::getPosition(odometry);
-    auto [ref_x, ref_y, ref_z]    = mrs_lib::getPosition(land_there_current_frame);
+    auto [pos_x, pos_y, pos_z] = mrs_lib::getPosition(*position_cmd);
+    auto [ref_x, ref_y, ref_z] = mrs_lib::getPosition(land_there_current_frame);
 
-    double odom_heading, ref_heading;
+    double pos_heading = position_cmd->heading;
+
+    double ref_heading = 0;
     try {
-      odom_heading = mrs_lib::getHeading(odometry);
-      ref_heading  = mrs_lib::getHeading(land_there_current_frame);
+      ref_heading = mrs_lib::getHeading(land_there_current_frame);
     }
     catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
       ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
       return;
     }
 
-    if (mrs_lib::geometry::dist(vec3_t(odom_x, odom_y, odom_z), vec3_t(ref_x, ref_y, ref_z)) < 0.05 && fabs(radians::diff(odom_heading, ref_heading)) < 0.05) {
+    if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < 0.05 && fabs(radians::diff(pos_heading, ref_heading)) < 0.05) {
 
       auto [success, message] = landWithDescendImpl();
 
@@ -1410,6 +1415,14 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       return true;
     }
+
+    if (!sh_position_cmd_.hasMsg()) {
+      ss << "can not land, missing position cmd!";
+      res.message = ss.str();
+      res.success = false;
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      return true;
+    }
   }
 
   //}
@@ -1464,6 +1477,14 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
     if (!sh_attitude_cmd_.hasMsg()) {
       ss << "can not land, missing attitude command!";
+      res.message = ss.str();
+      res.success = false;
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      return true;
+    }
+
+    if (!sh_position_cmd_.hasMsg()) {
+      ss << "can not land, missing position cmd!";
       res.message = ss.str();
       res.success = false;
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
@@ -1603,6 +1624,14 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
     if (!sh_attitude_cmd_.hasMsg()) {
       ss << "can not land, missing attitude command!";
+      res.message = ss.str();
+      res.success = false;
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      return true;
+    }
+
+    if (!sh_position_cmd_.hasMsg()) {
+      ss << "can not land, missing position cmd!";
       res.message = ss.str();
       res.success = false;
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
@@ -2409,7 +2438,7 @@ bool UavManager::takeoffSrv(void) {
 
 bool UavManager::emergencyReferenceSrv(const mrs_msgs::ReferenceStamped& goal) {
 
-  ROS_INFO("[UavManager]: calling for emergency reference");
+  ROS_INFO_THROTTLE(1.0, "[UavManager]: calling for emergency reference");
 
   mrs_msgs::ReferenceStampedSrv srv;
 
@@ -2421,14 +2450,14 @@ bool UavManager::emergencyReferenceSrv(const mrs_msgs::ReferenceStamped& goal) {
   if (res) {
 
     if (!srv.response.success) {
-      ROS_WARN("[UavManager]: service call for emergency reference returned: '%s'", srv.response.message.c_str());
+      ROS_WARN_THROTTLE(1.0, "[UavManager]: service call for emergency reference returned: '%s'", srv.response.message.c_str());
     }
 
     return srv.response.success;
 
   } else {
 
-    ROS_ERROR("[UavManager]: service call for emergency reference failed!");
+    ROS_ERROR_THROTTLE(1.0, "[UavManager]: service call for emergency reference failed!");
 
     return false;
   }
