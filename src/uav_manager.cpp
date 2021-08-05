@@ -240,6 +240,8 @@ public:
   double      _g_;
   double      landing_uav_mass_;
   bool        _landing_disarm_ = false;
+  double      _landing_tracking_tolerance_translation_;
+  double      _landing_tracking_tolerance_heading_;
 
   // diagnostics timer
   double _diagnostics_timer_rate_;
@@ -325,6 +327,8 @@ void UavManager::onInit() {
   param_loader.loadParam("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
   param_loader.loadParam("landing/disarm", _landing_disarm_);
   param_loader.loadParam("landing/descend_height", _landing_descend_height_);
+  param_loader.loadParam("landing/tracking_tolerance/translation", _landing_tracking_tolerance_translation_);
+  param_loader.loadParam("landing/tracking_tolerance/heading", _landing_tracking_tolerance_heading_);
 
   param_loader.loadParam("midair_activation/rate", _midair_activation_timer_rate_);
   param_loader.loadParam("midair_activation/during_activation/controller", _midair_activation_during_controller_);
@@ -547,7 +551,8 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
       return;
     }
 
-    if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < 0.05 && fabs(radians::diff(pos_heading, ref_heading)) < 0.05) {
+    if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < _landing_tracking_tolerance_translation_ &&
+        fabs(radians::diff(pos_heading, ref_heading)) < _landing_tracking_tolerance_heading_) {
 
       auto [success, message] = landWithDescendImpl();
 

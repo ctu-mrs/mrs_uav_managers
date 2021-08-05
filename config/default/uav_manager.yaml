@@ -57,6 +57,10 @@ landing:
   # and then land slowly and safely
   descend_height: 2.0 # [m]
 
+  tracking_tolerance:
+    translation: 0.1 # [m]
+    heading: 0.1 # [rad]
+
 midair_activation:
 
   rate: 100 # [Hz]
