@@ -29,6 +29,7 @@
   <arg name="custom_config_speed_tracker" default="" />
   <arg name="custom_config_mpc_tracker" default="" />
   <arg name="custom_config_flip_tracker" default="" />
+  <arg name="custom_config_midair_activation_tracker" default="" />
   <arg name="custom_config_uav_names" default="" />
 
     <!-- custom configs for controllers -->
@@ -36,6 +37,7 @@
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
   <arg name="custom_config_se3_controller" default="" />
+  <arg name="custom_config_midair_activation_controller" default="" />
 
   <arg name="custom_config_motor_params" default="" />
 
@@ -123,6 +125,13 @@
       <remap from="~emergency_controller/profiler" to="profiler" />
       <remap from="~emergency_controller/set_integral_terms_in" to="~emergency_controller/set_integral_terms" />
 
+      <!-- MidairActivation controller -->
+      <rosparam ns="midair_activation_controller" file="$(find mrs_uav_controllers)/config/default/midair_activation.yaml" />
+      <rosparam ns="midair_activation_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/midair_activation.yaml" />
+      <rosparam if="$(eval not arg('custom_config_midair_activation_controller') == '')" ns="midair_activation_controller" file="$(arg custom_config_midair_activation_controller)" />
+      <param name="midair_activation_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~midair_activation_controller/profiler" to="profiler" />
+
       <!-- Trackers' configs -->
 
       <!-- LineTracker -->
@@ -194,6 +203,13 @@
       <param name="flip_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~flip_tracker/profiler" to="profiler" />
       <remap from="~flip_tracker/flip_in" to="~flip_tracker/flip" />
+
+      <!-- MidairActivation tracker -->
+      <rosparam ns="midair_activation_tracker" file="$(find mrs_uav_trackers)/config/default/midair_activation_tracker.yaml" />
+      <rosparam ns="midair_activation_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/midair_activation_tracker.yaml" />
+      <rosparam if="$(eval not arg('custom_config_midair_activation_tracker') == '')" ns="midair_activation_tracker" file="$(arg custom_config_midair_activation_tracker)" />
+      <param name="midair_activation_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~midair_activation_tracker/profiler" to="profiler" />
 
       <!-- Subscribers -->
       <remap from="~odometry_in" to="odometry/odom_main" />
