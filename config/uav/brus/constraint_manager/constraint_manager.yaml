@@ -1,0 +1,10 @@
+constraint_management:
+
+  # list of allowed gains per odometry mode
+  allowed_constraints:
+    GPS: ["slow", "medium", "fast"]
+
+  # those gains will be used automatically when a localization mode switches
+  # and the current gains are not in the allowed list (next paragraphs)
+  fallback_constraints:
+    GPS: "medium"

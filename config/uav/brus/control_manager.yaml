@@ -1,3 +1,72 @@
+#- list of names of dynamically loaded trackers
+trackers : [
+  "MpcTracker",
+  "LandoffTracker",
+  "JoyTracker",
+  "NullTracker",
+  "SpeedTracker",
+  "MidairActivationTracker",
+]
+
+#- list of names of dynamically loaded controllers
+controllers : [
+  "Se3Controller",
+  "MpcController",
+  "FailsafeController",
+  "EmergencyController",
+  "MidairActivationController",
+]
+
+safety:
+
+  tilt_limit:
+
+    eland:
+      enabled: true
+      limit: deg(75) # [rad]
+
+    disarm:
+      enabled: true
+      limit: deg(90) # [rad]
+
+  tilt_error_disarm:
+    enabled: true
+    error_threshold: deg(45) # [rad]
+
+  yaw_error_eland:
+    enabled: true
+    limit: deg(90) # [rad]
+
+  # after not receiving odometry for more than this, the failsafe landing will trigger
+  odometry_max_missing_time: 0.2 # [s]
+
+  escalating_failsafe:
+
+    service:
+      enabled: true # can be called by a service
+
+    rc:
+      enabled: false # can be triggered by RC button
+      channel_number: 7 # [-],  activation RC channel
+      threshold: 1500 # [us]
+
+    ehover: true
+    eland: true
+    failsafe: false
+
+  # when the active tracker returns empty command
+  tracker_error_action: "ehover" # {eland, ehover}
+
 rc_joystick:
 
+  enabled: false
+  # activation channel
+  channel_number: 6 # indexed from 0
+
   carrot_distance: 2.00 # [m]
+
+  channels:
+    pitch: 2
+    roll: 0
+    heading: 3
+    thrust: 1
