@@ -1,6 +1,7 @@
 gains: [
   "supersoft",
   "soft",
+  "tight",
 ]
 
 
@@ -10,11 +11,11 @@ gain_management:
   allowed_gains:
     ICP: ["supersoft", "soft"]
     VSLAM: ["supersoft", "soft"]
-    BRICKFLOW: ["supersoft", "soft"]
+    BRICKFLOW: ["supersoft", "soft", "tight"]
     HECTOR: ["supersoft"]
-    ALOAM: ["supersoft"]
-    ALOAMGARM: ["supersoft"]
-    ALOAMREP: ["supersoft"]
+    ALOAM: ["supersoft", "soft"]
+    ALOAMGARM: ["supersoft", "soft", "tight"]
+    ALOAMREP: ["supersoft", "soft", "tight"]
     BRICK: ["supersoft", "soft"]
     T265: ["supersoft", "soft"]
     OBJECT: ["supersoft"]
@@ -35,9 +36,9 @@ gain_management:
     VSLAM: "supersoft"
     BRICKFLOW: "supersoft"
     HECTOR: "supersoft"
-    ALOAM: "supersoft"
-    ALOAMGARM: "supersoft"
-    ALOAMREP: "supersoft"
+    ALOAM: "soft"
+    ALOAMGARM: "soft"
+    ALOAMREP: "soft"
     BRICK: "supersoft"
     T265: "supersoft"
     OBJECT: "supersoft"
