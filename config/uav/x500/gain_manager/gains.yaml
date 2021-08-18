@@ -6,7 +6,7 @@ supersoft:
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 5.0
 
     kib: 0.1
     kib_lim: 10.0
@@ -34,7 +34,7 @@ soft:
     ka: 1.0
 
     attitude:
-      kq: 10.0
+      kq: 6.0
 
     kib: 0.1
     kib_lim: 10.0

@@ -38,7 +38,7 @@ gain_management:
     HECTOR: "supersoft"
     ALOAM: "soft"
     ALOAMGARM: "soft"
-    ALOAMREP: "soft"
+    ALOAMREP: "supersoft"
     BRICK: "supersoft"
     T265: "supersoft"
     OBJECT: "supersoft"
