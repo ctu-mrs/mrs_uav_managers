@@ -2916,7 +2916,7 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
   // condition for automatic motor turn off
   if (thrust_under_threshold_ && ((ros::Time::now() - thrust_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
 
-    ROS_INFO("[ControlManager]: detecting zero thrust, disarming");
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: detecting zero thrust, disarming");
 
     arming(false);
   }
