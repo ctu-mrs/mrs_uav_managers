@@ -2,6 +2,7 @@ gains: [
   "supersoft",
   "soft",
   "tight",
+  "supertight",
 ]
 
 
@@ -14,8 +15,8 @@ gain_management:
     BRICKFLOW: ["supersoft", "soft", "tight"]
     HECTOR: ["supersoft"]
     ALOAM: ["supersoft", "soft"]
-    ALOAMGARM: ["supersoft", "soft", "tight"]
-    ALOAMREP: ["supersoft", "soft", "tight"]
+    ALOAMGARM: ["supersoft", "soft", "tight", "supertight"]
+    ALOAMREP: ["supersoft", "soft", "tight", "supertight"]
     BRICK: ["supersoft", "soft"]
     T265: ["supersoft", "soft"]
     OBJECT: ["supersoft"]
