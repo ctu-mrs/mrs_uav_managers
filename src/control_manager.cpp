@@ -798,12 +798,15 @@ private:
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
-  bool   _rc_goto_enabled_               = false;
-  bool   rc_goto_active_                 = false;
-  int    rc_joystick_channel_last_value_ = PWM_MIDDLE;
-  bool   rc_joystick_channel_was_low_    = false;
-  int    _rc_joystick_channel_;
-  double _rc_joystick_carrot_distance_ = 0;
+  bool _rc_goto_enabled_               = false;
+  bool rc_goto_active_                 = false;
+  int  rc_joystick_channel_last_value_ = PWM_MIDDLE;
+  bool rc_joystick_channel_was_low_    = false;
+  int  _rc_joystick_channel_           = 0;
+
+  double _rc_horizontal_speed_ = 0;
+  double _rc_vertical_speed_   = 0;
+  double _rc_heading_rate_     = 0;
 
   // | ------------------- trajectory loading ------------------- |
 
@@ -1070,7 +1073,9 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
   param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.loadParam("rc_joystick/carrot_distance", _rc_joystick_carrot_distance_);
+  param_loader.loadParam("rc_joystick/horizontal_speed", _rc_horizontal_speed_);
+  param_loader.loadParam("rc_joystick/vertical_speed", _rc_vertical_speed_);
+  param_loader.loadParam("rc_joystick/heading_rate", _rc_heading_rate_);
 
   param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
   param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
@@ -3065,10 +3070,10 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     } else {
 
-      double tmp_x       = RCChannelToRange(rc_channels->channels[_rc_channel_pitch_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_y       = -RCChannelToRange(rc_channels->channels[_rc_channel_roll_], _rc_joystick_carrot_distance_, 0.1);
-      double tmp_z       = RCChannelToRange(rc_channels->channels[_rc_channel_thrust_], _rc_joystick_carrot_distance_, 0.3);
-      double tmp_heading = -RCChannelToRange(rc_channels->channels[_rc_channel_heading_], 1.0, 0.1);
+      double tmp_x       = RCChannelToRange(rc_channels->channels[_rc_channel_pitch_], _rc_horizontal_speed_, 0.1);
+      double tmp_y       = -RCChannelToRange(rc_channels->channels[_rc_channel_roll_], _rc_horizontal_speed_, 0.1);
+      double tmp_z       = RCChannelToRange(rc_channels->channels[_rc_channel_thrust_], _rc_vertical_speed_, 0.3);
+      double tmp_heading = -RCChannelToRange(rc_channels->channels[_rc_channel_heading_], _rc_heading_rate_, 0.1);
 
       if (abs(tmp_x) > 1e-3) {
         des_x         = tmp_x;

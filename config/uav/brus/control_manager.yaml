@@ -63,7 +63,9 @@ rc_joystick:
   # activation channel
   channel_number: 6 # indexed from 0
 
-  carrot_distance: 2.00 # [m]
+  horizontal_speed: 2.00 # [m/s]
+  vertical_speed: 1.00 # [m/s]
+  heading_rate: 0.20 # [rad/s]
 
   channels:
     pitch: 2
