@@ -7696,9 +7696,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
       ss << "escalating failsafe escalates to ehover";
       ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
-      state_escalating_failsafe_ = ESC_EHOVER_STATE;
+      auto [success, message] = ehover();
 
-      return ehover();
+      if (success) {
+        state_escalating_failsafe_ = ESC_EHOVER_STATE;
+      }
+
+      return {success, message};
 
       break;
     }
@@ -7708,9 +7712,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
       ss << "escalating failsafe escalates to eland";
       ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
-      state_escalating_failsafe_ = ESC_ELAND_STATE;
+      auto [success, message] = eland();
 
-      return eland();
+      if (success) {
+        state_escalating_failsafe_ = ESC_ELAND_STATE;
+      }
+
+      return {success, message};
 
       break;
     }
@@ -7722,9 +7730,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
       ss << "escalating failsafe escalates to failsafe";
       ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
-      state_escalating_failsafe_ = ESC_FINISHED_STATE;
+      auto [success, message] = failsafe();
 
-      return failsafe();
+      if (success) {
+        state_escalating_failsafe_ = ESC_FINISHED_STATE;
+      }
+
+      return {success, message};
 
       break;
     }
