@@ -798,11 +798,11 @@ private:
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
-  bool _rc_goto_enabled_               = false;
-  bool rc_goto_active_                 = false;
-  int  rc_joystick_channel_last_value_ = PWM_MIDDLE;
-  bool rc_joystick_channel_was_low_    = false;
-  int  _rc_joystick_channel_           = 0;
+  bool              _rc_goto_enabled_               = false;
+  std::atomic<bool> rc_goto_active_                 = false;
+  int               rc_joystick_channel_last_value_ = PWM_MIDDLE;
+  bool              rc_joystick_channel_was_low_    = false;
+  int               _rc_joystick_channel_           = 0;
 
   double _rc_horizontal_speed_ = 0;
   double _rc_vertical_speed_   = 0;
@@ -6417,6 +6417,8 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.motors = motors_;
 
+  diagnostics_msg.rc_mode = rc_goto_active_;
+
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
 
@@ -7512,7 +7514,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
   bool              success;
 
   if (elandSrv()) {
-
 
     changeLandingState(LANDING_STATE);
 
