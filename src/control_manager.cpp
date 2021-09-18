@@ -1111,6 +1111,8 @@ void ControlManager::onInit() {
 
   output_command->controller = "none";
 
+  output_command->attitude = mrs_lib::AttitudeConverter(0, 0, 0);
+
   // --------------------------------------------------------------
   // |         common handler for trackers and controllers        |
   // --------------------------------------------------------------
@@ -8339,6 +8341,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
               output_command->disturbance_by_w = 0.0;
               output_command->thrust           = _min_thrust_null_tracker_;
               output_command->controller       = "none";
+              output_command->attitude         = mrs_lib::AttitudeConverter(0, 0, 0);
 
               {
                 std::scoped_lock lock(mutex_last_attitude_cmd_);
@@ -8831,8 +8834,9 @@ void ControlManager::publish(void) {
       }
     }
 
-    // | -------------- prepared desired orientation -------------- |
+    // | --------------- prepare desired orientation -------------- |
 
+    // have the attitude_cmd results already
     if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
       cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
