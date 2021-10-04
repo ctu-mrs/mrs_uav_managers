@@ -2,6 +2,51 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* fixed cmd odom attitude initialization bug
+* added rc mode to control manager diag
+* parametrized rc joystick speed
+* fixed escalating failsafe sub-state success check
+* softened gains for x500
+* throttled failsafe disarming print
+* updated brus configs
+* added land_home check for previous takeoff
+* parametrized landing tracking reference thr
+* added position cmd check for landing
+* added missing checks on position cmd header
+* added brus configs
+* added midair activation
+* fixed motors on when already on
+* added brus simulation configs
+* added missing callbacks_enabled\_ and fixed velCmd
+* fix control manager crash while velocity reference on the ground
+* decreased the land home detection radius
+* added virtual destructor implementation to null tracker
+* fixed destructors in tracker and controller
+* updated rc mode carrot distance
+* fixed min/max height check in uav manager
+* fixed escalating failsafe initialization
+* added dofec uav config
+* enabled min height check with 0.5 height
+* updated max height check to atually use the height
+* fixed controller returning null action
+* separated escalating failsafe state machine
+* added tight gains for f450
+* updated naki gains
+* updated default constraints
+* updated mass loading for simulation
+* added speed publisher
+* updated naki gains
+* ControlManager: updated trajectory snapping
+* ControlManager: updated default constraints
+* ControlManager: updated odom timeout
+* added t18 configs
+* disabled trajectory snapping to safety area (by default)
+* added controll/tracker deactivation when motors off
+* fixed the odom timeout failsafe bug
+* Contributors: Matej Petrlik, Pavel Petracek, Tomas Baca
+
 1.0.1 (2021-05-16)
 ------------------
 * version -> 1.0.1
