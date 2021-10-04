@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.2 (2021-10-04)
+------------------
 * fixed cmd odom attitude initialization bug
 * added rc mode to control manager diag
 * parametrized rc joystick speed
