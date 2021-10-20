@@ -26,11 +26,11 @@ safety:
       limit: deg(75) # [rad]
 
     disarm:
-      enabled: true
+      enabled: false
       limit: deg(90) # [rad]
 
   tilt_error_disarm:
-    enabled: true
+    enabled: false
     error_threshold: deg(45) # [rad]
 
   yaw_error_eland:
