@@ -26,6 +26,7 @@
   <arg name="custom_config_landoff_tracker" default="" />
   <arg name="custom_config_line_tracker" default="" />
   <arg name="custom_config_matlab_tracker" default="" />
+  <arg name="custom_config_lite_tracker" default="" />
   <arg name="custom_config_speed_tracker" default="" />
   <arg name="custom_config_mpc_tracker" default="" />
   <arg name="custom_config_flip_tracker" default="" />
@@ -156,6 +157,14 @@
       <param name="matlab_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~matlab_tracker/profiler" to="profiler" />
       <remap from="~matlab_tracker/goal_in" to="~matlab_tracker/goal" />
+
+      <!-- LiteTracker -->
+      <rosparam ns="lite_tracker" file="$(find mrs_uav_trackers)/config/default/lite_tracker.yaml" />
+      <rosparam ns="lite_tracker" file="$(find mrs_uav_trackers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/lite_tracker.yaml" />
+      <rosparam if="$(eval not arg('custom_config_lite_tracker') == '')" ns="lite_tracker" file="$(arg custom_config_lite_tracker)" />
+      <param name="lite_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~lite_tracker/profiler" to="profiler" />
+      <remap from="~lite_tracker/goal_in" to="~lite_tracker/goal" />
 
       <!-- SpeedTracker -->
       <rosparam ns="speed_tracker" file="$(find mrs_uav_trackers)/config/default/speed_tracker.yaml" />
