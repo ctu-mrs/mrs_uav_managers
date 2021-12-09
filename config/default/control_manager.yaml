@@ -267,5 +267,11 @@ rc_joystick:
     thrust: 1
 
 pirouette:
+
   speed: 0.25 # [rad/s]
   timer_rate: 10 # [Hz]
+
+scope_timer:
+
+  enabled: false
+  log_filename: "" # if empty, scope timers output to terminal; otherwise log to file

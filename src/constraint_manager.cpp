@@ -15,6 +15,7 @@
 #include <mrs_msgs/String.h>
 
 #include <mrs_lib/profiler.h>
+#include <mrs_lib/scope_timer.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 
@@ -93,6 +94,11 @@ private:
 
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
+
+  // | ------------------- scope timer logger ------------------- |
+
+  bool                                       scope_timer_enabled_ = false;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
 
   // | ------------------------- helpers ------------------------ |
 
@@ -229,6 +235,12 @@ void ConstraintManager::onInit() {
 
   profiler_ = mrs_lib::Profiler(nh_, "ConstraintManager", _profiler_enabled_);
 
+  // | ------------------- scope timer logger ------------------- |
+
+  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
@@ -302,7 +314,8 @@ void ConstraintManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiag
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometryDiagnostics");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometryDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::callbackOdometryDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   {
     std::scoped_lock lock(mutex_odometry_diagnostics_);
@@ -386,7 +399,8 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerConstraintManagement", _constraint_management_rate_, 0.01, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerConstraintManagement", _constraint_management_rate_, 0.01, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerConstraintManagement", scope_timer_logger_, scope_timer_enabled_);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
@@ -453,7 +467,8 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
   auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);

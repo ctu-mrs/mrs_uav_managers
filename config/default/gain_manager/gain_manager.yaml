@@ -3,6 +3,11 @@ version: "1.0.2.0"
 rate: 25
 diagnostics_rate: 1
 
+scope_timer:
+
+  enabled: false
+  log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+
 estimator_types: [
   "ICP",
   "VSLAM",

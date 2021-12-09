@@ -266,6 +266,11 @@ private:
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
 
+  // | ------------------- scope timer logger ------------------- |
+
+  bool                                       scope_timer_enabled_ = false;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
+
   // | --------------------- general params --------------------- |
 
   // defines the type of state input: odometry or uav_state mesasge types
@@ -343,7 +348,7 @@ private:
   // | --------------------- common handlers -------------------- |
 
   // contains handlers that are shared with trackers and controllers
-  // safety area, tf transformer and bumper
+  // safety area, tf transformer, scope timer logger, and bumper
   std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers_;
 
   // | --------------- tracker and controller IDs --------------- |
@@ -1123,8 +1128,18 @@ void ControlManager::onInit() {
 
   transformer_ = std::make_shared<mrs_lib::Transformer>("ControlManager", _uav_name_);
 
-  // bind transformer so trackers and controllers can use
+  // | ------------------- scope timer logger ------------------- |
+
+  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+
+  // bind transformer to trackers and controllers for use
   common_handlers_->transformer = transformer_;
+
+  // bind scope timer to trackers and controllers for use
+  common_handlers_->scope_timer.enabled = scope_timer_enabled_;
+  common_handlers_->scope_timer.logger  = scope_timer_logger_;
 
   // | ----------------------- safety area ---------------------- |
 
@@ -1760,7 +1775,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -2468,7 +2484,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerSafety", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2810,7 +2827,8 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerEland", _elanding_timer_rate_, 0.01, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerEland", _elanding_timer_rate_, 0.01, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerEland", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2883,7 +2901,8 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerFailsafe", _failsafe_timer_rate_, 0.01, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerFailsafe", _failsafe_timer_rate_, 0.01, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerFailsafe", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -2939,7 +2958,8 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerJoystick", scope_timer_logger_, scope_timer_enabled_);
 
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
@@ -3152,7 +3172,8 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -3190,7 +3211,8 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerPirouette", _pirouette_timer_rate_, 0.01, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPirouette", _pirouette_timer_rate_, 0.01, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerPirouette", scope_timer_logger_, scope_timer_enabled_);
 
   pirouette_iterator_++;
 
@@ -3262,7 +3284,8 @@ void ControlManager::asyncControl(void) {
 
   mrs_lib::AtomicScopeFlag unset_running(running_async_control_);
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("asyncControl");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("asyncControl");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::asyncControl", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -3340,7 +3363,8 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
 
   nav_msgs::OdometryConstPtr odom = wrp.getMsg();
 
@@ -3493,7 +3517,8 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackUavState");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::UavStateConstPtr uav_state = wrp.getMsg();
 
@@ -3662,7 +3687,8 @@ void ControlManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::Na
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosGps", scope_timer_logger_, scope_timer_enabled_);
 
   sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
@@ -3678,7 +3704,8 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackJoystick");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackJoystick");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -3798,7 +3825,8 @@ void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosState");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosState");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosState", scope_timer_logger_, scope_timer_enabled_);
 
   mavros_msgs::StateConstPtr state = wrp.getMsg();
 
@@ -3845,7 +3873,8 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackRC");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
 
   mavros_msgs::RCInConstPtr rc = wrp.getMsg();
 
@@ -5229,7 +5258,8 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceService");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceService");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header    = req.header;
@@ -5252,7 +5282,8 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedCons
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setReference(*msg);
 }
@@ -5270,7 +5301,8 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenc
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::VelocityReferenceStamped des_reference;
   des_reference = req.reference;
@@ -5292,7 +5324,8 @@ void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityRefe
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setVelocityReference(*msg);
 }
@@ -5309,7 +5342,8 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackTrajectoryReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = setTrajectoryReference(req.trajectory);
 
@@ -5335,7 +5369,8 @@ void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::Trajectory
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackTrajectoryReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setTrajectoryReference(*msg);
 }
@@ -5354,7 +5389,8 @@ bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGoto");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGoto");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGoto", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
@@ -5384,7 +5420,8 @@ bool ControlManager::callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGotoFcu");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoFcu");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoFcu", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "fcu_untilted";
@@ -5414,7 +5451,8 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGotoRelative");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoRelative");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoRelative", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
@@ -5452,7 +5490,8 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoAltitude", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
@@ -5490,7 +5529,8 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetHeading");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeading");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeading", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
@@ -5528,7 +5568,8 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
     return true;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeadingRelative", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
@@ -6408,7 +6449,8 @@ void ControlManager::publishDiagnostics(void) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   std::scoped_lock lock(mutex_diagnostics_);
 
@@ -6483,7 +6525,8 @@ void ControlManager::publishDiagnostics(void) {
 
 void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest constraints) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("setConstraints");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
 
@@ -8235,7 +8278,8 @@ void ControlManager::switchMotors(bool input) {
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchTracker");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -8393,7 +8437,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string controller_name) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("switchController");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
@@ -8520,7 +8565,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
 void ControlManager::updateTrackers(void) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateTrackers");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -8617,7 +8663,8 @@ void ControlManager::updateTrackers(void) {
 
 void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("updateControllers");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
@@ -8763,7 +8810,8 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
 void ControlManager::publish(void) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publish");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publish");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);

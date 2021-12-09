@@ -13,7 +13,7 @@
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
-    <!-- other args -->
+  <!-- other args -->
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
   <arg name="body_frame" default="fcu" />
@@ -21,7 +21,7 @@
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
-    <!-- custom configs for trackers -->
+  <!-- custom configs for trackers -->
   <arg name="custom_config_joy_tracker" default="" />
   <arg name="custom_config_landoff_tracker" default="" />
   <arg name="custom_config_line_tracker" default="" />
@@ -32,7 +32,7 @@
   <arg name="custom_config_midair_activation_tracker" default="" />
   <arg name="custom_config_uav_names" default="" />
 
-    <!-- custom configs for controllers -->
+  <!-- custom configs for controllers -->
   <arg name="custom_config_failsafe_controller" default="" />
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
@@ -68,7 +68,7 @@
       <rosparam file="$(find mrs_uav_managers)/config/default/trackers.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/default/controllers.yaml" />
 
-        <!-- Load the particular param files -->
+      <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/control_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />

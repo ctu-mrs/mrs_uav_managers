@@ -32,6 +32,7 @@
 #include <sensor_msgs/NavSatFix.h>
 
 #include <mrs_lib/profiler.h>
+#include <mrs_lib/scope_timer.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transformer.h>
@@ -86,6 +87,10 @@ private:
 
 public:
   std::shared_ptr<mrs_lib::Transformer> transformer_;
+
+public:
+  bool                                       scope_timer_enabled_ = false;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
 
 public:
   virtual void onInit();
@@ -168,8 +173,8 @@ public:
   void timerTakeoff(const ros::TimerEvent& event);
   void timerMaxHeight(const ros::TimerEvent& event);
   void timerMinHeight(const ros::TimerEvent& event);
-  void timerFlighttime(const ros::TimerEvent& event);
-  void timerMaxthrust(const ros::TimerEvent& event);
+  void timerFlightTime(const ros::TimerEvent& event);
+  void timerMaxThrust(const ros::TimerEvent& event);
   void timerDiagnostics(const ros::TimerEvent& event);
 
   // publishers
@@ -369,6 +374,12 @@ void UavManager::onInit() {
 
   param_loader.loadParam("diagnostics/rate", _diagnostics_timer_rate_);
 
+  // | ------------------- scope timer logger ------------------- |
+
+  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
     ros::shutdown();
@@ -443,8 +454,8 @@ void UavManager::onInit() {
 
   timer_landing_           = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
   timer_takeoff_           = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
-  timer_flighttime_        = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlighttime, this, false, false);
-  timer_maxthrust_         = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxthrust, this, false, false);
+  timer_flighttime_        = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlightTime, this, false, false);
+  timer_maxthrust_         = nh_.createTimer(ros::Rate(_maxthrust_timer_rate_), &UavManager::timerMaxThrust, this, false, false);
   timer_diagnostics_       = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
   timer_midair_activation_ = nh_.createTimer(ros::Rate(_midair_activation_timer_rate_), &UavManager::timerMidairActivation, this, false, false);
 
@@ -509,7 +520,8 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerLanding", _landing_timer_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerLanding", _landing_timer_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerLanding", scope_timer_logger_, scope_timer_enabled_);
 
   auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
 
@@ -662,7 +674,8 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerTakeoff", _takeoff_timer_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerTakeoff", _takeoff_timer_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerTakeoff", scope_timer_logger_, scope_timer_enabled_);
 
   auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
 
@@ -714,7 +727,8 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxHeight", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
     return;
@@ -788,7 +802,8 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
   ROS_INFO_ONCE("[UavManager]: min height timer spinning");
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMinHeight", _min_height_checking_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMinHeight", _min_height_checking_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMinHeight", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_height_.hasMsg() || !sh_odometry_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
     return;
@@ -858,14 +873,15 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ timerFlighttime() */
+/* //{ timerFlightTime() */
 
-void UavManager::timerFlighttime(const ros::TimerEvent& event) {
+void UavManager::timerFlightTime(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerFlighttime", _flighttime_timer_rate_, 0.1, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerFlightTime", _flighttime_timer_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerFlightTime", scope_timer_logger_, scope_timer_enabled_);
 
   auto flighttime = mrs_lib::get_mutexed(mutex_flighttime_, flighttime_);
 
@@ -893,9 +909,9 @@ void UavManager::timerFlighttime(const ros::TimerEvent& event) {
 
 //}
 
-/* //{ timerMaxthrust() */
+/* //{ timerMaxThrust() */
 
-void UavManager::timerMaxthrust(const ros::TimerEvent& event) {
+void UavManager::timerMaxThrust(const ros::TimerEvent& event) {
 
   if (!is_initialized_)
     return;
@@ -904,7 +920,8 @@ void UavManager::timerMaxthrust(const ros::TimerEvent& event) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerMaxthrust", _maxthrust_timer_rate_, 0.03, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxThrust", _maxthrust_timer_rate_, 0.03, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxThrust", scope_timer_logger_, scope_timer_enabled_);
 
   auto desired_thrust = sh_attitude_cmd_.getMsg()->thrust;
 
@@ -955,7 +972,8 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerDiagnostics", _maxthrust_timer_rate_, 0.03, event);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _maxthrust_timer_rate_, 0.03, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_gps_est = false;
   bool got_rtk_est = false;
@@ -1099,7 +1117,8 @@ void UavManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSat
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosGps");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::callbackMavrosGps", scope_timer_logger_, scope_timer_enabled_);
 
   sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 

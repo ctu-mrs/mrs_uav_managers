@@ -2,6 +2,7 @@
 #define COMMON_HANDLERS_H
 
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/scope_timer.h>
 #include <mrs_lib/quadratic_thrust_model.h>
 
 namespace mrs_uav_managers
@@ -38,12 +39,23 @@ struct Bumper_t
 
 //}
 
+/* scope timer handler //{ */
+
+struct ScopeTimer_t
+{
+  bool                                       enabled;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> logger;
+};
+
+//}
+
 typedef boost::function<double(void)> getMass_t;
 
 struct CommonHandlers_t
 {
   SafetyArea_t                                   safety_area;
   std::shared_ptr<mrs_lib::Transformer>          transformer;
+  ScopeTimer_t                                   scope_timer;
   Bumper_t                                       bumper;
   getMass_t                                      getMass;
   mrs_lib::quadratic_thrust_model::MotorParams_t motor_params;

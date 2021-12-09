@@ -5,7 +5,7 @@
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
-    <!-- other args -->
+  <!-- other args -->
   <arg name="debug" default="false" />
   <arg name="standalone" default="true" />
 
@@ -14,6 +14,9 @@
   <arg name="fcu_frame_id" default="$(arg UAV_NAME)/fcu" />
   <arg name="fcu_untilted_frame_id" default="$(arg UAV_NAME)/fcu_untilted" />
   <arg name="imu_mode" default="false" />
+
+  <arg name="scope_timer_enabled" default="false" />
+  <arg name="scope_timer_log_filename" default="" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
@@ -28,22 +31,24 @@
     <node pkg="nodelet" type="nodelet" name="tf_manager" args="$(arg nodelet) mrs_uav_managers/TfManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <param name="scope_timer/enabled" type="bool" value="$(arg scope_timer_enabled)" />
+      <param name="scope_timer/log_filename" type="string" value="$(arg scope_timer_log_filename)" />
 
-        <!-- Parameters -->
+      <!-- Parameters -->
       <param name="frames/fcu_frame_id" type="string" value="$(arg fcu_frame_id)" />
       <param name="frames/fcu_untilted_frame_id" type="string" value="$(arg fcu_untilted_frame_id)" />
       <param name="imu_mode" type="bool" value="$(arg imu_mode)" />
 
-        <!-- Subscribers -->
+      <!-- Subscribers -->
       <remap from="~odom_mavros_in" to="mavros/local_position/odom" />
       <remap from="~imu_in" to="imu/data" />
 
-        <!-- Publishers -->
+      <!-- Publishers -->
 
-        <!-- Debug publishers -->
+      <!-- Debug publishers -->
       <remap from="~profiler" to="profiler" />
 
-        <!-- Services -->
+      <!-- Services -->
 
     </node>
 

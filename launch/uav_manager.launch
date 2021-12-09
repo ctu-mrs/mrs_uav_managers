@@ -11,7 +11,7 @@
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
-    <!-- other args -->
+  <!-- other args -->
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
@@ -44,7 +44,7 @@
       <!-- Load the default param files -->
       <rosparam file="$(find mrs_uav_managers)/config/default/uav_manager.yaml" />
 
-        <!-- Load the particular param files -->
+      <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/uav_manager.yaml" />
 
       <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mass.yaml" />
@@ -53,7 +53,7 @@
       <rosparam file="$(arg motor_params_file)" />
       <rosparam if="$(eval not arg('custom_config_motor_params') == '')" file="$(arg custom_config_motor_params)" />
 
-        <!-- Load a user param file -->
+      <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param if="$(eval arg('RUN_TYPE') == 'uav')" name="uav_mass" value="$(arg UAV_MASS)" />

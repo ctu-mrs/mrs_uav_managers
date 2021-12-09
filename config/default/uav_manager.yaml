@@ -91,3 +91,8 @@ max_thrust:
 diagnostics:
 
   rate: 1.0 # [Hz]
+
+scope_timer:
+
+  enabled: false
+  log_filename: "" # if empty, scope timers output to terminal; otherwise log to file

@@ -13,6 +13,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <mrs_lib/param_loader.h>
+#include <mrs_lib/scope_timer.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/mutex.h>
@@ -50,6 +51,10 @@ public:
   // profiler
   mrs_lib::Profiler profiler_;
 
+  // scope timer logger
+  bool                                       scope_timer_enabled_ = false;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
+
   // support functions
   void publishTf(const geometry_msgs::Quaternion& q_in);
 
@@ -83,6 +88,12 @@ void TfManager::onInit() {
 
   bool imu_mode = false;
   param_loader.loadParam("imu_mode", imu_mode);
+
+  // | ------------------- scope timer logger ------------------- |
+
+  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[TfManager]: Could not load all non-optional parameters. Shutting down.");
@@ -137,7 +148,8 @@ void TfManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosOdometry");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosOdometry");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("TfManager::callbackMavrosOdometry", scope_timer_logger_, scope_timer_enabled_);
 
   publishTf(msg->pose.pose.orientation);
 }
@@ -150,7 +162,8 @@ void TfManager::callbackImu(const sensor_msgs::ImuConstPtr& msg) {
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackMavrosOdometry");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackImu");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("TfManager::callbackImu", scope_timer_logger_, scope_timer_enabled_);
 
   publishTf(msg->orientation);
 }
@@ -163,7 +176,8 @@ void TfManager::callbackImu(const sensor_msgs::ImuConstPtr& msg) {
 
 void TfManager::publishTf(const geometry_msgs::Quaternion& q_in) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishTf");
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishTf");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("TfManager::publishTf", scope_timer_logger_, scope_timer_enabled_);
 
   // Obtain heading from UAV orientation
   double heading;
