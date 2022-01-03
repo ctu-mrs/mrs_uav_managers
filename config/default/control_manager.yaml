@@ -77,7 +77,7 @@ safety:
     # landing detection, especially in the case of wild eland with weird initial conditions.
     # It might be safe with just the normal landing though.
     cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
-    cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
+    cutoff_timeout:  2.0 # [s] how long does the thrust has to be below the mass factor
 
     disarm: true
     timer_rate: 10 # [Hz]

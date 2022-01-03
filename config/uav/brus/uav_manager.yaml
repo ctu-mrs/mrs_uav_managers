@@ -5,7 +5,7 @@ max_height_checking:
   enabled: false
 
 # periodically checks if min height was exceeded
-# if so, retakes control and descends below it
+# if so, retakes control and ascends above it
 min_height_checking:
 
   enabled: false

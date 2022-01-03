@@ -12,10 +12,10 @@ max_height_checking:
 
   enabled: true
   rate: 10.0 # [Hz]
-  safety_height_offset: 0.25 # how much lower to descend bellow the max height
+  safety_height_offset: 0.25 # how much lower to descend below the max height
 
 # periodically checks if min height was exceeded
-# if so, retakes control and descends below it
+# if so, retakes control and ascends above it
 min_height_checking:
 
   enabled: true
@@ -47,7 +47,7 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
-  landing_cutoff_timeout:  2.0 # [s] how long does the thrust has to be bellow the mass factor
+  landing_cutoff_timeout:  2.0 # [s] how long does the thrust has to be below the mass factor
 
   disarm: true
 
