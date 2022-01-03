@@ -1,0 +1,26 @@
+# periodically checks if max height was exceeded
+# if so, retakes control and descends below it
+max_height_checking:
+
+  enabled: false
+  safety_height_offset: 0.25 # how much lower to descend below the max height
+
+# periodically checks if min height was exceeded
+# if so, retakes control and ascends above it
+min_height_checking:
+
+  enabled: false
+  min_height: 1.5 # [m]
+  safety_height_offset: 0.25 # how much higher to ascend above the min height
+
+takeoff:
+
+  during_takeoff:
+    controller: "MpcController"
+    tracker: "LandoffTracker"
+
+  after_takeoff:
+    controller: "Se3Controller"
+    tracker: "MpcTracker"
+
+  takeoff_height: 1.5
