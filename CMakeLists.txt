@@ -24,9 +24,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
+set(LIBRARIES
+  GainManager ConstraintManager ControlManager UavManager TfManager
+  )
+
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES GainManager ConstraintManager ControlManager UavManager TfManager
+  LIBRARIES ${LIBRARIES}
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
   DEPENDS mavros_msgs
   )
@@ -39,7 +43,9 @@ include_directories(
 
 # ControlManager
 
-add_library(ControlManager src/control_manager.cpp)
+add_library(ControlManager
+  src/control_manager.cpp
+  )
 
 add_dependencies(ControlManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -53,7 +59,9 @@ target_link_libraries(ControlManager
 
 # NullTracker
 
-add_library(NullTracker src/null_tracker.cpp)
+add_library(NullTracker
+  src/null_tracker.cpp
+  )
 
 add_dependencies(NullTracker
   ${catkin_EXPORTED_TARGETS}
@@ -67,7 +75,9 @@ target_link_libraries(NullTracker
 
 # UavManager
 
-add_library(UavManager src/uav_manager.cpp)
+add_library(UavManager
+  src/uav_manager.cpp
+  )
 
 add_dependencies(UavManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -81,7 +91,9 @@ target_link_libraries(UavManager
 
 # GainManager
 
-add_library(GainManager src/gain_manager.cpp)
+add_library(GainManager
+  src/gain_manager.cpp
+  )
 
 add_dependencies(GainManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -95,7 +107,9 @@ target_link_libraries(GainManager
 
 # ConstraintManager
 
-add_library(ConstraintManager src/constraint_manager.cpp)
+add_library(ConstraintManager
+  src/constraint_manager.cpp
+  )
 
 add_dependencies(ConstraintManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -108,7 +122,9 @@ target_link_libraries(ConstraintManager
   )
 
 # TfManager
-add_library(TfManager src/tf_manager.cpp)
+add_library(TfManager
+  src/tf_manager.cpp
+  )
 
 add_dependencies(TfManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -118,4 +134,27 @@ add_dependencies(TfManager
 target_link_libraries(TfManager
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
+  )
+
+## --------------------------------------------------------------
+## |                           Install                          |
+## --------------------------------------------------------------
+
+install(TARGETS ${LIBRARIES}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+  )
+
+install(DIRECTORY launch config
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
+
+install(DIRECTORY include/
+  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
+  )
+
+install(DIRECTORY ./
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  FILES_MATCHING PATTERN "*.xml"
   )
