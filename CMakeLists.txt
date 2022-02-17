@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 set(LIBRARIES
-  GainManager ConstraintManager ControlManager UavManager TfManager
+  GainManager ConstraintManager ControlManager UavManager TfManager NullTracker
   )
 
 catkin_package(
