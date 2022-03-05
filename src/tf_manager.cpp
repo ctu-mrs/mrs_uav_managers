@@ -17,7 +17,6 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/mutex.h>
-#include <mrs_lib/transformer.h>
 
 #include <string>
 
@@ -43,7 +42,6 @@ public:
   ros::Subscriber sub_imu_;
 
   std::unique_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
-  mrs_lib::Transformer                           transformer_;
 
   // frame names
   std::string fcu_frame_id_, fcu_untilted_frame_id_;

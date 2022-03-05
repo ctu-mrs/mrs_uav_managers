@@ -1126,7 +1126,9 @@ void ControlManager::onInit() {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>("ControlManager", _uav_name_);
+  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "ControlManager");
+  transformer_->setDefaultPrefix(_uav_name_);
+  transformer_->retryLookupNewest(true);
 
   // | ------------------- scope timer logger ------------------- |
 
@@ -1970,7 +1972,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     mrs_msgs::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_frame_;
 
-    mrs_lib::TransformStamped tf;
+    geometry_msgs::TransformStamped tf;
 
     auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0));
 
@@ -1993,7 +1995,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       // do not publish it at all
       bool tf_success = true;
 
-      mrs_lib::TransformStamped tf = ret.value();
+      geometry_msgs::TransformStamped tf = ret.value();
 
       /* transform area points to local origin //{ */
 
@@ -2006,7 +2008,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
         temp_ref.reference.position.y = border_points_bot_original[i].y;
         temp_ref.reference.position.z = border_points_bot_original[i].z;
 
-        if (auto ret = transformer_->transform(tf, temp_ref)) {
+        if (auto ret = transformer_->transform(temp_ref, tf)) {
 
           temp_ref = ret.value();
 
@@ -2028,7 +2030,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
         temp_ref.reference.position.y = border_points_top_original[i].y;
         temp_ref.reference.position.z = border_points_top_original[i].z;
 
-        if (auto ret = transformer_->transform(tf, temp_ref)) {
+        if (auto ret = transformer_->transform(temp_ref, tf)) {
 
           temp_ref = ret.value();
 
@@ -2152,7 +2154,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          if (auto ret = transformer_->transform(tf, temp_ref)) {
+          if (auto ret = transformer_->transform(temp_ref, tf)) {
 
             temp_ref = ret.value();
 
@@ -2174,7 +2176,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          if (auto ret = transformer_->transform(tf, temp_ref)) {
+          if (auto ret = transformer_->transform(temp_ref, tf)) {
 
             temp_ref = ret.value();
 
@@ -2225,7 +2227,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_bot[i].y;
           temp_ref.reference.position.z = points_bot[i].z;
 
-          if (auto ret = transformer_->transform(tf, temp_ref)) {
+          if (auto ret = transformer_->transform(temp_ref, tf)) {
 
             temp_ref        = ret.value();
             points_bot[i].x = temp_ref.reference.position.x;
@@ -2246,7 +2248,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
           temp_ref.reference.position.y = points_top[i].y;
           temp_ref.reference.position.z = points_top[i].z;
 
-          if (auto ret = transformer_->transform(tf, temp_ref)) {
+          if (auto ret = transformer_->transform(temp_ref, tf)) {
 
             temp_ref = ret.value();
 
@@ -3470,7 +3472,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
       speed_child_frame.vector.y        = odom->twist.twist.linear.y;
       speed_child_frame.vector.z        = odom->twist.twist.linear.z;
 
-      auto res = transformer_->transformSingle(odom->header.frame_id, speed_child_frame);
+      auto res = transformer_->transformSingle(speed_child_frame, odom->header.frame_id);
 
       if (res) {
         uav_state_.velocity.linear.x = res.value().vector.x;
@@ -3493,7 +3495,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading");
     }
 
-    transformer_->setCurrentControlFrame(odom->header.frame_id);
+    transformer_->setDefaultFrame(odom->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -3663,7 +3665,7 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not calculate UAV heading, not updating it");
     }
 
-    transformer_->setCurrentControlFrame(uav_state->header.frame_id);
+    transformer_->setDefaultFrame(uav_state->header.frame_id);
 
     got_uav_state_ = true;
   }
@@ -3692,7 +3694,7 @@ void ControlManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::Na
 
   sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
-  transformer_->setCurrentLatLon(data->latitude, data->longitude);
+  transformer_->setLatLon(data->latitude, data->longitude);
 }
 
 //}
@@ -4474,7 +4476,7 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
   original_reference.header    = req.header;
   original_reference.reference = req.reference;
 
-  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+  auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
   if (!ret) {
 
@@ -4743,7 +4745,7 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
 
-  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_reference)) {
+  if (auto ret = transformer_->transformSingle(transformed_reference, req.frame_id)) {
 
     res.reference = ret.value();
     res.message   = "transformation successful";
@@ -4772,7 +4774,7 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
 
-  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_pose)) {
+  if (auto ret = transformer_->transformSingle(transformed_pose, req.frame_id)) {
 
     res.pose    = ret.value();
     res.message = "transformation successful";
@@ -4801,7 +4803,7 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
 
-  if (auto ret = transformer_->transformSingle(req.frame_id, transformed_vector3)) {
+  if (auto ret = transformer_->transformSingle(transformed_vector3, req.frame_id)) {
 
     res.vector  = ret.value();
     res.message = "transformation successful";
@@ -5007,7 +5009,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
   original_reference.header    = req.reference.header;
   original_reference.reference = req.reference.reference;
 
-  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+  auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
   if (!ret) {
 
@@ -5104,7 +5106,7 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
   original_reference.header    = req.reference.header;
   original_reference.reference = req.reference.reference;
 
-  auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+  auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
   if (!ret) {
 
@@ -5177,7 +5179,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
     return false;
   }
 
-  mrs_lib::TransformStamped tf = ret.value();
+  geometry_msgs::TransformStamped tf = ret.value();
 
   for (int i = 0; i < int(req.list.list.size()); i++) {
 
@@ -5207,7 +5209,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
       res.success[i] = false;
     }
 
-    auto ret = transformer_->transformSingle(uav_state.header.frame_id, original_reference);
+    auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
     if (!ret) {
 
@@ -5642,7 +5644,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
   auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
 
   // transform the reference to the current frame
-  auto ret = transformer_->transformSingle(uav_state.header.frame_id, reference_in);
+  auto ret = transformer_->transformSingle(reference_in, uav_state.header.frame_id);
 
   if (!ret) {
 
@@ -5744,8 +5746,9 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   mrs_msgs::VelocityReferenceStamped transformed_reference = reference_in;
 
-  auto                      ret = transformer_->getTransform(reference_in.header.frame_id, uav_state.header.frame_id, reference_in.header.stamp);
-  mrs_lib::TransformStamped tf;
+  auto ret = transformer_->getTransform(reference_in.header.frame_id, uav_state.header.frame_id, reference_in.header.stamp);
+
+  geometry_msgs::TransformStamped tf;
 
   if (!ret) {
     ss << "could not find tf from " << reference_in.header.frame_id << " to " << uav_state.header.frame_id;
@@ -5763,7 +5766,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     velocity.vector.y = reference_in.reference.velocity.y;
     velocity.vector.z = reference_in.reference.velocity.z;
 
-    auto ret = transformer_->transform(tf, velocity);
+    auto ret = transformer_->transform(velocity, tf);
 
     if (!ret) {
 
@@ -5787,7 +5790,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     pose.pose.position.z  = reference_in.reference.altitude;
     pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, reference_in.reference.heading);
 
-    auto ret = transformer_->transform(tf, pose);
+    auto ret = transformer_->transform(pose, tf);
 
     if (!ret) {
 
@@ -5804,8 +5807,8 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   // the heading rate doees not need to be transformed
   transformed_reference.reference.heading_rate = reference_in.reference.heading_rate;
 
-  transformed_reference.header.stamp    = tf.stamp();
-  transformed_reference.header.frame_id = tf.to();
+  transformed_reference.header.stamp    = tf.header.stamp;
+  transformed_reference.header.frame_id = transformer_->frame_to(tf);
 
   mrs_msgs::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
 
@@ -5936,7 +5939,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     geometry_msgs::PoseArray debug_trajectory_out;
     debug_trajectory_out.header = trajectory_in.header;
 
-    debug_trajectory_out.header.frame_id = transformer_->resolveFrameName(debug_trajectory_out.header.frame_id);
+    debug_trajectory_out.header.frame_id = transformer_->resolveFrame(debug_trajectory_out.header.frame_id);
 
     if (debug_trajectory_out.header.stamp == ros::Time(0)) {
       debug_trajectory_out.header.stamp = ros::Time::now();
@@ -5968,7 +5971,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     marker.header = trajectory_in.header;
 
-    marker.header.frame_id = transformer_->resolveFrameName(marker.header.frame_id);
+    marker.header.frame_id = transformer_->resolveFrame(marker.header.frame_id);
 
     if (marker.header.frame_id == "") {
       marker.header.frame_id = uav_state.header.frame_id;
@@ -6070,7 +6073,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
-    mrs_lib::TransformStamped tf = ret.value();
+    geometry_msgs::TransformStamped tf = ret.value();
 
     for (int i = 0; i < trajectory_size; i++) {
 
@@ -6078,7 +6081,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       trajectory_point.header    = processed_trajectory.header;
       trajectory_point.reference = processed_trajectory.points[i];
 
-      auto ret = transformer_->transform(tf, trajectory_point);
+      auto ret = transformer_->transform(trajectory_point, tf);
 
       if (!ret) {
 
@@ -6093,7 +6096,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       }
     }
 
-    processed_trajectory.header.frame_id = tf.to();
+    processed_trajectory.header.frame_id = transformer_->frame_to(tf);
   }
 
   //}
@@ -6127,7 +6130,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
-    auto res = transformer_->transformSingle(_safety_area_frame_, x_current_frame);
+    auto res = transformer_->transformSingle(x_current_frame, _safety_area_frame_);
 
     mrs_msgs::ReferenceStamped x_area_frame;
 
@@ -6285,9 +6288,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
-  mrs_lib::TransformStamped tf = ret.value();
+  geometry_msgs::TransformStamped tf = ret.value();
 
-  processed_trajectory.header.frame_id = tf.to();
+  processed_trajectory.header.frame_id = transformer_->frame_to(tf);
 
   for (int i = 0; i < trajectory_size; i++) {
 
@@ -6295,7 +6298,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     trajectory_point.header    = processed_trajectory.header;
     trajectory_point.reference = processed_trajectory.points[i];
 
-    auto ret = transformer_->transform(tf, trajectory_point);
+    auto ret = transformer_->transform(trajectory_point, tf);
 
     if (!ret) {
 
@@ -6650,7 +6653,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   // copy member variables
   auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
 
-  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
+  auto ret = transformer_->transformSingle(point, _safety_area_frame_);
 
   if (!ret) {
 
@@ -6679,7 +6682,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
     return true;
   }
 
-  auto ret = transformer_->transformSingle(_safety_area_frame_, point);
+  auto ret = transformer_->transformSingle(point, _safety_area_frame_);
 
   if (!ret) {
 
@@ -6706,7 +6709,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
   {
-    auto ret = transformer_->transformSingle(_safety_area_frame_, start);
+    auto ret = transformer_->transformSingle(start, _safety_area_frame_);
 
     if (!ret) {
 
@@ -6719,7 +6722,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
   }
 
   {
-    auto ret = transformer_->transformSingle(_safety_area_frame_, end);
+    auto ret = transformer_->transformSingle(end, _safety_area_frame_);
 
     if (!ret) {
 
@@ -6748,7 +6751,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
   {
-    auto ret = transformer_->transformSingle(_safety_area_frame_, start);
+    auto ret = transformer_->transformSingle(start, _safety_area_frame_);
 
     if (!ret) {
 
@@ -6761,7 +6764,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
   }
 
   {
-    auto ret = transformer_->transformSingle(_safety_area_frame_, end);
+    auto ret = transformer_->transformSingle(end, _safety_area_frame_);
 
     if (!ret) {
 
@@ -6854,7 +6857,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     return true;
   }
 
-  auto ret = transformer_->transformSingle("fcu_untilted", point);
+  auto ret = transformer_->transformSingle(point, "fcu_untilted");
 
   if (!ret) {
 
@@ -6998,7 +7001,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     }
 
     // express the point back in the original FRAME
-    auto ret = transformer_->transformSingle(point.header.frame_id, point_fcu);
+    auto ret = transformer_->transformSingle(point_fcu, point.header.frame_id);
 
     if (!ret) {
 
@@ -7240,7 +7243,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       // this is under the mutex_tracker_list since we don't won't the odometry switch to happen
       // to the tracker before we actually call the goto service
 
-      auto ret = transformer_->transformSingle(uav_state.header.frame_id, reference_fcu_untilted);
+      auto ret = transformer_->transformSingle(reference_fcu_untilted, uav_state.header.frame_id);
 
       if (!ret) {
 
@@ -8869,7 +8872,7 @@ void ControlManager::publish(void) {
         velocity.vector.z = last_position_cmd->velocity.z;
       }
 
-      auto res = transformer_->transformSingle(cmd_odom.child_frame_id, velocity);
+      auto res = transformer_->transformSingle(velocity, cmd_odom.child_frame_id);
 
       if (res) {
 

@@ -387,7 +387,9 @@ void UavManager::onInit() {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>("ControlManager", _uav_name_);
+  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "ControlManager");
+  transformer_->setDefaultPrefix(_uav_name_);
+  transformer_->retryLookupNewest(true);
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -531,7 +533,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   auto   odometry                    = sh_odometry_.getMsg();
   auto   position_cmd                = sh_position_cmd_.getMsg();
 
-  auto res = transformer_->transformSingle(odometry->header.frame_id, land_there_reference);
+  auto res = transformer_->transformSingle(land_there_reference, odometry->header.frame_id);
 
   mrs_msgs::ReferenceStamped land_there_current_frame;
 
@@ -591,7 +593,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
         current_pose.pose.position.z  = 0;
         current_pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
-        auto response = transformer_->transformSingle(land_there_reference_.header.frame_id, current_pose);
+        auto response = transformer_->transformSingle(current_pose, land_there_reference_.header.frame_id);
 
         if (response) {
 
@@ -1006,7 +1008,7 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
       geometry_msgs::PoseStamped uav_pose;
       uav_pose.pose = mrs_lib::getPose(odom);
 
-      auto res = transformer_->transformSingle("latlon_origin", uav_pose);
+      auto res = transformer_->transformSingle(uav_pose, "latlon_origin");
 
       if (res) {
         diag.cur_latitude  = res.value().pose.position.x;
@@ -1021,7 +1023,7 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
 
       auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
 
-      auto res = transformer_->transformSingle("latlon_origin", land_there_reference);
+      auto res = transformer_->transformSingle(land_there_reference, "latlon_origin");
 
       if (res) {
         diag.home_latitude  = res.value().reference.position.x;
@@ -1122,7 +1124,7 @@ void UavManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSat
 
   sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
-  transformer_->setCurrentLatLon(data->latitude, data->longitude);
+  transformer_->setLatLon(data->latitude, data->longitude);
 }
 
 //}
@@ -1136,7 +1138,7 @@ void UavManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>&
 
   nav_msgs::OdometryConstPtr data = wrp.getMsg();
 
-  transformer_->setCurrentControlFrame(data->header.frame_id);
+  transformer_->setDefaultFrame(data->header.frame_id);
 }
 
 //}
@@ -1558,7 +1560,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     current_pose.pose.position.z  = 0;
     current_pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
-    auto response = transformer_->transformSingle(land_there_reference_.header.frame_id, current_pose);
+    auto response = transformer_->transformSingle(current_pose, land_there_reference_.header.frame_id);
 
     if (response) {
 
