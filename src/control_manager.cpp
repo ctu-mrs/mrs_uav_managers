@@ -45,6 +45,7 @@
 #include <sensor_msgs/NavSatFix.h>
 
 #include <mavros_msgs/AttitudeTarget.h>
+#include <mavros_msgs/ActuatorControl.h>
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/RCIn.h>
@@ -376,7 +377,8 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
-  ros::Publisher publisher_control_output_;
+  ros::Publisher publisher_attitude_target_;
+  ros::Publisher publisher_actuator_control_;
   ros::Publisher publisher_position_cmd_;
   ros::Publisher publisher_attitude_cmd_;
   ros::Publisher publisher_thrust_force_;
@@ -1619,7 +1621,8 @@ void ControlManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_control_output_                  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
+  publisher_attitude_target_                 = nh_.advertise<mavros_msgs::AttitudeTarget>("attitude_target_out", 1);
+  publisher_actuator_control_                = nh_.advertise<mavros_msgs::ActuatorControl>("actuator_control_out", 1);
   publisher_position_cmd_                    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
   publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
   publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
@@ -8936,6 +8939,10 @@ void ControlManager::publish(void) {
   attitude_target.header.stamp    = ros::Time::now();
   attitude_target.header.frame_id = "base_link";
 
+  mavros_msgs::ActuatorControl actuator_control;
+  actuator_control.header.stamp    = ros::Time::now();
+  actuator_control.header.frame_id = "base_link";
+
   bool should_publish = false;
 
   if (!motors_) {
@@ -8961,6 +8968,8 @@ void ControlManager::publish(void) {
 
     attitude_target.thrust = _min_thrust_null_tracker_;
 
+    actuator_control.controls[3] = _min_thrust_null_tracker_;
+
     should_publish = true;
 
   } else if (active_tracker_idx != _null_tracker_idx_ && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
@@ -8979,6 +8988,8 @@ void ControlManager::publish(void) {
     attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
 
     attitude_target.thrust = _min_thrust_null_tracker_;
+
+    actuator_control.controls[3] = _min_thrust_null_tracker_;
 
     should_publish = true;
 
@@ -9005,9 +9016,17 @@ void ControlManager::publish(void) {
       attitude_target.orientation = last_attitude_cmd->attitude;
 
       attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+
+    } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ACTUATORS) {
+
+      actuator_control.controls[0] = last_attitude_cmd_->actuator_control.x;
+      actuator_control.controls[1] = last_attitude_cmd_->actuator_control.y;
+      actuator_control.controls[2] = last_attitude_cmd_->actuator_control.z;
+      actuator_control.controls[3] = last_attitude_cmd->thrust;
     }
 
     should_publish = true;
+
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
   }
@@ -9019,11 +9038,24 @@ void ControlManager::publish(void) {
       return;
     }
 
-    try {
-      publisher_control_output_.publish(attitude_target);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_control_output_.getTopic().c_str());
+    if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE || last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE) {
+
+      try {
+        publisher_attitude_target_.publish(attitude_target);
+      }
+      catch (...) {
+        ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_attitude_target_.getTopic().c_str());
+      }
+
+    } else {
+
+      try {
+        publisher_actuator_control_.publish(actuator_control);
+      }
+      catch (...) {
+        ROS_ERROR("exception caught during publishing topic '%s'", publisher_actuator_control_.getTopic().c_str());
+      }
+
     }
   }
 

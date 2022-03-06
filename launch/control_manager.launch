@@ -241,7 +241,8 @@
       <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->
-      <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~attitude_target_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~actuator_control_out" to="mavros/actuator_control" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
