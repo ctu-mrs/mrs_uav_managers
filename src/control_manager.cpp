@@ -40,6 +40,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/quadratic_thrust_model.h>
+#include <mrs_lib/publisher_handler.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -376,25 +377,25 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
-  ros::Publisher publisher_control_output_;
-  ros::Publisher publisher_position_cmd_;
-  ros::Publisher publisher_attitude_cmd_;
-  ros::Publisher publisher_thrust_force_;
-  ros::Publisher publisher_cmd_odom_;
-  ros::Publisher publisher_cmd_twist_;
-  ros::Publisher publisher_diagnostics_;
-  ros::Publisher publisher_motors_;
-  ros::Publisher publisher_offboard_on_;
-  ros::Publisher publisher_tilt_error_;
-  ros::Publisher publisher_mass_estimate_;
-  ros::Publisher publisher_control_error_;
-  ros::Publisher publisher_safety_area_markers_;
-  ros::Publisher publisher_safety_area_coordinates_markers_;
-  ros::Publisher publisher_disturbances_markers_;
-  ros::Publisher publisher_bumper_status_;
-  ros::Publisher publisher_current_constraints_;
-  ros::Publisher publisher_heading_;
-  ros::Publisher publisher_speed_;
+  mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>         publisher_control_output_;
+  mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>           publisher_position_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           publisher_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_thrust_force_;
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  publisher_cmd_odom_;
+  mrs_lib::PublisherHandler<geometry_msgs::Twist>                publisher_cmd_twist_;
+  mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> publisher_diagnostics_;
+  mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               publisher_motors_;
+  mrs_lib::PublisherHandler<std_msgs::Empty>                     publisher_offboard_on_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_tilt_error_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   publisher_mass_estimate_;
+  mrs_lib::PublisherHandler<mrs_msgs::ControlError>              publisher_control_error_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_safety_area_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_safety_area_coordinates_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_disturbances_markers_;
+  mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>              publisher_bumper_status_;
+  mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       publisher_current_constraints_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_heading_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_speed_;
 
   // | --------------------- service servers -------------------- |
 
@@ -815,8 +816,8 @@ private:
 
   // | ------------------- trajectory loading ------------------- |
 
-  ros::Publisher pub_debug_original_trajectory_poses_;
-  ros::Publisher pub_debug_original_trajectory_markers_;
+  mrs_lib::PublisherHandler<geometry_msgs::PoseArray>        pub_debug_original_trajectory_poses_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray> pub_debug_original_trajectory_markers_;
 
   // | --------------------- other routines --------------------- |
 
@@ -1619,27 +1620,27 @@ void ControlManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_control_output_                  = nh_.advertise<mavros_msgs::AttitudeTarget>("control_output_out", 1);
-  publisher_position_cmd_                    = nh_.advertise<mrs_msgs::PositionCommand>("position_cmd_out", 1);
-  publisher_attitude_cmd_                    = nh_.advertise<mrs_msgs::AttitudeCommand>("attitude_cmd_out", 1);
-  publisher_thrust_force_                    = nh_.advertise<mrs_msgs::Float64Stamped>("thrust_force_out", 1);
-  publisher_cmd_odom_                        = nh_.advertise<nav_msgs::Odometry>("cmd_odom_out", 1);
-  publisher_cmd_twist_                       = nh_.advertise<geometry_msgs::Twist>("cmd_twist_out", 1);
-  publisher_diagnostics_                     = nh_.advertise<mrs_msgs::ControlManagerDiagnostics>("diagnostics_out", 1);
-  publisher_motors_                          = nh_.advertise<mrs_msgs::BoolStamped>("motors_out", 1);
-  publisher_offboard_on_                     = nh_.advertise<std_msgs::Empty>("offboard_on_out", 1);
-  publisher_tilt_error_                      = nh_.advertise<mrs_msgs::Float64Stamped>("tilt_error_out", 1);
-  publisher_mass_estimate_                   = nh_.advertise<std_msgs::Float64>("mass_estimate_out", 1);
-  publisher_control_error_                   = nh_.advertise<mrs_msgs::ControlError>("control_error_out", 1);
-  publisher_safety_area_markers_             = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_markers_out", 1);
-  publisher_safety_area_coordinates_markers_ = nh_.advertise<visualization_msgs::MarkerArray>("safety_area_coordinates_markers_out", 1);
-  publisher_disturbances_markers_            = nh_.advertise<visualization_msgs::MarkerArray>("disturbances_markers_out", 1);
-  publisher_bumper_status_                   = nh_.advertise<mrs_msgs::BumperStatus>("bumper_status_out", 1);
-  publisher_current_constraints_             = nh_.advertise<mrs_msgs::DynamicsConstraints>("current_constraints_out", 1);
-  publisher_heading_                         = nh_.advertise<mrs_msgs::Float64Stamped>("heading_out", 1);
-  publisher_speed_                           = nh_.advertise<mrs_msgs::Float64Stamped>("speed_out", 1);
-  pub_debug_original_trajectory_poses_       = nh_.advertise<geometry_msgs::PoseArray>("trajectory_original/poses_out", 1, true);
-  pub_debug_original_trajectory_markers_     = nh_.advertise<visualization_msgs::MarkerArray>("trajectory_original/markers_out", 1, true);
+  publisher_control_output_                  = mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>(nh_, "control_output_out", 1);
+  publisher_position_cmd_                    = mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>(nh_, "position_cmd_out", 1);
+  publisher_attitude_cmd_                    = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
+  publisher_thrust_force_                    = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
+  publisher_cmd_odom_                        = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
+  publisher_cmd_twist_                       = mrs_lib::PublisherHandler<geometry_msgs::Twist>(nh_, "cmd_twist_out", 1);
+  publisher_diagnostics_                     = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
+  publisher_motors_                          = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
+  publisher_offboard_on_                     = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
+  publisher_tilt_error_                      = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
+  publisher_mass_estimate_                   = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1);
+  publisher_control_error_                   = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
+  publisher_safety_area_markers_             = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1);
+  publisher_safety_area_coordinates_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1);
+  publisher_disturbances_markers_            = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1);
+  publisher_bumper_status_                   = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
+  publisher_current_constraints_             = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
+  publisher_heading_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
+  publisher_speed_                           = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1);
+  pub_debug_original_trajectory_poses_       = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
+  pub_debug_original_trajectory_markers_     = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -1826,12 +1827,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   motors_out.data  = motors_;
   motors_out.stamp = ros::Time::now();
 
-  try {
-    publisher_motors_.publish(motors_out);
-  }
-  catch (...) {
-    ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_motors_.getTopic().c_str());
-  }
+  publisher_motors_.publish(motors_out);
 
   // --------------------------------------------------------------
   // |                publish if the offboard is on               |
@@ -1841,12 +1837,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     std_msgs::Empty offboard_on_out;
 
-    try {
-      publisher_offboard_on_.publish(offboard_on_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_offboard_on_.getTopic().c_str());
-    }
+    publisher_offboard_on_.publish(offboard_on_out);
   }
 
   // --------------------------------------------------------------
@@ -1860,12 +1851,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     tilt_error_out.header.frame_id = uav_state.header.frame_id;
     tilt_error_out.value           = (180.0 / M_PI) * tilt_error_;
 
-    try {
-      publisher_tilt_error_.publish(tilt_error_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_tilt_error_.getTopic().c_str());
-    }
+    publisher_tilt_error_.publish(tilt_error_out);
   }
 
   // --------------------------------------------------------------
@@ -1890,12 +1876,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     msg_out.position_eland_threshold    = it->second.eland_threshold;
     msg_out.position_failsafe_threshold = it->second.failsafe_threshold;
 
-    try {
-      publisher_control_error_.publish(msg_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_control_error_.getTopic().c_str());
-    }
+    publisher_control_error_.publish(msg_out);
   }
 
   // --------------------------------------------------------------
@@ -1907,12 +1888,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     std_msgs::Float64 mass_estimate_out;
     mass_estimate_out.data = _uav_mass_ + last_attitude_cmd->mass_difference;
 
-    try {
-      publisher_mass_estimate_.publish(mass_estimate_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_mass_estimate_.getTopic().c_str());
-    }
+    publisher_mass_estimate_.publish(mass_estimate_out);
   }
 
   // --------------------------------------------------------------
@@ -1931,12 +1907,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       heading_out.header = uav_state.header;
       heading_out.value  = heading;
 
-      try {
-        publisher_heading_.publish(heading_out);
-      }
-      catch (...) {
-        ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_heading_.getTopic().c_str());
-      }
+      publisher_heading_.publish(heading_out);
     }
     catch (...) {
       ROS_ERROR("exception caught, could not transform heading");
@@ -1955,12 +1926,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     speed_out.header = uav_state.header;
     speed_out.value  = speed;
 
-    try {
-      publisher_speed_.publish(speed_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_speed_.getTopic().c_str());
-    }
+    publisher_speed_.publish(speed_out);
   }
 
   // --------------------------------------------------------------
@@ -2285,19 +2251,9 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         safety_area_marker_array.markers.push_back(safety_area_marker);
 
-        try {
-          publisher_safety_area_markers_.publish(safety_area_marker_array);
-        }
-        catch (...) {
-          ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_safety_area_markers_.getTopic().c_str());
-        }
+        publisher_safety_area_markers_.publish(safety_area_marker_array);
 
-        try {
-          publisher_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
-        }
-        catch (...) {
-          ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_safety_area_markers_.getTopic().c_str());
-        }
+        publisher_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
       }
 
     } else {
@@ -2448,12 +2404,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     //}
 
-    try {
-      publisher_disturbances_markers_.publish(msg_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_disturbances_markers_.getTopic().c_str());
-    }
+    publisher_disturbances_markers_.publish(msg_out);
   }
 
   // --------------------------------------------------------------
@@ -2466,12 +2417,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     mrs_msgs::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
-    try {
-      publisher_current_constraints_.publish(constraints);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_current_constraints_.getTopic().c_str());
-    }
+    publisher_current_constraints_.publish(constraints);
   }
 }
 
@@ -5958,12 +5904,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       debug_trajectory_out.poses.push_back(new_pose);
     }
 
-    try {
-      pub_debug_original_trajectory_poses_.publish(debug_trajectory_out);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", pub_debug_original_trajectory_poses_.getTopic().c_str());
-    }
+    pub_debug_original_trajectory_poses_.publish(debug_trajectory_out);
 
     visualization_msgs::MarkerArray msg_out;
 
@@ -6010,12 +5951,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     msg_out.markers.push_back(marker);
 
-    try {
-      pub_debug_original_trajectory_markers_.publish(msg_out);
-    }
-    catch (...) {
-      ROS_ERROR("exception caught during publishing topic %s", pub_debug_original_trajectory_markers_.getTopic().c_str());
-    }
+    pub_debug_original_trajectory_markers_.publish(msg_out);
   }
 
   //}
@@ -6514,12 +6450,7 @@ void ControlManager::publishDiagnostics(void) {
 
   // | ------------------------- publish ------------------------ |
 
-  try {
-    publisher_diagnostics_.publish(diagnostics_msg);
-  }
-  catch (...) {
-    ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_diagnostics_.getTopic().c_str());
-  }
+  publisher_diagnostics_.publish(diagnostics_msg);
 }
 
 //}
@@ -6911,12 +6842,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
-    try {
-      publisher_bumper_status_.publish(bumper_status);
-    }
-    catch (...) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
-    }
+
+    publisher_bumper_status_.publish(bumper_status);
 
     return false;
   }
@@ -6930,12 +6857,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
-    try {
-      publisher_bumper_status_.publish(bumper_status);
-    }
-    catch (...) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
-    }
+
+    publisher_bumper_status_.publish(bumper_status);
 
     return false;
   }
@@ -6972,12 +6895,8 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
 
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
-      try {
-        publisher_bumper_status_.publish(bumper_status);
-      }
-      catch (...) {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
-      }
+
+      publisher_bumper_status_.publish(bumper_status);
     }
 
     if (bumper_data->sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance)) {
@@ -6992,12 +6911,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
 
-      try {
-        publisher_bumper_status_.publish(bumper_status);
-      }
-      catch (...) {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
-      }
+      publisher_bumper_status_.publish(bumper_status);
     }
 
     // express the point back in the original FRAME
@@ -7202,12 +7116,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = repulsing_;
-    try {
-      publisher_bumper_status_.publish(bumper_status);
-    }
-    catch (...) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught during publishing topic %s", publisher_bumper_status_.getTopic().c_str());
-    }
+
+    publisher_bumper_status_.publish(bumper_status);
 
     callbacks_enabled_ = false;
 
@@ -8902,30 +8812,15 @@ void ControlManager::publish(void) {
       cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->heading);
     }
 
-    try {
-      publisher_cmd_odom_.publish(cmd_odom);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_cmd_odom_.getTopic().c_str());
-    }
+    publisher_cmd_odom_.publish(cmd_odom);
 
-    try {
-      publisher_position_cmd_.publish(last_position_cmd);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_position_cmd_.getTopic().c_str());
-    }
+    publisher_position_cmd_.publish(last_position_cmd);
 
     // publish the twist topic (velocity command in body frame for external controllers)
     geometry_msgs::Twist cmd_twist;
     cmd_twist = cmd_odom.twist.twist;
 
-    try {
-      publisher_cmd_twist_.publish(cmd_twist);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_cmd_twist_.getTopic().c_str());
-    }
+    publisher_cmd_twist_.publish(cmd_twist);
   }
 
   // --------------------------------------------------------------
@@ -9019,23 +8914,13 @@ void ControlManager::publish(void) {
       return;
     }
 
-    try {
-      publisher_control_output_.publish(attitude_target);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_control_output_.getTopic().c_str());
-    }
+    publisher_control_output_.publish(attitude_target);
   }
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
   if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-    try {
-      publisher_attitude_cmd_.publish(last_attitude_cmd);  // the control command is already a ConstPtr
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_attitude_cmd_.getTopic().c_str());
-    }
+    publisher_attitude_cmd_.publish(last_attitude_cmd);  // the control command is already a ConstPtr
   }
 
   // | ------------ publish the desired thrust force ------------ |
@@ -9047,12 +8932,7 @@ void ControlManager::publish(void) {
 
     thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust);
 
-    try {
-      publisher_thrust_force_.publish(thrust_force);
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: exception caught during publishing topic %s", publisher_thrust_force_.getTopic().c_str());
-    }
+    publisher_thrust_force_.publish(thrust_force);
   }
 }  // namespace control_manager
 
