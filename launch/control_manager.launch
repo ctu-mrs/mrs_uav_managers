@@ -163,6 +163,7 @@
       <rosparam if="$(eval not arg('custom_config_speed_tracker') == '')" ns="speed_tracker" file="$(arg custom_config_speed_tracker)" />
       <param name="speed_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~speed_tracker/profiler" to="profiler" />
+      <remap from="~speed_tracker/rviz_marker_out" to="~speed_tracker/rviz_marker" />
       <remap from="~speed_tracker/command_in" to="~speed_tracker/command" />
 
       <!-- LandoffTracker -->
@@ -190,6 +191,10 @@
       <remap from="~mpc_tracker/diagnostics_out" to="~mpc_tracker/diagnostics" />
       <remap from="~mpc_tracker/string_out" to="mrs_uav_status/display_string" />
       <remap from="~mpc_tracker/current_trajectory_point_out" to="~mpc_tracker/current_trajectory_point" />
+      <remap from="~mpc_tracker/predicted_trajectory_out" to="~mpc_tracker/predicted_trajectory" />
+      <remap from="~mpc_tracker/predicted_trajectory_debugging_out" to="~mpc_tracker/predicted_trajectory_debugging" />
+      <remap from="~mpc_tracker/mpc_reference_debugging_out" to="~mpc_tracker/mpc_reference_debugging" />
+      <remap from="~mpc_tracker/prediction_full_state_out" to="~mpc_tracker/prediction_full_state" />
       <remap from="~mpc_tracker/wiggle_in" to="~mpc_tracker/wiggle" />
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
       <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
@@ -259,6 +264,7 @@
       <remap from="~current_constraints_out" to="~current_constraints" />
       <remap from="~heading_out" to="~heading" />
       <remap from="~speed_out" to="~speed" />
+      <remap from="~cmd_twist_out" to="~cmd_twist" />
       <remap from="~trajectory_original/poses_out" to="~trajectory_original/poses" />
       <remap from="~trajectory_original/markers_out" to="~trajectory_original/markers" />
       <remap from="~profiler" to="profiler" />

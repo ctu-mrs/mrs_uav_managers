@@ -38,6 +38,8 @@
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/geometry/misc.h>
@@ -128,20 +130,20 @@ public:
   bool callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   // service clients
-  ros::ServiceClient service_client_takeoff_;
-  ros::ServiceClient service_client_switch_tracker_;
-  ros::ServiceClient service_client_switch_controller_;
-  ros::ServiceClient service_client_land_;
-  ros::ServiceClient service_client_eland_;
-  ros::ServiceClient service_client_ehover_;
-  ros::ServiceClient service_client_control_callbacks_;
-  ros::ServiceClient service_client_emergency_reference_;
-  ros::ServiceClient service_client_arm_;
-  ros::ServiceClient service_client_pirouette_;
-  ros::ServiceClient service_client_odometry_callbacks_;
-  ros::ServiceClient service_client_ungrip_;
-  ros::ServiceClient service_client_motors_;
-  ros::ServiceClient service_client_offboard_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::Vec1>                sch_takeoff_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::String>              sch_switch_tracker_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::String>              sch_switch_controller_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_land_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_eland_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_ehover_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_control_callbacks_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> sch_emergency_reference_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_arm_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_pirouette_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_odometry_callbacks_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_ungrip_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_motors_;
+  mrs_lib::ServiceClientHandler<mavros_msgs::SetMode>          sch_offboard_;
 
   // service client wrappers
   bool takeoffSrv(void);
@@ -178,7 +180,7 @@ public:
   void timerDiagnostics(const ros::TimerEvent& event);
 
   // publishers
-  ros::Publisher publisher_diagnostics_;
+  mrs_lib::PublisherHandler<mrs_msgs::UavManagerDiagnostics> ph_diag_;
 
   // max height checking
   bool              _max_height_enabled_ = false;
@@ -295,7 +297,7 @@ public:
 
 void UavManager::onInit() {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
@@ -417,7 +419,7 @@ void UavManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_diagnostics_ = nh_.advertise<mrs_msgs::UavManagerDiagnostics>("diagnostics_out", 1);
+  ph_diag_ = mrs_lib::PublisherHandler<mrs_msgs::UavManagerDiagnostics>(nh_, "diagnostics_out", 1);
 
   // | --------------------- service servers -------------------- |
 
@@ -429,20 +431,20 @@ void UavManager::onInit() {
 
   // | --------------------- service clients -------------------- |
 
-  service_client_takeoff_             = nh_.serviceClient<mrs_msgs::Vec1>("takeoff_out");
-  service_client_land_                = nh_.serviceClient<std_srvs::Trigger>("land_out");
-  service_client_eland_               = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_ehover_              = nh_.serviceClient<std_srvs::Trigger>("ehover_out");
-  service_client_switch_tracker_      = nh_.serviceClient<mrs_msgs::String>("switch_tracker_out");
-  service_client_switch_controller_   = nh_.serviceClient<mrs_msgs::String>("switch_controller_out");
-  service_client_emergency_reference_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("emergency_reference_out");
-  service_client_control_callbacks_   = nh_.serviceClient<std_srvs::SetBool>("enable_callbacks_out");
-  service_client_arm_                 = nh_.serviceClient<std_srvs::SetBool>("arm_out");
-  service_client_pirouette_           = nh_.serviceClient<std_srvs::Trigger>("pirouette_out");
-  service_client_odometry_callbacks_  = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
-  service_client_ungrip_              = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
-  service_client_motors_              = nh_.serviceClient<std_srvs::SetBool>("motors_out");
-  service_client_offboard_            = nh_.serviceClient<mavros_msgs::SetMode>("offboard_out");
+  sch_takeoff_             = mrs_lib::ServiceClientHandler<mrs_msgs::Vec1>(nh_, "takeoff_out");
+  sch_land_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "land_out");
+  sch_eland_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
+  sch_ehover_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ehover_out");
+  sch_switch_tracker_      = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_tracker_out");
+  sch_switch_controller_   = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_controller_out");
+  sch_emergency_reference_ = mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv>(nh_, "emergency_reference_out");
+  sch_control_callbacks_   = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "enable_callbacks_out");
+  sch_arm_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "arm_out");
+  sch_pirouette_           = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "pirouette_out");
+  sch_odometry_callbacks_  = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
+  sch_ungrip_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
+  sch_motors_              = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "motors_out");
+  sch_offboard_            = mrs_lib::ServiceClientHandler<mavros_msgs::SetMode>(nh_, "offboard_out");
 
   // | ---------------------- state machine --------------------- |
 
@@ -1032,12 +1034,7 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
     }
   }
 
-  try {
-    publisher_diagnostics_.publish(diag);
-  }
-  catch (...) {
-    ROS_ERROR("exception caught during publishing topic '%s'", publisher_diagnostics_.getTopic().c_str());
-  }
+  ph_diag_.publish(diag);
 }
 
 //}
@@ -2126,7 +2123,7 @@ void UavManager::setOdometryCallbacksSrv(const bool& input) {
 
   srv.request.data = input;
 
-  bool res = service_client_odometry_callbacks_.call(srv);
+  bool res = sch_odometry_callbacks_.call(srv);
 
   if (res) {
 
@@ -2151,7 +2148,7 @@ void UavManager::setControlCallbacksSrv(const bool& input) {
 
   srv.request.data = input;
 
-  bool res = service_client_control_callbacks_.call(srv);
+  bool res = sch_control_callbacks_.call(srv);
 
   if (res) {
 
@@ -2174,7 +2171,7 @@ void UavManager::ungripSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_ungrip_.call(srv);
+  bool res = sch_ungrip_.call(srv);
 
   if (res) {
 
@@ -2199,7 +2196,7 @@ bool UavManager::motorsSrv(const bool in) {
 
   srv.request.data = in;
 
-  bool res = service_client_motors_.call(srv);
+  bool res = sch_motors_.call(srv);
 
   if (res) {
 
@@ -2229,7 +2226,7 @@ bool UavManager::offboardSrv(const bool in) {
   srv.request.base_mode   = 0;
   srv.request.custom_mode = "OFFBOARD";
 
-  bool res = service_client_offboard_.call(srv);
+  bool res = sch_offboard_.call(srv);
 
   if (!res) {
 
@@ -2257,7 +2254,7 @@ void UavManager::pirouetteSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_pirouette_.call(srv);
+  bool res = sch_pirouette_.call(srv);
 
   if (res) {
 
@@ -2280,7 +2277,7 @@ void UavManager::disarmSrv(void) {
 
   srv.request.data = false;
 
-  bool res = service_client_arm_.call(srv);
+  bool res = sch_arm_.call(srv);
 
   if (res) {
 
@@ -2304,7 +2301,7 @@ bool UavManager::switchControllerSrv(const std::string& controller) {
   mrs_msgs::String srv;
   srv.request.value = controller;
 
-  bool res = service_client_switch_controller_.call(srv);
+  bool res = sch_switch_controller_.call(srv);
 
   if (res) {
 
@@ -2334,7 +2331,7 @@ bool UavManager::switchTrackerSrv(const std::string& tracker) {
   mrs_msgs::String srv;
   srv.request.value = tracker;
 
-  bool res = service_client_switch_tracker_.call(srv);
+  bool res = sch_switch_tracker_.call(srv);
 
   if (res) {
 
@@ -2362,7 +2359,7 @@ bool UavManager::landSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_land_.call(srv);
+  bool res = sch_land_.call(srv);
 
   if (res) {
 
@@ -2390,7 +2387,7 @@ bool UavManager::elandSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_eland_.call(srv);
+  bool res = sch_eland_.call(srv);
 
   if (res) {
 
@@ -2418,7 +2415,7 @@ bool UavManager::ehoverSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_ehover_.call(srv);
+  bool res = sch_ehover_.call(srv);
 
   if (res) {
 
@@ -2448,7 +2445,7 @@ bool UavManager::takeoffSrv(void) {
 
   srv.request.goal = _takeoff_height_;
 
-  bool res = service_client_takeoff_.call(srv);
+  bool res = sch_takeoff_.call(srv);
 
   if (res) {
 
@@ -2479,7 +2476,7 @@ bool UavManager::emergencyReferenceSrv(const mrs_msgs::ReferenceStamped& goal) {
   srv.request.header    = goal.header;
   srv.request.reference = goal.reference;
 
-  bool res = service_client_emergency_reference_.call(srv);
+  bool res = sch_emergency_reference_.call(srv);
 
   if (res) {
 

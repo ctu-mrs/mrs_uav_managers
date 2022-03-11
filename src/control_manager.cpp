@@ -41,6 +41,7 @@
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/quadratic_thrust_model.h>
 #include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/service_client_handler.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -377,25 +378,25 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
-  mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>         publisher_control_output_;
-  mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>           publisher_position_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           publisher_attitude_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_thrust_force_;
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  publisher_cmd_odom_;
-  mrs_lib::PublisherHandler<geometry_msgs::Twist>                publisher_cmd_twist_;
-  mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> publisher_diagnostics_;
-  mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               publisher_motors_;
-  mrs_lib::PublisherHandler<std_msgs::Empty>                     publisher_offboard_on_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_tilt_error_;
-  mrs_lib::PublisherHandler<std_msgs::Float64>                   publisher_mass_estimate_;
-  mrs_lib::PublisherHandler<mrs_msgs::ControlError>              publisher_control_error_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_safety_area_markers_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_safety_area_coordinates_markers_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     publisher_disturbances_markers_;
-  mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>              publisher_bumper_status_;
-  mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       publisher_current_constraints_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_heading_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            publisher_speed_;
+  mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>         ph_control_output_;
+  mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>           ph_position_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           ph_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_thrust_force_;
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_cmd_odom_;
+  mrs_lib::PublisherHandler<geometry_msgs::Twist>                ph_cmd_twist_;
+  mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
+  mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               ph_motors_;
+  mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
+  mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_coordinates_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_disturbances_markers_;
+  mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>              ph_bumper_status_;
+  mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
 
   // | --------------------- service servers -------------------- |
 
@@ -457,11 +458,11 @@ private:
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
-  ros::ServiceClient service_client_mavros_command_long_;
-  ros::ServiceClient service_client_eland_;
-  ros::ServiceClient service_client_shutdown_;
-  ros::ServiceClient service_client_set_odometry_callbacks_;
-  ros::ServiceClient service_client_parachute_;
+  mrs_lib::ServiceClientHandler<mavros_msgs::CommandLong> sch_mavros_command_long_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_eland_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_shutdown_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>        sch_set_odometry_callbacks_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_parachute_;
 
   // min client
   ros::ServiceServer service_server_set_min_height_;
@@ -748,8 +749,8 @@ private:
   void       publishDiagnostics(void);
   std::mutex mutex_diagnostics_;
 
-  void               ungripSrv(void);
-  ros::ServiceClient service_client_ungrip_;
+  void                                             ungripSrv(void);
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_ungrip_;
 
   bool isFlyingNormally(void);
 
@@ -887,7 +888,7 @@ private:
 
 void ControlManager::onInit() {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
@@ -1620,27 +1621,27 @@ void ControlManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_control_output_                  = mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>(nh_, "control_output_out", 1);
-  publisher_position_cmd_                    = mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>(nh_, "position_cmd_out", 1);
-  publisher_attitude_cmd_                    = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
-  publisher_thrust_force_                    = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
-  publisher_cmd_odom_                        = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
-  publisher_cmd_twist_                       = mrs_lib::PublisherHandler<geometry_msgs::Twist>(nh_, "cmd_twist_out", 1);
-  publisher_diagnostics_                     = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
-  publisher_motors_                          = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
-  publisher_offboard_on_                     = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
-  publisher_tilt_error_                      = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
-  publisher_mass_estimate_                   = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1);
-  publisher_control_error_                   = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
-  publisher_safety_area_markers_             = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1);
-  publisher_safety_area_coordinates_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1);
-  publisher_disturbances_markers_            = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1);
-  publisher_bumper_status_                   = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
-  publisher_current_constraints_             = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
-  publisher_heading_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
-  publisher_speed_                           = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1);
-  pub_debug_original_trajectory_poses_       = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
-  pub_debug_original_trajectory_markers_     = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
+  ph_control_output_                     = mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>(nh_, "control_output_out", 1);
+  ph_position_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>(nh_, "position_cmd_out", 1);
+  ph_attitude_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
+  ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
+  ph_cmd_odom_                           = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
+  ph_cmd_twist_                          = mrs_lib::PublisherHandler<geometry_msgs::Twist>(nh_, "cmd_twist_out", 1);
+  ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
+  ph_motors_                             = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
+  ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
+  ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
+  ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1);
+  ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
+  ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1);
+  ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1);
+  ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1);
+  ph_bumper_status_                      = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
+  ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
+  ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
+  ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1);
+  pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
+  pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -1705,17 +1706,17 @@ void ControlManager::onInit() {
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
   service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
-  service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking", &ControlManager::callbackStartTrajectoryTracking, this);
-  service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking", &ControlManager::callbackStopTrajectoryTracking, this);
-  service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking", &ControlManager::callbackResumeTrajectoryTracking, this);
-  service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start", &ControlManager::callbackGotoTrajectoryStart, this);
+  service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
+  service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
+  service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
+  service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start_in", &ControlManager::callbackGotoTrajectoryStart, this);
 
-  service_client_mavros_command_long_    = nh_.serviceClient<mavros_msgs::CommandLong>("mavros_command_long_out");
-  service_client_eland_                  = nh_.serviceClient<std_srvs::Trigger>("eland_out");
-  service_client_shutdown_               = nh_.serviceClient<std_srvs::Trigger>("shutdown_out");
-  service_client_set_odometry_callbacks_ = nh_.serviceClient<std_srvs::SetBool>("set_odometry_callbacks_out");
-  service_client_ungrip_                 = nh_.serviceClient<std_srvs::Trigger>("ungrip_out");
-  service_client_parachute_              = nh_.serviceClient<std_srvs::Trigger>("parachute_out");
+  sch_mavros_command_long_    = mrs_lib::ServiceClientHandler<mavros_msgs::CommandLong>(nh_, "mavros_command_long_out");
+  sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
+  sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "shutdown_out");
+  sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
+  sch_ungrip_                 = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
+  sch_parachute_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "parachute_out");
 
   // | ---------------- setpoint command services --------------- |
 
@@ -1827,7 +1828,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   motors_out.data  = motors_;
   motors_out.stamp = ros::Time::now();
 
-  publisher_motors_.publish(motors_out);
+  ph_motors_.publish(motors_out);
 
   // --------------------------------------------------------------
   // |                publish if the offboard is on               |
@@ -1837,7 +1838,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     std_msgs::Empty offboard_on_out;
 
-    publisher_offboard_on_.publish(offboard_on_out);
+    ph_offboard_on_.publish(offboard_on_out);
   }
 
   // --------------------------------------------------------------
@@ -1851,7 +1852,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     tilt_error_out.header.frame_id = uav_state.header.frame_id;
     tilt_error_out.value           = (180.0 / M_PI) * tilt_error_;
 
-    publisher_tilt_error_.publish(tilt_error_out);
+    ph_tilt_error_.publish(tilt_error_out);
   }
 
   // --------------------------------------------------------------
@@ -1876,7 +1877,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     msg_out.position_eland_threshold    = it->second.eland_threshold;
     msg_out.position_failsafe_threshold = it->second.failsafe_threshold;
 
-    publisher_control_error_.publish(msg_out);
+    ph_control_error_.publish(msg_out);
   }
 
   // --------------------------------------------------------------
@@ -1888,7 +1889,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     std_msgs::Float64 mass_estimate_out;
     mass_estimate_out.data = _uav_mass_ + last_attitude_cmd->mass_difference;
 
-    publisher_mass_estimate_.publish(mass_estimate_out);
+    ph_mass_estimate_.publish(mass_estimate_out);
   }
 
   // --------------------------------------------------------------
@@ -1907,7 +1908,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       heading_out.header = uav_state.header;
       heading_out.value  = heading;
 
-      publisher_heading_.publish(heading_out);
+      ph_heading_.publish(heading_out);
     }
     catch (...) {
       ROS_ERROR("exception caught, could not transform heading");
@@ -1926,7 +1927,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     speed_out.header = uav_state.header;
     speed_out.value  = speed;
 
-    publisher_speed_.publish(speed_out);
+    ph_speed_.publish(speed_out);
   }
 
   // --------------------------------------------------------------
@@ -2251,9 +2252,9 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         safety_area_marker_array.markers.push_back(safety_area_marker);
 
-        publisher_safety_area_markers_.publish(safety_area_marker_array);
+        ph_safety_area_markers_.publish(safety_area_marker_array);
 
-        publisher_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
+        ph_safety_area_coordinates_markers_.publish(safety_area_coordinates_marker_array);
       }
 
     } else {
@@ -2404,7 +2405,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     //}
 
-    publisher_disturbances_markers_.publish(msg_out);
+    ph_disturbances_markers_.publish(msg_out);
   }
 
   // --------------------------------------------------------------
@@ -2417,7 +2418,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     mrs_msgs::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
-    publisher_current_constraints_.publish(constraints);
+    ph_current_constraints_.publish(constraints);
   }
 }
 
@@ -6450,7 +6451,7 @@ void ControlManager::publishDiagnostics(void) {
 
   // | ------------------------- publish ------------------------ |
 
-  publisher_diagnostics_.publish(diagnostics_msg);
+  ph_diagnostics_.publish(diagnostics_msg);
 }
 
 //}
@@ -6843,7 +6844,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
 
-    publisher_bumper_status_.publish(bumper_status);
+    ph_bumper_status_.publish(bumper_status);
 
     return false;
   }
@@ -6858,7 +6859,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.modifying_reference = true;
 
-    publisher_bumper_status_.publish(bumper_status);
+    ph_bumper_status_.publish(bumper_status);
 
     return false;
   }
@@ -6896,7 +6897,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
 
-      publisher_bumper_status_.publish(bumper_status);
+      ph_bumper_status_.publish(bumper_status);
     }
 
     if (bumper_data->sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance)) {
@@ -6911,7 +6912,7 @@ bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
       mrs_msgs::BumperStatus bumper_status;
       bumper_status.modifying_reference = true;
 
-      publisher_bumper_status_.publish(bumper_status);
+      ph_bumper_status_.publish(bumper_status);
     }
 
     // express the point back in the original FRAME
@@ -7117,7 +7118,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
     mrs_msgs::BumperStatus bumper_status;
     bumper_status.repulsing = repulsing_;
 
-    publisher_bumper_status_.publish(bumper_status);
+    ph_bumper_status_.publish(bumper_status);
 
     callbacks_enabled_ = false;
 
@@ -7966,7 +7967,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
   ROS_INFO("[ControlManager]: calling for %s", input ? "arming" : "disarming");
 
-  if (service_client_mavros_command_long_.call(srv_out)) {
+  if (sch_mavros_command_long_.call(srv_out)) {
 
     if (srv_out.response.success) {
 
@@ -8013,7 +8014,7 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 
   srv.request.data = input;
 
-  bool res = service_client_set_odometry_callbacks_.call(srv);
+  bool res = sch_set_odometry_callbacks_.call(srv);
 
   if (res) {
 
@@ -8036,7 +8037,7 @@ bool ControlManager::elandSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_eland_.call(srv);
+  bool res = sch_eland_.call(srv);
 
   if (res) {
 
@@ -8068,7 +8069,7 @@ void ControlManager::shutdown() {
     ROS_INFO("[ControlManager]: calling service for PC shutdown");
 
     std_srvs::Trigger shutdown_out;
-    service_client_shutdown_.call(shutdown_out);
+    sch_shutdown_.call(shutdown_out);
   }
 }
 
@@ -8082,7 +8083,7 @@ bool ControlManager::parachuteSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_parachute_.call(srv);
+  bool res = sch_parachute_.call(srv);
 
   if (res) {
 
@@ -8110,7 +8111,7 @@ void ControlManager::ungripSrv(void) {
 
   std_srvs::Trigger srv;
 
-  bool res = service_client_ungrip_.call(srv);
+  bool res = sch_ungrip_.call(srv);
 
   if (res) {
 
@@ -8812,15 +8813,15 @@ void ControlManager::publish(void) {
       cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->heading);
     }
 
-    publisher_cmd_odom_.publish(cmd_odom);
+    ph_cmd_odom_.publish(cmd_odom);
 
-    publisher_position_cmd_.publish(last_position_cmd);
+    ph_position_cmd_.publish(last_position_cmd);
 
     // publish the twist topic (velocity command in body frame for external controllers)
     geometry_msgs::Twist cmd_twist;
     cmd_twist = cmd_odom.twist.twist;
 
-    publisher_cmd_twist_.publish(cmd_twist);
+    ph_cmd_twist_.publish(cmd_twist);
   }
 
   // --------------------------------------------------------------
@@ -8914,13 +8915,13 @@ void ControlManager::publish(void) {
       return;
     }
 
-    publisher_control_output_.publish(attitude_target);
+    ph_control_output_.publish(attitude_target);
   }
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
   if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-    publisher_attitude_cmd_.publish(last_attitude_cmd);  // the control command is already a ConstPtr
+    ph_attitude_cmd_.publish(last_attitude_cmd);  // the control command is already a ConstPtr
   }
 
   // | ------------ publish the desired thrust force ------------ |
@@ -8932,7 +8933,7 @@ void ControlManager::publish(void) {
 
     thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust);
 
-    publisher_thrust_force_.publish(thrust_force);
+    ph_thrust_force_.publish(thrust_force);
   }
 }  // namespace control_manager
 
