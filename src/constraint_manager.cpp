@@ -13,6 +13,7 @@
 #include <mrs_msgs/DynamicsConstraintsSrv.h>
 #include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/String.h>
+#include <mrs_msgs/ConstraintsOverride.h>
 
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/scope_timer.h>
@@ -72,6 +73,7 @@ private:
   bool               callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
+  std::string                         last_estimator_name_;
   std::mutex                          mutex_last_estimator_type_;
 
   void       timerConstraintManagement(const ros::TimerEvent& event);
@@ -80,6 +82,16 @@ private:
 
   std::string current_constraints_;
   std::mutex  mutex_current_constraints_;
+
+  // | ------------------ constraints override ------------------ |
+
+  ros::ServiceServer service_server_constraints_override_;
+  bool               callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res);
+
+  std::atomic<bool>                    override_constraints_         = false;
+  std::atomic<bool>                    constraints_override_updated_ = false;
+  std::mutex                           mutex_constraints_override_;
+  mrs_msgs::ConstraintsOverrideRequest constraints_override_;
 
   // | ------------------ diagnostics publisher ----------------- |
 
@@ -210,10 +222,13 @@ void ConstraintManager::onInit() {
 
   current_constraints_ = "";
   last_estimator_type_ = -1;
+  last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
   service_server_set_constraints_ = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
+
+  service_server_constraints_override_ = nh_.advertiseService("constraints_override_in", &ConstraintManager::callbackConstraintsOverride, this);
 
   sc_set_constraints_ = mrs_lib::ServiceClientHandler<mrs_msgs::DynamicsConstraintsSrv>(nh_, "set_constraints_out");
 
@@ -284,6 +299,27 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
   mrs_msgs::DynamicsConstraintsSrv srv_call;
 
   srv_call.request = it->second;
+
+  if (override_constraints_) {
+
+    auto constraints_override = mrs_lib::get_mutexed(mutex_constraints_override_, constraints_override_);
+
+    if (constraints_override.acceleration_horizontal > 0 &&
+        constraints_override.acceleration_horizontal <= srv_call.request.constraints.horizontal_acceleration) {
+      srv_call.request.constraints.horizontal_acceleration = constraints_override.acceleration_horizontal;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required horizontal acceleration override is out of bounds");
+    }
+
+    if (constraints_override.acceleration_vertical > 0 &&
+        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_ascending_acceleration &&
+        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_descending_acceleration) {
+      srv_call.request.constraints.vertical_ascending_acceleration  = constraints_override.acceleration_vertical;
+      srv_call.request.constraints.vertical_descending_acceleration = constraints_override.acceleration_vertical;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required vertical acceleration override is out of bounds");
+    }
+  }
 
   bool res = sc_set_constraints_.call(srv_call);
 
@@ -360,6 +396,8 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
     return true;
   }
 
+  override_constraints_ = false;
+
   // try to set the constraints
   if (!setConstraints(req.value)) {
 
@@ -385,6 +423,33 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
 
 //}
 
+/* callackConstraintsOverride() //{ */
+
+bool ConstraintManager::callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res) {
+
+  if (!is_initialized_) {
+    return false;
+  }
+
+  {
+    std::scoped_lock lock(mutex_constraints_override_);
+
+    constraints_override_ = req;
+  }
+
+  override_constraints_         = true;
+  constraints_override_updated_ = true;
+
+  ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: setting constraints override");
+
+  res.message = "override set";
+  res.success = true;
+
+  return true;
+}
+
+//}
+
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
@@ -402,6 +467,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
 
   auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
   auto last_estimator_type = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
+  auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_name_);
 
   if (!sh_odom_diag_.hasMsg()) {
     ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing odometry diagnostics!");
@@ -429,6 +495,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
       if (stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
         last_estimator_type = odometry_diagnostics.estimator_type.type;
+        last_estimator_name = odometry_diagnostics.estimator_type.name;
 
         // else, try to set the fallback constraints
       } else {
@@ -439,6 +506,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
         if (setConstraints(it->second)) {
 
           last_estimator_type = odometry_diagnostics.estimator_type.type;
+          last_estimator_name = odometry_diagnostics.estimator_type.name;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: '%s'", it->second.c_str());
 
@@ -450,7 +518,22 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
     }
   }
 
+  if (constraints_override_updated_) {
+
+    std::map<std::string, std::string>::iterator it;
+    it = _map_type_fallback_constraints_.find(last_estimator_name_);
+
+    ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: re-setting constraints with user value override");
+
+    if (setConstraints(it->second)) {
+      constraints_override_updated_ = false;
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: could not re-set the constraints!");
+    }
+  }
+
   mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_type, last_estimator_type_);
+  mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_name, last_estimator_name_);
 }
 
 //}

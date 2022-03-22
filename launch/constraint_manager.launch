@@ -46,6 +46,7 @@
       <!-- Services -->
       <remap from="~set_constraints_in" to="~set_constraints" />
       <remap from="~set_constraints_out" to="control_manager/set_constraints" />
+      <remap from="~constraints_override_in" to="~constraints_override" />
 
       <!-- Publishers -->
       <remap from="~diagnostics_out" to="~diagnostics" />
