@@ -233,11 +233,11 @@ public:
   virtual void onInit();
 
 private:
-  ros::NodeHandle nh_;
-  std::string     _version_;
-  bool            is_initialized_ = false;
-  std::string     _uav_name_;
-  std::string     _body_frame_;
+  ros::NodeHandle   nh_;
+  std::string       _version_;
+  std::atomic<bool> is_initialized_ = false;
+  std::string       _uav_name_;
+  std::string       _body_frame_;
 
   // | --------------- dynamic loading of trackers -------------- |
 
@@ -297,6 +297,9 @@ private:
 
   // should disarm after emergancy landing?
   bool _eland_disarm_enabled_ = false;
+
+  // enabling the emergency handoff -> will disable eland and failsafe
+  bool _rc_emergency_handoff_ = false;
 
   // what thrust should be output when null tracker is active?
   double _min_thrust_null_tracker_ = 0.0;
@@ -951,6 +954,7 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
   param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
+
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -958,6 +962,7 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
   param_loader.loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
+
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -965,6 +970,7 @@ void ControlManager::onInit() {
 
   param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
   param_loader.loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
+
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -973,6 +979,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("status_timer_rate", _status_timer_rate_);
   param_loader.loadParam("safety/safety_timer_rate", _safety_timer_rate_);
   param_loader.loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
+  param_loader.loadParam("safety/rc_emergency_handoff/enabled", _rc_emergency_handoff_);
 
   param_loader.loadParam("uav_mass", _uav_mass_);
 
@@ -982,6 +989,7 @@ void ControlManager::onInit() {
   param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
   param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -7269,7 +7277,7 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
 
 //}
 
-// | ------------------------ elanding ------------------------ |
+// | ------------------------- safety ------------------------- |
 
 /* //{ changeLandingState() */
 
@@ -7439,6 +7447,13 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, ss.str());
   }
 
+  if (_rc_emergency_handoff_) {
+
+    switchMotors(false);
+
+    return std::tuple(true, "RC emergency handoff is ON, switching motors OFF");
+  }
+
   {
     auto [success, message] = switchTracker(_ehover_tracker_name_);
 
@@ -7520,6 +7535,13 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     ss << "can not trigger failsafe while not flying";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
+  }
+
+  if (_rc_emergency_handoff_) {
+
+    switchMotors(false);
+
+    return std::tuple(true, "RC emergency handoff is ON, switching motors OFF");
   }
 
   if (_parachute_enabled_) {

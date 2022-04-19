@@ -29,11 +29,6 @@ state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
 
 safety:
 
-  min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
-
-  safety_timer_rate: 100 # [Hz]
-  failsafe_timer_rate: 100 # [Hz]
-
   tilt_limit:
 
     eland:
@@ -105,6 +100,17 @@ safety:
 
   # when the active tracker returns empty command
   tracker_error_action: "eland" # {eland, ehover}
+
+  # handoff directly to RC control
+  # * overrides eland and failsafe landing
+  # * recommended when flying over water
+  rc_emergency_handoff:
+    enabled: false
+
+  min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
+
+  safety_timer_rate: 100 # [Hz]
+  failsafe_timer_rate: 100 # [Hz]
 
 # these constraints are normally overridden by the ConstraintManager.
 default_constraints:
