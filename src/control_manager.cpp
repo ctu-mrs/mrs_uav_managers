@@ -4245,6 +4245,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
   if (!is_initialized_)
     return false;
 
+  ROS_INFO("[ControlManager]: setting motors by service");
+
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -4307,6 +4309,11 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
 /* callbackArm() //{ */
 
 bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  ROS_INFO("[ControlManager]: arming by service");
 
   std::stringstream ss;
 

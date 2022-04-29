@@ -1149,6 +1149,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
   if (!is_initialized_)
     return false;
 
+  ROS_INFO("[UavManager]: takeoff called by service");
+
   /* preconditions //{ */
 
   {
@@ -1400,6 +1402,8 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
   if (!is_initialized_)
     return false;
 
+  ROS_INFO("[UavManager]: land called by service");
+
   /* preconditions //{ */
 
   {
@@ -1466,6 +1470,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
 
   if (!is_initialized_)
     return false;
+
+  ROS_INFO("[UavManager]: land home called by service");
 
   /* preconditions //{ */
 
@@ -1622,6 +1628,8 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
   if (!is_initialized_)
     return false;
 
+  ROS_INFO("[UavManager]: land there called by service");
+
   /* preconditions //{ */
 
   {
@@ -1736,6 +1744,8 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
 
   if (!is_initialized_)
     return false;
+
+  ROS_INFO("[UavManager]: midair activation called by service");
 
   /* preconditions //{ */
 
