@@ -90,7 +90,7 @@ safety:
     # how often does it allow to escalate
     timeout: 2.0 # [s]
 
-    ehover: false
+    ehover: true
     eland: true
     failsafe: false
 
