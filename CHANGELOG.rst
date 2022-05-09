@@ -2,8 +2,8 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.3 (2022-05-09)
+------------------
 * added useful prints
 * added midair activatioin to simulation yamls
 * default gain manager: allow supersoft gains for aloam estimators
