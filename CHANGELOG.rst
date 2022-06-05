@@ -2,6 +2,25 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.3 (2022-05-09)
+------------------
+* added useful prints
+* added midair activatioin to simulation yamls
+* default gain manager: allow supersoft gains for aloam estimators
+* + rc handoff for eland/failsafe
+* added constraints override
+* refactored agains publisher handler
+* refactored control manager
+* updated transformer interface
+* added install for forgotten NullTracker
+* + install in cmakelists
+* small config comments fix
+* naki: default to se3controller
+* add configs: simulation/naki
+* add ScopeTimer and its logger to all managers via CommonHandler; disabled by default
+* updated brus configs
+* Contributors: Pavel Petracek, Tomas Baca
+
 1.0.2 (2021-10-04)
 ------------------
 * fixed cmd odom attitude initialization bug

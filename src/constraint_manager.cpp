@@ -1,4 +1,4 @@
-#define VERSION "1.0.2.0"
+#define VERSION "1.0.3.0"
 
 /* includes //{ */
 
@@ -13,11 +13,15 @@
 #include <mrs_msgs/DynamicsConstraintsSrv.h>
 #include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/String.h>
+#include <mrs_msgs/ConstraintsOverride.h>
 
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/scope_timer.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
+#include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/service_client_handler.h>
+#include <mrs_lib/subscribe_handler.h>
 
 #include <dynamic_reconfigure/ReconfigureRequest.h>
 #include <dynamic_reconfigure/Reconfigure.h>
@@ -55,40 +59,47 @@ private:
 
   // | --------------------- service clients -------------------- |
 
-  ros::ServiceClient service_client_set_constraints_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::DynamicsConstraintsSrv> sc_set_constraints_;
 
-  // | ------------------ odometry diagnostics ------------------ |
+  // | ----------------------- subscribers ---------------------- |
 
-  ros::Subscriber subscriber_odometry_diagnostics_;
-  void            callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg);
-  bool            got_odometry_diagnostics_ = false;
-  std::mutex      mutex_odometry_diagnostics_;
-
-  mrs_msgs::OdometryDiag odometry_diagnostics_;
+  mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag> sh_odom_diag_;
 
   // | ------------- constraint management ------------- |
 
   bool setConstraints(std::string constraints_names);
 
   ros::ServiceServer service_server_set_constraints_;
-  bool               callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool               callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
   mrs_msgs::EstimatorType::_type_type last_estimator_type_;
+  std::string                         last_estimator_name_;
   std::mutex                          mutex_last_estimator_type_;
 
-  void       timerConstraintManagement(const ros::TimerEvent &event);
+  void       timerConstraintManagement(const ros::TimerEvent& event);
   ros::Timer timer_constraint_management_;
   int        _constraint_management_rate_;
 
   std::string current_constraints_;
   std::mutex  mutex_current_constraints_;
 
+  // | ------------------ constraints override ------------------ |
+
+  ros::ServiceServer service_server_constraints_override_;
+  bool               callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res);
+
+  std::atomic<bool>                    override_constraints_         = false;
+  std::atomic<bool>                    constraints_override_updated_ = false;
+  std::mutex                           mutex_constraints_override_;
+  mrs_msgs::ConstraintsOverrideRequest constraints_override_;
+
   // | ------------------ diagnostics publisher ----------------- |
 
-  void           timerDiagnostics(const ros::TimerEvent &event);
-  ros::Publisher publisher_diagnostics_;
-  ros::Timer     timer_diagnostics_;
-  int            _diagnostics_rate_;
+  mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics> ph_diagnostics_;
+
+  void       timerDiagnostics(const ros::TimerEvent& event);
+  ros::Timer timer_diagnostics_;
+  int        _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
 
@@ -102,7 +113,7 @@ private:
 
   // | ------------------------- helpers ------------------------ |
 
-  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
+  bool stringInVector(const std::string& value, const std::vector<std::string>& vector);
 };
 
 //}
@@ -111,7 +122,7 @@ private:
 
 void ConstraintManager::onInit() {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
@@ -211,20 +222,32 @@ void ConstraintManager::onInit() {
 
   current_constraints_ = "";
   last_estimator_type_ = -1;
+  last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
   service_server_set_constraints_ = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
 
-  service_client_set_constraints_ = nh_.serviceClient<mrs_msgs::DynamicsConstraintsSrv>("set_constraints_out");
+  service_server_constraints_override_ = nh_.advertiseService("constraints_override_in", &ConstraintManager::callbackConstraintsOverride, this);
+
+  sc_set_constraints_ = mrs_lib::ServiceClientHandler<mrs_msgs::DynamicsConstraintsSrv>(nh_, "set_constraints_out");
 
   // | ----------------------- subscribers ---------------------- |
-  subscriber_odometry_diagnostics_ =
-      nh_.subscribe("odometry_diagnostics_in", 1, &ConstraintManager::callbackOdometryDiagnostics, this, ros::TransportHints().tcpNoDelay());
+
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = "ConstraintManager";
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  sh_odom_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
 
   // | ----------------------- publishers ----------------------- |
 
-  publisher_diagnostics_ = nh_.advertise<mrs_msgs::ConstraintManagerDiagnostics>("diagnostics_out", 1);
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics>(nh_, "diagnostics_out", 1);
 
   // | ------------------------- timers ------------------------- |
 
@@ -277,7 +300,28 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
   srv_call.request = it->second;
 
-  bool res = service_client_set_constraints_.call(srv_call);
+  if (override_constraints_) {
+
+    auto constraints_override = mrs_lib::get_mutexed(mutex_constraints_override_, constraints_override_);
+
+    if (constraints_override.acceleration_horizontal > 0 &&
+        constraints_override.acceleration_horizontal <= srv_call.request.constraints.horizontal_acceleration) {
+      srv_call.request.constraints.horizontal_acceleration = constraints_override.acceleration_horizontal;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required horizontal acceleration override is out of bounds");
+    }
+
+    if (constraints_override.acceleration_vertical > 0 &&
+        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_ascending_acceleration &&
+        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_descending_acceleration) {
+      srv_call.request.constraints.vertical_ascending_acceleration  = constraints_override.acceleration_vertical;
+      srv_call.request.constraints.vertical_descending_acceleration = constraints_override.acceleration_vertical;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required vertical acceleration override is out of bounds");
+    }
+  }
+
+  bool res = sc_set_constraints_.call(srv_call);
 
   if (!res) {
 
@@ -305,41 +349,30 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 // |                          callbacks                         |
 // --------------------------------------------------------------
 
-// | --------------------- topic callbacks -------------------- |
-
-/* //{ callbackOdometryDiagnostics() */
-
-void ConstraintManager::callbackOdometryDiagnostics(const mrs_msgs::OdometryDiagConstPtr &msg) {
-
-  if (!is_initialized_)
-    return;
-
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometryDiagnostics");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::callbackOdometryDiagnostics", scope_timer_logger_, scope_timer_enabled_);
-
-  {
-    std::scoped_lock lock(mutex_odometry_diagnostics_);
-
-    odometry_diagnostics_ = *msg;
-  }
-
-  got_odometry_diagnostics_ = true;
-}
-
-//}
-
 // | -------------------- service callbacks ------------------- |
 
 /* //{ callbackSetConstraints() */
 
-bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
-
-  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
+  }
 
   std::stringstream ss;
+
+  if (!sh_odom_diag_.hasMsg()) {
+
+    ss << "missing odometry diagnostics";
+
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+
+    res.message = ss.str();
+    res.success = false;
+    return true;
+  }
+
+  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
 
   if (!stringInVector(req.value, _constraint_names_)) {
 
@@ -362,6 +395,8 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
     res.success = false;
     return true;
   }
+
+  override_constraints_ = false;
 
   // try to set the constraints
   if (!setConstraints(req.value)) {
@@ -388,28 +423,58 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request &req, m
 
 //}
 
+/* callackConstraintsOverride() //{ */
+
+bool ConstraintManager::callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res) {
+
+  if (!is_initialized_) {
+    return false;
+  }
+
+  {
+    std::scoped_lock lock(mutex_constraints_override_);
+
+    constraints_override_ = req;
+  }
+
+  override_constraints_         = true;
+  constraints_override_updated_ = true;
+
+  ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: setting constraints override");
+
+  res.message = "override set";
+  res.success = true;
+
+  return true;
+}
+
+//}
+
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
 
 /* timerConstraintManagement() //{ */
 
-void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) {
+void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerConstraintManagement", _constraint_management_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerConstraintManagement", scope_timer_logger_, scope_timer_enabled_);
 
-  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
-  auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
-  auto last_estimator_type  = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
+  auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
+  auto last_estimator_type = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
+  auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_name_);
 
-  if (!got_odometry_diagnostics_) {
+  if (!sh_odom_diag_.hasMsg()) {
     ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing odometry diagnostics!");
     return;
   }
+
+  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
 
   // | --- automatically set constraints when odometry.type changes -- |
   if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
@@ -430,6 +495,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) 
       if (stringInVector(current_constraints, _map_type_allowed_constraints_.at(odometry_diagnostics.estimator_type.name))) {
 
         last_estimator_type = odometry_diagnostics.estimator_type.type;
+        last_estimator_name = odometry_diagnostics.estimator_type.name;
 
         // else, try to set the fallback constraints
       } else {
@@ -440,6 +506,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) 
         if (setConstraints(it->second)) {
 
           last_estimator_type = odometry_diagnostics.estimator_type.type;
+          last_estimator_name = odometry_diagnostics.estimator_type.name;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: '%s'", it->second.c_str());
 
@@ -451,27 +518,45 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent &event) 
     }
   }
 
+  if (constraints_override_updated_) {
+
+    std::map<std::string, std::string>::iterator it;
+    it = _map_type_fallback_constraints_.find(last_estimator_name_);
+
+    ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: re-setting constraints with user value override");
+
+    if (setConstraints(it->second)) {
+      constraints_override_updated_ = false;
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: could not re-set the constraints!");
+    }
+  }
+
   mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_type, last_estimator_type_);
+  mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_name, last_estimator_name_);
 }
 
 //}
 
 /* timerDiagnostics() //{ */
 
-void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
+void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
-    return;
-
-  if (!got_odometry_diagnostics_) {
+  if (!is_initialized_) {
     return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
-  auto odometry_diagnostics = mrs_lib::get_mutexed(mutex_odometry_diagnostics_, odometry_diagnostics_);
-  auto current_constraints  = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
+  if (!sh_odom_diag_.hasMsg()) {
+    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing odometry diagnostics!");
+    return;
+  }
+
+  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
+
+  auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
 
   mrs_msgs::ConstraintManagerDiagnostics diagnostics;
 
@@ -500,12 +585,7 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
     diagnostics.current_values = it->second.constraints;
   }
 
-  try {
-    publisher_diagnostics_.publish(diagnostics);
-  }
-  catch (...) {
-    ROS_ERROR("[ConstraintManager]: exception caught during publishing topic %s", publisher_diagnostics_.getTopic().c_str());
-  }
+  ph_diagnostics_.publish(diagnostics);
 }
 
 //}
@@ -516,7 +596,7 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent &event) {
 
 /* stringInVector() //{ */
 
-bool ConstraintManager::stringInVector(const std::string &value, const std::vector<std::string> &vector) {
+bool ConstraintManager::stringInVector(const std::string& value, const std::vector<std::string>& vector) {
 
   if (std::find(vector.begin(), vector.end(), value) == vector.end()) {
     return false;
