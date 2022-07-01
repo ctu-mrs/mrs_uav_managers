@@ -18,6 +18,7 @@ controllers : [
   "FailsafeController",
   "EmergencyController",
   "MidairActivationController",
+  "MotorController",
 ]
 
 safety:

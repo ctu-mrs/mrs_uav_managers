@@ -34,3 +34,11 @@ MidairActivationController:
   eland_threshold: 3.0 # [m], position error triggering eland
   failsafe_threshold: 4.0 # [m], position error triggering failsafe land
   odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+
+MotorController:
+  address: "mrs_uav_controllers/MotorController"
+  namespace: "motor_controller"
+  eland_threshold: 0.0 # [m], position error triggering eland
+  failsafe_threshold: 0.0 # [m], position error triggering failsafe land
+  odometry_innovation_threshold: 0.0 # [m], position odometry innovation threshold
+  human_switchable: true

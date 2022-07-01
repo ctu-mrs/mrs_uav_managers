@@ -15,6 +15,7 @@ controllers : [
   "MpcController",
   "FailsafeController",
   "EmergencyController",
+  "MotorController",
 ]
 
 #- this is the "do nothing tracker", which is active when no other is

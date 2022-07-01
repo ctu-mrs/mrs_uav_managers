@@ -37,6 +37,7 @@
   <arg name="custom_config_mpc_controller" default="" />
   <arg name="custom_config_emergency_controller" default="" />
   <arg name="custom_config_se3_controller" default="" />
+  <arg name="custom_config_motor_controller" default="" />
   <arg name="custom_config_midair_activation_controller" default="" />
 
   <arg name="custom_config_motor_params" default="" />
@@ -98,6 +99,14 @@
       <rosparam if="$(eval not arg('custom_config_se3_controller') == '')" ns="se3_controller" file="$(arg custom_config_se3_controller)" />
       <param name="se3_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~se3_controller/profiler" to="profiler" />
+
+      <!-- MotorController -->
+      <rosparam ns="motor_controller" file="$(find mrs_uav_controllers)/config/default/motor.yaml" />
+      <rosparam ns="motor_controller" file="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor.yaml" />
+      <rosparam if="$(eval not arg('custom_config_motor_controller') == '')" ns="motor_controller" file="$(arg custom_config_motor_controller)" />
+      <param name="motor_controller/enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <remap from="~motor_controller/profiler" to="profiler" />
+      <remap from="~motor_controller/actuator_control_srv_out" to="~motor_controller/actuator_control_srv" />
 
       <!-- MPC controller -->
       <rosparam ns="mpc_controller" file="$(find mrs_uav_controllers)/config/default/mpc.yaml" />
