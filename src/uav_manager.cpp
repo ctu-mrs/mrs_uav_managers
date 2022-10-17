@@ -1253,6 +1253,24 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.message = ss.str();
       res.success = false;
       return true;
+
+    } else if (!sh_odometry_diagnostics_.hasMsg()) {
+
+      ss << "can not takeoff, missing odometry diagnostics!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      res.message = ss.str();
+      res.success = false;
+      return true;
+    }
+
+    const auto odom_diag = sh_odometry_diagnostics_.getMsg();
+    if (odom_diag->estimator_type.type == mrs_msgs::EstimatorType::DUMMY || odom_diag->altitude_type.type == mrs_msgs::AltitudeType::DUMMY ||
+        odom_diag->heading_type.type == mrs_msgs::HeadingType::DUMMY) {
+      ss << "can not takeoff, DUMMY estimator is active!";
+      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+      res.message = ss.str();
+      res.success = false;
+      return true;
     }
 
     if (number_of_takeoffs_ > 0) {
