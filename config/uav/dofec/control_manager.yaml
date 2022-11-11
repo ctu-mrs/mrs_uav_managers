@@ -1,0 +1,5 @@
+rc_joystick:
+
+  horizontal_speed: 2.00 # [m/s]
+  vertical_speed: 2.00 # [m/s]
+  heading_rate: 1.00 # [rad/s]
