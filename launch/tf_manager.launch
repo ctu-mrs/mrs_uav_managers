@@ -1,7 +1,7 @@
 <launch>
 
   <!-- args corresponding to environment variables -->
-  <arg name="UAV_NAME" default="$(env UAV_NAME)" />
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
