@@ -226,7 +226,7 @@
       <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~hw_api_diagnostics_in" to="mrs_uav_hw_api/diagnostics" />
-      <remap from="~rc_in" to="mavros/rc/in" />
+      <remap from="~hw_api_rc_in" to="mrs_uav_hw_api/rc_channels" />
 
       <!-- Subscribers and Services -->
       <remap from="~reference_in" to="~reference" />

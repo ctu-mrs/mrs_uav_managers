@@ -797,7 +797,7 @@ private:
   // | ------------------- RC joystick control ------------------ |
 
   // listening to the RC channels as told by pixhawk
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels> sh_rc_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels> sh_hw_api_rc_;
 
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
@@ -852,8 +852,9 @@ private:
   bool validateHwApiAttitudeRateCmd(const mrs_msgs::HwApiAttitudeRateCmd& cmd);
   bool validateVelocityReference(const mrs_msgs::VelocityReference& reference);
 
-  // translates the PWM raw value to a desired range
+  // translates the channel values to desired range
   double RCChannelToRange(double rc_value, double range, double deadband);
+
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
 
@@ -1676,7 +1677,7 @@ void ControlManager::onInit() {
   sh_max_height_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
   sh_joystick_       = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
   sh_gnss_           = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
-  sh_rc_             = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "rc_in", &ControlManager::callbackRC, this);
+  sh_hw_api_rc_      = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
 
   sh_hw_api_diagnostics_ =
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>(shopts, "hw_api_diagnostics_in", &ControlManager::callbackHwApiDiagnostics, this);
@@ -3021,7 +3022,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr() && sh_rc_.hasMsg()) {
+  if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr() && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
     mrs_msgs::VelocityReferenceStampedSrv::Request request;
@@ -3034,7 +3035,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     bool nothing_to_do = true;
 
     // copy member variables
-    mrs_msgs::HwApiRcChannelsConstPtr rc_channels = sh_rc_.getMsg();
+    mrs_msgs::HwApiRcChannelsConstPtr rc_channels = sh_hw_api_rc_.getMsg();
 
     if (rc_channels->channels.size() < 4) {
 
