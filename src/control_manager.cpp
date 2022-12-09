@@ -46,10 +46,10 @@
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
 
-#include <mavros_msgs/AttitudeTarget.h>
-#include <mavros_msgs/CommandLong.h>
-#include <mavros_msgs/State.h>
-#include <mavros_msgs/RCIn.h>
+#include <mrs_msgs/HwApiDiagnostics.h>
+#include <mrs_msgs/HwApiRcChannels.h>
+#include <mrs_msgs/HwApiAttitudeCmd.h>
+#include <mrs_msgs/HwApiAttitudeRateCmd.h>
 
 #include <std_msgs/Float64.h>
 
@@ -106,11 +106,6 @@
 /* defines //{ */
 
 #define TAU 2 * M_PI
-#define PWM_MIDDLE 1500
-#define PWM_MIN 1000
-#define PWM_MAX 2000
-#define PWM_DEADBAND 200
-#define PWM_RANGE PWM_MAX - PWM_MIN
 #define REF_X 0
 #define REF_Y 1
 #define REF_Z 2
@@ -121,6 +116,7 @@
 #define FAILSAFE_STR "failsafe"
 #define INPUT_UAV_STATE 0
 #define INPUT_ODOMETRY 1
+#define RC_DEADBAND 0.2
 
 //}
 
@@ -317,7 +313,7 @@ private:
 
   mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
   mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_pixhawk_odometry_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_local_;
 
   mrs_msgs::UavState uav_state_;
   mrs_msgs::UavState previous_uav_state_;
@@ -334,9 +330,7 @@ private:
   double uav_state_hiccup_factor_ = 1;
   int    uav_state_count_         = 0;
 
-  // | ------------------ Mavros GPS subscriber ----------------- |
-
-  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_mavros_gps_;
+  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
 
   // | ------------------ max height subscriber ----------------- |
 
@@ -381,7 +375,8 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
-  mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>         ph_control_output_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>          ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>      ph_hw_api_attitude_rate_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>           ph_position_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           ph_attitude_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_thrust_force_;
@@ -461,11 +456,11 @@ private:
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
-  mrs_lib::ServiceClientHandler<mavros_msgs::CommandLong> sch_mavros_command_long_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_eland_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_shutdown_;
-  mrs_lib::ServiceClientHandler<std_srvs::SetBool>        sch_set_odometry_callbacks_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger>        sch_parachute_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_arming_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_eland_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_shutdown_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_set_odometry_callbacks_;
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_parachute_;
 
   // min client
   ros::ServiceServer service_server_set_min_height_;
@@ -481,9 +476,9 @@ private:
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd_;
   std::mutex                          mutex_last_attitude_cmd_;
 
-  // | ----------------- Mavros state subscriber ---------------- |
+  // | -------------- HW API diagnostics subscriber ------------- |
 
-  mrs_lib::SubscribeHandler<mavros_msgs::State> sh_mavros_state_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics> sh_hw_api_diagnostics_;
 
   bool offboard_mode_          = false;
   bool offboard_mode_was_true_ = false;  // if it was even true
@@ -569,13 +564,12 @@ private:
   // topic callbacks
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
   void callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
-  void callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::State>& wrp);
-  void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
-  void callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wrp);
+  void callbackHwApiDiagnostics(mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>& wrp);
+  void callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
+  void callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp);
 
   // topic timeouts
   void timeoutUavState(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
-  void timeoutMavrosState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
@@ -803,14 +797,14 @@ private:
   // | ------------------- RC joystick control ------------------ |
 
   // listening to the RC channels as told by pixhawk
-  mrs_lib::SubscribeHandler<mavros_msgs::RCIn> sh_rc_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels> sh_rc_;
 
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
 
   bool              _rc_goto_enabled_               = false;
   std::atomic<bool> rc_goto_active_                 = false;
-  int               rc_joystick_channel_last_value_ = PWM_MIDDLE;
+  double            rc_joystick_channel_last_value_ = 0.5;
   bool              rc_joystick_channel_was_low_    = false;
   int               _rc_joystick_channel_           = 0;
 
@@ -854,12 +848,12 @@ private:
   // checks for invalid messages in/out
   bool validateOdometry(const nav_msgs::Odometry& odometry);
   bool validateUavState(const mrs_msgs::UavState& uav_state);
-  bool validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget& attitude_target);
+  bool validateHwApiAttitudeCmd(const mrs_msgs::HwApiAttitudeCmd& cmd);
+  bool validateHwApiAttitudeRateCmd(const mrs_msgs::HwApiAttitudeRateCmd& cmd);
   bool validateVelocityReference(const mrs_msgs::VelocityReference& reference);
 
   // translates the PWM raw value to a desired range
   double RCChannelToRange(double rc_value, double range, double deadband);
-
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
 
@@ -1629,7 +1623,8 @@ void ControlManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_control_output_                     = mrs_lib::PublisherHandler<mavros_msgs::AttitudeTarget>(nh_, "control_output_out", 1);
+  ph_hw_api_attitude_cmd_                = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
+  ph_hw_api_attitude_rate_cmd_           = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
   ph_position_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>(nh_, "position_cmd_out", 1);
   ph_attitude_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
   ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
@@ -1676,15 +1671,15 @@ void ControlManager::onInit() {
     sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
   }
 
-  sh_pixhawk_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odometry_in");
-  sh_bumper_           = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_height_       = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_joystick_         = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_mavros_gps_       = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_gps_in", &ControlManager::callbackMavrosGps, this);
-  sh_rc_               = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &ControlManager::callbackRC, this);
+  sh_odometry_local_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "local_odometry_in");
+  sh_bumper_         = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_height_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_joystick_       = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_           = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
+  sh_rc_             = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "rc_in", &ControlManager::callbackRC, this);
 
-  sh_mavros_state_ = mrs_lib::SubscribeHandler<mavros_msgs::State>(shopts, "mavros_state_in", ros::Duration(0.05), &ControlManager::timeoutMavrosState, this,
-                                                                   &ControlManager::callbackMavrosState, this);
+  sh_hw_api_diagnostics_ =
+      mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>(shopts, "hw_api_diagnostics_in", &ControlManager::callbackHwApiDiagnostics, this);
 
   // | -------------------- general services -------------------- |
 
@@ -1719,7 +1714,7 @@ void ControlManager::onInit() {
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
   service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start_in", &ControlManager::callbackGotoTrajectoryStart, this);
 
-  sch_mavros_command_long_    = mrs_lib::ServiceClientHandler<mavros_msgs::CommandLong>(nh_, "mavros_command_long_out");
+  sch_arming_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "hw_api_arming_out");
   sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
   sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "shutdown_out");
   sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
@@ -2452,7 +2447,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
-      !sh_pixhawk_odometry_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
+      !sh_odometry_local_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -3039,7 +3034,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     bool nothing_to_do = true;
 
     // copy member variables
-    mavros_msgs::RCInConstPtr rc_channels = sh_rc_.getMsg();
+    mrs_msgs::HwApiRcChannelsConstPtr rc_channels = sh_rc_.getMsg();
 
     if (rc_channels->channels.size() < 4) {
 
@@ -3637,15 +3632,15 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
 
 //}
 
-/* //{ callbackMavrosGps() */
+/* //{ callbackGNSS() */
 
-void ControlManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+void ControlManager::callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosGps");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosGps", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGNSS");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
 
   sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
@@ -3775,20 +3770,20 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
 //}
 
-/* //{ callbackMavrosState() */
+/* //{ callbackHwApiDiagnostics() */
 
-void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::State>& wrp) {
+void ControlManager::callbackHwApiDiagnostics(mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>& wrp) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosState");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosState", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
-  mavros_msgs::StateConstPtr state = wrp.getMsg();
+  mrs_msgs::HwApiDiagnosticsConstPtr state = wrp.getMsg();
 
   // | ------ detect and print the changes in offboard mode ----- |
-  if (state->mode == "OFFBOARD") {
+  if (state->offboard) {
 
     if (!offboard_mode_) {
       offboard_mode_          = true;
@@ -3825,7 +3820,7 @@ void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wrp) {
+void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp) {
 
   if (!is_initialized_)
     return;
@@ -3833,7 +3828,7 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
 
-  mavros_msgs::RCInConstPtr rc = wrp.getMsg();
+  mrs_msgs::HwApiRcChannelsConstPtr rc = wrp.getMsg();
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
@@ -3849,8 +3844,8 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
     } else {
 
-      bool channel_low  = rc->channels[_rc_joystick_channel_] < (PWM_MIDDLE - PWM_DEADBAND) ? true : false;
-      bool channel_high = rc->channels[_rc_joystick_channel_] > (PWM_MIDDLE + PWM_DEADBAND) ? true : false;
+      bool channel_low  = rc->channels[_rc_joystick_channel_] < (0.5 - RC_DEADBAND) ? true : false;
+      bool channel_high = rc->channels[_rc_joystick_channel_] > (0.5 + RC_DEADBAND) ? true : false;
 
       if (channel_low) {
         rc_joystick_channel_was_low_ = true;
@@ -3859,7 +3854,7 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
       // rc control activation
       if (!rc_goto_active_) {
 
-        if (rc_joystick_channel_last_value_ < (PWM_MIDDLE - PWM_DEADBAND) && channel_high) {
+        if (rc_joystick_channel_last_value_ < (0.5 - RC_DEADBAND) && channel_high) {
 
           if (isFlyingNormally()) {
 
@@ -3969,20 +3964,6 @@ void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& 
 
     failsafe();
   }
-}
-
-//}
-
-/* timeoutMavrosState() //{ */
-
-void ControlManager::timeoutMavrosState([[maybe_unused]] const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
-
-  ros::Duration time = ros::Time::now() - last_msg;
-
-  ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Not recieving Mavros state message for '%.3f s'! Setup the PixHawk SD card!!", time.toSec());
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: This could be also caused by the not being PixHawk booted properly due to, e.g., antispark connector jerkyness.");
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: The Mavros state should be supplied at 100 Hz to provided fast refresh rate on the state of the OFFBOARD mode.");
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: If missing, the UAV could be disarmed by safety routines while not knowing it has switched to the MANUAL mode.");
 }
 
 //}
@@ -4271,8 +4252,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     prereq_check = false;
   }
 
-  if (!sh_mavros_state_.hasMsg() || (ros::Time::now() - sh_mavros_state_.lastMsgTime()).toSec() > 1.0) {
-    ss << "can not switch motors ON, missing mavros state!";
+  if (!sh_hw_api_diagnostics_.hasMsg() || (ros::Time::now() - sh_hw_api_diagnostics_.lastMsgTime()).toSec() > 1.0) {
+    ss << "can not switch motors ON, missing HW API diagnostics!";
     prereq_check = false;
   }
 
@@ -6357,20 +6338,13 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
 bool ControlManager::isOffboard(void) {
 
-  if (!sh_mavros_state_.hasMsg()) {
+  if (!sh_hw_api_diagnostics_.hasMsg()) {
     return false;
   }
 
-  mavros_msgs::StateConstPtr mavros_state = sh_mavros_state_.getMsg();
+  mrs_msgs::HwApiDiagnosticsConstPtr hw_api_diag = sh_hw_api_diagnostics_.getMsg();
 
-  if ((ros::Time::now() - sh_mavros_state_.lastMsgTime()).toSec() < 1.0 && mavros_state->mode == "OFFBOARD") {
-
-    return true;
-
-  } else {
-
-    return false;
-  }
+  return hw_api_diag->connected && hw_api_diag->offboard;
 }
 
 //}
@@ -7575,7 +7549,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
     failsafe_attitude_cmd          = *last_attitude_cmd;
-    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_pixhawk_odometry_.getMsg()->pose.pose.orientation).getYaw();
+    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_odometry_local_.getMsg()->pose.pose.orientation).getYaw();
     failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
 
     mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
@@ -7980,23 +7954,13 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
     return std::tuple(false, ss.str());
   }
 
-  mavros_msgs::CommandLong srv_out;
+  std_srvs::SetBool srv_out;
 
-  srv_out.request.broadcast    = false;
-  srv_out.request.command      = 400;  // the code for arming
-  srv_out.request.confirmation = true;
-
-  srv_out.request.param1 = input ? 1 : 0;      // arm or disarm?
-  srv_out.request.param2 = input ? 0 : 21196;  // 21196 allows to disarm even in mid-flight
-  srv_out.request.param3 = 0;
-  srv_out.request.param4 = 0;
-  srv_out.request.param5 = 0;
-  srv_out.request.param6 = 0;
-  srv_out.request.param7 = 0;
+  srv_out.request.data = input ? 1 : 0;  // arm or disarm?
 
   ROS_INFO("[ControlManager]: calling for %s", input ? "arming" : "disarming");
 
-  if (sch_mavros_command_long_.call(srv_out)) {
+  if (sch_arming_.call(srv_out)) {
 
     if (srv_out.response.success) {
 
@@ -8024,7 +7988,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
     }
 
   } else {
-    ss << "calling for " << (input ? "arming" : "disarming") << " resulted in failure: '" << srv_out.response.result << "'";
+    ss << "calling for " << (input ? "arming" : "disarming") << " resulted in failure: '" << srv_out.response.message << "'";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
   }
 
@@ -8245,7 +8209,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (!sh_pixhawk_odometry_.hasMsg()) {
+  if (!sh_odometry_local_.hasMsg()) {
 
     ss << "can not switch tracker, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -8404,7 +8368,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (!sh_pixhawk_odometry_.hasMsg()) {
+  if (!sh_odometry_local_.hasMsg()) {
 
     ss << "can not switch controller, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -8857,94 +8821,74 @@ void ControlManager::publish(void) {
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
-  mavros_msgs::AttitudeTarget attitude_target;
-  attitude_target.header.stamp    = ros::Time::now();
-  attitude_target.header.frame_id = "base_link";
+  mrs_msgs::HwApiAttitudeCmd attitude_target;
+  attitude_target.stamp = ros::Time::now();
 
-  bool should_publish = false;
+  mrs_msgs::HwApiAttitudeRateCmd attitude_rate_target;
+  attitude_rate_target.stamp = ros::Time::now();
 
   if (!motors_) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
 
-    should_publish = false;
-
   } else if (active_tracker_idx == _null_tracker_idx_) {
 
     ROS_WARN_THROTTLE(5.0, "[ControlManager]: 'NullTracker' is active, not controlling");
 
-    // set the desired attitude to the current odometry
-    // better than setting it to something unrelated
-    attitude_target.orientation = uav_state.pose.orientation;
-
     // set the desired rate to 0
-    attitude_target.body_rate.x = 0.0;
-    attitude_target.body_rate.y = 0.0;
-    attitude_target.body_rate.z = 0.0;
+    attitude_rate_target.body_rate.x = 0.0;
+    attitude_rate_target.body_rate.y = 0.0;
+    attitude_rate_target.body_rate.z = 0.0;
 
-    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+    attitude_rate_target.throttle = _min_thrust_null_tracker_;
 
-    attitude_target.thrust = _min_thrust_null_tracker_;
-
-    should_publish = true;
+    ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
   } else if (active_tracker_idx != _null_tracker_idx_ && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything",
                       _controller_names_[active_controller_idx].c_str());
 
-    // set the desired attitude to the current odometry
-    // better than setting it to something unrelated
-    attitude_target.orientation = uav_state.pose.orientation;
+    attitude_rate_target.body_rate.x = 0.0;
+    attitude_rate_target.body_rate.y = 0.0;
+    attitude_rate_target.body_rate.z = 0.0;
 
-    attitude_target.body_rate.x = 0.0;
-    attitude_target.body_rate.y = 0.0;
-    attitude_target.body_rate.z = 0.0;
+    attitude_rate_target.throttle = _min_thrust_null_tracker_;
 
-    attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
-
-    attitude_target.thrust = _min_thrust_null_tracker_;
-
-    should_publish = true;
+    ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
   } else if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    attitude_target.thrust = last_attitude_cmd->thrust;
-
     if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE) {
 
+      attitude_target.throttle    = last_attitude_cmd->thrust;
       attitude_target.orientation = last_attitude_cmd->attitude;
 
-      attitude_target.body_rate.x = 0.0;
-      attitude_target.body_rate.y = 0.0;
-      attitude_target.body_rate.z = 0.0;
-
-      attitude_target.type_mask = attitude_target.IGNORE_YAW_RATE | attitude_target.IGNORE_ROLL_RATE | attitude_target.IGNORE_PITCH_RATE;
+      if (validateHwApiAttitudeCmd(attitude_target)) {
+        ph_hw_api_attitude_cmd_.publish(attitude_target);
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude cmd is not valid just before publishing!");
+        return;
+      }
 
     } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
 
-      attitude_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
-      attitude_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
-      attitude_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
+      attitude_rate_target.throttle = last_attitude_cmd->thrust;
 
-      attitude_target.orientation = last_attitude_cmd->attitude;
+      attitude_rate_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
+      attitude_rate_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
+      attitude_rate_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
 
-      attitude_target.type_mask = attitude_target.IGNORE_ATTITUDE;
+      if (validateHwApiAttitudeRateCmd(attitude_rate_target)) {
+        ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude rate cmd is not valid just before publishing!");
+        return;
+      }
     }
 
-    should_publish = true;
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
-  }
-
-  if (should_publish) {
-
-    if (!validateMavrosAttitudeTarget(attitude_target)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the target attitude is not valid just before publishing, returning");
-      return;
-    }
-
-    ph_control_output_.publish(attitude_target);
   }
 
   // | --------- publish the attitude_cmd for debugging --------- |
@@ -9469,53 +9413,69 @@ bool ControlManager::validateUavState(const mrs_msgs::UavState& uav_state) {
 
 //}
 
-/* validateMavrosAttitudeTarget() //{ */
+/* validateHwApiAttitudeCmd() //{ */
 
-bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTarget& attitude_target) {
+bool ControlManager::validateHwApiAttitudeCmd(const mrs_msgs::HwApiAttitudeCmd& cmd) {
 
   // check the orientation
 
-  if (!std::isfinite(attitude_target.orientation.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.x'!!!");
+  if (!std::isfinite(cmd.orientation.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.orientation.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_target.orientation.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.y'!!!");
+  if (!std::isfinite(cmd.orientation.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.orientation.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_target.orientation.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.z'!!!");
+  if (!std::isfinite(cmd.orientation.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.orientation.z'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_target.orientation.w)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.orientation.w'!!!");
+  if (!std::isfinite(cmd.orientation.w)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.orientation.w'!!!");
     return false;
   }
+
+  // check the throttle
+
+  if (!std::isfinite(cmd.throttle)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.throttle'!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateHwApiAttitudeRateCmd() //{ */
+
+bool ControlManager::validateHwApiAttitudeRateCmd(const mrs_msgs::HwApiAttitudeRateCmd& cmd) {
 
   // check the body rate
 
-  if (!std::isfinite(attitude_target.body_rate.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.x'!!!");
+  if (!std::isfinite(cmd.body_rate.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.body_rate.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_target.body_rate.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.y'!!!");
+  if (!std::isfinite(cmd.body_rate.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.body_rate.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(attitude_target.body_rate.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.body_rate.z'!!!");
+  if (!std::isfinite(cmd.body_rate.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.body_rate.z'!!!");
     return false;
   }
 
-  // check the thrust
+  // check the throttle
 
-  if (!std::isfinite(attitude_target.thrust)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'attitude_target.thrust'!!!");
+  if (!std::isfinite(cmd.throttle)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'cmd.throttle'!!!");
     return false;
   }
 
@@ -9528,8 +9488,7 @@ bool ControlManager::validateMavrosAttitudeTarget(const mavros_msgs::AttitudeTar
 
 double ControlManager::RCChannelToRange(double rc_value, double range, double deadband) {
 
-  double tmp_0_to_1    = (rc_value - double(PWM_MIN)) / (double(PWM_RANGE));
-  double tmp_neg1_to_1 = (tmp_0_to_1 - 0.5) * 2.0;
+  double tmp_neg1_to_1 = (rc_value - 0.5) * 2.0;
 
   if (tmp_neg1_to_1 > 1.0) {
     tmp_neg1_to_1 = 1.0;

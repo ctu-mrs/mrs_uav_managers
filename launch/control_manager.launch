@@ -220,12 +220,12 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~uav_state_in" to="odometry/uav_state" />
       <remap from="~odometry_innovation_in" to="odometry/odom_main_innovation" />
-      <remap from="~mavros_odometry_in" to="mavros/local_position/odom" />
-      <remap from="~mavros_gps_in" to="mavros/global_position/global" />
+      <remap from="~local_odometry_in" to="mrs_uav_hw_api/odometry_local" />
+      <remap from="~gnss_in" to="mrs_uav_hw_api/gnss" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
-      <remap from="~mavros_state_in" to="mavros/state" />
+      <remap from="~hw_api_diagnostics_in" to="mrs_uav_hw_api/diagnostics" />
       <remap from="~rc_in" to="mavros/rc/in" />
 
       <!-- Subscribers and Services -->
@@ -246,7 +246,8 @@
       <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->
-      <remap from="~control_output_out" to="mavros/setpoint_raw/attitude" />
+      <remap from="~hw_api_attitude_cmd_out" to="mrs_uav_hw_api/attitude_cmd" />
+      <remap from="~hw_api_attitude_rate_cmd_out" to="mrs_uav_hw_api/attitude_rate_cmd" />
       <remap from="~cmd_odom_out" to="~cmd_odom" />
       <remap from="~position_cmd_out" to="~position_cmd" />
       <remap from="~attitude_cmd_out" to="~attitude_cmd" />
@@ -285,7 +286,7 @@
       <remap from="~set_gains_out" to="gain_manager/set_gains" />
       <remap from="~set_constraints_in" to="~set_constraints" />
       <remap from="~use_joystick_in" to="~use_joystick" />
-      <remap from="~mavros_command_long_out" to="mavros/cmd/command" />
+      <remap from="~hw_api_arming_out" to="mrs_uav_hw_api/arming" />
       <remap from="~arm_in" to="~arm" />
       <remap from="~eland_in" to="~eland" />
       <remap from="~failsafe_in" to="~failsafe" />
