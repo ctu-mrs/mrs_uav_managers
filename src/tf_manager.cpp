@@ -35,8 +35,8 @@ public:
   virtual void onInit();
   bool         is_initialized_ = false;
 
-  void            callbackMavrosOdometry(const nav_msgs::OdometryConstPtr& msg);
-  ros::Subscriber sub_odom_mavros_;
+  void            callbackHwApiOdometryLocal(const nav_msgs::OdometryConstPtr& msg);
+  ros::Subscriber sub_hw_api_odom_local_;
 
   void            callbackImu(const sensor_msgs::ImuConstPtr& msg);
   ros::Subscriber sub_imu_;
@@ -105,7 +105,7 @@ void TfManager::onInit() {
 
   /* subscribers //{ */
 
-  // subscribe to mavros odometry
+  // subscribe to HW API local odometry
 
   if (imu_mode) {
 
@@ -115,7 +115,7 @@ void TfManager::onInit() {
   } else {
 
     ROS_INFO("[TfManager]: using odometry data for publishing of untilted frame");
-    sub_odom_mavros_ = nh.subscribe("odom_mavros_in", 1, &TfManager::callbackMavrosOdometry, this, ros::TransportHints().tcpNoDelay());
+    sub_hw_api_odom_local_ = nh.subscribe("hw_api_local_odom_in", 1, &TfManager::callbackHwApiOdometryLocal, this, ros::TransportHints().tcpNoDelay());
   }
 
 
@@ -140,14 +140,15 @@ void TfManager::onInit() {
 
 // | ------------------------ callbacks ----------------------- |
 
-/* //{ callbackMavrosOdometry() */
-void TfManager::callbackMavrosOdometry(const nav_msgs::OdometryConstPtr& msg) {
+/* //{ callbackHwApiOdometryLocal() */
+
+void TfManager::callbackHwApiOdometryLocal(const nav_msgs::OdometryConstPtr& msg) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosOdometry");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("TfManager::callbackMavrosOdometry", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiOdometryLocal");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("TfManager::callbackHwApiOdometryLocal", scope_timer_logger_, scope_timer_enabled_);
 
   publishTf(msg->pose.pose.orientation);
 }

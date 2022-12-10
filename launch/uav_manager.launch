@@ -67,8 +67,8 @@
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~attitude_cmd_in" to="control_manager/attitude_cmd" />
       <remap from="~position_cmd_in" to="control_manager/position_cmd" />
-      <remap from="~mavros_state_in" to="mavros/state" />
-      <remap from="~mavros_gps_in" to="mavros/global_position/global" />
+      <remap from="~hw_api_diagnostics_in" to="hw_api/diagnostics" />
+      <remap from="~hw_api_gnss_in" to="hw_api/gnss" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/height" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
@@ -97,7 +97,7 @@
       <remap from="~pirouette_out" to="control_manager/pirouette" />
       <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
-      <remap from="~offboard_out" to="mavros/set_mode" />
+      <remap from="~offboard_out" to="hw_api/offboard" />
       <remap from="~midair_activation_in" to="~midair_activation" />
 
     </node>

@@ -16,9 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   )
 
-# find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
-find_package(mavros_msgs REQUIRED)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -32,13 +29,11 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${LIBRARIES}
   CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
-  DEPENDS mavros_msgs
   )
 
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${mavros_msgs_INCLUDE_DIRS}
   )
 
 # ControlManager
@@ -54,7 +49,6 @@ add_dependencies(ControlManager
 
 target_link_libraries(ControlManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
 # NullTracker
@@ -70,7 +64,6 @@ add_dependencies(NullTracker
 
 target_link_libraries(NullTracker
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
 # UavManager
@@ -86,7 +79,6 @@ add_dependencies(UavManager
 
 target_link_libraries(UavManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
 # GainManager
@@ -102,7 +94,6 @@ add_dependencies(GainManager
 
 target_link_libraries(GainManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
 # ConstraintManager
@@ -118,7 +109,6 @@ add_dependencies(ConstraintManager
 
 target_link_libraries(ConstraintManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
 # TfManager
