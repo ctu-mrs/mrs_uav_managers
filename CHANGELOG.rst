@@ -2,6 +2,13 @@
 Changelog for package mrs_uav_managers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.4 (2023-01-20)
+------------------
+* added big dofec simulation configs
+* updated dofec params
+* fixed launch, env->optenv
+* Contributors: Tomas Baca, Vaclav Pritzl
+
 1.0.3 (2022-05-09)
 ------------------
 * added useful prints
