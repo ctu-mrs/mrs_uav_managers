@@ -18,7 +18,7 @@ gain_management:
     BRICK: ["supersoft", "soft"]
     T265: ["supersoft", "soft"]
     OBJECT: ["supersoft"]
-    VIO: ["supersoft"]
+    VIO: ["supersoft", "soft"]
     LIDAR: ["supersoft"]
     RTK: ["supersoft"]
     OPTFLOWGPS: ["supersoft"]
@@ -41,7 +41,7 @@ gain_management:
     BRICK: "supersoft"
     T265: "supersoft"
     OBJECT: "supersoft"
-    VIO: "supersoft"
+    VIO: "soft"
     LIDAR: "supersoft"
     RTK: "supersoft"
     OPTFLOWGPS: "supersoft"
