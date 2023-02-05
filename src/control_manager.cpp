@@ -21,6 +21,7 @@
 #include <mrs_msgs/ValidateReference.h>
 #include <mrs_msgs/ValidateReferenceList.h>
 #include <mrs_msgs/BumperParamsSrv.h>
+#include <mrs_msgs/TrackerCommand.h>
 
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -377,7 +378,7 @@ private:
 
   mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>          ph_hw_api_attitude_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>      ph_hw_api_attitude_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>           ph_position_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           ph_attitude_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_thrust_force_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_cmd_odom_;
@@ -469,8 +470,8 @@ private:
   // | --------- trackers' and controllers' last results -------- |
 
   // the last result of an active tracker
-  mrs_msgs::PositionCommand::ConstPtr last_position_cmd_;
-  std::mutex                          mutex_last_position_cmd_;
+  mrs_msgs::TrackerCommand::ConstPtr last_tracker_cmd_;
+  std::mutex                         mutex_last_tracker_cmd_;
 
   // the last result of an active controller
   mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd_;
@@ -842,7 +843,7 @@ private:
   void publish(void);
 
   // checks for invalid values in the result from trackers
-  bool validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command);
+  bool validateTrackerCommand(const mrs_msgs::TrackerCommand::ConstPtr tracker_command);
   bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command);
 
   // checks for invalid messages in/out
@@ -899,7 +900,7 @@ void ControlManager::onInit() {
   ROS_INFO("[ControlManager]: initializing");
 
   last_attitude_cmd_ = mrs_msgs::AttitudeCommand::Ptr();
-  last_position_cmd_ = mrs_msgs::PositionCommand::Ptr();
+  last_tracker_cmd_  = mrs_msgs::TrackerCommand::Ptr();
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -1592,7 +1593,7 @@ void ControlManager::onInit() {
 
   ROS_INFO("[ControlManager]: activating the null tracker");
 
-  tracker_list_[_null_tracker_idx_]->activate(last_position_cmd_);
+  tracker_list_[_null_tracker_idx_]->activate(last_tracker_cmd_);
   active_tracker_idx_ = _null_tracker_idx_;
 
   // --------------------------------------------------------------
@@ -1626,7 +1627,7 @@ void ControlManager::onInit() {
 
   ph_hw_api_attitude_cmd_                = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
   ph_hw_api_attitude_rate_cmd_           = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
-  ph_position_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::PositionCommand>(nh_, "position_cmd_out", 1);
+  ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
   ph_attitude_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
   ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
   ph_cmd_odom_                           = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
@@ -1789,7 +1790,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd  = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto yaw_error         = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto [position_error_x, position_error_y, position_error_z] =
       mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
@@ -1863,7 +1864,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |                  publish the control error                 |
   // --------------------------------------------------------------
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::ControlError msg_out;
 
@@ -2442,7 +2443,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto [uav_state, uav_yaw]  = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_yaw_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -2470,7 +2471,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // This means that the timerFailsafe only does its work when Controllers and Trackers produce valid output.
   // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
     return;
   }
 
@@ -2485,9 +2486,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   {
     std::scoped_lock lock(mutex_control_error_);
 
-    position_error_x_ = last_position_cmd->position.x - uav_state.pose.position.x;
-    position_error_y_ = last_position_cmd->position.y - uav_state.pose.position.y;
-    position_error_z_ = last_position_cmd->position.z - uav_state.pose.position.z;
+    position_error_x_ = last_tracker_cmd->position.x - uav_state.pose.position.x;
+    position_error_y_ = last_tracker_cmd->position.y - uav_state.pose.position.y;
+    position_error_z_ = last_tracker_cmd->position.z - uav_state.pose.position.z;
   }
 
   // rotate the drone's z axis
@@ -2523,11 +2524,11 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto [position_error_x, position_error_y, position_error_z] =
       mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
 
-  if (last_position_cmd->use_position_horizontal && last_position_cmd->use_position_vertical) {
+  if (last_tracker_cmd->use_position_horizontal && last_tracker_cmd->use_position_vertical) {
     control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
-  } else if (last_position_cmd->use_position_horizontal) {
+  } else if (last_tracker_cmd->use_position_horizontal) {
     control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2));
-  } else if (last_position_cmd->use_position_vertical) {
+  } else if (last_tracker_cmd->use_position_vertical) {
     control_error = fabs(position_error_z);
   }
 
@@ -3022,7 +3023,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (rc_goto_active_ && last_position_cmd_ != mrs_msgs::PositionCommand::Ptr() && sh_hw_api_rc_.hasMsg()) {
+  if (rc_goto_active_ && last_tracker_cmd_ != mrs_msgs::TrackerCommand::Ptr() && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
     mrs_msgs::VelocityReferenceStampedSrv::Request request;
@@ -3186,13 +3187,13 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
   // set the reference
   mrs_msgs::ReferenceStamped reference_request;
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   reference_request.header.frame_id      = "";
   reference_request.header.stamp         = ros::Time(0);
-  reference_request.reference.position.x = last_position_cmd->position.x;
-  reference_request.reference.position.y = last_position_cmd->position.y;
-  reference_request.reference.position.z = last_position_cmd->position.z;
+  reference_request.reference.position.x = last_tracker_cmd->position.x;
+  reference_request.reference.position.y = last_tracker_cmd->position.y;
+  reference_request.reference.position.z = last_tracker_cmd->position.z;
   reference_request.reference.heading    = pirouette_initial_heading_ + pirouette_iterator_ * pirouette_step_size;
 
   // enable the callbacks for the active tracker
@@ -4945,8 +4946,8 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped original_reference;
@@ -4980,13 +4981,13 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
-    from_point.reference.position.x = last_position_cmd->position.x;
-    from_point.reference.position.y = last_position_cmd->position.y;
-    from_point.reference.position.z = last_position_cmd->position.z;
+    from_point.reference.position.x = last_tracker_cmd->position.x;
+    from_point.reference.position.y = last_tracker_cmd->position.y;
+    from_point.reference.position.z = last_tracker_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the path is going outside the safety area!");
@@ -5042,8 +5043,8 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped original_reference;
@@ -5077,13 +5078,13 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
     return true;
   }
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
-    from_point.reference.position.x = last_position_cmd->position.x;
-    from_point.reference.position.y = last_position_cmd->position.y;
-    from_point.reference.position.z = last_position_cmd->position.z;
+    from_point.reference.position.x = last_tracker_cmd->position.x;
+    from_point.reference.position.y = last_tracker_cmd->position.y;
+    from_point.reference.position.z = last_tracker_cmd->position.z;
 
     if (!isPathToPointInSafetyArea2d(from_point, transformed_reference)) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the path is going outside the safety area!");
@@ -5110,8 +5111,8 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // get the transformer
   auto ret = transformer_->getTransform(uav_state.header.frame_id, req.list.header.frame_id, req.list.header.stamp);
@@ -5172,13 +5173,13 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
       res.success[i] = false;
     }
 
-    if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+    if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
       mrs_msgs::ReferenceStamped from_point;
       from_point.header.frame_id      = uav_state.header.frame_id;
-      from_point.reference.position.x = last_position_cmd->position.x;
-      from_point.reference.position.y = last_position_cmd->position.y;
-      from_point.reference.position.z = last_position_cmd->position.z;
+      from_point.reference.position.x = last_tracker_cmd->position.x;
+      from_point.reference.position.y = last_tracker_cmd->position.y;
+      from_point.reference.position.z = last_tracker_cmd->position.z;
 
       if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
         res.success[i] = false;
@@ -5400,9 +5401,9 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoRelative");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoRelative", scope_timer_logger_, scope_timer_enabled_);
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5411,10 +5412,10 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
-  des_reference.reference.position.x = last_position_cmd->position.x + req.goal[REF_X];
-  des_reference.reference.position.y = last_position_cmd->position.y + req.goal[REF_Y];
-  des_reference.reference.position.z = last_position_cmd->position.z + req.goal[REF_Z];
-  des_reference.reference.heading    = last_position_cmd->heading + req.goal[REF_HEADING];
+  des_reference.reference.position.x = last_tracker_cmd->position.x + req.goal[REF_X];
+  des_reference.reference.position.y = last_tracker_cmd->position.y + req.goal[REF_Y];
+  des_reference.reference.position.z = last_tracker_cmd->position.z + req.goal[REF_Z];
+  des_reference.reference.heading    = last_tracker_cmd->heading + req.goal[REF_HEADING];
 
   auto [success, message] = setReference(des_reference);
 
@@ -5439,9 +5440,9 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoAltitude", scope_timer_logger_, scope_timer_enabled_);
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5450,10 +5451,10 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
-  des_reference.reference.position.x = last_position_cmd->position.x;
-  des_reference.reference.position.y = last_position_cmd->position.y;
+  des_reference.reference.position.x = last_tracker_cmd->position.x;
+  des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = req.goal;
-  des_reference.reference.heading    = last_position_cmd->heading;
+  des_reference.reference.heading    = last_tracker_cmd->heading;
 
   auto [success, message] = setReference(des_reference);
 
@@ -5478,9 +5479,9 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeading");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeading", scope_timer_logger_, scope_timer_enabled_);
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5489,9 +5490,9 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
-  des_reference.reference.position.x = last_position_cmd->position.x;
-  des_reference.reference.position.y = last_position_cmd->position.y;
-  des_reference.reference.position.z = last_position_cmd->position.z;
+  des_reference.reference.position.x = last_tracker_cmd->position.x;
+  des_reference.reference.position.y = last_tracker_cmd->position.y;
+  des_reference.reference.position.z = last_tracker_cmd->position.z;
   des_reference.reference.heading    = req.goal;
 
   auto [success, message] = setReference(des_reference);
@@ -5517,9 +5518,9 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeadingRelative", scope_timer_logger_, scope_timer_enabled_);
 
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5528,10 +5529,10 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
   mrs_msgs::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
   des_reference.header.stamp         = ros::Time(0);
-  des_reference.reference.position.x = last_position_cmd->position.x;
-  des_reference.reference.position.y = last_position_cmd->position.y;
-  des_reference.reference.position.z = last_position_cmd->position.z;
-  des_reference.reference.heading    = last_position_cmd->heading + req.goal;
+  des_reference.reference.position.x = last_tracker_cmd->position.x;
+  des_reference.reference.position.y = last_tracker_cmd->position.y;
+  des_reference.reference.position.z = last_tracker_cmd->position.z;
+  des_reference.reference.heading    = last_tracker_cmd->heading + req.goal;
 
   auto [success, message] = setReference(des_reference);
 
@@ -5584,8 +5585,8 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // transform the reference to the current frame
   auto ret = transformer_->transformSingle(reference_in, uav_state.header.frame_id);
@@ -5612,13 +5613,13 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
-    from_point.reference.position.x = last_position_cmd->position.x;
-    from_point.reference.position.y = last_position_cmd->position.y;
-    from_point.reference.position.z = last_position_cmd->position.z;
+    from_point.reference.position.x = last_tracker_cmd->position.x;
+    from_point.reference.position.y = last_tracker_cmd->position.y;
+    from_point.reference.position.z = last_tracker_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
       ss << "failed to set the reference, the path is going outside the safety area!";
@@ -5673,9 +5674,9 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   }
 
   {
-    std::scoped_lock lock(mutex_last_position_cmd_);
+    std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-    if (last_position_cmd_ == mrs_msgs::PositionCommand::Ptr()) {
+    if (last_tracker_cmd_ == mrs_msgs::TrackerCommand::Ptr()) {
       ss << "could not set velocity command, not flying!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str());
@@ -5683,8 +5684,8 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   }
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // | -- transform the velocity reference to the current frame - |
 
@@ -5773,13 +5774,13 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     return std::tuple(false, ss.str());
   }
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
-    from_point.reference.position.x = last_position_cmd->position.x;
-    from_point.reference.position.y = last_position_cmd->position.y;
-    from_point.reference.position.z = last_position_cmd->position.z;
+    from_point.reference.position.x = last_tracker_cmd->position.x;
+    from_point.reference.position.y = last_tracker_cmd->position.y;
+    from_point.reference.position.z = last_tracker_cmd->position.z;
 
     if (!isPathToPointInSafetyArea3d(from_point, eqivalent_reference)) {
       ss << "failed to set the reference, the path is going outside the safety area!";
@@ -5820,8 +5821,8 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
     const mrs_msgs::TrajectoryReference trajectory_in) {
 
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_position_cmd = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   std::stringstream ss;
 
@@ -6043,11 +6044,11 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     mrs_msgs::ReferenceStamped x_current_frame;
     x_current_frame.header = uav_state.header;
 
-    if (last_position_cmd_ != mrs_msgs::PositionCommand::Ptr()) {
+    if (last_tracker_cmd_ != mrs_msgs::TrackerCommand::Ptr()) {
 
-      x_current_frame.reference.position.x = last_position_cmd->position.x;
-      x_current_frame.reference.position.y = last_position_cmd->position.y;
-      x_current_frame.reference.position.z = last_position_cmd->position.z;
+      x_current_frame.reference.position.x = last_tracker_cmd->position.x;
+      x_current_frame.reference.position.y = last_tracker_cmd->position.y;
+      x_current_frame.reference.position.z = last_tracker_cmd->position.z;
 
     } else if (got_uav_state_) {
 
@@ -7348,7 +7349,7 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   // copy the member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
@@ -7416,7 +7417,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
-  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -7501,7 +7502,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -8191,7 +8192,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
   // copy member variables
   auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd  = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   std::stringstream ss;
@@ -8248,7 +8249,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
       ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx].c_str());
 
-      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_position_cmd);
+      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd);
 
       if (!success) {
 
@@ -8350,7 +8351,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   std::stringstream ss;
@@ -8427,7 +8428,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           std::scoped_lock lock(mutex_tracker_list_);
 
           tracker_list_[active_tracker_idx_]->deactivate();
-          tracker_list_[active_tracker_idx_]->activate(mrs_msgs::PositionCommand::Ptr());
+          tracker_list_[active_tracker_idx_]->activate(mrs_msgs::TrackerCommand::Ptr());
         }
 
         {
@@ -8485,8 +8486,8 @@ void ControlManager::updateTrackers(void) {
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  mrs_msgs::PositionCommand::ConstPtr tracker_output_cmd;
-  mrs_msgs::UavState::ConstPtr        uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
+  mrs_msgs::TrackerCommand::ConstPtr tracker_output_cmd;
+  mrs_msgs::UavState::ConstPtr       uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
   // for each tracker
   for (int i = 0; i < int(tracker_list_.size()); i++) {
@@ -8527,11 +8528,11 @@ void ControlManager::updateTrackers(void) {
     }
   }
 
-  if (tracker_output_cmd != mrs_msgs::PositionCommand::Ptr() && validatePositionCommand(tracker_output_cmd)) {
+  if (tracker_output_cmd != mrs_msgs::TrackerCommand::Ptr() && validateTrackerCommand(tracker_output_cmd)) {
 
-    std::scoped_lock lock(mutex_last_position_cmd_);
+    std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-    last_position_cmd_ = tracker_output_cmd;
+    last_tracker_cmd_ = tracker_output_cmd;
 
   } else {
 
@@ -8558,9 +8559,9 @@ void ControlManager::updateTrackers(void) {
 
     } else {
 
-      std::scoped_lock lock(mutex_last_position_cmd_);
+      std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-      last_position_cmd_ = tracker_output_cmd;
+      last_tracker_cmd_ = tracker_output_cmd;
     }
   }
 }
@@ -8575,7 +8576,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   // --------------------------------------------------------------
@@ -8587,7 +8588,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
   mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
   // the trackers are not running
-  if (last_position_cmd == mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
 
     mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
@@ -8617,7 +8618,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
+        controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
       }
     }
 
@@ -8632,7 +8633,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_position_cmd);
+          controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8657,7 +8658,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state_const_ptr, last_position_cmd);
+          controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8723,7 +8724,7 @@ void ControlManager::publish(void) {
 
   // copy member variables
   auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_position_cmd     = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -8732,12 +8733,12 @@ void ControlManager::publish(void) {
   // |                  publish the position cmd                  |
   // --------------------------------------------------------------
 
-  if (last_position_cmd != mrs_msgs::PositionCommand::Ptr()) {
+  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
 
     // publish the odom topic (position command for debugging, e.g. rviz)
     nav_msgs::Odometry cmd_odom;
 
-    cmd_odom.header = last_position_cmd->header;
+    cmd_odom.header = last_tracker_cmd->header;
 
     if (cmd_odom.header.frame_id == "") {
       cmd_odom.header.frame_id = uav_state.header.frame_id;
@@ -8747,34 +8748,34 @@ void ControlManager::publish(void) {
       cmd_odom.header.stamp = ros::Time::now();
     }
 
-    if (last_position_cmd->use_position_horizontal) {
-      cmd_odom.pose.pose.position.x = last_position_cmd->position.x;
-      cmd_odom.pose.pose.position.y = last_position_cmd->position.y;
+    if (last_tracker_cmd->use_position_horizontal) {
+      cmd_odom.pose.pose.position.x = last_tracker_cmd->position.x;
+      cmd_odom.pose.pose.position.y = last_tracker_cmd->position.y;
     } else {
       cmd_odom.pose.pose.position.x = uav_state.pose.position.x;
       cmd_odom.pose.pose.position.y = uav_state.pose.position.y;
     }
 
-    if (last_position_cmd->use_position_vertical) {
-      cmd_odom.pose.pose.position.z = last_position_cmd->position.z;
+    if (last_tracker_cmd->use_position_vertical) {
+      cmd_odom.pose.pose.position.z = last_tracker_cmd->position.z;
     } else {
       cmd_odom.pose.pose.position.z = uav_state.pose.position.z;
     }
 
     // transform the velocity in the reference to the child_frame
-    if (last_position_cmd->use_velocity_horizontal || last_position_cmd->use_velocity_vertical) {
+    if (last_tracker_cmd->use_velocity_horizontal || last_tracker_cmd->use_velocity_vertical) {
       cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_;
 
       geometry_msgs::Vector3Stamped velocity;
-      velocity.header = last_position_cmd->header;
+      velocity.header = last_tracker_cmd->header;
 
-      if (last_position_cmd->use_velocity_horizontal) {
-        velocity.vector.x = last_position_cmd->velocity.x;
-        velocity.vector.y = last_position_cmd->velocity.y;
+      if (last_tracker_cmd->use_velocity_horizontal) {
+        velocity.vector.x = last_tracker_cmd->velocity.x;
+        velocity.vector.y = last_tracker_cmd->velocity.y;
       }
 
-      if (last_position_cmd->use_velocity_vertical) {
-        velocity.vector.z = last_position_cmd->velocity.z;
+      if (last_tracker_cmd->use_velocity_vertical) {
+        velocity.vector.z = last_tracker_cmd->velocity.z;
       }
 
       auto res = transformer_->transformSingle(velocity, cmd_odom.child_frame_id);
@@ -8804,12 +8805,12 @@ void ControlManager::publish(void) {
       // use just the heading from position command
     } else {
 
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_position_cmd->heading);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_tracker_cmd->heading);
     }
 
     ph_cmd_odom_.publish(cmd_odom);
 
-    ph_position_cmd_.publish(last_position_cmd);
+    ph_tracker_cmd_.publish(last_tracker_cmd);
 
     // publish the twist topic (velocity command in body frame for external controllers)
     geometry_msgs::Twist cmd_twist;
@@ -8938,126 +8939,126 @@ std::string ControlManager::resolveFrameName(const std::string in) {
 
 /* validateTrackerCommand() //{ */
 
-bool ControlManager::validatePositionCommand(const mrs_msgs::PositionCommand::ConstPtr position_command) {
+bool ControlManager::validateTrackerCommand(const mrs_msgs::TrackerCommand::ConstPtr tracker_command) {
 
   // check positions
 
-  if (!std::isfinite(position_command->position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.x'!!!");
+  if (!std::isfinite(tracker_command->position.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->position.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.y'!!!");
+  if (!std::isfinite(tracker_command->position.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->position.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->position.z'!!!");
+  if (!std::isfinite(tracker_command->position.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->position.z'!!!");
     return false;
   }
 
   // check velocities
 
-  if (!std::isfinite(position_command->velocity.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.x'!!!");
+  if (!std::isfinite(tracker_command->velocity.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->velocity.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->velocity.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.y'!!!");
+  if (!std::isfinite(tracker_command->velocity.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->velocity.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->velocity.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->velocity.z'!!!");
+  if (!std::isfinite(tracker_command->velocity.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->velocity.z'!!!");
     return false;
   }
 
   // check accelerations
 
-  if (!std::isfinite(position_command->acceleration.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.x'!!!");
+  if (!std::isfinite(tracker_command->acceleration.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->acceleration.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->acceleration.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.y'!!!");
+  if (!std::isfinite(tracker_command->acceleration.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->acceleration.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->acceleration.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->acceleration.z'!!!");
+  if (!std::isfinite(tracker_command->acceleration.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->acceleration.z'!!!");
     return false;
   }
 
   // check jerk
 
-  if (!std::isfinite(position_command->jerk.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.x'!!!");
+  if (!std::isfinite(tracker_command->jerk.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->jerk.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->jerk.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.y'!!!");
+  if (!std::isfinite(tracker_command->jerk.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->jerk.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->jerk.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->jerk.z'!!!");
+  if (!std::isfinite(tracker_command->jerk.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->jerk.z'!!!");
     return false;
   }
 
   // check snap
 
-  if (!std::isfinite(position_command->snap.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.x'!!!");
+  if (!std::isfinite(tracker_command->snap.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->snap.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->snap.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.y'!!!");
+  if (!std::isfinite(tracker_command->snap.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->snap.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->snap.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->snap.z'!!!");
+  if (!std::isfinite(tracker_command->snap.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->snap.z'!!!");
     return false;
   }
 
   // check attitude rate
 
-  if (!std::isfinite(position_command->attitude_rate.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.x'!!!");
+  if (!std::isfinite(tracker_command->attitude_rate.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->attitude_rate.x'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->attitude_rate.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.y'!!!");
+  if (!std::isfinite(tracker_command->attitude_rate.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->attitude_rate.y'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->attitude_rate.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->attitude_rate.z'!!!");
+  if (!std::isfinite(tracker_command->attitude_rate.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->attitude_rate.z'!!!");
     return false;
   }
 
   // check heading
 
-  if (!std::isfinite(position_command->heading)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->heading'!!!");
+  if (!std::isfinite(tracker_command->heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->heading'!!!");
     return false;
   }
 
-  if (!std::isfinite(position_command->heading_rate)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->heading_rate'!!!");
+  if (!std::isfinite(tracker_command->heading_rate)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->heading_rate'!!!");
     return false;
   }
 
   // check thrust
 
-  if (!std::isfinite(position_command->thrust)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'position_command->thrust'!!!");
+  if (!std::isfinite(tracker_command->thrust)) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'tracker_command->thrust'!!!");
     return false;
   }
 
@@ -9569,7 +9570,7 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
 
-  auto last_position_cmd   = mrs_lib::get_mutexed(mutex_last_position_cmd_, last_position_cmd_);
+  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
 
@@ -9597,15 +9598,15 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
       stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_descending_acceleration) + 1.0;
     }
 
-    reference_out.reference.position.z = last_position_cmd->position.z + vel_reference.reference.velocity.z * stopping_time_z;
+    reference_out.reference.position.z = last_tracker_cmd->position.z + vel_reference.reference.velocity.z * stopping_time_z;
   }
 
   {
     double stopping_time_x = 1.5 * (fabs(vel_reference.reference.velocity.x) / current_constraints.constraints.horizontal_acceleration) + 1.0;
     double stopping_time_y = 1.5 * (fabs(vel_reference.reference.velocity.y) / current_constraints.constraints.horizontal_acceleration) + 1.0;
 
-    reference_out.reference.position.x = last_position_cmd->position.x + vel_reference.reference.velocity.x * stopping_time_x;
-    reference_out.reference.position.y = last_position_cmd->position.y + vel_reference.reference.velocity.y * stopping_time_y;
+    reference_out.reference.position.x = last_tracker_cmd->position.x + vel_reference.reference.velocity.x * stopping_time_x;
+    reference_out.reference.position.y = last_tracker_cmd->position.y + vel_reference.reference.velocity.y * stopping_time_y;
   }
 
   return reference_out;

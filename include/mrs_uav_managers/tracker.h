@@ -7,7 +7,7 @@
 
 #include <mrs_uav_managers/common_handlers.h>
 
-#include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/UavState.h>
 
@@ -70,7 +70,7 @@ public:
    *
    * @return true if success and message
    */
-  virtual std::tuple<bool, std::string> activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) = 0;
+  virtual std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd) = 0;
 
   /**
    * @brief is called when this trackers output is no longer needed. However, it can be activated later.
@@ -102,8 +102,8 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
-                                                           const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
+  virtual const mrs_msgs::TrackerCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
+                                                          const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
 
   /**
    * @brief A request for the tracker's status.

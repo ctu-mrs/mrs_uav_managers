@@ -15,7 +15,7 @@
 #include <mrs_msgs/Vec4.h>
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/AttitudeCommand.h>
-#include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/Float64.h>
 #include <mrs_msgs/BoolStamped.h>
@@ -109,7 +109,7 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_hw_api_gnss_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
-  mrs_lib::SubscribeHandler<mrs_msgs::PositionCommand>              sh_position_cmd_;
+  mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>               sh_position_cmd_;
 
   void callbackHwApiGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
@@ -413,7 +413,7 @@ void UavManager::onInit() {
   sh_constraints_diag_     = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_hw_api_gnss_          = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "hw_api_gnss_in", &UavManager::callbackHwApiGNSS, this);
   sh_max_height_           = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_position_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::PositionCommand>(shopts, "position_cmd_in");
+  sh_position_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>(shopts, "position_cmd_in");
 
   // | ----------------------- publishers ----------------------- |
 

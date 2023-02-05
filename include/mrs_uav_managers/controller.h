@@ -9,7 +9,7 @@
 
 #include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/ControllerStatus.h>
-#include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/UavState.h>
 
 #include <mrs_msgs/DynamicsConstraintsSrv.h>
@@ -75,8 +75,8 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
-                                                           const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) = 0;
+  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &      uav_state,
+                                                           const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd) = 0;
 
   /**
    * @brief A request for the controller's status.
