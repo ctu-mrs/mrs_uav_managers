@@ -13,7 +13,7 @@ public:
   ~NullTracker(){};
 
   void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers);
-  std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd);
+  std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd);
   void                          deactivate(void);
   bool                          resetStatic(void);
 
@@ -67,7 +67,7 @@ void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] 
 
 /* //{ activate() */
 
-std::tuple<bool, std::string> NullTracker::activate([[maybe_unused]] const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd) {
+std::tuple<bool, std::string> NullTracker::activate([[maybe_unused]] const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd) {
 
   std::stringstream ss;
   ss << "activated";

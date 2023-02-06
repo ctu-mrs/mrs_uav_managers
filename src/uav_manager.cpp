@@ -109,7 +109,7 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_hw_api_gnss_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
-  mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>               sh_position_cmd_;
+  mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>               sh_tracker_cmd_;
 
   void callbackHwApiGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
@@ -413,7 +413,7 @@ void UavManager::onInit() {
   sh_constraints_diag_     = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_hw_api_gnss_          = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "hw_api_gnss_in", &UavManager::callbackHwApiGNSS, this);
   sh_max_height_           = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_position_cmd_         = mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>(shopts, "position_cmd_in");
+  sh_tracker_cmd_          = mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>(shopts, "tracker_cmd_in");
 
   // | ----------------------- publishers ----------------------- |
 
@@ -531,7 +531,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
   double desired_thrust              = sh_attitude_cmd_.getMsg()->thrust;
   auto   odometry                    = sh_odometry_.getMsg();
-  auto   position_cmd                = sh_position_cmd_.getMsg();
+  auto   tracker_cmd                 = sh_tracker_cmd_.getMsg();
 
   auto res = transformer_->transformSingle(land_there_reference, odometry->header.frame_id);
 
@@ -551,10 +551,10 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == FLY_THERE_STATE) {
 
-    auto [pos_x, pos_y, pos_z] = mrs_lib::getPosition(*position_cmd);
+    auto [pos_x, pos_y, pos_z] = mrs_lib::getPosition(*tracker_cmd);
     auto [ref_x, ref_y, ref_z] = mrs_lib::getPosition(land_there_current_frame);
 
-    double pos_heading = position_cmd->heading;
+    double pos_heading = tracker_cmd->heading;
 
     double ref_heading = 0;
     try {
@@ -1441,7 +1441,7 @@ bool UavManager::callbackLand([[maybe_unused]] std_srvs::Trigger::Request& req, 
       return true;
     }
 
-    if (!sh_position_cmd_.hasMsg()) {
+    if (!sh_tracker_cmd_.hasMsg()) {
       ss << "can not land, missing position cmd!";
       res.message = ss.str();
       res.success = false;
@@ -1518,7 +1518,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
       return true;
     }
 
-    if (!sh_position_cmd_.hasMsg()) {
+    if (!sh_tracker_cmd_.hasMsg()) {
       ss << "can not land, missing position cmd!";
       res.message = ss.str();
       res.success = false;
@@ -1667,7 +1667,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
       return true;
     }
 
-    if (!sh_position_cmd_.hasMsg()) {
+    if (!sh_tracker_cmd_.hasMsg()) {
       ss << "can not land, missing position cmd!";
       res.message = ss.str();
       res.success = false;

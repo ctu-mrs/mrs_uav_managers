@@ -71,12 +71,12 @@ public:
    * @brief The most important routine. It is called with every odometry update and it should produce a new control command.
    *
    * @param uav_state the latest UAV state estimate
-   * @param last_position_cmd the last controller's output command (may be useful)
+   * @param last_tracker_cmd the last controller's output command (may be useful)
    *
    * @return the new reference for the controllers
    */
   virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &      uav_state,
-                                                           const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd) = 0;
+                                                           const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd) = 0;
 
   /**
    * @brief A request for the controller's status.

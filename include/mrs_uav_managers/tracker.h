@@ -66,11 +66,11 @@ public:
   /**
    * @brief It is called before the trackers output will be required and used. Should not take much time (within miliseconds).
    *
-   * @param last_position_cmd the last command produced by the last active tracker. Should be used as an initial condition to maintain a smooth reference.
+   * @param last_tracker_cmd the last command produced by the last active tracker. Should be used as an initial condition to maintain a smooth reference.
    *
    * @return true if success and message
    */
-  virtual std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_position_cmd) = 0;
+  virtual std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd) = 0;
 
   /**
    * @brief is called when this trackers output is no longer needed. However, it can be activated later.
