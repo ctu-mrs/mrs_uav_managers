@@ -203,6 +203,8 @@ public:
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
 
+Tracker::~Tracker(){};
+
 }  // namespace mrs_uav_managers
 
 #endif

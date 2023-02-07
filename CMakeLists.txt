@@ -40,6 +40,7 @@ include_directories(
 
 add_library(ControlManager
   src/control_manager.cpp
+  src/common/common.cpp
   )
 
 add_dependencies(ControlManager

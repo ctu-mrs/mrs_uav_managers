@@ -21,19 +21,27 @@
 namespace mrs_uav_managers
 {
 
-// parameters of the propulsion thrust curve
-// T = A*sqrt(F) + B
-// T is within [0, 1]
-// F is in Newtons
-struct MotorParams
-{
-  double A;
-  double B;
-};
-
 class Controller {
 public:
+  typedef struct ControllerOutputs_t
+  {
+    bool position      = false;
+    bool velocity      = false;
+    bool acceleration  = false;
+    bool attitude      = false;
+    bool attitude_rate = false;
+    bool control_group = false;
+    bool actuators     = false;
+  } ControllerOutputs;
+
   virtual ~Controller() = 0;
+
+  /**
+   * @brief Queries the controller for its output modalities.
+   *
+   * @return The handled output modalities.
+   */
+  virtual mrs_uav_managers::Controller::ControllerOutputs probeControllerOutputs(void) = 0;
 
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
@@ -75,8 +83,9 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &      uav_state,
-                                                           const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd) = 0;
+  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &                   uav_state,
+                                                           const mrs_msgs::TrackerCommand::ConstPtr &             last_tracker_cmd,
+                                                           const mrs_uav_managers::Controller::ControllerOutputs &output_modalities) = 0;
 
   /**
    * @brief A request for the controller's status.
@@ -102,6 +111,9 @@ public:
    */
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
 };
+
+// A pure virtual destructor requires a function body.
+Controller::~Controller(){};
 
 }  // namespace mrs_uav_managers
 

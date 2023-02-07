@@ -225,6 +225,7 @@
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
+      <remap from="~hw_api_mode_in" to="hw_api/mode" />
       <remap from="~hw_api_diagnostics_in" to="hw_api/diagnostics" />
       <remap from="~hw_api_rc_in" to="hw_api/rc_channels" />
 
