@@ -51,8 +51,13 @@
 
 #include <mrs_msgs/HwApiDiagnostics.h>
 #include <mrs_msgs/HwApiRcChannels.h>
-#include <mrs_msgs/HwApiAttitudeCmd.h>
+#include <mrs_msgs/HwApiActuatorCmd.h>
+#include <mrs_msgs/HwApiControlGroupCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
+#include <mrs_msgs/HwApiAttitudeCmd.h>
+#include <mrs_msgs/HwApiAccelerationCmd.h>
+#include <mrs_msgs/HwApiVelocityCmd.h>
+#include <mrs_msgs/HwApiPositionCmd.h>
 #include <mrs_msgs/HwApiMode.h>
 
 #include <std_msgs/Float64.h>
@@ -259,8 +264,13 @@ private:
 
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode> sh_hw_api_mode_;
 
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>     ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>     ph_hw_api_actuator_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd> ph_hw_api_control_group_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd> ph_hw_api_attitude_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>     ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationCmd> ph_hw_api_acceleration_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityCmd>     ph_hw_api_velocity_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>     ph_hw_api_position_cmd_;
 
   Controller::ControllerOutputs _hw_api_inputs_;
 
@@ -493,8 +503,8 @@ private:
   std::mutex                         mutex_last_tracker_cmd_;
 
   // the last result of an active controller
-  mrs_msgs::AttitudeCommand::ConstPtr last_attitude_cmd_;
-  std::mutex                          mutex_last_attitude_cmd_;
+  Controller::ControlOutput last_control_output_;
+  std::mutex                mutex_last_control_output_;
 
   // | -------------- HW API diagnostics subscriber ------------- |
 
@@ -534,13 +544,12 @@ private:
   double _yaw_error_eland_ = 0;  // [rad]
 
   // keeping track of control errors
-  double     tilt_error_       = 0;
-  double     yaw_error_        = 0;
-  double     position_error_x_ = 0;
-  double     position_error_y_ = 0;
-  double     position_error_z_ = 0;
-  std::mutex mutex_attitude_error_;
-  std::mutex mutex_control_error_;
+  std::optional<double> tilt_error_ = 0;
+  std::optional<double> yaw_error_  = 0;
+  std::mutex            mutex_attitude_error_;
+
+  std::optional<Eigen::Vector3d> position_error_;
+  std::mutex                     mutex_position_error_;
 
   // control error for triggering failsafe, eland, etc.
   // this filled with the current controllers failsafe threshold
@@ -932,8 +941,10 @@ void ControlManager::initialize(void) {
 
   ROS_INFO("[ControlManager]: initializing");
 
-  last_attitude_cmd_ = mrs_msgs::AttitudeCommand::Ptr();
-  last_tracker_cmd_  = mrs_msgs::TrackerCommand::Ptr();
+  last_control_output_.control_output      = {};
+  last_control_output_.desired_orientation = {};
+
+  last_tracker_cmd_ = mrs_msgs::TrackerCommand::Ptr();
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -1138,24 +1149,17 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("body_disturbance_x", _initial_body_disturbance_x_);
   param_loader.loadParam("body_disturbance_y", _initial_body_disturbance_y_);
 
-  mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
-  last_attitude_cmd_ = output_command;
+  last_control_output_.diagnostics.total_mass      = _uav_mass_;
+  last_control_output_.diagnostics.mass_difference = 0.0;
 
-  output_command->total_mass      = _uav_mass_;
-  output_command->mass_difference = 0.0;
+  last_control_output_.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
+  last_control_output_.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+  last_control_output_.diagnostics.disturbance_wx_w = 0.0;
+  last_control_output_.diagnostics.disturbance_wy_w = 0.0;
+  last_control_output_.diagnostics.disturbance_bx_w = 0.0;
+  last_control_output_.diagnostics.disturbance_by_w = 0.0;
 
-  output_command->disturbance_bx_b = _initial_body_disturbance_x_;
-  output_command->disturbance_by_b = _initial_body_disturbance_y_;
-  output_command->disturbance_wx_w = 0.0;
-  output_command->disturbance_wy_w = 0.0;
-  output_command->disturbance_bx_w = 0.0;
-  output_command->disturbance_by_w = 0.0;
-
-  output_command->thrust = _min_thrust_null_tracker_;
-
-  output_command->controller = "none";
-
-  output_command->attitude = mrs_lib::AttitudeConverter(0, 0, 0);
+  last_control_output_.diagnostics.controller = "none";
 
   // --------------------------------------------------------------
   // |         common handler for trackers and controllers        |
@@ -1431,6 +1435,66 @@ void ControlManager::initialize(void) {
     param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
     param_loader.loadParam(controller_name + "/human_switchable", human_switchable, false);
 
+    // check if the controller cna output some of the required outputs
+    {
+
+      Controller::ControllerOutputs outputs;
+      param_loader.loadParam(controller_name + "/outputs/actuators", outputs.actuators, false);
+      param_loader.loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
+      param_loader.loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/attitude", outputs.attitude, false);
+      param_loader.loadParam(controller_name + "/outputs/acceleration", outputs.acceleration, false);
+      param_loader.loadParam(controller_name + "/outputs/velocity", outputs.velocity, false);
+      param_loader.loadParam(controller_name + "/outputs/position", outputs.position, false);
+
+      bool meets_actuators     = (_hw_api_inputs_.actuators && outputs.actuators);
+      bool meets_control_group = (_hw_api_inputs_.control_group && outputs.control_group);
+      bool meets_attitude_rate = (_hw_api_inputs_.attitude_rate && outputs.attitude_rate);
+      bool meets_attitude      = (_hw_api_inputs_.attitude && outputs.attitude);
+      bool meets_acceleration  = (_hw_api_inputs_.acceleration && outputs.acceleration);
+      bool meets_velocity      = (_hw_api_inputs_.velocity && outputs.velocity);
+      bool meets_position      = (_hw_api_inputs_.position && outputs.position);
+
+      bool meets_requirements =
+          meets_actuators || meets_control_group || meets_attitude_rate || meets_attitude || meets_acceleration || meets_velocity || meets_position;
+
+      if (!meets_requirements) {
+
+        ROS_ERROR("[ControlManager]: the controller '%s' does not meet the control output requirements, which are some of the following",
+                  controller_name.c_str());
+
+        if (_hw_api_inputs_.actuators) {
+          ROS_ERROR("[ControlManager]: - actuators");
+        }
+
+        if (_hw_api_inputs_.control_group) {
+          ROS_ERROR("[ControlManager]: - control group");
+        }
+
+        if (_hw_api_inputs_.attitude_rate) {
+          ROS_ERROR("[ControlManager]: - attitude rate");
+        }
+
+        if (_hw_api_inputs_.attitude) {
+          ROS_ERROR("[ControlManager]: - attitude");
+        }
+
+        if (_hw_api_inputs_.acceleration) {
+          ROS_ERROR("[ControlManager]: - acceleration");
+        }
+
+        if (_hw_api_inputs_.velocity) {
+          ROS_ERROR("[ControlManager]: - velocity");
+        }
+
+        if (_hw_api_inputs_.position) {
+          ROS_ERROR("[ControlManager]: - position");
+        }
+
+        ros::shutdown();
+      }
+    }
+
     if (eland_threshold == 0) {
       eland_threshold = 1e6;
     }
@@ -1471,7 +1535,7 @@ void ControlManager::initialize(void) {
       it = controllers_.find(_controller_names_[i]);
 
       ROS_INFO("[ControlManager]: initializing the controller '%s'", it->second.address.c_str());
-      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _uav_mass_, common_handlers_);
+      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _uav_mass_, common_handlers_, _hw_api_inputs_);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: exception caught during controller initialization: '%s'", ex.what());
@@ -1549,7 +1613,7 @@ void ControlManager::initialize(void) {
 
   ROS_INFO("[ControlManager]: activating the the eland controller (%s) as the first controller", _controller_names_[_eland_controller_idx_].c_str());
 
-  controller_list_[_eland_controller_idx_]->activate(last_attitude_cmd_);
+  controller_list_[_eland_controller_idx_]->activate(last_control_output_.diagnostics);
   active_controller_idx_ = _eland_controller_idx_;
 
   // update the time
@@ -1572,8 +1636,15 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_hw_api_attitude_cmd_                = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
-  ph_hw_api_attitude_rate_cmd_           = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
+  // hw api control outputs
+  ph_hw_api_actuator_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd_", 1);
+  ph_hw_api_control_group_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh_, "hw_api_control_group_cmd_out", 1);
+  ph_hw_api_attitude_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
+  ph_hw_api_attitude_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
+  ph_hw_api_acceleration_cmd_  = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationCmd>(nh_, "hw_api_acceleration_cmd_out", 1);
+  ph_hw_api_velocity_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityCmd>(nh_, "hw_api_velocity_cmd_out", 1);
+  ph_hw_api_position_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>(nh_, "hw_api_position_cmd_out", 1);
+
   ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
   ph_attitude_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
   ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
@@ -1793,12 +1864,11 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_tracker_cmd  = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto yaw_error         = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
-  auto [position_error_x, position_error_y, position_error_z] =
-      mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
+  auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto yaw_error             = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
+  auto position_error        = mrs_lib::get_mutexed(mutex_position_error_, position_error_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -1814,11 +1884,11 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   {
     std::string controller = _controller_names_[active_controller_idx];
     std::string tracker    = _tracker_names_[active_tracker_idx];
-    double      mass       = last_attitude_cmd->total_mass;
-    double      bx_b       = last_attitude_cmd->disturbance_bx_b;
-    double      by_b       = last_attitude_cmd->disturbance_by_b;
-    double      wx_w       = last_attitude_cmd->disturbance_wx_w;
-    double      wy_w       = last_attitude_cmd->disturbance_wy_w;
+    double      mass       = last_control_output.diagnostics.total_mass;
+    double      bx_b       = last_control_output.diagnostics.disturbance_bx_b;
+    double      by_b       = last_control_output.diagnostics.disturbance_by_b;
+    double      wx_w       = last_control_output.diagnostics.disturbance_wx_w;
+    double      wy_w       = last_control_output.diagnostics.disturbance_wy_w;
 
     ROS_INFO_THROTTLE(5.0, "[ControlManager]: tracker: '%s', controller: '%s', mass: '%.2f kg', disturbances: body [%.2f, %.2f] N, world [%.2f, %.2f] N",
                       tracker.c_str(), controller.c_str(), mass, bx_b, by_b, wx_w, wy_w);
@@ -1857,30 +1927,36 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   {
     std::scoped_lock lock(mutex_attitude_error_);
 
-    mrs_msgs::Float64Stamped tilt_error_out;
-    tilt_error_out.header.stamp    = ros::Time::now();
-    tilt_error_out.header.frame_id = uav_state.header.frame_id;
-    tilt_error_out.value           = (180.0 / M_PI) * tilt_error_;
+    if (tilt_error_) {
 
-    ph_tilt_error_.publish(tilt_error_out);
+      mrs_msgs::Float64Stamped tilt_error_out;
+      tilt_error_out.header.stamp    = ros::Time::now();
+      tilt_error_out.header.frame_id = uav_state.header.frame_id;
+      tilt_error_out.value           = (180.0 / M_PI) * tilt_error_.value();
+
+      ph_tilt_error_.publish(tilt_error_out);
+    }
   }
 
   // --------------------------------------------------------------
   // |                  publish the control error                 |
   // --------------------------------------------------------------
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+  if (position_error_) {
 
     mrs_msgs::ControlError msg_out;
 
     msg_out.header.stamp    = ros::Time::now();
     msg_out.header.frame_id = uav_state.header.frame_id;
 
-    msg_out.position_errors.x    = position_error_x;
-    msg_out.position_errors.y    = position_error_y;
-    msg_out.position_errors.z    = position_error_z;
-    msg_out.total_position_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
-    msg_out.yaw_error            = yaw_error;
+    msg_out.position_errors.x    = position_error.value()[0];
+    msg_out.position_errors.y    = position_error.value()[1];
+    msg_out.position_errors.z    = position_error.value()[2];
+    msg_out.total_position_error = position_error->norm();
+
+    if (yaw_error_) {
+      msg_out.yaw_error = yaw_error.value();
+    }
 
     std::map<std::string, ControllerParams>::iterator it;
     it                                  = controllers_.find(_controller_names_[active_controller_idx]);
@@ -1894,10 +1970,10 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |                  publish the mass estimate                 |
   // --------------------------------------------------------------
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+  if (last_control_output.diagnostics.mass_estimator) {
 
     std_msgs::Float64 mass_estimate_out;
-    mass_estimate_out.data = _uav_mass_ + last_attitude_cmd->mass_difference;
+    mass_estimate_out.data = _uav_mass_ + last_control_output.diagnostics.mass_difference;
 
     ph_mass_estimate_.publish(mass_estimate_out);
   }
@@ -2276,7 +2352,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |              publish the disturbances markers              |
   // --------------------------------------------------------------
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr() && got_uav_state_) {
+  if (last_control_output.diagnostics.disturbance_estimator && got_uav_state_) {
 
     visualization_msgs::MarkerArray msg_out;
 
@@ -2326,8 +2402,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* tip //{ */
 
-      point.x = uav_x + multiplier * last_attitude_cmd->disturbance_wx_w;
-      point.y = uav_y + multiplier * last_attitude_cmd->disturbance_wy_w;
+      point.x = uav_x + multiplier * last_control_output.diagnostics.disturbance_wx_w;
+      point.y = uav_y + multiplier * last_control_output.diagnostics.disturbance_wy_w;
       point.z = uav_z;
 
       marker.points.push_back(point);
@@ -2388,7 +2464,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       /* tip //{ */
 
-      vec3d << multiplier * last_attitude_cmd->disturbance_bx_b, multiplier * last_attitude_cmd->disturbance_by_b, 0;
+      vec3d << multiplier * last_control_output.diagnostics.disturbance_bx_b, multiplier * last_control_output.diagnostics.disturbance_by_b, 0;
       vec3d = quat_eigen * vec3d;
 
       point.x = uav_x + vec3d[0];
@@ -2447,7 +2523,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerSafety", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto [uav_state, uav_yaw]  = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_, uav_yaw_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
@@ -2476,7 +2552,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // This means that the timerFailsafe only does its work when Controllers and Trackers produce valid output.
   // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr() || last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr() || !last_control_output.control_output) {
     return;
   }
 
@@ -2487,13 +2563,22 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     yaw_error_  = 0;
   }
 
-  // control errors
   {
-    std::scoped_lock lock(mutex_control_error_);
+    // TODO this is very clumsy
+    if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-    position_error_x_ = last_tracker_cmd->position.x - uav_state.pose.position.x;
-    position_error_y_ = last_tracker_cmd->position.y - uav_state.pose.position.y;
-    position_error_z_ = last_tracker_cmd->position.z - uav_state.pose.position.z;
+      std::scoped_lock lock(mutex_position_error_);
+
+      position_error_.value()[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
+      position_error_.value()[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
+    }
+
+    if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
+
+      std::scoped_lock lock(mutex_position_error_);
+
+      position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
+    }
   }
 
   // rotate the drone's z axis
@@ -2507,52 +2592,46 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | --------------------- the tilt error --------------------- |
 
-  // calculate the desired drone's z axis in the world frame
-  tf2::Transform attitude_cmd_transform = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
-  tf2::Vector3   uav_z_in_world_desired = attitude_cmd_transform * tf2::Vector3(0, 0, 1);
+  if (last_control_output.desired_orientation) {
 
-  {
-    std::scoped_lock lock(mutex_attitude_error_);
+    // calculate the desired drone's z axis in the world frame
+    tf2::Transform attitude_cmd_transform = mrs_lib::AttitudeConverter(last_control_output.desired_orientation.value());
+    tf2::Vector3   uav_z_in_world_desired = attitude_cmd_transform * tf2::Vector3(0, 0, 1);
 
-    // calculate the angle between the drone's z axis and the world's z axis
-    tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
+    {
+      std::scoped_lock lock(mutex_attitude_error_);
 
-    // calculate the yaw error
-    double cmd_yaw = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude).getYaw();
-    yaw_error_     = fabs(radians::diff(cmd_yaw, uav_yaw));
+      // calculate the angle between the drone's z axis and the world's z axis
+      tilt_error_ = acos(uav_z_in_world.dot(uav_z_in_world_desired));
+
+      // calculate the yaw error
+      double cmd_yaw = mrs_lib::AttitudeConverter(last_control_output.desired_orientation.value()).getYaw();
+      yaw_error_     = fabs(radians::diff(cmd_yaw, uav_yaw));
+    }
   }
 
-
-  // do not have to mutex the position error, since I am filling it in this function
-  double control_error = 0;
-
-  auto [position_error_x, position_error_y, position_error_z] =
-      mrs_lib::get_mutexed(mutex_control_error_, position_error_x_, position_error_y_, position_error_z_);
-
-  if (last_tracker_cmd->use_position_horizontal && last_tracker_cmd->use_position_vertical) {
-    control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2) + pow(position_error_z, 2));
-  } else if (last_tracker_cmd->use_position_horizontal) {
-    control_error = sqrt(pow(position_error_x, 2) + pow(position_error_y, 2));
-  } else if (last_tracker_cmd->use_position_vertical) {
-    control_error = fabs(position_error_z);
-  }
+  auto position_error          = mrs_lib::get_mutexed(mutex_position_error_, position_error_);
+  auto [tilt_error, yaw_error] = mrs_lib::get_mutexed(mutex_attitude_error_, tilt_error_, yaw_error_);
 
   // --------------------------------------------------------------
   // |   activate the failsafe controller in case of large error  |
   // --------------------------------------------------------------
 
-  if (control_error > _failsafe_threshold_ && !failsafe_triggered_) {
+  if (position_error) {
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+    if (position_error->norm() > _failsafe_threshold_ && !failsafe_triggered_) {
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if (!failsafe_triggered_) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        ROS_ERROR("[ControlManager]: activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _failsafe_threshold_,
-                  position_error_x, position_error_y, position_error_z);
+        if (!failsafe_triggered_) {
 
-        failsafe();
+          ROS_ERROR("[ControlManager]: activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(),
+                    _failsafe_threshold_, position_error.value()[0], position_error.value()[1], position_error.value()[2]);
+
+          failsafe();
+        }
       }
     }
   }
@@ -2617,34 +2696,39 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // | ----------------- position control error ----------------- |
 
-  if (control_error > _eland_threshold_ / 2.0) {
+  if (position_error) {
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+    double error_size = position_error->norm();
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+    if (error_size > _eland_threshold_ / 2.0) {
 
-      if (!failsafe_triggered_ && !eland_triggered_) {
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-        ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error,
-                           _eland_threshold_ / 2.0, position_error_x, position_error_y, position_error_z);
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-        ungripSrv();
+        if (!failsafe_triggered_ && !eland_triggered_) {
+
+          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", error_size,
+                             _eland_threshold_ / 2.0, position_error.value()[0], position_error.value()[1], position_error.value()[2]);
+
+          ungripSrv();
+        }
       }
     }
-  }
 
-  if (control_error > _eland_threshold_) {
+    if (error_size > _eland_threshold_) {
 
-    auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
+      auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
 
-      if (!failsafe_triggered_ && !eland_triggered_) {
+        if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", control_error, _eland_threshold_,
-                  position_error_x, position_error_y, position_error_z);
+          ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", error_size, _eland_threshold_,
+                    position_error.value()[0], position_error.value()[1], position_error.value()[2]);
 
-        eland();
+          eland();
+        }
       }
     }
   }
@@ -2652,9 +2736,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // | -------------------- yaw control error ------------------- |
   // do not have to mutex the yaw_error_ here since I am filling it in this function
 
-  if (_yaw_error_eland_enabled_) {
+  if (_yaw_error_eland_enabled_ && yaw_error) {
 
-    if (yaw_error_ > (_yaw_error_eland_ / 2.0)) {
+    if (yaw_error.value() > (_yaw_error_eland_ / 2.0)) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2662,7 +2746,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_,
+          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
                              (180.0 / M_PI) * _yaw_error_eland_ / 2.0);
 
           ungripSrv();
@@ -2670,7 +2754,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       }
     }
 
-    if (yaw_error_ > _yaw_error_eland_) {
+    if (yaw_error.value() > _yaw_error_eland_) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2678,7 +2762,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error_, (180.0 / M_PI) * _yaw_error_eland_);
+          ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
+                    (180.0 / M_PI) * _yaw_error_eland_);
 
           eland();
         }
@@ -2700,7 +2785,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // |     disarm the drone when tilt error exceeds the limit     |
   // --------------------------------------------------------------
 
-  if (_tilt_error_disarm_enabled_) {
+  if (_tilt_error_disarm_enabled_ && tilt_error) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
@@ -2710,7 +2795,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     // if the tile error is over the threshold
     // && we are not ramping up during takeoff
-    if (fabs(tilt_error_) > _tilt_error_disarm_threshold_ && !last_attitude_cmd->ramping_up) {
+    if (fabs(tilt_error.value()) > _tilt_error_disarm_threshold_ && !last_control_output.diagnostics.ramping_up) {
 
       // only account for the error if some time passed from the last tracker/controller switch
       if (time_from_ctrl_tracker_switch > 1.0) {
@@ -2721,13 +2806,13 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
           tilt_error_disarm_over_thr_ = true;
           tilt_error_disarm_time_     = ros::Time::now();
 
-          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error_,
+          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error.value(),
                    (180.0 / M_PI) * _tilt_error_disarm_threshold_);
 
           // if it was exceeded before, just keep it
         } else {
 
-          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error_,
+          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error.value(),
                             (ros::Time::now() - tilt_error_disarm_time_).toSec());
         }
 
@@ -2775,7 +2860,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     switchMotors(false);
   }
-}
+}  // namespace control_manager
 
 //}
 
@@ -2790,7 +2875,24 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerEland", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+
+  if (!last_control_output.control_output) {
+    return;
+  }
+
+  double throttle = 0;
+
+  if (std::holds_alternative<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value()).throttle;
+  } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
+  } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).controls[3];
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement eland timer for this control mode");
+    return;
+  }
 
   if (current_state_landing_ == IDLE_STATE) {
 
@@ -2798,18 +2900,18 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == LANDING_STATE) {
 
-    if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerEland: last_attitude_cmd has not been initialized, returning");
+    if (!last_control_output.control_output) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerEland: last_control_output has not been initialized, returning");
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
       return;
     }
 
     // recalculate the mass based on the thrust
-    thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust) / common_handlers_->g;
+    thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
     // condition for automatic motor turn off
-    if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || last_attitude_cmd->thrust < 0.01)) {
+    if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || throttle < 0.01)) {
       if (!thrust_under_threshold_) {
 
         thrust_mass_estimate_first_time_ = ros::Time::now();
@@ -2864,21 +2966,38 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerFailsafe", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto uav_state         = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   updateControllers(uav_state);
 
   publish();
 
-  if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerFailsafe: last_attitude_cmd has not been initialized, returning");
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+
+  if (!last_control_output.control_output) {
+    return;
+  }
+
+  double throttle = 0;
+
+  if (std::holds_alternative<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value()).throttle;
+  } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
+  } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
+    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).controls[3];
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement failsafe timer for this control mode");
+    return;
+  }
+
+  if (!last_control_output.control_output) {
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerFailsafe: last_control_output has not been initialized, returning");
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
     return;
   }
 
-  double thrust_mass_estimate_ =
-      mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd_->thrust) / common_handlers_->g;
+  double thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
 
   // condition for automatic motor turn off
@@ -6493,54 +6612,55 @@ void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest cons
 bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   bool enforcing = false;
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-    if (last_attitude_cmd->controller_enforcing_constraints) {
+  if (last_control_output.control_output) {
+
+    if (last_control_output.diagnostics.controller_enforcing_constraints) {
 
       std::scoped_lock lock(mutex_tracker_list_);
 
       // enforce horizontal speed
-      if (last_attitude_cmd->horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
-        constraints.constraints.horizontal_speed = last_attitude_cmd->horizontal_speed_constraint;
+      if (last_control_output.diagnostics.horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
+        constraints.constraints.horizontal_speed = last_control_output.diagnostics.horizontal_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce horizontal acceleration
-      if (last_attitude_cmd->horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
-        constraints.constraints.horizontal_acceleration = last_attitude_cmd->horizontal_acc_constraint;
+      if (last_control_output.diagnostics.horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
+        constraints.constraints.horizontal_acceleration = last_control_output.diagnostics.horizontal_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending speed
-      if (last_attitude_cmd->vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
-        constraints.constraints.vertical_ascending_speed = last_attitude_cmd->vertical_asc_speed_constraint;
+      if (last_control_output.diagnostics.vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
+        constraints.constraints.vertical_ascending_speed = last_control_output.diagnostics.vertical_asc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical ascending acceleration
-      if (last_attitude_cmd->vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
-        constraints.constraints.vertical_ascending_acceleration = last_attitude_cmd->vertical_asc_acc_constraint;
+      if (last_control_output.diagnostics.vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
+        constraints.constraints.vertical_ascending_acceleration = last_control_output.diagnostics.vertical_asc_acc_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending speed
-      if (last_attitude_cmd->vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
-        constraints.constraints.vertical_descending_speed = last_attitude_cmd->vertical_desc_speed_constraint;
+      if (last_control_output.diagnostics.vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
+        constraints.constraints.vertical_descending_speed = last_control_output.diagnostics.vertical_desc_speed_constraint;
 
         enforcing = true;
       }
 
       // enforce vertical descending acceleration
-      if (last_attitude_cmd->vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
-        constraints.constraints.vertical_descending_acceleration = last_attitude_cmd->vertical_desc_acc_constraint;
+      if (last_control_output.diagnostics.vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
+        constraints.constraints.vertical_descending_acceleration = last_control_output.diagnostics.vertical_desc_acc_constraint;
 
         enforcing = true;
       }
@@ -6749,10 +6869,10 @@ double ControlManager::getMinHeight(void) {
 
 double ControlManager::getMass(void) {
 
-  std::scoped_lock lock(mutex_last_attitude_cmd_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
-  if (last_attitude_cmd_ != mrs_msgs::AttitudeCommand::Ptr()) {
-    return _uav_mass_ + last_attitude_cmd_->mass_difference;
+  if (last_control_output.diagnostics.mass_estimator) {
+    return _uav_mass_ + last_control_output.diagnostics.mass_difference;
   } else {
     return _uav_mass_;
   }
@@ -7272,7 +7392,7 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
 void ControlManager::changeLandingState(LandingStates_t new_state) {
 
   // copy member variables
-  auto last_attitude_cmd = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
   {
     std::scoped_lock lock(mutex_landing_state_machine_);
@@ -7293,11 +7413,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
       eland_triggered_ = true;
       bumper_enabled_  = false;
 
-      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
-        landing_uav_mass_ = _uav_mass_;
-      } else {
-        landing_uav_mass_ = _uav_mass_ + last_attitude_cmd->mass_difference;
-      }
+      landing_uav_mass_ = getMass();
     }
 
     break;
@@ -7353,9 +7469,9 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
     return std::tuple(false, "cannot ehover, failsafe already triggered");
 
   // copy the member variables
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
 
@@ -7422,9 +7538,9 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
-  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
 
@@ -7506,7 +7622,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -7555,7 +7671,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
     mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
-    failsafe_attitude_cmd          = *last_attitude_cmd;
+    failsafe_attitude_cmd          = *last_control_output;
     double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_odometry_local_.getMsg()->pose.pose.orientation).getYaw();
     failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
 
@@ -7580,10 +7696,10 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       timer_eland_.stop();
       ROS_DEBUG("[ControlManager]: eland timer stopped");
 
-      if (last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+      if (last_control_output == mrs_msgs::AttitudeCommand::Ptr()) {
         landing_uav_mass_ = _uav_mass_;
       } else {
-        landing_uav_mass_ = _uav_mass_ + last_attitude_cmd->mass_difference;
+        landing_uav_mass_ = _uav_mass_ + last_control_output->mass_difference;
       }
 
       eland_triggered_ = false;
@@ -8196,9 +8312,9 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   std::stringstream ss;
 
@@ -8302,13 +8418,13 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
               output_command->attitude         = mrs_lib::AttitudeConverter(0, 0, 0);
 
               {
-                std::scoped_lock lock(mutex_last_attitude_cmd_);
+                std::scoped_lock lock(mutex_last_control_output_);
 
-                last_attitude_cmd_ = output_command;
-                last_attitude_cmd  = last_attitude_cmd_;
+                last_control_output_ = output_command;
+                last_control_output  = last_control_output_;
               }
 
-              controller_list_[active_controller_idx_]->activate(last_attitude_cmd);
+              controller_list_[active_controller_idx_]->activate(last_control_output);
 
               {
                 std::scoped_lock lock(mutex_controller_tracker_switch_time_);
@@ -8355,7 +8471,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
@@ -8412,7 +8528,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     try {
 
       ROS_INFO("[ControlManager]: activating the controller '%s'", _controller_names_[new_controller_idx].c_str());
-      if (!controller_list_[new_controller_idx]->activate(last_attitude_cmd)) {
+      if (!controller_list_[new_controller_idx]->activate(last_control_output)) {
 
         ss << "the controller '" << controller_name << "' was not activated";
         ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -8483,9 +8599,9 @@ void ControlManager::updateTrackers(void) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto uav_state          = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_attitude_cmd  = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -8503,7 +8619,7 @@ void ControlManager::updateTrackers(void) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         // active tracker => update and retrieve the command
-        tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
+        tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
       }
       catch (std::runtime_error& exrun) {
 
@@ -8520,7 +8636,7 @@ void ControlManager::updateTrackers(void) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         // nonactive tracker => just update without retrieving the command
-        tracker_list_[i]->update(uav_state_const_ptr, last_attitude_cmd);
+        tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
       }
       catch (std::runtime_error& exrun) {
 
@@ -8612,9 +8728,9 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
     output_command->controller = "none";
 
     {
-      std::scoped_lock lock(mutex_last_attitude_cmd_);
+      std::scoped_lock lock(mutex_last_control_output_);
 
-      last_attitude_cmd_ = output_command;
+      last_control_output_ = output_command;
     }
 
     // give the controllers current uav state
@@ -8638,7 +8754,8 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          controller_output_cmd = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd, _hw_api_inputs_);
+          auto [control_output, controller_diagnostics] =
+              controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd, _hw_api_inputs_);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8677,11 +8794,11 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
     }
 
     // normally the active controller returns a valid command
-    if (controller_output_cmd != mrs_msgs::AttitudeCommand::Ptr() && validateAttitudeCommand(controller_output_cmd, "ControlManager", "attitude_cmd")) {
+    if (control_output && validateAttitudeCommand(controller_output_cmd.value(), "ControlManager", "attitude_cmd")) {
 
-      std::scoped_lock lock(mutex_last_attitude_cmd_);
+      std::scoped_lock lock(mutex_last_control_output_);
 
-      last_attitude_cmd_ = controller_output_cmd;
+      last_control_output_ = controller_output_cmd;
 
       // but it can return an empty command, due to some critical internal error
       // which means we should trigger the failsafe landing
@@ -8728,7 +8845,7 @@ void ControlManager::publish(void) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_attitude_cmd     = mrs_lib::get_mutexed(mutex_last_attitude_cmd_, last_attitude_cmd_);
+  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
@@ -8799,13 +8916,13 @@ void ControlManager::publish(void) {
     // | --------------- prepare desired orientation -------------- |
 
     // have the attitude_cmd results already
-    if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+    if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
 
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_attitude_cmd->attitude);
+      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_control_output->attitude);
 
-      cmd_odom.twist.twist.angular.x = last_attitude_cmd->attitude_rate.x;
-      cmd_odom.twist.twist.angular.y = last_attitude_cmd->attitude_rate.y;
-      cmd_odom.twist.twist.angular.z = last_attitude_cmd->attitude_rate.z;
+      cmd_odom.twist.twist.angular.x = last_control_output->attitude_rate.x;
+      cmd_odom.twist.twist.angular.y = last_control_output->attitude_rate.y;
+      cmd_odom.twist.twist.angular.z = last_control_output->attitude_rate.z;
 
       // use just the heading from position command
     } else {
@@ -8851,7 +8968,7 @@ void ControlManager::publish(void) {
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
-  } else if (active_tracker_idx != _null_tracker_idx_ && last_attitude_cmd == mrs_msgs::AttitudeCommand::Ptr()) {
+  } else if (active_tracker_idx != _null_tracker_idx_ && last_control_output == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything",
                       _controller_names_[active_controller_idx].c_str());
@@ -8864,12 +8981,12 @@ void ControlManager::publish(void) {
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
-  } else if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+  } else if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
 
-    if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE) {
+    if (last_control_output->mode_mask == last_control_output->MODE_ATTITUDE) {
 
-      attitude_target.throttle    = last_attitude_cmd->thrust;
-      attitude_target.orientation = last_attitude_cmd->attitude;
+      attitude_target.throttle    = last_control_output->thrust;
+      attitude_target.orientation = last_control_output->attitude;
 
       if (validateHwApiAttitudeCmd(attitude_target, "ControlManager", "attitude_target")) {
         ph_hw_api_attitude_cmd_.publish(attitude_target);
@@ -8878,13 +8995,13 @@ void ControlManager::publish(void) {
         return;
       }
 
-    } else if (last_attitude_cmd->mode_mask == last_attitude_cmd->MODE_ATTITUDE_RATE) {
+    } else if (last_control_output->mode_mask == last_control_output->MODE_ATTITUDE_RATE) {
 
-      attitude_rate_target.throttle = last_attitude_cmd->thrust;
+      attitude_rate_target.throttle = last_control_output->thrust;
 
-      attitude_rate_target.body_rate.x = last_attitude_cmd->attitude_rate.x;
-      attitude_rate_target.body_rate.y = last_attitude_cmd->attitude_rate.y;
-      attitude_rate_target.body_rate.z = last_attitude_cmd->attitude_rate.z;
+      attitude_rate_target.body_rate.x = last_control_output->attitude_rate.x;
+      attitude_rate_target.body_rate.y = last_control_output->attitude_rate.y;
+      attitude_rate_target.body_rate.z = last_control_output->attitude_rate.z;
 
       if (validateHwApiAttitudeRateCmd(attitude_rate_target, "ControlManager", "attitude_rate_target")) {
         ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
@@ -8900,18 +9017,18 @@ void ControlManager::publish(void) {
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
-    ph_attitude_cmd_.publish(last_attitude_cmd);  // the control command is already a ConstPtr
+  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
+    ph_attitude_cmd_.publish(last_control_output);  // the control command is already a ConstPtr
   }
 
   // | ------------ publish the desired thrust force ------------ |
 
-  if (last_attitude_cmd != mrs_msgs::AttitudeCommand::Ptr()) {
+  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
 
     mrs_msgs::Float64Stamped thrust_force;
     thrust_force.header.stamp = ros::Time::now();
 
-    thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_attitude_cmd->thrust);
+    thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_control_output->thrust);
 
     ph_thrust_force_.publish(thrust_force);
   }

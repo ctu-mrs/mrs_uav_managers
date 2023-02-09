@@ -6,6 +6,11 @@ Se3Controller:
   odometry_innovation_threshold: 1.5 # [m], position odometry innovation threshold
   human_switchable: true
 
+  # which outputs the controller can provide
+  outputs:
+    attitude_rate: true
+    attitude:      true
+
 MpcController:
   address: "mrs_uav_controllers/MpcController"
   namespace: "mpc_controller"
@@ -14,12 +19,22 @@ MpcController:
   odometry_innovation_threshold: 2.0 # [m], position odometry innovation threshold
   human_switchable: true
 
+  # which outputs the controller can provide
+  outputs:
+    attitude_rate: true
+    attitude:      true
+
 FailsafeController:
   address: "mrs_uav_controllers/FailsafeController"
   namespace: "failsafe_controller"
   eland_threshold: 0.0 # [m], position error triggering eland
   failsafe_threshold: 0.0 # [m], position error triggering failsafe land
   odometry_innovation_threshold: 0.0 # [m], position odometry innovation threshold
+
+  # which outputs the controller can provide
+  outputs:
+    attitude_rate: true
+    attitude:      true
 
 EmergencyController:
   address: "mrs_uav_controllers/MpcController"
@@ -28,9 +43,19 @@ EmergencyController:
   failsafe_threshold: 4.0 # [m], position error triggering failsafe land
   odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
 
+  # which outputs the controller can provide
+  outputs:
+    attitude_rate: true
+    attitude:      true
+
 MidairActivationController:
   address: "mrs_uav_controllers/MidairActivationController"
   namespace: "midair_activation_controller"
   eland_threshold: 3.0 # [m], position error triggering eland
   failsafe_threshold: 4.0 # [m], position error triggering failsafe land
   odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+
+  # which outputs the controller can provide
+  outputs:
+    attitude_rate: true
+    attitude:      true

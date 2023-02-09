@@ -7,7 +7,15 @@
 
 #include <mrs_uav_managers/common_handlers.h>
 
-#include <mrs_msgs/AttitudeCommand.h>
+#include <mrs_msgs/HwApiActuatorCmd.h>
+#include <mrs_msgs/HwApiControlGroupCmd.h>
+#include <mrs_msgs/HwApiAttitudeRateCmd.h>
+#include <mrs_msgs/HwApiAttitudeCmd.h>
+#include <mrs_msgs/HwApiAccelerationCmd.h>
+#include <mrs_msgs/HwApiVelocityCmd.h>
+#include <mrs_msgs/HwApiPositionCmd.h>
+
+#include <mrs_msgs/ControllerDiagnostics.h>
 #include <mrs_msgs/ControllerStatus.h>
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/UavState.h>
@@ -23,7 +31,7 @@ namespace mrs_uav_managers
 
 class Controller {
 public:
-  typedef struct ControllerOutputs_t
+  typedef struct ControllerOutputs
   {
     bool position      = false;
     bool velocity      = false;
@@ -34,14 +42,18 @@ public:
     bool actuators     = false;
   } ControllerOutputs;
 
-  virtual ~Controller() = 0;
+  typedef std::variant<mrs_msgs::HwApiActuatorCmd, mrs_msgs::HwApiControlGroupCmd, mrs_msgs::HwApiAttitudeRateCmd, mrs_msgs::HwApiAttitudeCmd,
+                       mrs_msgs::HwApiAccelerationCmd, mrs_msgs::HwApiVelocityCmd, mrs_msgs::HwApiPositionCmd>
+      HwApiOutputVariant;
 
-  /**
-   * @brief Queries the controller for its output modalities.
-   *
-   * @return The handled output modalities.
-   */
-  virtual mrs_uav_managers::Controller::ControllerOutputs probeControllerOutputs(void) = 0;
+  typedef struct
+  {
+    std::optional<HwApiOutputVariant> control_output;
+    std::optional<Eigen::Quaterniond> desired_orientation;
+    mrs_msgs::ControllerDiagnostics   diagnostics;
+  } ControlOutput;
+
+  virtual ~Controller() = 0;
 
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
@@ -53,7 +65,8 @@ public:
    * @param common_handlers handlers shared between trackers and controllers
    */
   virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space, const double uav_mass,
-                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
+                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t>    common_handlers,
+                          const mrs_uav_managers::Controller::ControllerOutputs &output_modalities) = 0;
 
   /**
    * @brief It is called before the controller output will be required and used. Should not take much time (within miliseconds).
@@ -63,7 +76,7 @@ public:
    *
    * @return true if success
    */
-  virtual bool activate(const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
+  virtual bool activate(const mrs_msgs::ControllerDiagnostics &last_attitude_cmd) = 0;
 
   /**
    * @brief is called when this controller's output is no longer needed. However, it can be activated later.
@@ -78,15 +91,9 @@ public:
   /**
    * @brief The most important routine. It is called with every odometry update and it should produce a new control command.
    *
-   * @param uav_state the latest UAV state estimate
-   * @param last_tracker_cmd the last controller's output command (may be useful)
-   *
-   * @return the new reference for the controllers
+   * TODO
    */
-  virtual const mrs_msgs::AttitudeCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &                   uav_state,
-                                                           const mrs_msgs::TrackerCommand::ConstPtr &             last_tracker_cmd,
-                                                           const mrs_uav_managers::Controller::ControllerOutputs &output_modalities) = 0;
-
+  virtual ControlOutput update(const mrs_msgs::UavState::ConstPtr &uav_state, const mrs_msgs::TrackerCommand::ConstPtr &tracker_command) = 0;
   /**
    * @brief A request for the controller's status.
    *
