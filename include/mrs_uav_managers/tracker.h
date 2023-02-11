@@ -41,7 +41,7 @@
 #include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/DynamicsConstraintsSrvResponse.h>
 
-#include <mrs_msgs/AttitudeCommand.h>
+#include <mrs_uav_managers/controller.h>
 
 //}
 
@@ -102,8 +102,8 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::TrackerCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
-                                                          const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
+  virtual const mrs_msgs::TrackerCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &uav_state,
+                                                          const Controller::ControlOutput &   last_controller_output) = 0;
 
   /**
    * @brief A request for the tracker's status.

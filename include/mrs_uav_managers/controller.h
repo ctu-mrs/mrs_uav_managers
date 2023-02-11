@@ -49,8 +49,8 @@ public:
   typedef struct
   {
     std::optional<HwApiOutputVariant> control_output;
-    std::optional<Eigen::Quaterniond> desired_orientation;
     mrs_msgs::ControllerDiagnostics   diagnostics;
+    std::optional<Eigen::Quaterniond> desired_orientation;
   } ControlOutput;
 
   virtual ~Controller() = 0;
@@ -76,7 +76,7 @@ public:
    *
    * @return true if success
    */
-  virtual bool activate(const mrs_msgs::ControllerDiagnostics &last_attitude_cmd) = 0;
+  virtual bool activate(const ControlOutput &last_control_output) = 0;
 
   /**
    * @brief is called when this controller's output is no longer needed. However, it can be activated later.

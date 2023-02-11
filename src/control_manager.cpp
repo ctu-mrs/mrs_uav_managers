@@ -330,7 +330,7 @@ private:
   bool _rc_emergency_handoff_ = false;
 
   // what thrust should be output when null tracker is active?
-  double _min_thrust_null_tracker_ = 0.0;
+  double _min_throttle_null_tracker_ = 0.0;
 
   // rates of all the timers
   int _status_timer_rate_   = 0;
@@ -973,7 +973,7 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam("safety/min_thrust_null_tracker", _min_thrust_null_tracker_);
+  param_loader.loadParam("safety/min_thrust_null_tracker", _min_throttle_null_tracker_);
   param_loader.loadParam("safety/ehover_tracker", _ehover_tracker_name_);
   param_loader.loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
@@ -1613,7 +1613,7 @@ void ControlManager::initialize(void) {
 
   ROS_INFO("[ControlManager]: activating the the eland controller (%s) as the first controller", _controller_names_[_eland_controller_idx_].c_str());
 
-  controller_list_[_eland_controller_idx_]->activate(last_control_output_.diagnostics);
+  controller_list_[_eland_controller_idx_]->activate(last_control_output_);
   active_controller_idx_ = _eland_controller_idx_;
 
   // update the time
@@ -7627,11 +7627,13 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
-  if (failsafe_triggered_)
+  if (failsafe_triggered_) {
     return std::tuple(false, "cannot, failsafe already triggered");
+  }
 
   if (active_tracker_idx == _null_tracker_idx_) {
 
@@ -7670,19 +7672,19 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
-    mrs_msgs::AttitudeCommand failsafe_attitude_cmd;
-    failsafe_attitude_cmd          = *last_control_output;
-    double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_odometry_local_.getMsg()->pose.pose.orientation).getYaw();
-    failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw);
-
-    mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd));
+    // TODO old failsafe initialization
+    /* mrs_msgs::AttitudeCommand failsafe_attitude_cmd; */
+    /* failsafe_attitude_cmd          = *last_control_output; */
+    /* double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_odometry_local_.getMsg()->pose.pose.orientation).getYaw(); */
+    /* failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw); */
+    /* mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd)); */
 
     try {
 
       std::scoped_lock lock(mutex_controller_list_);
 
       ROS_INFO("[ControlManager]: activating the controller '%s'", _failsafe_controller_name_.c_str());
-      controller_list_[_failsafe_controller_idx_]->activate(failsafe_attitude_cmd_ptr);
+      controller_list_[_failsafe_controller_idx_]->activate(last_control_output);
 
       {
         std::scoped_lock lock(mutex_controller_tracker_switch_time_);
@@ -7696,11 +7698,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       timer_eland_.stop();
       ROS_DEBUG("[ControlManager]: eland timer stopped");
 
-      if (last_control_output == mrs_msgs::AttitudeCommand::Ptr()) {
-        landing_uav_mass_ = _uav_mass_;
-      } else {
-        landing_uav_mass_ = _uav_mass_ + last_control_output->mass_difference;
-      }
+      landing_uav_mass_ = getMass();
 
       eland_triggered_ = false;
       ROS_DEBUG("[ControlManager]: starting failsafe timer");
@@ -8396,7 +8394,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
           ROS_INFO("[ControlManager]: deactivating '%s'", _tracker_names_[active_tracker_idx_].c_str());
           tracker_list_[active_tracker_idx_]->deactivate();
 
-          // if switching from null tracker, activate the active the controller
+          // if switching from null tracker, re-activate the already active the controller
           if (_tracker_names_[active_tracker_idx_] == _null_tracker_name_) {
 
             ROS_INFO("[ControlManager]: reactivating '%s' due to switching from 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
@@ -8405,26 +8403,29 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
               mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
-              output_command->total_mass       = _uav_mass_;
-              output_command->mass_difference  = 0.0;
-              output_command->disturbance_bx_b = _initial_body_disturbance_x_;
-              output_command->disturbance_by_b = _initial_body_disturbance_y_;
-              output_command->disturbance_wx_w = 0.0;
-              output_command->disturbance_wy_w = 0.0;
-              output_command->disturbance_bx_w = 0.0;
-              output_command->disturbance_by_w = 0.0;
-              output_command->thrust           = _min_thrust_null_tracker_;
-              output_command->controller       = "none";
-              output_command->attitude         = mrs_lib::AttitudeConverter(0, 0, 0);
+              Controller::ControlOutput controller_output;
+
+              controller_output.diagnostics.total_mass       = _uav_mass_;
+              controller_output.diagnostics.mass_difference  = 0.0;
+              controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
+              controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+              controller_output.diagnostics.disturbance_wx_w = 0.0;
+              controller_output.diagnostics.disturbance_wy_w = 0.0;
+              controller_output.diagnostics.disturbance_bx_w = 0.0;
+              controller_output.diagnostics.disturbance_by_w = 0.0;
+              controller_output.diagnostics.controller       = "none";
+
+              // TODO
+              /* controller_output.diagnostics.thrust           = _min_throttle_null_tracker_; */
+              /* controller_output.diagnostics.attitude         = mrs_lib::AttitudeConverter(0, 0, 0); */
 
               {
                 std::scoped_lock lock(mutex_last_control_output_);
 
-                last_control_output_ = output_command;
-                last_control_output  = last_control_output_;
+                last_control_output_ = controller_output;
               }
 
-              controller_list_[active_controller_idx_]->activate(last_control_output);
+              controller_list_[active_controller_idx_]->activate(controller_output);
 
               {
                 std::scoped_lock lock(mutex_controller_tracker_switch_time_);
@@ -8723,7 +8724,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
     output_command->disturbance_bx_w = 0.0;
     output_command->disturbance_by_w = 0.0;
 
-    output_command->thrust = _min_thrust_null_tracker_;
+    output_command->thrust = _min_throttle_null_tracker_;
 
     output_command->controller = "none";
 
@@ -8793,7 +8794,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
       }
     }
 
-    // normally the active controller returns a valid command
+    // normally, the active controller returns a valid command
     if (control_output && validateAttitudeCommand(controller_output_cmd.value(), "ControlManager", "attitude_cmd")) {
 
       std::scoped_lock lock(mutex_last_control_output_);
@@ -8964,7 +8965,7 @@ void ControlManager::publish(void) {
     attitude_rate_target.body_rate.y = 0.0;
     attitude_rate_target.body_rate.z = 0.0;
 
-    attitude_rate_target.throttle = _min_thrust_null_tracker_;
+    attitude_rate_target.throttle = _min_throttle_null_tracker_;
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
@@ -8977,7 +8978,7 @@ void ControlManager::publish(void) {
     attitude_rate_target.body_rate.y = 0.0;
     attitude_rate_target.body_rate.z = 0.0;
 
-    attitude_rate_target.throttle = _min_thrust_null_tracker_;
+    attitude_rate_target.throttle = _min_throttle_null_tracker_;
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
