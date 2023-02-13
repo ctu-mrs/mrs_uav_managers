@@ -20,7 +20,12 @@ std::optional<unsigned int> idxInVector(const std::string& str, const std::vecto
 
 /* validateTrackerCommand() //{ */
 
-bool validateTrackerCommand(const mrs_msgs::TrackerCommand::ConstPtr msg, const std::string& node_name, const std::string& var_name) {
+bool validateTrackerCommand(const std::optional<mrs_msgs::TrackerCommand>& msg, const std::string& node_name, const std::string& var_name) {
+
+  if (!msg) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: the optional variable '%s' is not set!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
 
   // check positions
 
@@ -140,98 +145,6 @@ bool validateTrackerCommand(const mrs_msgs::TrackerCommand::ConstPtr msg, const 
 
   if (!std::isfinite(msg->thrust)) {
     ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->thrust'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-//}
-
-/* validateAttitudeCommand() //{ */
-
-bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr msg, const std::string& node_name, const std::string& var_name) {
-
-  // check euler attitude
-
-  if (!std::isfinite(msg->attitude.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude.x'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->attitude.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude.y'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->attitude.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude.z'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  // check attitude rate
-
-  if (!std::isfinite(msg->attitude_rate.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude_rate.x'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->attitude_rate.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude_rate.y'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->attitude_rate.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->attitude_rate.z'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  // check desired_acceleration
-
-  if (!std::isfinite(msg->desired_acceleration.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->desired_acceleration.x'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->desired_acceleration.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->desired_acceleration.y'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->desired_acceleration.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->desired_acceleration.z'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  // check the constraints
-
-  if (!std::isfinite(msg->horizontal_speed_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->horizontal_speed_constraint'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->horizontal_acc_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->horizontal_acc_constraint'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->vertical_asc_speed_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->vertical_asc_speed_constraint'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->vertical_asc_acc_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->vertical_asc_acc_constraint'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->vertical_desc_speed_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->vertical_desc_speed_constraint'!!!", node_name.c_str(), var_name.c_str());
-    return false;
-  }
-
-  if (!std::isfinite(msg->vertical_desc_acc_constraint)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->vertical_desc_acc_constraint'!!!", node_name.c_str(), var_name.c_str());
     return false;
   }
 

@@ -24,12 +24,17 @@
 #include <mrs_msgs/ValidateReferenceList.h>
 #include <mrs_msgs/BumperParamsSrv.h>
 #include <mrs_msgs/TrackerCommand.h>
+#include <mrs_msgs/MrsOdometryInput.h>
 
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/Vector3Stamped.h>
+
 #include <nav_msgs/Odometry.h>
+
+#include <sensor_msgs/Joy.h>
+#include <sensor_msgs/NavSatFix.h>
 
 #include <mrs_lib/safety_zone/safety_zone.h>
 #include <mrs_lib/profiler.h>
@@ -46,17 +51,16 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
-#include <sensor_msgs/Joy.h>
-#include <sensor_msgs/NavSatFix.h>
-
 #include <mrs_msgs/HwApiDiagnostics.h>
 #include <mrs_msgs/HwApiRcChannels.h>
 #include <mrs_msgs/HwApiActuatorCmd.h>
 #include <mrs_msgs/HwApiControlGroupCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
 #include <mrs_msgs/HwApiAttitudeCmd.h>
-#include <mrs_msgs/HwApiAccelerationCmd.h>
-#include <mrs_msgs/HwApiVelocityCmd.h>
+#include <mrs_msgs/HwApiAccelerationHdgRateCmd.h>
+#include <mrs_msgs/HwApiAccelerationHdgCmd.h>
+#include <mrs_msgs/HwApiVelocityHdgRateCmd.h>
+#include <mrs_msgs/HwApiVelocityHdgCmd.h>
 #include <mrs_msgs/HwApiPositionCmd.h>
 #include <mrs_msgs/HwApiMode.h>
 
@@ -264,13 +268,15 @@ private:
 
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode> sh_hw_api_mode_;
 
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>     ph_hw_api_actuator_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd> ph_hw_api_control_group_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd> ph_hw_api_attitude_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>     ph_hw_api_attitude_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationCmd> ph_hw_api_acceleration_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityCmd>     ph_hw_api_velocity_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>     ph_hw_api_position_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>            ph_hw_api_actuator_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>        ph_hw_api_control_group_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>        ph_hw_api_attitude_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>            ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd> ph_hw_api_acceleration_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>     ph_hw_api_acceleration_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>     ph_hw_api_velocity_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>         ph_hw_api_velocity_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>            ph_hw_api_position_cmd_;
 
   Controller::ControllerOutputs _hw_api_inputs_;
 
@@ -408,9 +414,9 @@ private:
   // | ----------------------- publishers ----------------------- |
 
   mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>           ph_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>          ph_mrs_odom_input_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_thrust_force_;
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_cmd_odom_;
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
   mrs_lib::PublisherHandler<geometry_msgs::Twist>                ph_cmd_twist_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               ph_motors_;
@@ -499,8 +505,8 @@ private:
   // | --------- trackers' and controllers' last results -------- |
 
   // the last result of an active tracker
-  mrs_msgs::TrackerCommand::ConstPtr last_tracker_cmd_;
-  std::mutex                         mutex_last_tracker_cmd_;
+  std::optional<mrs_msgs::TrackerCommand> last_tracker_cmd_;
+  std::mutex                              mutex_last_tracker_cmd_;
 
   // the last result of an active controller
   Controller::ControlOutput last_control_output_;
@@ -867,8 +873,11 @@ private:
   std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
       const mrs_msgs::TrajectoryReference trajectory_in);
 
-  // this publishes the control commands
+  // publishes
   void publish(void);
+
+  // publishes rviz-visualizable control reference
+  void publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
@@ -943,8 +952,6 @@ void ControlManager::initialize(void) {
 
   last_control_output_.control_output      = {};
   last_control_output_.desired_orientation = {};
-
-  last_tracker_cmd_ = mrs_msgs::TrackerCommand::Ptr();
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -1443,20 +1450,24 @@ void ControlManager::initialize(void) {
       param_loader.loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
       param_loader.loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
       param_loader.loadParam(controller_name + "/outputs/attitude", outputs.attitude, false);
-      param_loader.loadParam(controller_name + "/outputs/acceleration", outputs.acceleration, false);
-      param_loader.loadParam(controller_name + "/outputs/velocity", outputs.velocity, false);
+      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg_rate", outputs.acceleration_hdg_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg", outputs.acceleration_hdg, false);
+      param_loader.loadParam(controller_name + "/outputs/velocity_hdg_rate", outputs.velocity_hdg_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/velocity_hdg", outputs.velocity_hdg, false);
       param_loader.loadParam(controller_name + "/outputs/position", outputs.position, false);
 
-      bool meets_actuators     = (_hw_api_inputs_.actuators && outputs.actuators);
-      bool meets_control_group = (_hw_api_inputs_.control_group && outputs.control_group);
-      bool meets_attitude_rate = (_hw_api_inputs_.attitude_rate && outputs.attitude_rate);
-      bool meets_attitude      = (_hw_api_inputs_.attitude && outputs.attitude);
-      bool meets_acceleration  = (_hw_api_inputs_.acceleration && outputs.acceleration);
-      bool meets_velocity      = (_hw_api_inputs_.velocity && outputs.velocity);
-      bool meets_position      = (_hw_api_inputs_.position && outputs.position);
+      bool meets_actuators             = (_hw_api_inputs_.actuators && outputs.actuators);
+      bool meets_control_group         = (_hw_api_inputs_.control_group && outputs.control_group);
+      bool meets_attitude_rate         = (_hw_api_inputs_.attitude_rate && outputs.attitude_rate);
+      bool meets_attitude              = (_hw_api_inputs_.attitude && outputs.attitude);
+      bool meets_acceleration_hdg_rate = (_hw_api_inputs_.acceleration_hdg_rate && outputs.acceleration_hdg_rate);
+      bool meets_acceleration_hdg      = (_hw_api_inputs_.acceleration_hdg && outputs.acceleration_hdg);
+      bool meets_velocity_hdg_rate     = (_hw_api_inputs_.velocity_hdg_rate && outputs.velocity_hdg_rate);
+      bool meets_velocity_hdg          = (_hw_api_inputs_.velocity_hdg && outputs.velocity_hdg);
+      bool meets_position              = (_hw_api_inputs_.position && outputs.position);
 
-      bool meets_requirements =
-          meets_actuators || meets_control_group || meets_attitude_rate || meets_attitude || meets_acceleration || meets_velocity || meets_position;
+      bool meets_requirements = meets_actuators || meets_control_group || meets_attitude_rate || meets_attitude || meets_acceleration_hdg_rate ||
+                                meets_acceleration_hdg || meets_velocity_hdg_rate || meets_velocity_hdg || meets_position;
 
       if (!meets_requirements) {
 
@@ -1479,12 +1490,20 @@ void ControlManager::initialize(void) {
           ROS_ERROR("[ControlManager]: - attitude");
         }
 
-        if (_hw_api_inputs_.acceleration) {
-          ROS_ERROR("[ControlManager]: - acceleration");
+        if (_hw_api_inputs_.acceleration_hdg_rate) {
+          ROS_ERROR("[ControlManager]: - acceleration+hdg rate");
         }
 
-        if (_hw_api_inputs_.velocity) {
-          ROS_ERROR("[ControlManager]: - velocity");
+        if (_hw_api_inputs_.acceleration_hdg) {
+          ROS_ERROR("[ControlManager]: - acceleration+hdg");
+        }
+
+        if (_hw_api_inputs_.velocity_hdg_rate) {
+          ROS_ERROR("[ControlManager]: - velocity+hdg rate");
+        }
+
+        if (_hw_api_inputs_.velocity_hdg) {
+          ROS_ERROR("[ControlManager]: - velocity+hdg");
         }
 
         if (_hw_api_inputs_.position) {
@@ -1604,7 +1623,7 @@ void ControlManager::initialize(void) {
 
   ROS_INFO("[ControlManager]: activating the null tracker");
 
-  tracker_list_[_null_tracker_idx_]->activate(last_tracker_cmd_);
+  tracker_list_[_null_tracker_idx_]->activate(last_tracker_cmd_.value());
   active_tracker_idx_ = _null_tracker_idx_;
 
   // --------------------------------------------------------------
@@ -1637,18 +1656,20 @@ void ControlManager::initialize(void) {
   // | ----------------------- publishers ----------------------- |
 
   // hw api control outputs
-  ph_hw_api_actuator_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd_", 1);
-  ph_hw_api_control_group_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh_, "hw_api_control_group_cmd_out", 1);
-  ph_hw_api_attitude_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
-  ph_hw_api_attitude_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
-  ph_hw_api_acceleration_cmd_  = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationCmd>(nh_, "hw_api_acceleration_cmd_out", 1);
-  ph_hw_api_velocity_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityCmd>(nh_, "hw_api_velocity_cmd_out", 1);
-  ph_hw_api_position_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>(nh_, "hw_api_position_cmd_out", 1);
+  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd_", 1);
+  ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh_, "hw_api_control_group_cmd_out", 1);
+  ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
+  ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
+  ph_hw_api_acceleration_hdg_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd>(nh_, "hw_api_acceleration_hdg_rate_cmd_out", 1);
+  ph_hw_api_acceleration_hdg_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>(nh_, "hw_api_acceleration_hdg_cmd_out", 1);
+  ph_hw_api_velocity_hdg_rate_cmd_     = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>(nh_, "hw_api_velocity_hdg_rate_cmd_out", 1);
+  ph_hw_api_velocity_hdg_cmd_          = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>(nh_, "hw_api_velocity_hdg_cmd_out", 1);
+  ph_hw_api_position_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>(nh_, "hw_api_position_cmd_out", 1);
 
   ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
-  ph_attitude_cmd_                       = mrs_lib::PublisherHandler<mrs_msgs::AttitudeCommand>(nh_, "attitude_cmd_out", 1);
+  ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>(nh_, "odometry_input_out", 1);
   ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
-  ph_cmd_odom_                           = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
+  ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
   ph_cmd_twist_                          = mrs_lib::PublisherHandler<geometry_msgs::Twist>(nh_, "cmd_twist_out", 1);
   ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
   ph_motors_                             = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
@@ -1831,14 +1852,24 @@ void ControlManager::timerHwApiMode(const ros::TimerEvent& event) {
     _hw_api_inputs_.attitude = true;
   }
 
-  if (hw_api_mode->accepts_acceleration_cmd) {
-    ROS_INFO("[ControlManager]: - acceleration command");
-    _hw_api_inputs_.acceleration = true;
+  if (hw_api_mode->accepts_acceleration_hdg_rate_cmd) {
+    ROS_INFO("[ControlManager]: - acceleration+hdg rate command");
+    _hw_api_inputs_.acceleration_hdg_rate = true;
   }
 
-  if (hw_api_mode->accepts_velocity_cmd) {
-    ROS_INFO("[ControlManager]: - velocity command");
-    _hw_api_inputs_.velocity = true;
+  if (hw_api_mode->accepts_acceleration_hdg_cmd) {
+    ROS_INFO("[ControlManager]: - acceleration+hdg command");
+    _hw_api_inputs_.acceleration_hdg = true;
+  }
+
+  if (hw_api_mode->accepts_velocity_hdg_rate_cmd) {
+    ROS_INFO("[ControlManager]: - velocityhdg rate command");
+    _hw_api_inputs_.velocity_hdg_rate = true;
+  }
+
+  if (hw_api_mode->accepts_velocity_hdg_cmd) {
+    ROS_INFO("[ControlManager]: - velocityhdg command");
+    _hw_api_inputs_.velocity_hdg = true;
   }
 
   if (hw_api_mode->accepts_position_cmd) {
@@ -2888,7 +2919,7 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
   } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
     throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
   } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).controls[3];
+    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement eland timer for this control mode");
     return;
@@ -2985,7 +3016,7 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
   } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
     throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
   } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).controls[3];
+    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement failsafe timer for this control mode");
     return;
@@ -3038,6 +3069,8 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerJoystick", scope_timer_logger_, scope_timer_enabled_);
+
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // if start was pressed and held for > 3.0 s
   if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
@@ -3147,7 +3180,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (rc_goto_active_ && last_tracker_cmd_ != mrs_msgs::TrackerCommand::Ptr() && sh_hw_api_rc_.hasMsg()) {
+  if (rc_goto_active_ && last_tracker_cmd && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
     mrs_msgs::VelocityReferenceStampedSrv::Request request;
@@ -5105,7 +5138,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
-  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
@@ -5202,7 +5235,7 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
     return true;
   }
 
-  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
@@ -5297,7 +5330,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
       res.success[i] = false;
     }
 
-    if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+    if (last_tracker_cmd) {
 
       mrs_msgs::ReferenceStamped from_point;
       from_point.header.frame_id      = uav_state.header.frame_id;
@@ -5527,7 +5560,7 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5566,7 +5599,7 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5605,7 +5638,7 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5644,7 +5677,7 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5737,7 +5770,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
-  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
@@ -5800,7 +5833,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   {
     std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-    if (last_tracker_cmd_ == mrs_msgs::TrackerCommand::Ptr()) {
+    if (!last_tracker_cmd_) {
       ss << "could not set velocity command, not flying!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
       return std::tuple(false, ss.str());
@@ -5898,7 +5931,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     return std::tuple(false, ss.str());
   }
 
-  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
+  if (last_tracker_cmd) {
 
     mrs_msgs::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
@@ -6168,7 +6201,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     mrs_msgs::ReferenceStamped x_current_frame;
     x_current_frame.header = uav_state.header;
 
-    if (last_tracker_cmd_ != mrs_msgs::TrackerCommand::Ptr()) {
+    if (last_tracker_cmd) {
 
       x_current_frame.reference.position.x = last_tracker_cmd->position.x;
       x_current_frame.reference.position.y = last_tracker_cmd->position.y;
@@ -8368,7 +8401,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
       ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx].c_str());
 
-      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd);
+      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd.value());
 
       if (!success) {
 
@@ -8400,8 +8433,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
             ROS_INFO("[ControlManager]: reactivating '%s' due to switching from 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
-
-              mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
               Controller::ControlOutput controller_output;
 
@@ -8550,7 +8581,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           std::scoped_lock lock(mutex_tracker_list_);
 
           tracker_list_[active_tracker_idx_]->deactivate();
-          tracker_list_[active_tracker_idx_]->activate(mrs_msgs::TrackerCommand::Ptr());
+          tracker_list_[active_tracker_idx_]->activate({});
         }
 
         {
@@ -8608,8 +8639,8 @@ void ControlManager::updateTrackers(void) {
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  mrs_msgs::TrackerCommand::ConstPtr tracker_output_cmd;
-  mrs_msgs::UavState::ConstPtr       uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
+  std::optional<mrs_msgs::TrackerCommand> tracker_command;
+  mrs_msgs::UavState::ConstPtr            uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
   // for each tracker
   for (int i = 0; i < int(tracker_list_.size()); i++) {
@@ -8620,7 +8651,7 @@ void ControlManager::updateTrackers(void) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         // active tracker => update and retrieve the command
-        tracker_output_cmd = tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
+        tracker_command = tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
       }
       catch (std::runtime_error& exrun) {
 
@@ -8650,11 +8681,11 @@ void ControlManager::updateTrackers(void) {
     }
   }
 
-  if (tracker_output_cmd != mrs_msgs::TrackerCommand::Ptr() && validateTrackerCommand(tracker_output_cmd, "ControlManager", "tracker_output_cmd")) {
+  if (validateTrackerCommand(tracker_command, "ControlManager", "tracker_output_cmd")) {
 
     std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-    last_tracker_cmd_ = tracker_output_cmd;
+    last_tracker_cmd_ = tracker_command;
 
   } else {
 
@@ -8683,7 +8714,7 @@ void ControlManager::updateTrackers(void) {
 
       std::scoped_lock lock(mutex_last_tracker_cmd_);
 
-      last_tracker_cmd_ = tracker_output_cmd;
+      last_tracker_cmd_ = tracker_command;
     }
   }
 }
@@ -8740,11 +8771,13 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd, _hw_api_inputs_);
+        controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
       }
     }
 
   } else {
+
+    Controller::ControlOutput control_output;
 
     // for each controller
     for (int i = 0; i < int(controller_list_.size()); i++) {
@@ -8755,8 +8788,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          auto [control_output, controller_diagnostics] =
-              controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd, _hw_api_inputs_);
+          control_output = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8781,7 +8813,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd, _hw_api_inputs_);
+          controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8852,95 +8884,7 @@ void ControlManager::publish(void) {
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  // --------------------------------------------------------------
-  // |                  publish the position cmd                  |
-  // --------------------------------------------------------------
-
-  if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) {
-
-    // publish the odom topic (position command for debugging, e.g. rviz)
-    nav_msgs::Odometry cmd_odom;
-
-    cmd_odom.header = last_tracker_cmd->header;
-
-    if (cmd_odom.header.frame_id == "") {
-      cmd_odom.header.frame_id = uav_state.header.frame_id;
-    }
-
-    if (cmd_odom.header.stamp == ros::Time(0)) {
-      cmd_odom.header.stamp = ros::Time::now();
-    }
-
-    if (last_tracker_cmd->use_position_horizontal) {
-      cmd_odom.pose.pose.position.x = last_tracker_cmd->position.x;
-      cmd_odom.pose.pose.position.y = last_tracker_cmd->position.y;
-    } else {
-      cmd_odom.pose.pose.position.x = uav_state.pose.position.x;
-      cmd_odom.pose.pose.position.y = uav_state.pose.position.y;
-    }
-
-    if (last_tracker_cmd->use_position_vertical) {
-      cmd_odom.pose.pose.position.z = last_tracker_cmd->position.z;
-    } else {
-      cmd_odom.pose.pose.position.z = uav_state.pose.position.z;
-    }
-
-    // transform the velocity in the reference to the child_frame
-    if (last_tracker_cmd->use_velocity_horizontal || last_tracker_cmd->use_velocity_vertical) {
-      cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_;
-
-      geometry_msgs::Vector3Stamped velocity;
-      velocity.header = last_tracker_cmd->header;
-
-      if (last_tracker_cmd->use_velocity_horizontal) {
-        velocity.vector.x = last_tracker_cmd->velocity.x;
-        velocity.vector.y = last_tracker_cmd->velocity.y;
-      }
-
-      if (last_tracker_cmd->use_velocity_vertical) {
-        velocity.vector.z = last_tracker_cmd->velocity.z;
-      }
-
-      auto res = transformer_->transformSingle(velocity, cmd_odom.child_frame_id);
-
-      if (res) {
-
-        cmd_odom.twist.twist.linear.x = res.value().vector.x;
-        cmd_odom.twist.twist.linear.y = res.value().vector.y;
-        cmd_odom.twist.twist.linear.z = res.value().vector.z;
-      } else {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the cmd odom speed from '%s' to '%s'", velocity.header.frame_id.c_str(),
-                           cmd_odom.child_frame_id.c_str());
-      }
-    }
-
-    // | --------------- prepare desired orientation -------------- |
-
-    // have the attitude_cmd results already
-    if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
-
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_control_output->attitude);
-
-      cmd_odom.twist.twist.angular.x = last_control_output->attitude_rate.x;
-      cmd_odom.twist.twist.angular.y = last_control_output->attitude_rate.y;
-      cmd_odom.twist.twist.angular.z = last_control_output->attitude_rate.z;
-
-      // use just the heading from position command
-    } else {
-
-      cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_tracker_cmd->heading);
-    }
-
-    ph_cmd_odom_.publish(cmd_odom);
-
-    ph_tracker_cmd_.publish(last_tracker_cmd);
-
-    // publish the twist topic (velocity command in body frame for external controllers)
-    geometry_msgs::Twist cmd_twist;
-    cmd_twist = cmd_odom.twist.twist;
-
-    ph_cmd_twist_.publish(cmd_twist);
-  }
+  publishControlReferenceOdom(last_tracker_cmd, last_control_output);
 
   // --------------------------------------------------------------
   // |                 Publish the control command                |
@@ -9019,7 +8963,7 @@ void ControlManager::publish(void) {
   // | --------- publish the attitude_cmd for debugging --------- |
 
   if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
-    ph_attitude_cmd_.publish(last_control_output);  // the control command is already a ConstPtr
+    ph_mrs_odom_input_.publish(last_control_output);  // the control command is already a ConstPtr
   }
 
   // | ------------ publish the desired thrust force ------------ |
@@ -9149,6 +9093,101 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
   }
 
   return reference_out;
+}
+
+//}
+
+/* publishControlReferenceOdom() //{ */
+
+void ControlManager::publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output) {
+
+  // TODO fill in
+
+  /* if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) { */
+
+  /*   // publish the odom topic (position command for debugging, e.g. rviz) */
+  /*   nav_msgs::Odometry cmd_odom; */
+
+  /*   cmd_odom.header = last_tracker_cmd->header; */
+
+  /*   if (cmd_odom.header.frame_id == "") { */
+  /*     cmd_odom.header.frame_id = uav_state.header.frame_id; */
+  /*   } */
+
+  /*   if (cmd_odom.header.stamp == ros::Time(0)) { */
+  /*     cmd_odom.header.stamp = ros::Time::now(); */
+  /*   } */
+
+  /*   if (last_tracker_cmd->use_position_horizontal) { */
+  /*     cmd_odom.pose.pose.position.x = last_tracker_cmd->position.x; */
+  /*     cmd_odom.pose.pose.position.y = last_tracker_cmd->position.y; */
+  /*   } else { */
+  /*     cmd_odom.pose.pose.position.x = uav_state.pose.position.x; */
+  /*     cmd_odom.pose.pose.position.y = uav_state.pose.position.y; */
+  /*   } */
+
+  /*   if (last_tracker_cmd->use_position_vertical) { */
+  /*     cmd_odom.pose.pose.position.z = last_tracker_cmd->position.z; */
+  /*   } else { */
+  /*     cmd_odom.pose.pose.position.z = uav_state.pose.position.z; */
+  /*   } */
+
+  /*   // transform the velocity in the reference to the child_frame */
+  /*   if (last_tracker_cmd->use_velocity_horizontal || last_tracker_cmd->use_velocity_vertical) { */
+  /*     cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_; */
+
+  /*     geometry_msgs::Vector3Stamped velocity; */
+  /*     velocity.header = last_tracker_cmd->header; */
+
+  /*     if (last_tracker_cmd->use_velocity_horizontal) { */
+  /*       velocity.vector.x = last_tracker_cmd->velocity.x; */
+  /*       velocity.vector.y = last_tracker_cmd->velocity.y; */
+  /*     } */
+
+  /*     if (last_tracker_cmd->use_velocity_vertical) { */
+  /*       velocity.vector.z = last_tracker_cmd->velocity.z; */
+  /*     } */
+
+  /*     auto res = transformer_->transformSingle(velocity, cmd_odom.child_frame_id); */
+
+  /*     if (res) { */
+
+  /*       cmd_odom.twist.twist.linear.x = res.value().vector.x; */
+  /*       cmd_odom.twist.twist.linear.y = res.value().vector.y; */
+  /*       cmd_odom.twist.twist.linear.z = res.value().vector.z; */
+  /*     } else { */
+  /*       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the cmd odom speed from '%s' to '%s'", velocity.header.frame_id.c_str(), */
+  /*                          cmd_odom.child_frame_id.c_str()); */
+  /*     } */
+  /*   } */
+
+  /*   // | --------------- prepare desired orientation -------------- | */
+
+  /*   // have the attitude_cmd results already */
+  /*   if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) { */
+
+  /*     cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_control_output->attitude); */
+
+  /*     cmd_odom.twist.twist.angular.x = last_control_output->attitude_rate.x; */
+  /*     cmd_odom.twist.twist.angular.y = last_control_output->attitude_rate.y; */
+  /*     cmd_odom.twist.twist.angular.z = last_control_output->attitude_rate.z; */
+
+  /*     // use just the heading from position command */
+  /*   } else { */
+
+  /*     cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_tracker_cmd->heading); */
+  /*   } */
+
+  /*   ph_control_reference_odom_.publish(cmd_odom); */
+
+  /*   ph_tracker_cmd_.publish(last_tracker_cmd); */
+
+  /*   // publish the twist topic (velocity command in body frame for external controllers) */
+  /*   geometry_msgs::Twist cmd_twist; */
+  /*   cmd_twist = cmd_odom.twist.twist; */
+
+  /*   ph_cmd_twist_.publish(cmd_twist); */
+  /* } */
 }
 
 //}

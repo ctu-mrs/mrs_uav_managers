@@ -8,7 +8,6 @@
 #include <optional>
 
 #include <mrs_msgs/TrackerCommand.h>
-#include <mrs_msgs/AttitudeCommand.h>
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/HwApiActuatorCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
@@ -23,8 +22,7 @@ namespace mrs_uav_managers
 std::optional<unsigned int> idxInVector(const std::string& str, const std::vector<std::string>& vec);
 
 // checks for invalid values in the result from trackers
-bool validateTrackerCommand(const mrs_msgs::TrackerCommand::ConstPtr tracker_command, const std::string& node_name, const std::string& var_name);
-bool validateAttitudeCommand(const mrs_msgs::AttitudeCommand::ConstPtr attitude_command, const std::string& node_name, const std::string& var_name);
+bool validateTrackerCommand(const std::optional<mrs_msgs::TrackerCommand>& msg, const std::string& node_name, const std::string& var_name);
 
 // checks for invalid messages in/out
 bool validateOdometry(const nav_msgs::Odometry& msg, const std::string& node_name, const std::string& var_name);

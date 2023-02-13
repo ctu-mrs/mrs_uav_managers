@@ -70,7 +70,7 @@ public:
    *
    * @return true if success and message
    */
-  virtual std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand::ConstPtr &last_tracker_cmd) = 0;
+  virtual std::tuple<bool, std::string> activate(const mrs_msgs::TrackerCommand &last_tracker_cmd) = 0;
 
   /**
    * @brief is called when this trackers output is no longer needed. However, it can be activated later.
@@ -102,8 +102,8 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::TrackerCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &uav_state,
-                                                          const Controller::ControlOutput &   last_controller_output) = 0;
+  virtual std::optional<mrs_msgs::TrackerCommand> update(const mrs_msgs::UavState::ConstPtr &uav_state,
+                                                         const Controller::ControlOutput &   last_control_output) = 0;
 
   /**
    * @brief A request for the tracker's status.

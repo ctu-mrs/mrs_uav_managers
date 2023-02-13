@@ -11,8 +11,10 @@
 #include <mrs_msgs/HwApiControlGroupCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
 #include <mrs_msgs/HwApiAttitudeCmd.h>
-#include <mrs_msgs/HwApiAccelerationCmd.h>
-#include <mrs_msgs/HwApiVelocityCmd.h>
+#include <mrs_msgs/HwApiAccelerationHdgRateCmd.h>
+#include <mrs_msgs/HwApiAccelerationHdgCmd.h>
+#include <mrs_msgs/HwApiVelocityHdgRateCmd.h>
+#include <mrs_msgs/HwApiVelocityHdgCmd.h>
 #include <mrs_msgs/HwApiPositionCmd.h>
 
 #include <mrs_msgs/ControllerDiagnostics.h>
@@ -33,24 +35,44 @@ class Controller {
 public:
   typedef struct ControllerOutputs
   {
-    bool position      = false;
-    bool velocity      = false;
-    bool acceleration  = false;
-    bool attitude      = false;
-    bool attitude_rate = false;
-    bool control_group = false;
-    bool actuators     = false;
+    bool actuators             = false;
+    bool control_group         = false;
+    bool attitude_rate         = false;
+    bool attitude              = false;
+    bool acceleration_hdg_rate = false;
+    bool acceleration_hdg      = false;
+    bool velocity_hdg_rate     = false;
+    bool velocity_hdg          = false;
+    bool position              = false;
   } ControllerOutputs;
 
   typedef std::variant<mrs_msgs::HwApiActuatorCmd, mrs_msgs::HwApiControlGroupCmd, mrs_msgs::HwApiAttitudeRateCmd, mrs_msgs::HwApiAttitudeCmd,
-                       mrs_msgs::HwApiAccelerationCmd, mrs_msgs::HwApiVelocityCmd, mrs_msgs::HwApiPositionCmd>
+                       mrs_msgs::HwApiAccelerationHdgRateCmd, mrs_msgs::HwApiAccelerationHdgCmd, mrs_msgs::HwApiVelocityHdgRateCmd,
+                       mrs_msgs::HwApiVelocityHdgCmd, mrs_msgs::HwApiPositionCmd>
       HwApiOutputVariant;
 
   typedef struct
   {
     std::optional<HwApiOutputVariant> control_output;
     mrs_msgs::ControllerDiagnostics   diagnostics;
+
+    /**
+     * @brief Desired orientation is used for checking the orientation control error.
+     *        This variable is optional, fill it in if you know it.
+     */
     std::optional<Eigen::Quaterniond> desired_orientation;
+
+    /**
+     * @brief Desired unbiased acceleration is used by the MRS odometry as control input.
+     *        This variable is optional, fill it in if you know it.
+     */
+    std::optional<Eigen::Vector3d> desired_unbiased_acceleration;
+
+    /**
+     * @brief Desired heading rate caused by the controllers control action.
+     *        This variable is optional, fill it in if you know it.
+     */
+    std::optional<double> desired_heading_rate;
   } ControlOutput;
 
   virtual ~Controller() = 0;
