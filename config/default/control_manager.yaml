@@ -72,7 +72,7 @@ safety:
     # landing detection, especially in the case of wild eland with weird initial conditions.
     # It might be safe with just the normal landing though.
     cutoff_mass_factor:  0.5 # how much lighter does the drone appear to be?
-    cutoff_timeout:  2.0 # [s] how long does the thrust has to be below the mass factor
+    cutoff_timeout:  2.0 # [s] how long does the throttle has to be below the mass factor
 
     disarm: true
     timer_rate: 10 # [Hz]
@@ -107,7 +107,7 @@ safety:
   rc_emergency_handoff:
     enabled: false
 
-  min_thrust_null_tracker: 0.10 # [] minimum thrust when not flying
+  min_throttle_null_tracker: 0.10 # [] minimum throttle when not flying
 
   safety_timer_rate: 100 # [Hz]
   failsafe_timer_rate: 100 # [Hz]
@@ -246,7 +246,7 @@ joystick:
     pitch: 1 # []
     roll: 3 # []
     heading: 0 # []
-    thrust: 4 # []
+    throttle: 4 # []
 
   # multipliers for scaling and reversing the channels
   channel_multipliers:
@@ -254,7 +254,7 @@ joystick:
     pitch: 1.0 # []
     roll: 1.0 # []
     heading: 1.0 # []
-    thrust: 1.0 # []
+    throttle: 1.0 # []
 
 rc_joystick:
 
@@ -270,7 +270,7 @@ rc_joystick:
     pitch: 2
     roll: 0
     heading: 3
-    thrust: 1
+    throttle: 1
 
 pirouette:
 

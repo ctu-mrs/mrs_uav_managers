@@ -444,6 +444,23 @@ double RCChannelToRange(double rc_value, double range, double deadband) {
 
 //}
 
+// | -------- extraction of throttle out of hw api cmds ------- |
+
+/* extractThrottle() //{ */
+
+std::optional<double> extractThrottle(const Controller::ControlOutput& control_output) {
+
+  if (!control_output.control_output) {
+    return {};
+  }
+
+  return std::visit(HwApiCmdExtractThrottleVisitor(), control_output.control_output.value());
+}
+
+//}
+
+// | -------------- validation of HW api commands ------------- |
+
 /* validateControlOutput() //{ */
 
 bool validateControlOutput(const Controller::ControlOutput& control_output, const std::string& node_name, const std::string& var_name) {
@@ -456,12 +473,10 @@ bool validateControlOutput(const Controller::ControlOutput& control_output, cons
   std::variant<std::string> node_name_var{node_name};
   std::variant<std::string> var_name_var{var_name};
 
-  return std::visit(HwApiCmdValidator(), control_output.control_output.value(), node_name_var, var_name_var);
+  return std::visit(HwApiValidateVisitor(), control_output.control_output.value(), node_name_var, var_name_var);
 }
 
 //}
-
-// | -------------- validation of HW api commands ------------- |
 
 /* validateHwApiActuatorCmd() //{ */
 
@@ -740,6 +755,192 @@ bool validateHwApiPositionCmd(const mrs_msgs::HwApiPositionCmd& msg, const std::
   }
 
   return true;
+}
+
+//}
+
+// | ------------ initialization of HW api commands ----------- |
+
+/* initializeDefaultOutput() //{ */
+
+Controller::HwApiOutputVariant initializeDefaultOutput(const Controller::ControllerOutputs& possible_outputs, const mrs_msgs::UavState& uav_state,
+                                                       const double& min_throttle, const double& n_motors) {
+
+  Controller::HwApiOutputVariant output;
+
+  if (possible_outputs.actuators) {
+    output = mrs_msgs::HwApiActuatorCmd();
+  } else if (possible_outputs.control_group) {
+    output = mrs_msgs::HwApiControlGroupCmd();
+  } else if (possible_outputs.attitude_rate) {
+    output = mrs_msgs::HwApiAttitudeRateCmd();
+  } else if (possible_outputs.attitude) {
+    output = mrs_msgs::HwApiAttitudeCmd();
+  } else if (possible_outputs.acceleration_hdg_rate) {
+    output = mrs_msgs::HwApiAccelerationHdgRateCmd();
+  } else if (possible_outputs.acceleration_hdg) {
+    output = mrs_msgs::HwApiAccelerationHdgCmd();
+  } else if (possible_outputs.velocity_hdg_rate) {
+    output = mrs_msgs::HwApiVelocityHdgRateCmd();
+  } else if (possible_outputs.velocity_hdg) {
+    output = mrs_msgs::HwApiVelocityHdgCmd();
+  } else if (possible_outputs.position) {
+    output = mrs_msgs::HwApiPositionCmd();
+  }
+
+  std::variant<mrs_msgs::UavState> uav_state_var{uav_state};
+  std::variant<double>             min_throttle_var{min_throttle};
+  std::variant<double>             n_motors_var{n_motors};
+
+  std::visit(HwApiInitializeVisitor(), output, uav_state_var, min_throttle_var, n_motors_var);
+
+  return output;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiActuatorCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiActuatorCmd& msg, const double& min_throttle, const double& n_motors) {
+
+  msg.stamp = ros::Time::now();
+
+  for (int i = 0; i < n_motors; i++) {
+    msg.motors.push_back(min_throttle);
+  }
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiControlGroupCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiControlGroupCmd& msg, const double& min_throttle) {
+
+  msg.stamp = ros::Time::now();
+
+  msg.roll     = 0;
+  msg.pitch    = 0;
+  msg.yaw      = 0;
+  msg.throttle = min_throttle;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiAttitudeRateCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiAttitudeRateCmd& msg, const double& min_throttle) {
+
+  msg.stamp = ros::Time::now();
+
+  msg.body_rate.x = 0;
+  msg.body_rate.y = 0;
+  msg.body_rate.z = 0;
+  msg.throttle    = min_throttle;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiAttitudeCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiAttitudeCmd& msg, const mrs_msgs::UavState& uav_state, const double& min_throttle) {
+
+  msg.stamp = ros::Time::now();
+
+  msg.orientation = uav_state.pose.orientation;
+  msg.throttle    = min_throttle;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiAccelerationHdgRateCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiAccelerationHdgRateCmd& msg, const mrs_msgs::UavState& uav_state) {
+
+  msg.header.frame_id = uav_state.header.frame_id;
+  msg.header.stamp    = ros::Time::now();
+
+  msg.acceleration.x = 0;
+  msg.acceleration.y = 0;
+  msg.acceleration.z = 0;
+  msg.heading_rate   = 0;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiAccelerationHdgCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiAccelerationHdgCmd& msg, const mrs_msgs::UavState& uav_state) {
+
+  msg.header.frame_id = uav_state.header.frame_id;
+  msg.header.stamp    = ros::Time::now();
+
+  msg.acceleration.x = 0;
+  msg.acceleration.y = 0;
+  msg.acceleration.z = 0;
+
+  try {
+    msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+  }
+  catch (std::runtime_error& exrun) {
+    msg.heading = 0;
+  }
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiVelocityHdgRateCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiVelocityHdgRateCmd& msg, const mrs_msgs::UavState& uav_state) {
+
+  msg.header.frame_id = uav_state.header.frame_id;
+  msg.header.stamp    = ros::Time::now();
+
+  msg.velocity.x   = 0;
+  msg.velocity.y   = 0;
+  msg.velocity.z   = 0;
+  msg.heading_rate = 0;
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiVelocityHdgCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiVelocityHdgCmd& msg, const mrs_msgs::UavState& uav_state) {
+
+  msg.header.frame_id = uav_state.header.frame_id;
+  msg.header.stamp    = ros::Time::now();
+
+  msg.velocity.x = 0;
+  msg.velocity.y = 0;
+  msg.velocity.z = 0;
+
+  try {
+    msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+  }
+  catch (std::runtime_error& exrun) {
+    msg.heading = 0;
+  }
+}
+
+//}
+
+/* initializeHwApiCmd(mrs_msgs::HwApiPositionCmd& msg) //{ */
+
+void initializeHwApiCmd(mrs_msgs::HwApiPositionCmd& msg, const mrs_msgs::UavState& uav_state) {
+
+  msg.header.frame_id = uav_state.header.frame_id;
+  msg.header.stamp    = ros::Time::now();
+
+  msg.position.x = uav_state.pose.position.x;
+  msg.position.y = uav_state.pose.position.y;
+  msg.position.z = uav_state.pose.position.z;
+
+  try {
+    msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
+  }
+  catch (std::runtime_error& exrun) {
+    msg.heading = 0;
+  }
 }
 
 //}

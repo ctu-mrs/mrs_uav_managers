@@ -85,6 +85,7 @@ public:
    * @param name_space the parameter namespace of the controller, can be used during initialization of the private node handle
    * @param uav_mass the net mass of the UAV
    * @param common_handlers handlers shared between trackers and controllers
+   * @param output_modalities declares which output command does the hardware API of the UAV accept
    */
   virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space, const double uav_mass,
                           std::shared_ptr<mrs_uav_managers::CommonHandlers_t>    common_handlers,
@@ -116,6 +117,7 @@ public:
    * TODO
    */
   virtual ControlOutput update(const mrs_msgs::UavState &uav_state, const std::optional<mrs_msgs::TrackerCommand> &tracker_command) = 0;
+
   /**
    * @brief A request for the controller's status.
    *
@@ -142,7 +144,7 @@ public:
 };
 
 // A pure virtual destructor requires a function body.
-Controller::~Controller(){};
+/* Controller::~Controller(){}; */
 
 }  // namespace mrs_uav_managers
 

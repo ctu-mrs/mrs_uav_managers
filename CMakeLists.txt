@@ -40,7 +40,7 @@ include_directories(
 
 add_library(ControlManager
   src/control_manager/control_manager.cpp
-  src/control_manager/reference_publisher.cpp
+  src/control_manager/output_publisher.cpp
   src/common/common.cpp
   )
 

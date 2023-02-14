@@ -274,6 +274,7 @@
       <remap from="~cmd_twist_out" to="~cmd_twist" />
       <remap from="~trajectory_original/poses_out" to="~trajectory_original/poses" />
       <remap from="~trajectory_original/markers_out" to="~trajectory_original/markers" />
+      <remap from="~controller_diagnostics_out" to="~controller_diagnostics" />
       <remap from="~profiler" to="profiler" />
 
       <!-- Services -->

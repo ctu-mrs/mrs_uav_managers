@@ -7,6 +7,7 @@
 #include <nodelet/nodelet.h>
 
 #include <common.h>
+#include <control_manager/output_publisher.h>
 
 #include <mrs_uav_managers/controller.h>
 #include <mrs_uav_managers/tracker.h>
@@ -51,8 +52,10 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
+#include <mrs_msgs/HwApiMode.h>
 #include <mrs_msgs/HwApiDiagnostics.h>
 #include <mrs_msgs/HwApiRcChannels.h>
+
 #include <mrs_msgs/HwApiActuatorCmd.h>
 #include <mrs_msgs/HwApiControlGroupCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
@@ -62,7 +65,6 @@
 #include <mrs_msgs/HwApiVelocityHdgRateCmd.h>
 #include <mrs_msgs/HwApiVelocityHdgCmd.h>
 #include <mrs_msgs/HwApiPositionCmd.h>
-#include <mrs_msgs/HwApiMode.h>
 
 #include <std_msgs/Float64.h>
 
@@ -268,15 +270,7 @@ private:
 
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode> sh_hw_api_mode_;
 
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>            ph_hw_api_actuator_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>        ph_hw_api_control_group_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>        ph_hw_api_attitude_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>            ph_hw_api_attitude_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd> ph_hw_api_acceleration_hdg_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>     ph_hw_api_acceleration_hdg_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>     ph_hw_api_velocity_hdg_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>         ph_hw_api_velocity_hdg_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>            ph_hw_api_position_cmd_;
+  OutputPublisher control_output_publisher_;
 
   Controller::ControllerOutputs _hw_api_inputs_;
 
@@ -335,7 +329,7 @@ private:
   // enabling the emergency handoff -> will disable eland and failsafe
   bool _rc_emergency_handoff_ = false;
 
-  // what thrust should be output when null tracker is active?
+  // what throttle should be output when null tracker is active?
   double _min_throttle_null_tracker_ = 0.0;
 
   // rates of all the timers
@@ -413,16 +407,16 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
+  mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>     ph_controller_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
   mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>          ph_mrs_odom_input_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_thrust_force_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
-  mrs_lib::PublisherHandler<geometry_msgs::Twist>                ph_cmd_twist_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               ph_motors_;
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_throttle_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_markers_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_coordinates_markers_;
@@ -520,12 +514,12 @@ private:
   bool offboard_mode_was_true_ = false;  // if it was ever true
   bool armed_                  = false;
 
-  // | --------------------- thrust and mass -------------------- |
+  // | -------------------- throttle and mass ------------------- |
 
-  // thrust mass estimation during eland
-  double    thrust_mass_estimate_   = 0;
-  bool      thrust_under_threshold_ = false;
-  ros::Time thrust_mass_estimate_first_time_;
+  // throttle mass estimation during eland
+  double    throttle_mass_estimate_   = 0;
+  bool      throttle_under_threshold_ = false;
+  ros::Time throttle_mass_estimate_first_time_;
 
   // | ---------------------- safety params --------------------- |
 
@@ -807,8 +801,8 @@ private:
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
 
   // channel numbers and channel multipliers
-  int    _channel_pitch_, _channel_roll_, _channel_heading_, _channel_thrust_;
-  double _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_thrust_;
+  int    _channel_pitch_, _channel_roll_, _channel_heading_, _channel_throttle_;
+  double _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_throttle_;
 
   ros::Timer timer_joystick_;
   void       timerJoystick(const ros::TimerEvent& event);
@@ -835,7 +829,7 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels> sh_hw_api_rc_;
 
   // the RC channel mapping of the main 4 control signals
-  double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_thrust_;
+  double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_throttle_;
 
   bool              _rc_goto_enabled_               = false;
   std::atomic<bool> rc_goto_active_                 = false;
@@ -854,14 +848,11 @@ private:
 
   // | --------------------- other routines --------------------- |
 
-  // resolves simplified frame names
-  std::string resolveFrameName(const std::string in);
-
   // this is called to update the trackers and to receive position control command from the active one
   void updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
-  void updateControllers(mrs_msgs::UavState uav_state_for_control);
+  void updateControllers(const mrs_msgs::UavState& uav_state);
 
   // sets the reference to the active tracker
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
@@ -877,7 +868,7 @@ private:
   void publish(void);
 
   // publishes rviz-visualizable control reference
-  void publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output);
+  void publishControlReferenceOdom(const std::optional<mrs_msgs::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
@@ -980,7 +971,7 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam("safety/min_thrust_null_tracker", _min_throttle_null_tracker_);
+  param_loader.loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
   param_loader.loadParam("safety/ehover_tracker", _ehover_tracker_name_);
   param_loader.loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
@@ -1096,13 +1087,13 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("joystick/channels/pitch", _channel_pitch_);
   param_loader.loadParam("joystick/channels/roll", _channel_roll_);
   param_loader.loadParam("joystick/channels/heading", _channel_heading_);
-  param_loader.loadParam("joystick/channels/thrust", _channel_thrust_);
+  param_loader.loadParam("joystick/channels/throttle", _channel_throttle_);
 
   // load channel multipliers
   param_loader.loadParam("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
   param_loader.loadParam("joystick/channel_multipliers/roll", _channel_mult_roll_);
   param_loader.loadParam("joystick/channel_multipliers/heading", _channel_mult_heading_);
-  param_loader.loadParam("joystick/channel_multipliers/thrust", _channel_mult_thrust_);
+  param_loader.loadParam("joystick/channel_multipliers/throttle", _channel_mult_throttle_);
 
   param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled_);
   param_loader.loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
@@ -1142,7 +1133,7 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
   param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
   param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
-  param_loader.loadParam("rc_joystick/channels/thrust", _rc_channel_thrust_);
+  param_loader.loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
 
   param_loader.loadParam("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
 
@@ -1655,35 +1646,26 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- publishers ----------------------- |
 
-  // hw api control outputs
-  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd_", 1);
-  ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh_, "hw_api_control_group_cmd_out", 1);
-  ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
-  ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
-  ph_hw_api_acceleration_hdg_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd>(nh_, "hw_api_acceleration_hdg_rate_cmd_out", 1);
-  ph_hw_api_acceleration_hdg_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>(nh_, "hw_api_acceleration_hdg_cmd_out", 1);
-  ph_hw_api_velocity_hdg_rate_cmd_     = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>(nh_, "hw_api_velocity_hdg_rate_cmd_out", 1);
-  ph_hw_api_velocity_hdg_cmd_          = mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>(nh_, "hw_api_velocity_hdg_cmd_out", 1);
-  ph_hw_api_position_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>(nh_, "hw_api_position_cmd_out", 1);
+  control_output_publisher_ = OutputPublisher(nh_);
 
+  ph_controller_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>(nh_, "controller_diagnostics_out", 1);
   ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
   ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>(nh_, "odometry_input_out", 1);
-  ph_thrust_force_                       = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "thrust_force_out", 1);
   ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
-  ph_cmd_twist_                          = mrs_lib::PublisherHandler<geometry_msgs::Twist>(nh_, "cmd_twist_out", 1);
   ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
   ph_motors_                             = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
   ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
-  ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1);
+  ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
+  ph_throttle_                           = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "throttle_out", 1, false, 10.0);
   ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
-  ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1);
-  ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1);
-  ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1);
+  ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1, true, 1.0);
+  ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1, true, 1.0);
+  ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1, false, 10.0);
   ph_bumper_status_                      = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
   ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
   ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
-  ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1);
+  ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
   pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
 
@@ -2028,7 +2010,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       ph_heading_.publish(heading_out);
     }
     catch (...) {
-      ROS_ERROR("exception caught, could not transform heading");
+      ROS_ERROR_THROTTLE(1.0, "exception caught, could not transform heading");
     }
   }
 
@@ -2583,7 +2565,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   // This means that the timerFailsafe only does its work when Controllers and Trackers produce valid output.
   // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr() || !last_control_output.control_output) {
+  if (!last_tracker_cmd || !last_control_output.control_output) {
     return;
   }
 
@@ -2937,29 +2919,29 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
       return;
     }
 
-    // recalculate the mass based on the thrust
-    thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f thrust mass estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
+    // recalculate the mass based on the throttle
+    throttle_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
     // condition for automatic motor turn off
-    if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || throttle < 0.01)) {
-      if (!thrust_under_threshold_) {
+    if (((throttle_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || throttle < 0.01)) {
+      if (!throttle_under_threshold_) {
 
-        thrust_mass_estimate_first_time_ = ros::Time::now();
-        thrust_under_threshold_          = true;
+        throttle_mass_estimate_first_time_ = ros::Time::now();
+        throttle_under_threshold_          = true;
       }
 
-      ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time_).toSec());
+      ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_first_time_).toSec());
 
     } else {
-      thrust_mass_estimate_first_time_ = ros::Time::now();
-      thrust_under_threshold_          = false;
+      throttle_mass_estimate_first_time_ = ros::Time::now();
+      throttle_under_threshold_          = false;
     }
 
-    if (thrust_under_threshold_ && ((ros::Time::now() - thrust_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
+    if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
       // enable callbacks? ... NO
 
-      ROS_INFO("[ControlManager]: reached cutoff thrust, setting motors OFF");
+      ROS_INFO("[ControlManager]: reached cutoff throttle, setting motors OFF");
       switchMotors(false);
 
       // disarm the drone
@@ -3028,30 +3010,30 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     return;
   }
 
-  double thrust_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f thrust_mass_estimate: %.2f", landing_uav_mass_, thrust_mass_estimate_);
+  double throttle_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
+  ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
   // condition for automatic motor turn off
-  if (((thrust_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_))) {
+  if (((throttle_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_))) {
 
-    if (!thrust_under_threshold_) {
+    if (!throttle_under_threshold_) {
 
-      thrust_mass_estimate_first_time_ = ros::Time::now();
-      thrust_under_threshold_          = true;
+      throttle_mass_estimate_first_time_ = ros::Time::now();
+      throttle_under_threshold_          = true;
     }
 
-    ROS_INFO_THROTTLE(0.1, "[ControlManager]: thrust is under cutoff factor for %.2f s", (ros::Time::now() - thrust_mass_estimate_first_time_).toSec());
+    ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_first_time_).toSec());
 
   } else {
 
-    thrust_mass_estimate_first_time_ = ros::Time::now();
-    thrust_under_threshold_          = false;
+    throttle_mass_estimate_first_time_ = ros::Time::now();
+    throttle_under_threshold_          = false;
   }
 
   // condition for automatic motor turn off
-  if (thrust_under_threshold_ && ((ros::Time::now() - thrust_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
+  if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
 
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: detecting zero thrust, disarming");
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: detecting zero throttle, disarming");
 
     arming(false);
   }
@@ -3131,13 +3113,13 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     mrs_msgs::Vec4::Request request;
 
     if (fabs(joystick_data->axes[_channel_pitch_]) >= 0.05 || fabs(joystick_data->axes[_channel_roll_]) >= 0.05 ||
-        fabs(joystick_data->axes[_channel_heading_]) >= 0.05 || fabs(joystick_data->axes[_channel_thrust_]) >= 0.05) {
+        fabs(joystick_data->axes[_channel_heading_]) >= 0.05 || fabs(joystick_data->axes[_channel_throttle_]) >= 0.05) {
 
       if (_joystick_mode_ == 0) {
 
         request.goal[REF_X]       = _channel_mult_pitch_ * joystick_data->axes[_channel_pitch_] * _joystick_carrot_distance_;
         request.goal[REF_Y]       = _channel_mult_roll_ * joystick_data->axes[_channel_roll_] * _joystick_carrot_distance_;
-        request.goal[REF_Z]       = _channel_mult_thrust_ * joystick_data->axes[_channel_thrust_];
+        request.goal[REF_Z]       = _channel_mult_throttle_ * joystick_data->axes[_channel_throttle_];
         request.goal[REF_HEADING] = _channel_mult_heading_ * joystick_data->axes[_channel_heading_];
 
         mrs_msgs::Vec4::Response response;
@@ -3169,7 +3151,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
           point.position.x += _channel_mult_pitch_ * joystick_data->axes[_channel_pitch_] * (speed * dt);
           point.position.y += _channel_mult_roll_ * joystick_data->axes[_channel_roll_] * (speed * dt);
-          point.position.z += _channel_mult_thrust_ * joystick_data->axes[_channel_thrust_] * (speed * dt);
+          point.position.z += _channel_mult_throttle_ * joystick_data->axes[_channel_throttle_] * (speed * dt);
           point.heading = _channel_mult_heading_ * joystick_data->axes[_channel_heading_];
 
           trajectory.points.push_back(point);
@@ -3205,7 +3187,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
       double tmp_x       = RCChannelToRange(rc_channels->channels[_rc_channel_pitch_], _rc_horizontal_speed_, 0.1);
       double tmp_y       = -RCChannelToRange(rc_channels->channels[_rc_channel_roll_], _rc_horizontal_speed_, 0.1);
-      double tmp_z       = RCChannelToRange(rc_channels->channels[_rc_channel_thrust_], _rc_vertical_speed_, 0.3);
+      double tmp_z       = RCChannelToRange(rc_channels->channels[_rc_channel_throttle_], _rc_vertical_speed_, 0.3);
       double tmp_heading = -RCChannelToRange(rc_channels->channels[_rc_channel_heading_], _rc_heading_rate_, 0.1);
 
       if (abs(tmp_x) > 1e-3) {
@@ -8640,7 +8622,6 @@ void ControlManager::updateTrackers(void) {
   // --------------------------------------------------------------
 
   std::optional<mrs_msgs::TrackerCommand> tracker_command;
-  mrs_msgs::UavState::ConstPtr            uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state));
 
   // for each tracker
   for (int i = 0; i < int(tracker_list_.size()); i++) {
@@ -8651,7 +8632,7 @@ void ControlManager::updateTrackers(void) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         // active tracker => update and retrieve the command
-        tracker_command = tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
+        tracker_command = tracker_list_[i]->update(uav_state, last_control_output);
       }
       catch (std::runtime_error& exrun) {
 
@@ -8668,7 +8649,7 @@ void ControlManager::updateTrackers(void) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         // nonactive tracker => just update without retrieving the command
-        tracker_list_[i]->update(uav_state_const_ptr, last_control_output);
+        tracker_list_[i]->update(uav_state, last_control_output);
       }
       catch (std::runtime_error& exrun) {
 
@@ -8723,7 +8704,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
+void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -8732,38 +8713,33 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  // --------------------------------------------------------------
-  // |                   Update the controller                    |
-  // --------------------------------------------------------------
-
-  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_for_control));
-
-  mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
+  // | ----------------- update the controllers ----------------- |
 
   // the trackers are not running
-  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
+  if (!last_tracker_cmd) {
 
-    mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
+    // TODO we used to set the default/empty attitude command here
+    /* mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>()); */
 
-    output_command->total_mass      = _uav_mass_;
-    output_command->mass_difference = 0.0;
+    /* output_command->total_mass      = _uav_mass_; */
+    /* output_command->mass_difference = 0.0; */
 
-    output_command->disturbance_bx_b = _initial_body_disturbance_x_;
-    output_command->disturbance_by_b = _initial_body_disturbance_y_;
-    output_command->disturbance_wx_w = 0.0;
-    output_command->disturbance_wy_w = 0.0;
-    output_command->disturbance_bx_w = 0.0;
-    output_command->disturbance_by_w = 0.0;
+    /* output_command->disturbance_bx_b = _initial_body_disturbance_x_; */
+    /* output_command->disturbance_by_b = _initial_body_disturbance_y_; */
+    /* output_command->disturbance_wx_w = 0.0; */
+    /* output_command->disturbance_wy_w = 0.0; */
+    /* output_command->disturbance_bx_w = 0.0; */
+    /* output_command->disturbance_by_w = 0.0; */
 
-    output_command->thrust = _min_throttle_null_tracker_;
+    /* output_command->thrust = _min_throttle_null_tracker_; */
 
-    output_command->controller = "none";
+    /* output_command->controller = "none"; */
 
-    {
-      std::scoped_lock lock(mutex_last_control_output_);
+    /* { */
+    /*   std::scoped_lock lock(mutex_last_control_output_); */
 
-      last_control_output_ = output_command;
-    }
+    /*   last_control_output_ = output_command; */
+    /* } */
 
     // give the controllers current uav state
     {
@@ -8771,7 +8747,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
+        controller_list_[i]->update(uav_state, last_tracker_cmd);
       }
     }
 
@@ -8788,7 +8764,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          control_output = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd);
+          control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8813,7 +8789,7 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
           std::scoped_lock lock(mutex_controller_list_);
 
           // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
+          controller_list_[i]->update(uav_state, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8827,11 +8803,11 @@ void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control)
     }
 
     // normally, the active controller returns a valid command
-    if (control_output && validateAttitudeCommand(controller_output_cmd.value(), "ControlManager", "attitude_cmd")) {
+    if (validateControlOutput(control_output, "ControlManager", "control_output")) {
 
       std::scoped_lock lock(mutex_last_control_output_);
 
-      last_control_output_ = controller_output_cmd;
+      last_control_output_ = control_output;
 
       // but it can return an empty command, due to some critical internal error
       // which means we should trigger the failsafe landing
@@ -8904,102 +8880,48 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(5.0, "[ControlManager]: 'NullTracker' is active, not controlling");
 
-    // set the desired rate to 0
-    attitude_rate_target.body_rate.x = 0.0;
-    attitude_rate_target.body_rate.y = 0.0;
-    attitude_rate_target.body_rate.z = 0.0;
+    Controller::HwApiOutputVariant output =
+        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->motor_params.n_motors);
 
-    attitude_rate_target.throttle = _min_throttle_null_tracker_;
+    control_output_publisher_.publish(output);
 
-    ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
-
-  } else if (active_tracker_idx != _null_tracker_idx_ && last_control_output == mrs_msgs::AttitudeCommand::Ptr()) {
+  } else if (active_tracker_idx != _null_tracker_idx_ && !last_control_output.control_output) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything",
                       _controller_names_[active_controller_idx].c_str());
 
-    attitude_rate_target.body_rate.x = 0.0;
-    attitude_rate_target.body_rate.y = 0.0;
-    attitude_rate_target.body_rate.z = 0.0;
+    Controller::HwApiOutputVariant output =
+        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->motor_params.n_motors);
 
-    attitude_rate_target.throttle = _min_throttle_null_tracker_;
+    control_output_publisher_.publish(output);
 
-    ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
+  } else if (last_control_output.control_output) {
 
-  } else if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
-
-    if (last_control_output->mode_mask == last_control_output->MODE_ATTITUDE) {
-
-      attitude_target.throttle    = last_control_output->thrust;
-      attitude_target.orientation = last_control_output->attitude;
-
-      if (validateHwApiAttitudeCmd(attitude_target, "ControlManager", "attitude_target")) {
-        ph_hw_api_attitude_cmd_.publish(attitude_target);
-      } else {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude cmd is not valid just before publishing!");
-        return;
-      }
-
-    } else if (last_control_output->mode_mask == last_control_output->MODE_ATTITUDE_RATE) {
-
-      attitude_rate_target.throttle = last_control_output->thrust;
-
-      attitude_rate_target.body_rate.x = last_control_output->attitude_rate.x;
-      attitude_rate_target.body_rate.y = last_control_output->attitude_rate.y;
-      attitude_rate_target.body_rate.z = last_control_output->attitude_rate.z;
-
-      if (validateHwApiAttitudeRateCmd(attitude_rate_target, "ControlManager", "attitude_rate_target")) {
-        ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
-      } else {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude rate cmd is not valid just before publishing!");
-        return;
-      }
+    if (validateHwApiAttitudeCmd(attitude_target, "ControlManager", "last_control_output.control_output")) {
+      control_output_publisher_.publish(last_control_output.control_output.value());
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude cmd is not valid just before publishing!");
+      return;
     }
 
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
   }
 
-  // | --------- publish the attitude_cmd for debugging --------- |
+  // | -------------- publish the applied throttle -------------- |
 
-  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
-    ph_mrs_odom_input_.publish(last_control_output);  // the control command is already a ConstPtr
+  auto throttle = extractThrottle(last_control_output);
+
+  if (throttle) {
+    std_msgs::Float64 msg;
+    msg.data = throttle.value();
+    ph_throttle_.publish(msg);
   }
 
-  // | ------------ publish the desired thrust force ------------ |
+  // | --------------- publish the odometry input --------------- |
 
-  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
-
-    mrs_msgs::Float64Stamped thrust_force;
-    thrust_force.header.stamp = ros::Time::now();
-
-    thrust_force.value = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, last_control_output->thrust);
-
-    ph_thrust_force_.publish(thrust_force);
+  if (last_control_output.control_output) {
   }
-}  // namespace control_manager
-
-//}
-
-/* resolveFrameName() //{ */
-
-std::string ControlManager::resolveFrameName(const std::string in) {
-
-  // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-  if (in == "") {
-
-    return uav_state.header.frame_id;
-  }
-
-  size_t found = in.find("/");
-  if (found == std::string::npos) {
-
-    return _uav_name_ + "/" + in;
-  }
-
-  return in;
 }
 
 //}
@@ -9099,7 +9021,8 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 /* publishControlReferenceOdom() //{ */
 
-void ControlManager::publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output) {
+void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
+                                                 [[maybe_unused]] const Controller::ControlOutput&               control_output) {
 
   // TODO fill in
 
