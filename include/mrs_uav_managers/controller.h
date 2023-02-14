@@ -115,7 +115,7 @@ public:
    *
    * TODO
    */
-  virtual ControlOutput update(const mrs_msgs::UavState::ConstPtr &uav_state, const mrs_msgs::TrackerCommand::ConstPtr &tracker_command) = 0;
+  virtual ControlOutput update(const mrs_msgs::UavState &uav_state, const std::optional<mrs_msgs::TrackerCommand> &tracker_command) = 0;
   /**
    * @brief A request for the controller's status.
    *

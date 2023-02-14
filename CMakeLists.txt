@@ -39,7 +39,8 @@ include_directories(
 # ControlManager
 
 add_library(ControlManager
-  src/control_manager.cpp
+  src/control_manager/control_manager.cpp
+  src/control_manager/reference_publisher.cpp
   src/common/common.cpp
   )
 

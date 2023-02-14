@@ -7,7 +7,6 @@
 #include <nodelet/nodelet.h>
 
 #include <common.h>
-#include <control_manager/reference_publisher.h>
 
 #include <mrs_uav_managers/controller.h>
 #include <mrs_uav_managers/tracker.h>
@@ -52,10 +51,8 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
-#include <mrs_msgs/HwApiMode.h>
 #include <mrs_msgs/HwApiDiagnostics.h>
 #include <mrs_msgs/HwApiRcChannels.h>
-
 #include <mrs_msgs/HwApiActuatorCmd.h>
 #include <mrs_msgs/HwApiControlGroupCmd.h>
 #include <mrs_msgs/HwApiAttitudeRateCmd.h>
@@ -65,6 +62,7 @@
 #include <mrs_msgs/HwApiVelocityHdgRateCmd.h>
 #include <mrs_msgs/HwApiVelocityHdgCmd.h>
 #include <mrs_msgs/HwApiPositionCmd.h>
+#include <mrs_msgs/HwApiMode.h>
 
 #include <std_msgs/Float64.h>
 
@@ -269,6 +267,16 @@ private:
   // | ------------------------- HW API ------------------------- |
 
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode> sh_hw_api_mode_;
+
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>            ph_hw_api_actuator_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>        ph_hw_api_control_group_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>        ph_hw_api_attitude_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>            ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd> ph_hw_api_acceleration_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>     ph_hw_api_acceleration_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>     ph_hw_api_velocity_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>         ph_hw_api_velocity_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>            ph_hw_api_position_cmd_;
 
   Controller::ControllerOutputs _hw_api_inputs_;
 
@@ -846,11 +854,14 @@ private:
 
   // | --------------------- other routines --------------------- |
 
+  // resolves simplified frame names
+  std::string resolveFrameName(const std::string in);
+
   // this is called to update the trackers and to receive position control command from the active one
   void updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
-  void updateControllers(const mrs_msgs::UavState& uav_state);
+  void updateControllers(mrs_msgs::UavState uav_state_for_control);
 
   // sets the reference to the active tracker
   std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
@@ -866,7 +877,7 @@ private:
   void publish(void);
 
   // publishes rviz-visualizable control reference
-  void publishControlReferenceOdom(const std::optional<mrs_msgs::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
+  void publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
@@ -1645,7 +1656,7 @@ void ControlManager::initialize(void) {
   // | ----------------------- publishers ----------------------- |
 
   // hw api control outputs
-  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd", 1);
+  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh_, "ph_hw_api_actuator_cmd_", 1);
   ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh_, "hw_api_control_group_cmd_out", 1);
   ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh_, "hw_api_attitude_rate_cmd_out", 1);
   ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh_, "hw_api_attitude_cmd_out", 1);
@@ -8712,7 +8723,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
+void ControlManager::updateControllers(mrs_msgs::UavState uav_state_for_control) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -8721,33 +8732,38 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  // | ----------------- update the controllers ----------------- |
+  // --------------------------------------------------------------
+  // |                   Update the controller                    |
+  // --------------------------------------------------------------
+
+  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_for_control));
+
+  mrs_msgs::AttitudeCommand::ConstPtr controller_output_cmd;
 
   // the trackers are not running
-  if (!last_tracker_cmd) {
+  if (last_tracker_cmd == mrs_msgs::TrackerCommand::Ptr()) {
 
-    // TODO we used to set the default/empty attitude command here
-    /* mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>()); */
+    mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>());
 
-    /* output_command->total_mass      = _uav_mass_; */
-    /* output_command->mass_difference = 0.0; */
+    output_command->total_mass      = _uav_mass_;
+    output_command->mass_difference = 0.0;
 
-    /* output_command->disturbance_bx_b = _initial_body_disturbance_x_; */
-    /* output_command->disturbance_by_b = _initial_body_disturbance_y_; */
-    /* output_command->disturbance_wx_w = 0.0; */
-    /* output_command->disturbance_wy_w = 0.0; */
-    /* output_command->disturbance_bx_w = 0.0; */
-    /* output_command->disturbance_by_w = 0.0; */
+    output_command->disturbance_bx_b = _initial_body_disturbance_x_;
+    output_command->disturbance_by_b = _initial_body_disturbance_y_;
+    output_command->disturbance_wx_w = 0.0;
+    output_command->disturbance_wy_w = 0.0;
+    output_command->disturbance_bx_w = 0.0;
+    output_command->disturbance_by_w = 0.0;
 
-    /* output_command->thrust = _min_throttle_null_tracker_; */
+    output_command->thrust = _min_throttle_null_tracker_;
 
-    /* output_command->controller = "none"; */
+    output_command->controller = "none";
 
-    /* { */
-    /*   std::scoped_lock lock(mutex_last_control_output_); */
+    {
+      std::scoped_lock lock(mutex_last_control_output_);
 
-    /*   last_control_output_ = output_command; */
-    /* } */
+      last_control_output_ = output_command;
+    }
 
     // give the controllers current uav state
     {
@@ -8755,7 +8771,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state, last_tracker_cmd);
+        controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
       }
     }
 
@@ -8772,7 +8788,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd);
+          control_output = controller_list_[active_controller_idx]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8797,7 +8813,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
           std::scoped_lock lock(mutex_controller_list_);
 
           // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state, last_tracker_cmd);
+          controller_list_[i]->update(uav_state_const_ptr, last_tracker_cmd);
         }
         catch (std::runtime_error& exrun) {
 
@@ -8811,11 +8827,11 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
     }
 
     // normally, the active controller returns a valid command
-    if (validateControlOutput(control_output, "ControlManager", "control_output")) {
+    if (control_output && validateAttitudeCommand(controller_output_cmd.value(), "ControlManager", "attitude_cmd")) {
 
       std::scoped_lock lock(mutex_last_control_output_);
 
-      last_control_output_ = control_output;
+      last_control_output_ = controller_output_cmd;
 
       // but it can return an empty command, due to some critical internal error
       // which means we should trigger the failsafe landing
@@ -8897,7 +8913,7 @@ void ControlManager::publish(void) {
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
-  } else if (active_tracker_idx != _null_tracker_idx_ && !last_control_output.control_output) {
+  } else if (active_tracker_idx != _null_tracker_idx_ && last_control_output == mrs_msgs::AttitudeCommand::Ptr()) {
 
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything",
                       _controller_names_[active_controller_idx].c_str());
@@ -8910,7 +8926,7 @@ void ControlManager::publish(void) {
 
     ph_hw_api_attitude_rate_cmd_.publish(attitude_rate_target);
 
-  } else if (last_control_output.control_output) {
+  } else if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
 
     if (last_control_output->mode_mask == last_control_output->MODE_ATTITUDE) {
 
@@ -8946,13 +8962,13 @@ void ControlManager::publish(void) {
 
   // | --------- publish the attitude_cmd for debugging --------- |
 
-  if (last_control_output.control_output) {
+  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
     ph_mrs_odom_input_.publish(last_control_output);  // the control command is already a ConstPtr
   }
 
   // | ------------ publish the desired thrust force ------------ |
 
-  if (last_control_output.control_output) {
+  if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) {
 
     mrs_msgs::Float64Stamped thrust_force;
     thrust_force.header.stamp = ros::Time::now();
@@ -8961,6 +8977,29 @@ void ControlManager::publish(void) {
 
     ph_thrust_force_.publish(thrust_force);
   }
+}  // namespace control_manager
+
+//}
+
+/* resolveFrameName() //{ */
+
+std::string ControlManager::resolveFrameName(const std::string in) {
+
+  // copy member variables
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+  if (in == "") {
+
+    return uav_state.header.frame_id;
+  }
+
+  size_t found = in.find("/");
+  if (found == std::string::npos) {
+
+    return _uav_name_ + "/" + in;
+  }
+
+  return in;
 }
 
 //}
@@ -9060,8 +9099,7 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 /* publishControlReferenceOdom() //{ */
 
-void ControlManager::publishControlReferenceOdom(const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
-                                                 const Controller::ControlOutput&               control_output) {
+void ControlManager::publishControlReferenceOdom(const mrs_msgs::TrackerCommand& tracker_command, const Controller::ControlOutput& control_output) {
 
   // TODO fill in
 
