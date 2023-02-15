@@ -9,7 +9,9 @@
 #include <variant>
 
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/param_loader.h>
 
+#include <mrs_uav_managers/common_handlers.h>
 #include <mrs_uav_managers/controller.h>
 
 #include <mrs_msgs/TrackerCommand.h>
@@ -42,6 +44,8 @@ bool validateTrackerCommand(const std::optional<mrs_msgs::TrackerCommand>& msg, 
 bool validateOdometry(const nav_msgs::Odometry& msg, const std::string& node_name, const std::string& var_name);
 bool validateUavState(const mrs_msgs::UavState& msg, const std::string& node_name, const std::string& var_nam);
 bool validateVelocityReference(const mrs_msgs::VelocityReference& msg, const std::string& node_name, const std::string& var_name);
+
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name);
 
 // translates the channel values to desired range
 double RCChannelToRange(double rc_value, double range, double deadband);
@@ -148,7 +152,7 @@ struct HwApiValidateVisitor
 
 /* control output initialization //{ */
 
-Controller::HwApiOutputVariant initializeDefaultOutput(const Controller::ControllerOutputs& possible_outputs, const mrs_msgs::UavState& uav_state,
+Controller::HwApiOutputVariant initializeDefaultOutput(const ControlOutputModalities_t& possible_outputs, const mrs_msgs::UavState& uav_state,
                                                        const double& min_throttle, const double& n_motors);
 
 void initializeHwApiCmd(mrs_msgs::HwApiActuatorCmd& msg, const double& min_throttle, const double& n_motors);

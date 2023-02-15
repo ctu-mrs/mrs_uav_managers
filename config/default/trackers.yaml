@@ -11,9 +11,6 @@ LineTracker:
 JoyTracker:
   address: "mrs_uav_trackers/JoyTracker"
 
-MatlabTracker:
-  address: "mrs_uav_trackers/MatlabTracker"
-
 SpeedTracker:
   address: "mrs_uav_trackers/SpeedTracker"
 

@@ -48,7 +48,7 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/msg_extractor.h>
-#include <mrs_lib/quadratic_thrust_model.h>
+#include <mrs_lib/quadratic_throttle_model.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
@@ -272,7 +272,7 @@ private:
 
   OutputPublisher control_output_publisher_;
 
-  Controller::ControllerOutputs _hw_api_inputs_;
+  ControlOutputModalities_t _hw_api_inputs_;
 
   // this timer will check till we already got the hardware api diagnostics
   // then it will trigger the initialization of the controllers and finish
@@ -1265,10 +1265,13 @@ void ControlManager::initialize(void) {
   common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
   common_handlers_->bumper.enabled             = bumper_enabled_;
 
-  param_loader.loadParam("motor_params/a", common_handlers_->motor_params.A);
-  param_loader.loadParam("motor_params/b", common_handlers_->motor_params.B);
-  param_loader.loadParam("motor_params/n_motors", common_handlers_->motor_params.n_motors);
   param_loader.loadParam("g", common_handlers_->g);
+
+  param_loader.loadParam("motor_params/a", common_handlers_->throttle_model.A);
+  param_loader.loadParam("motor_params/b", common_handlers_->throttle_model.B);
+  param_loader.loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
+
+  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager");
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1436,7 +1439,7 @@ void ControlManager::initialize(void) {
     // check if the controller cna output some of the required outputs
     {
 
-      Controller::ControllerOutputs outputs;
+      ControlOutputModalities_t outputs;
       param_loader.loadParam(controller_name + "/outputs/actuators", outputs.actuators, false);
       param_loader.loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
       param_loader.loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
@@ -1503,6 +1506,12 @@ void ControlManager::initialize(void) {
 
         ros::shutdown();
       }
+
+      if ((_hw_api_inputs_.actuators || _hw_api_inputs_.control_group) && !common_handlers_->detailed_model_params) {
+        ROS_ERROR(
+            "[ControlManager]: the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
+        ros::shutdown();
+      }
     }
 
     if (eland_threshold == 0) {
@@ -1545,7 +1554,7 @@ void ControlManager::initialize(void) {
       it = controllers_.find(_controller_names_[i]);
 
       ROS_INFO("[ControlManager]: initializing the controller '%s'", it->second.address.c_str());
-      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, _uav_mass_, common_handlers_, _hw_api_inputs_);
+      controller_list_[i]->initialize(nh_, _controller_names_[i], it->second.name_space, common_handlers_);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[ControlManager]: exception caught during controller initialization: '%s'", ex.what());
@@ -1614,7 +1623,7 @@ void ControlManager::initialize(void) {
 
   ROS_INFO("[ControlManager]: activating the null tracker");
 
-  tracker_list_[_null_tracker_idx_]->activate(last_tracker_cmd_.value());
+  tracker_list_[_null_tracker_idx_]->activate(last_tracker_cmd_);
   active_tracker_idx_ = _null_tracker_idx_;
 
   // --------------------------------------------------------------
@@ -2920,7 +2929,7 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     }
 
     // recalculate the mass based on the throttle
-    throttle_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
+    throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle) / common_handlers_->g;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
     // condition for automatic motor turn off
@@ -3010,7 +3019,7 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     return;
   }
 
-  double throttle_mass_estimate_ = mrs_lib::quadratic_thrust_model::thrustToForce(common_handlers_->motor_params, throttle) / common_handlers_->g;
+  double throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
   // condition for automatic motor turn off
@@ -3480,8 +3489,6 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
   uav_state_odom.pose     = odom->pose.pose;
   uav_state_odom.velocity = odom->twist.twist;
 
-  mrs_msgs::UavState::ConstPtr uav_state_const_ptr(std::make_unique<mrs_msgs::UavState>(uav_state_odom));
-
   // | ----- check for change in odometry frame of reference ---- |
 
   if (got_uav_state_) {
@@ -3532,8 +3539,8 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
       {
         std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
 
-        tracker_list_[active_tracker_idx_]->switchOdometrySource(uav_state_const_ptr);
-        controller_list_[active_controller_idx_]->switchOdometrySource(uav_state_const_ptr);
+        tracker_list_[active_tracker_idx_]->switchOdometrySource(uav_state_odom);
+        controller_list_[active_controller_idx_]->switchOdometrySource(uav_state_odom);
       }
     }
   }
@@ -3728,8 +3735,8 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
       {
         std::scoped_lock lock(mutex_controller_list_, mutex_tracker_list_);
 
-        tracker_list_[active_tracker_idx_]->switchOdometrySource(uav_state);
-        controller_list_[active_controller_idx_]->switchOdometrySource(uav_state);
+        tracker_list_[active_tracker_idx_]->switchOdometrySource(*uav_state);
+        controller_list_[active_controller_idx_]->switchOdometrySource(*uav_state);
       }
     }
   }
@@ -5056,6 +5063,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
+  // TODO these checks should be offloaded to a function !!!
   if (!std::isfinite(req.reference.reference.position.x)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
     res.message = "NaNs/infs in the goal!";
@@ -8881,7 +8889,7 @@ void ControlManager::publish(void) {
     ROS_WARN_THROTTLE(5.0, "[ControlManager]: 'NullTracker' is active, not controlling");
 
     Controller::HwApiOutputVariant output =
-        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->motor_params.n_motors);
+        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
 
     control_output_publisher_.publish(output);
 
@@ -8891,7 +8899,7 @@ void ControlManager::publish(void) {
                       _controller_names_[active_controller_idx].c_str());
 
     Controller::HwApiOutputVariant output =
-        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->motor_params.n_motors);
+        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
 
     control_output_publisher_.publish(output);
 

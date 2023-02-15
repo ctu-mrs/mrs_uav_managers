@@ -72,6 +72,7 @@
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/control_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/trackers.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/controllers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/model_params.yaml" />
 
       <rosparam if="$(eval arg('RUN_TYPE') == 'simulation')" file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/mass.yaml" />
 

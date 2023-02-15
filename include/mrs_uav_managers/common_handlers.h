@@ -3,7 +3,7 @@
 
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/scope_timer.h>
-#include <mrs_lib/quadratic_thrust_model.h>
+#include <mrs_lib/quadratic_throttle_model.h>
 
 namespace mrs_uav_managers
 {
@@ -51,17 +51,41 @@ struct ScopeTimer_t
 
 typedef boost::function<double(void)> getMass_t;
 
-struct CommonHandlers_t
+struct DetailedModelParams_t
 {
-  SafetyArea_t                                   safety_area;
-  std::shared_ptr<mrs_lib::Transformer>          transformer;
-  ScopeTimer_t                                   scope_timer;
-  Bumper_t                                       bumper;
-  getMass_t                                      getMass;
-  mrs_lib::quadratic_thrust_model::MotorParams_t motor_params;
-  double                                         g;
+  Eigen::MatrixXd control_group_mixer;
+  Eigen::MatrixXd force_torque_mixer;
+  Eigen::Matrix3d inertia;
+  double          prop_radius;
+  double          arm_length;
+  double          body_height;
 };
 
+struct ControlOutputModalities_t
+{
+  bool actuators             = false;
+  bool control_group         = false;
+  bool attitude_rate         = false;
+  bool attitude              = false;
+  bool acceleration_hdg_rate = false;
+  bool acceleration_hdg      = false;
+  bool velocity_hdg_rate     = false;
+  bool velocity_hdg          = false;
+  bool position              = false;
+};
+
+struct CommonHandlers_t
+{
+  SafetyArea_t                                     safety_area;
+  std::shared_ptr<mrs_lib::Transformer>            transformer;
+  ScopeTimer_t                                     scope_timer;
+  Bumper_t                                         bumper;
+  getMass_t                                        getMass;
+  double                                           g;
+  mrs_lib::quadratic_throttle_model::MotorParams_t throttle_model;
+  std::optional<DetailedModelParams_t>             detailed_model_params;
+  ControlOutputModalities_t                        control_output_modalities;
+};
 
 }  // namespace mrs_uav_managers
 

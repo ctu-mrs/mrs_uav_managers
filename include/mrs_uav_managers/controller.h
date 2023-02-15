@@ -33,19 +33,6 @@ namespace mrs_uav_managers
 
 class Controller {
 public:
-  typedef struct ControllerOutputs
-  {
-    bool actuators             = false;
-    bool control_group         = false;
-    bool attitude_rate         = false;
-    bool attitude              = false;
-    bool acceleration_hdg_rate = false;
-    bool acceleration_hdg      = false;
-    bool velocity_hdg_rate     = false;
-    bool velocity_hdg          = false;
-    bool position              = false;
-  } ControllerOutputs;
-
   typedef std::variant<mrs_msgs::HwApiActuatorCmd, mrs_msgs::HwApiControlGroupCmd, mrs_msgs::HwApiAttitudeRateCmd, mrs_msgs::HwApiAttitudeCmd,
                        mrs_msgs::HwApiAccelerationHdgRateCmd, mrs_msgs::HwApiAccelerationHdgCmd, mrs_msgs::HwApiVelocityHdgRateCmd,
                        mrs_msgs::HwApiVelocityHdgCmd, mrs_msgs::HwApiPositionCmd>
@@ -87,9 +74,8 @@ public:
    * @param common_handlers handlers shared between trackers and controllers
    * @param output_modalities declares which output command does the hardware API of the UAV accept
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space, const double uav_mass,
-                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t>    common_handlers,
-                          const mrs_uav_managers::Controller::ControllerOutputs &output_modalities) = 0;
+  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space,
+                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
 
   /**
    * @brief It is called before the controller output will be required and used. Should not take much time (within miliseconds).
@@ -131,7 +117,7 @@ public:
    *
    * @param new_uav_state the new UavState which will come in the next update()
    */
-  virtual void switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+  virtual void switchOdometrySource(const mrs_msgs::UavState &new_uav_state) = 0;
 
   /**
    * @brief Request for setting new constraints.

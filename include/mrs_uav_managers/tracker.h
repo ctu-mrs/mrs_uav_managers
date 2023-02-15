@@ -85,7 +85,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState &new_uav_state) = 0;
 
   /**
    * @brief Request for reseting the tracker's states given the UAV is static.

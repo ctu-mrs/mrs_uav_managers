@@ -6,6 +6,9 @@ namespace mrs_uav_managers
 namespace control_manager
 {
 
+OutputPublisher::OutputPublisher() {
+}
+
 OutputPublisher::OutputPublisher(ros::NodeHandle& nh) {
 
   ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh, "ph_hw_api_actuator_cmd", 1);

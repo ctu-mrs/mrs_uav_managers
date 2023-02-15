@@ -47,7 +47,7 @@ landing:
 
   # those two must apply simultaneously
   landing_cutoff_mass_factor:  0.5 # how much light does the drone appear to be?
-  landing_cutoff_timeout:  2.0 # [s] how long does the thrust has to be below the mass factor
+  landing_cutoff_timeout:  2.0 # [s] how long does the throttle has to be below the mass factor
 
   disarm: true
 
@@ -79,12 +79,12 @@ flight_timer:
   rate: 1 # [Hz]
   max_time: 10 # [s]
 
-# detecting if desired thrust cross max threshold, triggers landing after that
-max_thrust:
+# detecting if desired throttle cross max threshold, triggers landing after that
+max_throttle:
 
   enabled: true
   rate: 30 # [Hz]
-  max_thrust: 0.80 # [-]
+  max_throttle: 0.80 # [-]
   eland_timeout: 1.0 # [s]
   ungrip_timeout: 0.5 # [s]
 

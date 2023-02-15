@@ -444,6 +444,96 @@ double RCChannelToRange(double rc_value, double range, double deadband) {
 
 //}
 
+/* loadDetailedUavModelParams() //{ */
+
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name) {
+
+  mrs_lib::ParamLoader param_loader(nh, node_name);
+
+  double arm_length;
+  double body_height;
+  double force_constant;
+  double torque_constant;
+  double prop_radius;
+  double rpm_min;
+  double rpm_max;
+  double mass;
+
+  param_loader.loadParam("mass", mass);
+
+  param_loader.loadParam("model_params/arm_length", arm_length);
+  param_loader.loadParam("model_params/body_height", body_height);
+
+  param_loader.loadParam("model_params/propulsion/force_constant", force_constant);
+  param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant);
+  param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius);
+  param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min);
+  param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max);
+
+  Eigen::MatrixXd allocation_matrix = param_loader.loadMatrixDynamic2("model_params/propulsion/allocation_matrix", 4, -1);
+
+  if (!param_loader.loadedSuccessfully()) {
+    ROS_INFO("[%s]: detailed model params not loaded, missing some info", node_name.c_str());
+    return {};
+  }
+
+  int n_motors = allocation_matrix.cols();
+
+  DetailedModelParams_t model_params;
+
+  model_params.arm_length  = arm_length;
+  model_params.body_height = body_height;
+  model_params.prop_radius = prop_radius;
+
+  // create the inertia matrix
+  model_params.inertia       = Eigen::Matrix3d::Zero();
+  model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+  model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+  model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+
+  // create the force-torque allocation matrix
+  model_params.force_torque_mixer.row(0) *= arm_length * force_constant;
+  model_params.force_torque_mixer.row(1) *= arm_length * force_constant;
+  model_params.force_torque_mixer.row(2) *= torque_constant * (3.0 * prop_radius) * force_constant;
+  model_params.force_torque_mixer.row(3) *= force_constant;
+
+  // | ------- create the control group allocation matrix ------- |
+
+  // pseudoinverse of the force-torque matrix (maximum norm)
+  Eigen::MatrixXd alloc_tmp =
+      model_params.force_torque_mixer.transpose() * (model_params.force_torque_mixer * model_params.force_torque_mixer.transpose()).inverse();
+
+  // | ------------- normalize the allocation matrix ------------ |
+  // this will make it match the PX4 control group mixing
+
+  // the first two columns (roll, pitch)
+  for (int i = 0; i < n_motors; i++) {
+    alloc_tmp.block(i, 0, 1, 2).normalize();
+  }
+
+  // the 3rd column (yaw)
+  for (int i = 0; i < n_motors; i++) {
+    if (alloc_tmp(i, 2) > 1e-2) {
+      alloc_tmp(i, 2) = 1.0;
+    } else if (alloc_tmp(i, 2) < -1e-2) {
+      alloc_tmp(i, 2) = -1.0;
+    } else {
+      alloc_tmp(i, 2) = 0.0;
+    }
+  }
+
+  // the 4th column (throttle)
+  for (int i = 0; i < n_motors; i++) {
+    alloc_tmp(i, 3) = 1.0;
+  }
+
+  model_params.control_group_mixer = alloc_tmp;
+
+  return model_params;
+}
+
+//}
+
 // | -------- extraction of throttle out of hw api cmds ------- |
 
 /* extractThrottle() //{ */
@@ -763,7 +853,7 @@ bool validateHwApiPositionCmd(const mrs_msgs::HwApiPositionCmd& msg, const std::
 
 /* initializeDefaultOutput() //{ */
 
-Controller::HwApiOutputVariant initializeDefaultOutput(const Controller::ControllerOutputs& possible_outputs, const mrs_msgs::UavState& uav_state,
+Controller::HwApiOutputVariant initializeDefaultOutput(const ControlOutputModalities_t& possible_outputs, const mrs_msgs::UavState& uav_state,
                                                        const double& min_throttle, const double& n_motors) {
 
   Controller::HwApiOutputVariant output;

@@ -4,7 +4,6 @@ trackers : [
   "LineTracker",
   "LandoffTracker",
   "JoyTracker",
-  "MatlabTracker",
   "SpeedTracker",
   "FlipTracker",
   "NullTracker",
