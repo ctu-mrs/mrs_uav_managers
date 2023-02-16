@@ -535,7 +535,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   // copy member variables
   auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-  double desired_throttle            = sh_throttle_.getMsg()->data;
+  double desired_throttle            = sh_throttle_.getMsg()->data; // TODO might not be available
   auto   odometry                    = sh_odometry_.getMsg();
   auto   tracker_cmd                 = sh_tracker_cmd_.getMsg();
 
@@ -924,9 +924,11 @@ void UavManager::timerMaxthrottle(const ros::TimerEvent& event) {
   if (!is_initialized_)
     return;
 
-  if (!sh_throttle_.hasMsg() && (ros::Time::now() - sh_throttle_.lastMsgTime()).toSec() < 1.0) {
+  if (!sh_throttle_.hasMsg() || (ros::Time::now() - sh_throttle_.lastMsgTime()).toSec() > 1.0) {
     return;
   }
+
+  ROS_INFO_ONCE("[UavManager]: max throttle timer spinning");
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxthrottle", _maxthrottle_timer_rate_, 0.03, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxthrottle", scope_timer_logger_, scope_timer_enabled_);
@@ -2135,7 +2137,7 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
 
 void UavManager::setOdometryCallbacksSrv(const bool& input) {
 
-  ROS_INFO("[UavManager]: switching odometry callabcks to %s", input ? "ON" : "OFF");
+  ROS_INFO("[UavManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 

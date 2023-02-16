@@ -1273,6 +1273,8 @@ void ControlManager::initialize(void) {
 
   common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager");
 
+  common_handlers_->control_output_modalities = _hw_api_inputs_;
+
   // --------------------------------------------------------------
   // |                        load trackers                       |
   // --------------------------------------------------------------
@@ -2586,10 +2588,17 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   {
-    // TODO this is very clumsy
+    // TODO this whole scope is very clumsy
+
+    position_error_ = {};
+
     if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
       std::scoped_lock lock(mutex_position_error_);
+
+      if (!position_error_) {
+        position_error_ = Eigen::Vector3d::Zero(3);
+      }
 
       position_error_.value()[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
       position_error_.value()[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
@@ -2598,6 +2607,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
     if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
       std::scoped_lock lock(mutex_position_error_);
+
+      if (!position_error_) {
+        position_error_ = Eigen::Vector3d::Zero(3);
+      }
+
+      position_error_ = Eigen::Vector3d::Zero(3);
 
       position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
     }
@@ -5550,7 +5565,7 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd) {
+  if (!last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5589,7 +5604,7 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd) {
+  if (!last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5628,7 +5643,7 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd) {
+  if (!last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5667,7 +5682,7 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
-  if (last_tracker_cmd) {
+  if (!last_tracker_cmd) {
     res.message = "not flying";
     res.success = false;
     return true;
@@ -5754,6 +5769,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
+  // safety area check
   if (!isPointInSafetyArea3d(transformed_reference)) {
     ss << "failed to set the reference, the point is outside of the safety area!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
@@ -8391,7 +8407,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
       ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx].c_str());
 
-      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd.value());
+      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd);
 
       if (!success) {
 
@@ -8916,6 +8932,10 @@ void ControlManager::publish(void) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: not publishing a control command");
   }
 
+  // | ----------- publish the controller diagnostics ----------- |
+
+  ph_controller_diagnostics_.publish(last_control_output.diagnostics);
+
   // | -------------- publish the applied throttle -------------- |
 
   auto throttle = extractThrottle(last_control_output);
@@ -8926,9 +8946,32 @@ void ControlManager::publish(void) {
     ph_throttle_.publish(msg);
   }
 
+  // | ----------------- publish tracker command ---------------- |
+
+  ph_tracker_cmd_.publish(last_tracker_cmd.value());
+
   // | --------------- publish the odometry input --------------- |
 
   if (last_control_output.control_output) {
+
+    mrs_msgs::MrsOdometryInput msg;
+
+    msg.header.frame_id = uav_state.header.frame_id;
+    msg.header.stamp    = ros::Time::now();
+
+    if (last_control_output.desired_unbiased_acceleration) {
+      msg.control_acceleration.x = last_control_output.desired_unbiased_acceleration.value()[0];
+      msg.control_acceleration.y = last_control_output.desired_unbiased_acceleration.value()[1];
+      msg.control_acceleration.z = last_control_output.desired_unbiased_acceleration.value()[2];
+    }
+
+    if (last_control_output.desired_heading_rate) {
+      msg.control_hdg_rate = last_control_output.desired_heading_rate.value();
+    }
+
+    if (last_control_output.desired_unbiased_acceleration) {
+      ph_mrs_odom_input_.publish(msg);
+    }
   }
 }
 
@@ -9110,8 +9153,6 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
   /*   } */
 
   /*   ph_control_reference_odom_.publish(cmd_odom); */
-
-  /*   ph_tracker_cmd_.publish(last_tracker_cmd); */
 
   /*   // publish the twist topic (velocity command in body frame for external controllers) */
   /*   geometry_msgs::Twist cmd_twist; */
