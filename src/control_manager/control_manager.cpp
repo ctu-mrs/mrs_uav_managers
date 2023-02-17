@@ -870,6 +870,8 @@ private:
   // publishes rviz-visualizable control reference
   void publishControlReferenceOdom(const std::optional<mrs_msgs::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
 
+  void initializeControlOutput(void);
+
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
 
@@ -940,9 +942,6 @@ void ControlManager::initialize(void) {
   controller_tracker_switch_time_ = ros::Time(0);
 
   ROS_INFO("[ControlManager]: initializing");
-
-  last_control_output_.control_output      = {};
-  last_control_output_.desired_orientation = {};
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -1147,17 +1146,11 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("body_disturbance_x", _initial_body_disturbance_x_);
   param_loader.loadParam("body_disturbance_y", _initial_body_disturbance_y_);
 
-  last_control_output_.diagnostics.total_mass      = _uav_mass_;
-  last_control_output_.diagnostics.mass_difference = 0.0;
+  // --------------------------------------------------------------
+  // |             initialize the last control output             |
+  // --------------------------------------------------------------
 
-  last_control_output_.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
-  last_control_output_.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
-  last_control_output_.diagnostics.disturbance_wx_w = 0.0;
-  last_control_output_.diagnostics.disturbance_wy_w = 0.0;
-  last_control_output_.diagnostics.disturbance_bx_w = 0.0;
-  last_control_output_.diagnostics.disturbance_by_w = 0.0;
-
-  last_control_output_.diagnostics.controller = "none";
+  initializeControlOutput();
 
   // --------------------------------------------------------------
   // |         common handler for trackers and controllers        |
@@ -1966,24 +1959,28 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // |                  publish the control error                 |
   // --------------------------------------------------------------
 
-  if (position_error_) {
+  if (position_error) {
+
+    Eigen::Vector3d pos_error_value = position_error.value();
 
     mrs_msgs::ControlError msg_out;
 
     msg_out.header.stamp    = ros::Time::now();
     msg_out.header.frame_id = uav_state.header.frame_id;
 
-    msg_out.position_errors.x    = position_error.value()[0];
-    msg_out.position_errors.y    = position_error.value()[1];
-    msg_out.position_errors.z    = position_error.value()[2];
-    msg_out.total_position_error = position_error->norm();
+    msg_out.position_errors.x    = pos_error_value[0];
+    msg_out.position_errors.y    = pos_error_value[1];
+    msg_out.position_errors.z    = pos_error_value[2];
+    msg_out.total_position_error = pos_error_value.norm();
 
     if (yaw_error_) {
       msg_out.yaw_error = yaw_error.value();
     }
 
     std::map<std::string, ControllerParams>::iterator it;
-    it                                  = controllers_.find(_controller_names_[active_controller_idx]);
+
+    it = controllers_.find(_controller_names_[active_controller_idx]);
+
     msg_out.position_eland_threshold    = it->second.eland_threshold;
     msg_out.position_failsafe_threshold = it->second.failsafe_threshold;
 
@@ -2996,8 +2993,11 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
 void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
+
+  ROS_INFO_ONCE("[ControlManager]: timerFailsafe() spinning");
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerFailsafe", _failsafe_timer_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerFailsafe", scope_timer_logger_, scope_timer_enabled_);
@@ -3012,6 +3012,7 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
   if (!last_control_output.control_output) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: timerFailsafe: the control output produced by the failsafe controller is empty!");
     return;
   }
 
@@ -3025,12 +3026,6 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
   } else {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement failsafe timer for this control mode");
-    return;
-  }
-
-  if (!last_control_output.control_output) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerFailsafe: last_control_output has not been initialized, returning");
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
     return;
   }
 
@@ -7711,13 +7706,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   if (_failsafe_controller_idx_ != active_controller_idx) {
 
-    // TODO old failsafe initialization
-    /* mrs_msgs::AttitudeCommand failsafe_attitude_cmd; */
-    /* failsafe_attitude_cmd          = *last_control_output; */
-    /* double pixhawk_yaw             = mrs_lib::AttitudeConverter(sh_odometry_local_.getMsg()->pose.pose.orientation).getYaw(); */
-    /* failsafe_attitude_cmd.attitude = mrs_lib::AttitudeConverter(0, 0, pixhawk_yaw); */
-    /* mrs_msgs::AttitudeCommand::ConstPtr failsafe_attitude_cmd_ptr(std::make_unique<mrs_msgs::AttitudeCommand>(failsafe_attitude_cmd)); */
-
     try {
 
       std::scoped_lock lock(mutex_controller_list_);
@@ -7754,7 +7742,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
       // super important, switch the active controller idx
       try {
-
         controller_list_[active_controller_idx_]->deactivate();
         active_controller_idx_ = _failsafe_controller_idx_;
       }
@@ -8349,9 +8336,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+  auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   std::stringstream ss;
 
@@ -8434,35 +8420,17 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
           tracker_list_[active_tracker_idx_]->deactivate();
 
           // if switching from null tracker, re-activate the already active the controller
-          if (_tracker_names_[active_tracker_idx_] == _null_tracker_name_) {
+          if (active_tracker_idx_ == _null_tracker_idx_) {
 
             ROS_INFO("[ControlManager]: reactivating '%s' due to switching from 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
 
-              Controller::ControlOutput controller_output;
+              initializeControlOutput();
 
-              controller_output.diagnostics.total_mass       = _uav_mass_;
-              controller_output.diagnostics.mass_difference  = 0.0;
-              controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
-              controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
-              controller_output.diagnostics.disturbance_wx_w = 0.0;
-              controller_output.diagnostics.disturbance_wy_w = 0.0;
-              controller_output.diagnostics.disturbance_bx_w = 0.0;
-              controller_output.diagnostics.disturbance_by_w = 0.0;
-              controller_output.diagnostics.controller       = "none";
+              auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
-              // TODO
-              /* controller_output.diagnostics.thrust           = _min_throttle_null_tracker_; */
-              /* controller_output.diagnostics.attitude         = mrs_lib::AttitudeConverter(0, 0, 0); */
-
-              {
-                std::scoped_lock lock(mutex_last_control_output_);
-
-                last_control_output_ = controller_output;
-              }
-
-              controller_list_[active_controller_idx_]->activate(controller_output);
+              controller_list_[active_controller_idx_]->activate(last_control_output);
 
               {
                 std::scoped_lock lock(mutex_controller_tracker_switch_time_);
@@ -8473,7 +8441,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
             }
 
             // if switching to null tracker, deactivate the active controller
-          } else if (_tracker_names_[new_tracker_idx] == _null_tracker_name_) {
+          } else if (new_tracker_idx == _null_tracker_idx_) {
 
             ROS_INFO("[ControlManager]: deactivating '%s' due to switching to 'NullTracker'", _controller_names_[active_controller_idx_].c_str());
             {
@@ -8487,6 +8455,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
               last_tracker_cmd_ = {};
             }
+
+            initializeControlOutput();
           }
 
           active_tracker_idx_ = new_tracker_idx;
@@ -8762,6 +8732,8 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   // the trackers are not running
   if (!last_tracker_cmd) {
 
+    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: tracker command is empty, giving controller just the uav_state");
+
     // give the controllers current uav state
     {
       std::scoped_lock lock(mutex_controller_list_);
@@ -8772,94 +8744,94 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
       }
     }
 
-  } else {
+    return;
+  }
 
-    Controller::ControlOutput control_output;
+  Controller::ControlOutput control_output;
 
-    // for each controller
-    for (int i = 0; i < int(controller_list_.size()); i++) {
+  // for each controller
+  for (int i = 0; i < int(controller_list_.size()); i++) {
 
-      if (i == active_controller_idx) {
+    if (i == active_controller_idx) {
 
-        try {
-          std::scoped_lock lock(mutex_controller_list_);
-
-          // active controller => update and retrieve the command
-          control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd.value());
-        }
-        catch (std::runtime_error& exrun) {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active controller (%s)", _controller_names_[active_controller_idx].c_str());
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-
-          if (eland_triggered_) {
-
-            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering failsafe due to an exception in the active controller (eland is already active)");
-            failsafe();
-
-          } else {
-
-            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active controller");
-            eland();
-          }
-        }
-
-      } else {
-
-        try {
-          std::scoped_lock lock(mutex_controller_list_);
-
-          // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state);
-        }
-        catch (std::runtime_error& exrun) {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the controller '%s'", _controller_names_[i].c_str());
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland (somebody should notice this)");
-
-          eland();
-        }
-      }
-    }
-
-    // normally, the active controller returns a valid command
-    if (validateControlOutput(control_output, "ControlManager", "control_output")) {
-
-      std::scoped_lock lock(mutex_last_control_output_);
-
-      last_control_output_ = control_output;
-
-      // but it can return an empty command, due to some critical internal error
-      // which means we should trigger the failsafe landing
-    } else {
-
-      // only if the controller is still active, trigger failsafe
-      // if not active, we don't care, we should not ask the controller for
-      // the result anyway -> this could mean a race condition occured
-      // like it once happend during landing
-      bool controller_status = false;
-
-      {
+      try {
         std::scoped_lock lock(mutex_controller_list_);
 
-        controller_status = controller_list_[active_controller_idx]->getStatus().active;
+        // active controller => update and retrieve the command
+        control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd.value());
       }
+      catch (std::runtime_error& exrun) {
 
-      if (controller_status) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active controller (%s)", _controller_names_[active_controller_idx].c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
 
-        if (active_controller_idx_ == _eland_controller_idx_) {
+        if (eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: triggering failsafe, the emergency controller returned empty or invalid command");
-
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering failsafe due to an exception in the active controller (eland is already active)");
           failsafe();
 
         } else {
 
-          ROS_ERROR("[ControlManager]: triggering eland, the controller returned empty or invalid command");
-
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active controller");
           eland();
         }
+      }
+
+    } else {
+
+      try {
+        std::scoped_lock lock(mutex_controller_list_);
+
+        // nonactive controller => just update without retrieving the command
+        controller_list_[i]->update(uav_state);
+      }
+      catch (std::runtime_error& exrun) {
+
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the controller '%s'", _controller_names_[i].c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland (somebody should notice this)");
+
+        eland();
+      }
+    }
+  }
+
+  // normally, the active controller returns a valid command
+  if (validateControlOutput(control_output, "ControlManager", "control_output")) {
+
+    std::scoped_lock lock(mutex_last_control_output_);
+
+    last_control_output_ = control_output;
+
+    // but it can return an empty command, due to some critical internal error
+    // which means we should trigger the failsafe landing
+  } else {
+
+    // only if the controller is still active, trigger failsafe
+    // if not active, we don't care, we should not ask the controller for
+    // the result anyway -> this could mean a race condition occured
+    // like it once happend during landing
+    bool controller_status = false;
+
+    {
+      std::scoped_lock lock(mutex_controller_list_);
+
+      controller_status = controller_list_[active_controller_idx]->getStatus().active;
+    }
+
+    if (controller_status) {
+
+      if (active_controller_idx_ == _eland_controller_idx_) {
+
+        ROS_ERROR("[ControlManager]: triggering failsafe, the emergency controller returned empty or invalid command");
+
+        failsafe();
+
+      } else {
+
+        ROS_ERROR("[ControlManager]: triggering eland, the controller returned empty or invalid command");
+
+        eland();
       }
     }
   }
@@ -9143,6 +9115,27 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
   }
 
   ph_control_reference_odom_.publish(msg);
+}
+
+//}
+
+/* initializeControlOutput() //{ */
+
+void ControlManager::initializeControlOutput(void) {
+
+  Controller::ControlOutput controller_output;
+
+  controller_output.diagnostics.total_mass       = _uav_mass_;
+  controller_output.diagnostics.mass_difference  = 0.0;
+  controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
+  controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+  controller_output.diagnostics.disturbance_wx_w = 0.0;
+  controller_output.diagnostics.disturbance_wy_w = 0.0;
+  controller_output.diagnostics.disturbance_bx_w = 0.0;
+  controller_output.diagnostics.disturbance_by_w = 0.0;
+  controller_output.diagnostics.controller       = "none";
+
+  mrs_lib::set_mutexed(mutex_last_control_output_, controller_output, last_control_output_);
 }
 
 //}

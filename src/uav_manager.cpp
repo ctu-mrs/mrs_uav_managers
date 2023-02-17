@@ -2162,7 +2162,7 @@ void UavManager::setOdometryCallbacksSrv(const bool& input) {
 
 void UavManager::setControlCallbacksSrv(const bool& input) {
 
-  ROS_INFO("[UavManager]: switching control callabcks to %s", input ? "ON" : "OFF");
+  ROS_INFO("[UavManager]: switching control callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 
