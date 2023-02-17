@@ -1662,7 +1662,7 @@ void ControlManager::initialize(void) {
   ph_controller_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>(nh_, "controller_diagnostics_out", 1);
   ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
   ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>(nh_, "odometry_input_out", 1);
-  ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "cmd_odom_out", 1);
+  ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "control_reference_out", 1);
   ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
   ph_motors_                             = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
@@ -8481,6 +8481,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
               controller_list_[active_controller_idx_]->deactivate();
             }
+
+            {
+              std::scoped_lock lock(mutex_last_tracker_cmd_);
+
+              last_tracker_cmd_ = {};
+            }
           }
 
           active_tracker_idx_ = new_tracker_idx;
@@ -8686,11 +8692,25 @@ void ControlManager::updateTrackers(void) {
     }
   }
 
-  if (validateTrackerCommand(tracker_command, "ControlManager", "tracker_output_cmd")) {
+  if (active_tracker_idx == _null_tracker_idx_) {
+    return;
+  }
+
+  if (validateTrackerCommand(tracker_command, "ControlManager", "tracker_command")) {
 
     std::scoped_lock lock(mutex_last_tracker_cmd_);
 
     last_tracker_cmd_ = tracker_command;
+
+    // | --------- fill in the potentially missing header --------- |
+
+    if (last_tracker_cmd_->header.frame_id == "") {
+      last_tracker_cmd_->header.frame_id = uav_state.header.frame_id;
+    }
+
+    if (last_tracker_cmd_->header.stamp == ros::Time(0)) {
+      last_tracker_cmd_->header.stamp = ros::Time::now();
+    }
 
   } else {
 
@@ -8742,36 +8762,13 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   // the trackers are not running
   if (!last_tracker_cmd) {
 
-    // TODO we used to set the default/empty attitude command here
-    /* mrs_msgs::AttitudeCommand::Ptr output_command(std::make_unique<mrs_msgs::AttitudeCommand>()); */
-
-    /* output_command->total_mass      = _uav_mass_; */
-    /* output_command->mass_difference = 0.0; */
-
-    /* output_command->disturbance_bx_b = _initial_body_disturbance_x_; */
-    /* output_command->disturbance_by_b = _initial_body_disturbance_y_; */
-    /* output_command->disturbance_wx_w = 0.0; */
-    /* output_command->disturbance_wy_w = 0.0; */
-    /* output_command->disturbance_bx_w = 0.0; */
-    /* output_command->disturbance_by_w = 0.0; */
-
-    /* output_command->thrust = _min_throttle_null_tracker_; */
-
-    /* output_command->controller = "none"; */
-
-    /* { */
-    /*   std::scoped_lock lock(mutex_last_control_output_); */
-
-    /*   last_control_output_ = output_command; */
-    /* } */
-
     // give the controllers current uav state
     {
       std::scoped_lock lock(mutex_controller_list_);
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state, last_tracker_cmd);
+        controller_list_[i]->update(uav_state);
       }
     }
 
@@ -8788,7 +8785,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
           std::scoped_lock lock(mutex_controller_list_);
 
           // active controller => update and retrieve the command
-          control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd);
+          control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd.value());
         }
         catch (std::runtime_error& exrun) {
 
@@ -8813,7 +8810,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
           std::scoped_lock lock(mutex_controller_list_);
 
           // nonactive controller => just update without retrieving the command
-          controller_list_[i]->update(uav_state, last_tracker_cmd);
+          controller_list_[i]->update(uav_state);
         }
         catch (std::runtime_error& exrun) {
 
@@ -9075,91 +9072,77 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
                                                  [[maybe_unused]] const Controller::ControlOutput&               control_output) {
 
-  // TODO fill in
+  if (!tracker_command || !control_output.control_output) {
+    return;
+  }
 
-  /* if (last_tracker_cmd != mrs_msgs::TrackerCommand::Ptr()) { */
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  /*   // publish the odom topic (position command for debugging, e.g. rviz) */
-  /*   nav_msgs::Odometry cmd_odom; */
+  nav_msgs::Odometry msg;
 
-  /*   cmd_odom.header = last_tracker_cmd->header; */
+  msg.header = tracker_command->header;
 
-  /*   if (cmd_odom.header.frame_id == "") { */
-  /*     cmd_odom.header.frame_id = uav_state.header.frame_id; */
-  /*   } */
+  if (tracker_command->use_position_horizontal) {
+    msg.pose.pose.position.x = tracker_command->position.x;
+    msg.pose.pose.position.y = tracker_command->position.y;
+  } else {
+    msg.pose.pose.position.x = uav_state.pose.position.x;
+    msg.pose.pose.position.y = uav_state.pose.position.y;
+  }
 
-  /*   if (cmd_odom.header.stamp == ros::Time(0)) { */
-  /*     cmd_odom.header.stamp = ros::Time::now(); */
-  /*   } */
+  if (tracker_command->use_position_vertical) {
+    msg.pose.pose.position.z = tracker_command->position.z;
+  } else {
+    msg.pose.pose.position.z = uav_state.pose.position.z;
+  }
 
-  /*   if (last_tracker_cmd->use_position_horizontal) { */
-  /*     cmd_odom.pose.pose.position.x = last_tracker_cmd->position.x; */
-  /*     cmd_odom.pose.pose.position.y = last_tracker_cmd->position.y; */
-  /*   } else { */
-  /*     cmd_odom.pose.pose.position.x = uav_state.pose.position.x; */
-  /*     cmd_odom.pose.pose.position.y = uav_state.pose.position.y; */
-  /*   } */
+  // transform the velocity in the reference to the child_frame
+  if (tracker_command->use_velocity_horizontal || tracker_command->use_velocity_vertical) {
 
-  /*   if (last_tracker_cmd->use_position_vertical) { */
-  /*     cmd_odom.pose.pose.position.z = last_tracker_cmd->position.z; */
-  /*   } else { */
-  /*     cmd_odom.pose.pose.position.z = uav_state.pose.position.z; */
-  /*   } */
+    msg.child_frame_id = _uav_name_ + "/" + _body_frame_;
 
-  /*   // transform the velocity in the reference to the child_frame */
-  /*   if (last_tracker_cmd->use_velocity_horizontal || last_tracker_cmd->use_velocity_vertical) { */
-  /*     cmd_odom.child_frame_id = _uav_name_ + "/" + _body_frame_; */
+    geometry_msgs::Vector3Stamped velocity;
+    velocity.header = tracker_command->header;
 
-  /*     geometry_msgs::Vector3Stamped velocity; */
-  /*     velocity.header = last_tracker_cmd->header; */
+    if (tracker_command->use_velocity_horizontal) {
+      velocity.vector.x = tracker_command->velocity.x;
+      velocity.vector.y = tracker_command->velocity.y;
+    }
 
-  /*     if (last_tracker_cmd->use_velocity_horizontal) { */
-  /*       velocity.vector.x = last_tracker_cmd->velocity.x; */
-  /*       velocity.vector.y = last_tracker_cmd->velocity.y; */
-  /*     } */
+    if (tracker_command->use_velocity_vertical) {
+      velocity.vector.z = tracker_command->velocity.z;
+    }
 
-  /*     if (last_tracker_cmd->use_velocity_vertical) { */
-  /*       velocity.vector.z = last_tracker_cmd->velocity.z; */
-  /*     } */
+    auto res = transformer_->transformSingle(velocity, msg.child_frame_id);
 
-  /*     auto res = transformer_->transformSingle(velocity, cmd_odom.child_frame_id); */
+    if (res) {
+      msg.twist.twist.linear.x = res.value().vector.x;
+      msg.twist.twist.linear.y = res.value().vector.y;
+      msg.twist.twist.linear.z = res.value().vector.z;
+    } else {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the reference speed from '%s' to '%s'", velocity.header.frame_id.c_str(),
+                         msg.child_frame_id.c_str());
+    }
+  }
 
-  /*     if (res) { */
+  // fill in the orientation or heading
+  if (control_output.desired_orientation) {
+    msg.pose.pose.orientation = mrs_lib::AttitudeConverter(control_output.desired_orientation.value());
+  } else if (tracker_command->use_heading) {
+    msg.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, tracker_command->heading);
+  }
 
-  /*       cmd_odom.twist.twist.linear.x = res.value().vector.x; */
-  /*       cmd_odom.twist.twist.linear.y = res.value().vector.y; */
-  /*       cmd_odom.twist.twist.linear.z = res.value().vector.z; */
-  /*     } else { */
-  /*       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the cmd odom speed from '%s' to '%s'", velocity.header.frame_id.c_str(), */
-  /*                          cmd_odom.child_frame_id.c_str()); */
-  /*     } */
-  /*   } */
+  // fill in the attitude rate
+  if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(control_output.control_output.value())) {
 
-  /*   // | --------------- prepare desired orientation -------------- | */
+    auto attitude_cmd = std::get<mrs_msgs::HwApiAttitudeRateCmd>(control_output.control_output.value());
 
-  /*   // have the attitude_cmd results already */
-  /*   if (last_control_output != mrs_msgs::AttitudeCommand::Ptr()) { */
+    msg.twist.twist.angular.x = attitude_cmd.body_rate.x;
+    msg.twist.twist.angular.y = attitude_cmd.body_rate.y;
+    msg.twist.twist.angular.z = attitude_cmd.body_rate.z;
+  }
 
-  /*     cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(last_control_output->attitude); */
-
-  /*     cmd_odom.twist.twist.angular.x = last_control_output->attitude_rate.x; */
-  /*     cmd_odom.twist.twist.angular.y = last_control_output->attitude_rate.y; */
-  /*     cmd_odom.twist.twist.angular.z = last_control_output->attitude_rate.z; */
-
-  /*     // use just the heading from position command */
-  /*   } else { */
-
-  /*     cmd_odom.pose.pose.orientation = mrs_lib::AttitudeConverter(0, 0, last_tracker_cmd->heading); */
-  /*   } */
-
-  /*   ph_control_reference_odom_.publish(cmd_odom); */
-
-  /*   // publish the twist topic (velocity command in body frame for external controllers) */
-  /*   geometry_msgs::Twist cmd_twist; */
-  /*   cmd_twist = cmd_odom.twist.twist; */
-
-  /*   ph_cmd_twist_.publish(cmd_twist); */
-  /* } */
+  ph_control_reference_odom_.publish(msg);
 }
 
 //}

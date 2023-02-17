@@ -556,6 +556,7 @@ std::optional<double> extractThrottle(const Controller::ControlOutput& control_o
 bool validateControlOutput(const Controller::ControlOutput& control_output, const std::string& node_name, const std::string& var_name) {
 
   if (!control_output.control_output) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: the optional variable '%s' is not set!!!", node_name.c_str(), var_name.c_str());
     return false;
   }
 

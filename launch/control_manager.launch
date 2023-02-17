@@ -257,7 +257,7 @@
       <remap from="~hw_api_velocity_hdg_rate_cmd_out" to="hw_api/velocity_hdg_rate_cmd" />
       <remap from="~hw_api_velocity_hdg_cmd_out" to="hw_api/velocity_hdg_cmd" />
       <remap from="~hw_api_position_cmd_out" to="hw_api/position_cmd" />
-      <remap from="~cmd_odom_out" to="~cmd_odom" />
+      <remap from="~control_reference_out" to="~control_reference" />
       <remap from="~tracker_cmd_out" to="~tracker_cmd" />
       <remap from="~odometry_input_out" to="~odometry_input" />
       <remap from="~control_error_out" to="~control_error" />
@@ -275,7 +275,6 @@
       <remap from="~current_constraints_out" to="~current_constraints" />
       <remap from="~heading_out" to="~heading" />
       <remap from="~speed_out" to="~speed" />
-      <remap from="~cmd_twist_out" to="~cmd_twist" />
       <remap from="~trajectory_original/poses_out" to="~trajectory_original/poses" />
       <remap from="~trajectory_original/markers_out" to="~trajectory_original/markers" />
       <remap from="~controller_diagnostics_out" to="~controller_diagnostics" />

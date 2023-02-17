@@ -97,12 +97,14 @@ public:
    */
   virtual void resetDisturbanceEstimators(void) = 0;
 
+  virtual void update(const mrs_msgs::UavState &uav_state) = 0;
+
   /**
    * @brief The most important routine. It is called with every odometry update and it should produce a new control command.
    *
    * TODO
    */
-  virtual ControlOutput update(const mrs_msgs::UavState &uav_state, const std::optional<mrs_msgs::TrackerCommand> &tracker_command) = 0;
+  virtual ControlOutput update(const mrs_msgs::UavState &uav_state, const mrs_msgs::TrackerCommand &tracker_command) = 0;
 
   /**
    * @brief A request for the controller's status.
