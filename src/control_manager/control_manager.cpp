@@ -385,19 +385,19 @@ private:
   // | --------------- tracker and controller IDs --------------- |
 
   // keeping track of currently active controllers and trackers
-  int active_tracker_idx_    = 0;
-  int active_controller_idx_ = 0;
+  unsigned int active_tracker_idx_    = 0;
+  unsigned int active_controller_idx_ = 0;
 
   // indeces of some notable trackers
-  int _ehover_tracker_idx_               = 0;
-  int _landoff_tracker_idx_              = 0;
-  int _joystick_tracker_idx_             = 0;
-  int _joystick_controller_idx_          = 0;
-  int _failsafe_controller_idx_          = 0;
-  int _joystick_fallback_controller_idx_ = 0;
-  int _joystick_fallback_tracker_idx_    = 0;
-  int _null_tracker_idx_                 = 0;
-  int _eland_controller_idx_             = 0;
+  unsigned int _ehover_tracker_idx_               = 0;
+  unsigned int _landoff_tracker_idx_              = 0;
+  unsigned int _joystick_tracker_idx_             = 0;
+  unsigned int _joystick_controller_idx_          = 0;
+  unsigned int _failsafe_controller_idx_          = 0;
+  unsigned int _joystick_fallback_controller_idx_ = 0;
+  unsigned int _joystick_fallback_tracker_idx_    = 0;
+  unsigned int _null_tracker_idx_                 = 0;
+  unsigned int _eland_controller_idx_             = 0;
 
   // | -------------- enabling the output publisher ------------- |
 
@@ -6458,7 +6458,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     }
 
     // set the trajectory to the non-active trackers
-    for (int i = 0; i < int(tracker_list_.size()); i++) {
+    for (size_t i = 0; i < tracker_list_.size(); i++) {
 
       if (i != active_tracker_idx_) {
 
@@ -8362,25 +8362,17 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  int new_tracker_idx = -1;
-
-  for (int i = 0; i < int(_tracker_names_.size()); i++) {
-    if (tracker_name == _tracker_names_[i]) {
-      new_tracker_idx = i;
-    }
-  }
+  auto new_tracker_idx = idxInVector(tracker_name, _tracker_names_);
 
   // check if the tracker exists
-  if (new_tracker_idx < 0) {
-
+  if (!new_tracker_idx) {
     ss << "the tracker '" << tracker_name << "' does not exist!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
   // check if the tracker is already active
-  if (new_tracker_idx == active_tracker_idx) {
-
+  if (new_tracker_idx.value() == active_tracker_idx) {
     ss << "not switching, the tracker '" << tracker_name << "' is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(true, ss.str());
@@ -8391,9 +8383,9 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
     try {
 
-      ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx].c_str());
+      ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_[new_tracker_idx.value()].c_str());
 
-      auto [success, message] = tracker_list_[new_tracker_idx]->activate(last_tracker_cmd);
+      auto [success, message] = tracker_list_[new_tracker_idx.value()]->activate(last_tracker_cmd);
 
       if (!success) {
 
@@ -8459,7 +8451,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
             initializeControlOutput();
           }
 
-          active_tracker_idx_ = new_tracker_idx;
+          active_tracker_idx_ = new_tracker_idx.value();
         }
         catch (std::runtime_error& exrun) {
           ROS_ERROR("[ControlManager]: could not deactivate the tracker '%s'", _tracker_names_[active_tracker_idx_].c_str());
@@ -8512,24 +8504,17 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  int new_controller_idx = -1;
-
-  for (int i = 0; i < int(_controller_names_.size()); i++) {
-    if (controller_name == _controller_names_[i]) {
-      new_controller_idx = i;
-    }
-  }
+  auto new_controller_idx = idxInVector(controller_name, _controller_names_);
 
   // check if the controller exists
-  if (new_controller_idx < 0) {
-
+  if (!new_controller_idx) {
     ss << "the controller '" << controller_name << "' does not exist!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
   // check if the controller is not active
-  if (new_controller_idx == active_controller_idx) {
+  if (new_controller_idx.value() == active_controller_idx) {
 
     ss << "not switching, the controller '" << controller_name << "' is already active!";
     ROS_INFO_STREAM("[ControlManager]: " << ss.str());
@@ -8541,8 +8526,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     try {
 
-      ROS_INFO("[ControlManager]: activating the controller '%s'", _controller_names_[new_controller_idx].c_str());
-      if (!controller_list_[new_controller_idx]->activate(last_control_output)) {
+      ROS_INFO("[ControlManager]: activating the controller '%s'", _controller_names_[new_controller_idx.value()].c_str());
+      if (!controller_list_[new_controller_idx.value()]->activate(last_control_output)) {
 
         ss << "the controller '" << controller_name << "' was not activated";
         ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
@@ -8553,7 +8538,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
         ss << "the controller '" << controller_name << "' was activated";
         ROS_INFO_STREAM("[ControlManager]: " << ss.str());
 
-        ROS_INFO("[ControlManager]: triggering hover after switching to '%s', re-activating '%s'", _controller_names_[new_controller_idx].c_str(),
+        ROS_INFO("[ControlManager]: triggering hover after switching to '%s', re-activating '%s'", _controller_names_[new_controller_idx.value()].c_str(),
                  _tracker_names_[active_tracker_idx_].c_str());
 
         // reactivate the current tracker
@@ -8577,7 +8562,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
         try {
 
           controller_list_[active_controller_idx_]->deactivate();
-          active_controller_idx_ = new_controller_idx;
+          active_controller_idx_ = new_controller_idx.value();
         }
         catch (std::runtime_error& exrun) {
           ROS_ERROR("[ControlManager]: could not deactivate controller '%s'", _controller_names_[active_controller_idx_].c_str());
@@ -8624,7 +8609,7 @@ void ControlManager::updateTrackers(void) {
   std::optional<mrs_msgs::TrackerCommand> tracker_command;
 
   // for each tracker
-  for (int i = 0; i < int(tracker_list_.size()); i++) {
+  for (size_t i = 0; i < tracker_list_.size(); i++) {
 
     if (i == active_tracker_idx) {
 
@@ -8750,7 +8735,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   Controller::ControlOutput control_output;
 
   // for each controller
-  for (int i = 0; i < int(controller_list_.size()); i++) {
+  for (size_t i = 0; i < controller_list_.size(); i++) {
 
     if (i == active_controller_idx) {
 
@@ -8797,17 +8782,15 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   }
 
   // normally, the active controller returns a valid command
-  if (validateControlOutput(control_output, "ControlManager", "control_output")) {
+  if (validateControlOutput(control_output, _hw_api_inputs_, "ControlManager", "control_output")) {
 
-    std::scoped_lock lock(mutex_last_control_output_);
-
-    last_control_output_ = control_output;
+    mrs_lib::set_mutexed(mutex_last_control_output_, control_output, last_control_output_);
 
     // but it can return an empty command, due to some critical internal error
     // which means we should trigger the failsafe landing
   } else {
 
-    // only if the controller is still active, trigger failsafe
+    // only if the controller is still active, trigger escalating failsafe
     // if not active, we don't care, we should not ask the controller for
     // the result anyway -> this could mean a race condition occured
     // like it once happend during landing

@@ -104,7 +104,8 @@ struct HwApiCmdExtractThrottleVisitor
 
 /* control output validation //{ */
 
-bool validateControlOutput(const Controller::ControlOutput& control_output, const std::string& node_name, const std::string& var_name);
+bool validateControlOutput(const Controller::ControlOutput& control_output, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                           const std::string& var_name);
 
 // validation of hw api messages
 bool validateHwApiActuatorCmd(const mrs_msgs::HwApiActuatorCmd& msg, const std::string& node_name, const std::string& var_name);
@@ -119,31 +120,94 @@ bool validateHwApiPositionCmd(const mrs_msgs::HwApiPositionCmd& msg, const std::
 
 struct HwApiValidateVisitor
 {
-  bool operator()(const mrs_msgs::HwApiActuatorCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiActuatorCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.actuators) {
+      ROS_ERROR("[%s]: The controller returned an output modality (actuator cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiActuatorCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiControlGroupCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiControlGroupCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.control_group) {
+      ROS_ERROR("[%s]: The controller returned an output modality (control group cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiControlGroupCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiAttitudeCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiAttitudeCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.attitude) {
+      ROS_ERROR("[%s]: The controller returned an output modality (attitude cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiAttitudeCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiAttitudeRateCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiAttitudeRateCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.attitude_rate) {
+      ROS_ERROR("[%s]: The controller returned an output modality (attitude rate cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiAttitudeRateCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiAccelerationHdgRateCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiAccelerationHdgRateCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.acceleration_hdg_rate) {
+      ROS_ERROR("[%s]: The controller returned an output modality (acceleration+hdg rate cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiAccelerationHdgRateCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiAccelerationHdgCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiAccelerationHdgCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.acceleration_hdg) {
+      ROS_ERROR("[%s]: The controller returned an output modality (acceleration+hdg cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiAccelerationHdgCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiVelocityHdgRateCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiVelocityHdgRateCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.velocity_hdg_rate) {
+      ROS_ERROR("[%s]: The controller returned an output modality (velocity+hdg rate cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiVelocityHdgRateCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiVelocityHdgCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiVelocityHdgCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.velocity_hdg) {
+      ROS_ERROR("[%s]: The controller returned an output modality (velocity+hdg cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiVelocityHdgCmd(msg, node_name, var_name);
   }
-  bool operator()(const mrs_msgs::HwApiPositionCmd& msg, const std::string& node_name, const std::string& var_name) {
+  bool operator()(const mrs_msgs::HwApiPositionCmd& msg, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                  const std::string& var_name) {
+
+    if (!output_modalities.position) {
+      ROS_ERROR("[%s]: The controller returned an output modality (position cmd) that is not supported by the hardware API", node_name.c_str());
+      return false;
+    }
+
     return validateHwApiPositionCmd(msg, node_name, var_name);
   }
 };

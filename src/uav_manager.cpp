@@ -535,7 +535,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
   // copy member variables
   auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-  double desired_throttle            = sh_throttle_.getMsg()->data; // TODO might not be available
+  double desired_throttle            = sh_throttle_.getMsg()->data;  // TODO might not be available
   auto   odometry                    = sh_odometry_.getMsg();
   auto   tracker_cmd                 = sh_tracker_cmd_.getMsg();
 

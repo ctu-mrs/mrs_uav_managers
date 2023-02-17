@@ -553,17 +553,19 @@ std::optional<double> extractThrottle(const Controller::ControlOutput& control_o
 
 /* validateControlOutput() //{ */
 
-bool validateControlOutput(const Controller::ControlOutput& control_output, const std::string& node_name, const std::string& var_name) {
+bool validateControlOutput(const Controller::ControlOutput& control_output, const ControlOutputModalities_t& output_modalities, const std::string& node_name,
+                           const std::string& var_name) {
 
   if (!control_output.control_output) {
     ROS_ERROR_THROTTLE(1.0, "[%s]: the optional variable '%s' is not set!!!", node_name.c_str(), var_name.c_str());
     return false;
   }
 
-  std::variant<std::string> node_name_var{node_name};
-  std::variant<std::string> var_name_var{var_name};
+  std::variant<ControlOutputModalities_t> output_modalities_var{output_modalities};
+  std::variant<std::string>               node_name_var{node_name};
+  std::variant<std::string>               var_name_var{var_name};
 
-  return std::visit(HwApiValidateVisitor(), control_output.control_output.value(), node_name_var, var_name_var);
+  return std::visit(HwApiValidateVisitor(), control_output.control_output.value(), output_modalities_var, node_name_var, var_name_var);
 }
 
 //}
