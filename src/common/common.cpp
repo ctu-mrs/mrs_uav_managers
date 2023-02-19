@@ -459,7 +459,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   double rpm_max;
   double mass;
 
-  param_loader.loadParam("mass", mass);
+  param_loader.loadParam("uav_mass", mass);
 
   param_loader.loadParam("model_params/arm_length", arm_length);
   param_loader.loadParam("model_params/body_height", body_height);
@@ -492,6 +492,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
 
   // create the force-torque allocation matrix
+  model_params.force_torque_mixer = allocation_matrix;
   model_params.force_torque_mixer.row(0) *= arm_length * force_constant;
   model_params.force_torque_mixer.row(1) *= arm_length * force_constant;
   model_params.force_torque_mixer.row(2) *= torque_constant * (3.0 * prop_radius) * force_constant;
