@@ -8,8 +8,15 @@ Se3Controller:
 
   # which outputs the controller can provide
   outputs:
-    attitude_rate: true
-    attitude:      true
+    actuators:             true
+    control_group:         true
+    attitude_rate:         true
+    attitude:              true
+    acceleration_hdg_rate: true
+    acceleration_hdg:      true
+    velocity_hdg_rate:     true
+    velocity_hdg:          true
+    position:              true
 
 MpcController:
   address: "mrs_uav_controllers/MpcController"
@@ -21,8 +28,15 @@ MpcController:
 
   # which outputs the controller can provide
   outputs:
-    attitude_rate: true
-    attitude:      true
+    actuators:             true
+    control_group:         true
+    attitude_rate:         true
+    attitude:              true
+    acceleration_hdg_rate: true
+    acceleration_hdg:      true
+    velocity_hdg_rate:     true
+    velocity_hdg:          true
+    position:              true
 
 FailsafeController:
   address: "mrs_uav_controllers/FailsafeController"
@@ -33,8 +47,15 @@ FailsafeController:
 
   # which outputs the controller can provide
   outputs:
-    attitude_rate: true
-    attitude:      true
+    actuators:             true
+    control_group:         true
+    attitude_rate:         true
+    attitude:              true
+    acceleration_hdg_rate: true
+    acceleration_hdg:      true
+    velocity_hdg_rate:     true
+    velocity_hdg:          true
+    position:              true
 
 EmergencyController:
   address: "mrs_uav_controllers/MpcController"
@@ -45,8 +66,15 @@ EmergencyController:
 
   # which outputs the controller can provide
   outputs:
-    attitude_rate: true
-    attitude:      true
+    actuators:             true
+    control_group:         true
+    attitude_rate:         true
+    attitude:              true
+    acceleration_hdg_rate: true
+    acceleration_hdg:      true
+    velocity_hdg_rate:     true
+    velocity_hdg:          true
+    position:              true
 
 MidairActivationController:
   address: "mrs_uav_controllers/MidairActivationController"
@@ -57,5 +85,12 @@ MidairActivationController:
 
   # which outputs the controller can provide
   outputs:
-    attitude_rate: true
-    attitude:      true
+    actuators:             true
+    control_group:         true
+    attitude_rate:         true
+    attitude:              true
+    acceleration_hdg_rate: true
+    acceleration_hdg:      true
+    velocity_hdg_rate:     true
+    velocity_hdg:          true
+    position:              true
