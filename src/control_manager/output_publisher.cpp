@@ -11,7 +11,7 @@ OutputPublisher::OutputPublisher() {
 
 OutputPublisher::OutputPublisher(ros::NodeHandle& nh) {
 
-  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh, "ph_hw_api_actuator_cmd", 1);
+  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>(nh, "hw_api_actuator_cmd_out", 1);
   ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>(nh, "hw_api_control_group_cmd_out", 1);
   ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>(nh, "hw_api_attitude_rate_cmd_out", 1);
   ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>(nh, "hw_api_attitude_cmd_out", 1);

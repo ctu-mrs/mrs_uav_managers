@@ -528,6 +528,8 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
     alloc_tmp(i, 3) = 1.0;
   }
 
+  std::cout << "Control group mixer: " << std::endl << alloc_tmp << std::endl;
+
   model_params.control_group_mixer = alloc_tmp;
 
   return model_params;

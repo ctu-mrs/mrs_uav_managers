@@ -248,7 +248,7 @@
       <remap from="~validate_reference_list_in" to="~validate_reference_list" />
 
       <!-- Publishers -->
-      <remap from="~hw_api_actuators_cmd_out" to="hw_api/actuators_cmd" />
+      <remap from="~hw_api_actuator_cmd_out" to="hw_api/actuator_cmd" />
       <remap from="~hw_api_control_group_cmd_out" to="hw_api/control_group_cmd" />
       <remap from="~hw_api_attitude_rate_cmd_out" to="hw_api/attitude_rate_cmd" />
       <remap from="~hw_api_attitude_cmd_out" to="hw_api/attitude_cmd" />
