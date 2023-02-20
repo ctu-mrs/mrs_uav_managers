@@ -2041,7 +2041,7 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
 std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
 
   // 1. activate the mid-air activation controller
-  // the controller will output hover throttle and "leveled" desired orientation with the currend heading
+  // the controller will output hover-like control output
   std::string old_controller;
   {
     old_controller           = sh_control_manager_diag_.getMsg()->active_controller;
