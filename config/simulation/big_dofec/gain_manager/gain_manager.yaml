@@ -3,7 +3,6 @@ gains: [
   "soft",
 ]
 
-
 gain_management:
 
   # list of allowed gains per odometry mode

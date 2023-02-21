@@ -3016,20 +3016,14 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     return;
   }
 
-  double throttle = 0;
+  auto throttle = extractThrottle(last_control_output);
 
-  if (std::holds_alternative<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
-  } else {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement failsafe timer for this control mode");
+  if (!throttle) {
+    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: FailsafeTimer: could not extract throttle out of the last control output");
     return;
   }
 
-  double throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle) / common_handlers_->g;
+  double throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value()) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
   // condition for automatic motor turn off
@@ -8322,6 +8316,10 @@ void ControlManager::switchMotors(bool input) {
       }
     }
 
+    timer_failsafe_.stop();
+    timer_eland_.stop();
+    timer_pirouette_.stop();
+
     offboard_mode_was_true_ = false;
   }
 }
@@ -8804,7 +8802,13 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
     if (controller_status) {
 
-      if (active_controller_idx_ == _eland_controller_idx_) {
+      if (active_controller_idx_ == _failsafe_controller_idx_) {
+
+        ROS_ERROR("[ControlManager]: failsafe controller returned empty command, disabling control");
+
+        switchMotors(false);
+
+      } else if (active_controller_idx_ == _eland_controller_idx_) {
 
         ROS_ERROR("[ControlManager]: triggering failsafe, the emergency controller returned empty or invalid command");
 
@@ -8900,7 +8904,9 @@ void ControlManager::publish(void) {
 
   // | ----------------- publish tracker command ---------------- |
 
-  ph_tracker_cmd_.publish(last_tracker_cmd.value());
+  if (last_tracker_cmd) {
+    ph_tracker_cmd_.publish(last_tracker_cmd.value());
+  }
 
   // | --------------- publish the odometry input --------------- |
 
