@@ -59,7 +59,7 @@ struct HwApiCmdExtractThrottleVisitor
   std::optional<double> operator()(const mrs_msgs::HwApiActuatorCmd& msg) {
 
     if (msg.motors.size() == 0) {
-      return {};
+      return std::nullopt;
     }
 
     double throttle = 0;
@@ -82,19 +82,19 @@ struct HwApiCmdExtractThrottleVisitor
     return msg.throttle;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::HwApiAccelerationHdgRateCmd& msg) {
-    return {};
+    return std::nullopt;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::HwApiAccelerationHdgCmd& msg) {
-    return {};
+    return std::nullopt;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::HwApiVelocityHdgRateCmd& msg) {
-    return {};
+    return std::nullopt;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::HwApiVelocityHdgCmd& msg) {
-    return {};
+    return std::nullopt;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::HwApiPositionCmd& msg) {
-    return {};
+    return std::nullopt;
   }
 };
 
