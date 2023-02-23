@@ -1782,7 +1782,7 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.getMsg()->offboard) {
+    if (sh_hw_api_diagnostics_.getMsg()->offboard) {
       ss << "can not activate, UAV already in offboard mode!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
