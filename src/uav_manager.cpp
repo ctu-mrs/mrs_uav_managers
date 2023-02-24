@@ -492,9 +492,6 @@ void UavManager::onInit() {
 
 void UavManager::changeLandingState(LandingStates_t new_state) {
 
-  // copy member variables
-  auto mass_esimtate = sh_mass_estimate_.getMsg();
-
   previous_state_landing_ = current_state_landing_;
   current_state_landing_  = new_state;
 
@@ -502,7 +499,14 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
     case LANDING_STATE: {
 
-      landing_uav_mass_ = mass_esimtate->data;
+      if (sh_mass_estimate_.hasMsg() && (ros::Time::now() - sh_mass_estimate_.lastMsgTime()).toSec() < 1.0) {
+
+        // copy member variables
+        auto mass_esimtate = sh_mass_estimate_.getMsg();
+
+        landing_uav_mass_ = mass_esimtate->data;
+      }
+
       break;
     };
 
@@ -534,10 +538,15 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
   auto land_there_reference = mrs_lib::get_mutexed(mutex_land_there_reference_, land_there_reference_);
 
   // copy member variables
-  auto   control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-  double desired_throttle            = sh_throttle_.getMsg()->data;  // TODO might not be available
-  auto   odometry                    = sh_odometry_.getMsg();
-  auto   tracker_cmd                 = sh_tracker_cmd_.getMsg();
+  auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+  auto odometry                    = sh_odometry_.getMsg();
+  auto tracker_cmd                 = sh_tracker_cmd_.getMsg();
+
+  std::optional<double> desired_throttle;
+
+  if (sh_throttle_.hasMsg() && (ros::Time::now() - sh_throttle_.lastMsgTime()).toSec() < 1.0) {
+    desired_throttle = sh_throttle_.getMsg()->data;
+  }
 
   auto res = transformer_->transformSingle(land_there_reference, odometry->header.frame_id);
 
@@ -626,44 +635,47 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
     // we should not attempt to finish the landing if some other tracked was activated
     if (_landing_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
 
-      // recalculate the mass based on the throttle
-      throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(_throttle_model_, desired_throttle) / _g_;
-      ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
+      if (desired_throttle) {
 
-      // condition for automatic motor turn off
-      if (((throttle_mass_estimate_ < _landing_cutoff_mass_factor_ * landing_uav_mass_) || desired_throttle < 0.01)) {
+        // recalculate the mass based on the throttle
+        throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(_throttle_model_, desired_throttle.value()) / _g_;
+        ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
-        if (!throttle_under_threshold_) {
+        // condition for automatic motor turn off
+        if (((throttle_mass_estimate_ < _landing_cutoff_mass_factor_ * landing_uav_mass_) || desired_throttle < 0.01)) {
 
-          throttle_mass_estimate_firm_time_ = ros::Time::now();
-          throttle_under_threshold_         = true;
+          if (!throttle_under_threshold_) {
+
+            throttle_mass_estimate_firm_time_ = ros::Time::now();
+            throttle_under_threshold_         = true;
+          }
+
+          ROS_INFO_THROTTLE(0.5, "[UavManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_firm_time_).toSec());
+
+        } else {
+
+          throttle_under_threshold_ = false;
         }
 
-        ROS_INFO_THROTTLE(0.5, "[UavManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_firm_time_).toSec());
+        if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_firm_time_).toSec() > _landing_cutoff_mass_timeout_)) {
 
-      } else {
+          switchTrackerSrv(_null_tracker_name_);
 
-        throttle_under_threshold_ = false;
-      }
+          setControlCallbacksSrv(true);
 
-      if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_firm_time_).toSec() > _landing_cutoff_mass_timeout_)) {
+          if (_landing_disarm_) {
 
-        switchTrackerSrv(_null_tracker_name_);
+            ROS_INFO("[UavManager]: disarming after landing");
 
-        setControlCallbacksSrv(true);
+            disarmSrv();
+          }
 
-        if (_landing_disarm_) {
+          changeLandingState(IDLE_STATE);
 
-          ROS_INFO("[UavManager]: disarming after landing");
+          ROS_INFO("[UavManager]: landing finished");
 
-          disarmSrv();
+          timer_landing_.stop();
         }
-
-        changeLandingState(IDLE_STATE);
-
-        ROS_INFO("[UavManager]: landing finished");
-
-        timer_landing_.stop();
       }
 
     } else {
