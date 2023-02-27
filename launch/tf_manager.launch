@@ -40,7 +40,7 @@
       <param name="imu_mode" type="bool" value="$(arg imu_mode)" />
 
       <!-- Subscribers -->
-      <remap from="~hw_api_local_odom_in" to="hw_api/odometry_local" />
+      <remap from="~hw_api_local_odom_in" to="hw_api/odometry" />
       <remap from="~imu_in" to="imu/data" />
 
       <!-- Publishers -->

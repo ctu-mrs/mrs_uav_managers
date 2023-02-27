@@ -173,7 +173,6 @@
       <rosparam if="$(eval not arg('custom_config_landoff_tracker') == '')" ns="landoff_tracker" file="$(arg custom_config_landoff_tracker)" />
       <param name="landoff_tracker/enable_profiler" type="bool" value="$(arg PROFILER)" />
       <remap from="~landoff_tracker/profiler" to="profiler" />
-      <remap from="~landoff_tracker/reset_lateral_odometry_out" to="odometry/reset_lateral_kalman" />
       <remap from="~landoff_tracker/land_in" to="~landoff_tracker/land" />
       <remap from="~landoff_tracker/eland_in" to="~landoff_tracker/eland" />
       <remap from="~landoff_tracker/takeoff_in" to="~landoff_tracker/takeoff" />
@@ -221,13 +220,13 @@
       <remap from="~odometry_in" to="odometry/odom_main" />
       <remap from="~uav_state_in" to="odometry/uav_state" />
       <remap from="~odometry_innovation_in" to="odometry/odom_main_innovation" />
-      <remap from="~local_odometry_in" to="hw_api/odometry_local" />
+      <remap from="~local_odometry_in" to="hw_api/odometry" />
       <remap from="~gnss_in" to="hw_api/gnss" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
-      <remap from="~hw_api_mode_in" to="hw_api/mode" />
-      <remap from="~hw_api_diagnostics_in" to="hw_api/diagnostics" />
+      <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
+      <remap from="~hw_api_status_in" to="hw_api/status" />
       <remap from="~hw_api_rc_in" to="hw_api/rc_channels" />
 
       <!-- Subscribers and Services -->

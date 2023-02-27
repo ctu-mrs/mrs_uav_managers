@@ -52,8 +52,8 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
-#include <mrs_msgs/HwApiMode.h>
-#include <mrs_msgs/HwApiDiagnostics.h>
+#include <mrs_msgs/HwApiCapabilities.h>
+#include <mrs_msgs/HwApiStatus.h>
 #include <mrs_msgs/HwApiRcChannels.h>
 
 #include <mrs_msgs/HwApiActuatorCmd.h>
@@ -268,7 +268,7 @@ private:
 
   // | ------------------------- HW API ------------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode> sh_hw_api_mode_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
   OutputPublisher control_output_publisher_;
 
@@ -277,8 +277,8 @@ private:
   // this timer will check till we already got the hardware api diagnostics
   // then it will trigger the initialization of the controllers and finish
   // the initialization of the ControlManager
-  ros::Timer timer_hw_api_mode_;
-  void       timerHwApiMode(const ros::TimerEvent& event);
+  ros::Timer timer_hw_api_capabilities_;
+  void       timerHwApiCapabilities(const ros::TimerEvent& event);
 
   void preinitialize(void);
   void initialize(void);
@@ -345,7 +345,6 @@ private:
 
   mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
   mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_local_;
 
   mrs_msgs::UavState uav_state_;
   mrs_msgs::UavState previous_uav_state_;
@@ -508,7 +507,7 @@ private:
 
   // | -------------- HW API diagnostics subscriber ------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics> sh_hw_api_diagnostics_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus> sh_hw_api_status_;
 
   bool offboard_mode_          = false;
   bool offboard_mode_was_true_ = false;  // if it was ever true
@@ -593,7 +592,7 @@ private:
   // topic callbacks
   void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
   void callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
-  void callbackHwApiDiagnostics(mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>& wrp);
+  void callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>& wrp);
   void callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   void callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp);
 
@@ -924,9 +923,9 @@ void ControlManager::preinitialize(void) {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_hw_api_mode_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiMode>(shopts, "hw_api_mode_in");
+  sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
 
-  timer_hw_api_mode_ = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerHwApiMode, this);
+  timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerHwApiCapabilities, this);
 }
 
 //}
@@ -1698,15 +1697,13 @@ void ControlManager::initialize(void) {
     sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
   }
 
-  sh_odometry_local_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "local_odometry_in");
-  sh_bumper_         = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_height_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_joystick_       = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_gnss_           = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_      = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_bumper_     = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_height_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_joystick_   = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_       = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
+  sh_hw_api_rc_  = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
 
-  sh_hw_api_diagnostics_ =
-      mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>(shopts, "hw_api_diagnostics_in", &ControlManager::callbackHwApiDiagnostics, this);
+  sh_hw_api_status_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
   // | -------------------- general services -------------------- |
 
@@ -1802,70 +1799,70 @@ void ControlManager::initialize(void) {
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* timerHwApiMode() //{ */
+/* timerHwApiCapabilities() //{ */
 
-void ControlManager::timerHwApiMode(const ros::TimerEvent& event) {
+void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiMode", _status_timer_rate_, 1.0, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiMode", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", _status_timer_rate_, 1.0, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_hw_api_mode_.hasMsg()) {
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API modes");
+  if (!sh_hw_api_capabilities_.hasMsg()) {
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
     return;
   }
 
-  auto hw_api_mode = sh_hw_api_mode_.getMsg();
+  auto hw_ap_capabilities = sh_hw_api_capabilities_.getMsg();
 
-  ROS_INFO("[ControlManager]: got HW API mode, the possible control modes are:");
+  ROS_INFO("[ControlManager]: got HW API capabilities, the possible control modes are:");
 
-  if (hw_api_mode->accepts_actuator_cmd) {
+  if (hw_ap_capabilities->accepts_actuator_cmd) {
     ROS_INFO("[ControlManager]: - actuator command");
     _hw_api_inputs_.actuators = true;
   }
 
-  if (hw_api_mode->accepts_control_group_cmd) {
+  if (hw_ap_capabilities->accepts_control_group_cmd) {
     ROS_INFO("[ControlManager]: - control group command");
     _hw_api_inputs_.control_group = true;
   }
 
-  if (hw_api_mode->accepts_attitude_rate_cmd) {
+  if (hw_ap_capabilities->accepts_attitude_rate_cmd) {
     ROS_INFO("[ControlManager]: - attitude rate command");
     _hw_api_inputs_.attitude_rate = true;
   }
 
-  if (hw_api_mode->accepts_attitude_cmd) {
+  if (hw_ap_capabilities->accepts_attitude_cmd) {
     ROS_INFO("[ControlManager]: - attitude command");
     _hw_api_inputs_.attitude = true;
   }
 
-  if (hw_api_mode->accepts_acceleration_hdg_rate_cmd) {
+  if (hw_ap_capabilities->accepts_acceleration_hdg_rate_cmd) {
     ROS_INFO("[ControlManager]: - acceleration+hdg rate command");
     _hw_api_inputs_.acceleration_hdg_rate = true;
   }
 
-  if (hw_api_mode->accepts_acceleration_hdg_cmd) {
+  if (hw_ap_capabilities->accepts_acceleration_hdg_cmd) {
     ROS_INFO("[ControlManager]: - acceleration+hdg command");
     _hw_api_inputs_.acceleration_hdg = true;
   }
 
-  if (hw_api_mode->accepts_velocity_hdg_rate_cmd) {
+  if (hw_ap_capabilities->accepts_velocity_hdg_rate_cmd) {
     ROS_INFO("[ControlManager]: - velocityhdg rate command");
     _hw_api_inputs_.velocity_hdg_rate = true;
   }
 
-  if (hw_api_mode->accepts_velocity_hdg_cmd) {
+  if (hw_ap_capabilities->accepts_velocity_hdg_cmd) {
     ROS_INFO("[ControlManager]: - velocityhdg command");
     _hw_api_inputs_.velocity_hdg = true;
   }
 
-  if (hw_api_mode->accepts_position_cmd) {
+  if (hw_ap_capabilities->accepts_position_cmd) {
     ROS_INFO("[ControlManager]: - position command");
     _hw_api_inputs_.position = true;
   }
 
   initialize();
 
-  timer_hw_api_mode_.stop();
+  timer_hw_api_capabilities_.stop();
 }
 
 //}
@@ -2551,7 +2548,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
-      !sh_odometry_local_.hasMsg() || active_tracker_idx == _null_tracker_idx_) {
+      active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -3922,17 +3919,17 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
 //}
 
-/* //{ callbackHwApiDiagnostics() */
+/* //{ callbackHwApiStatus() */
 
-void ControlManager::callbackHwApiDiagnostics(mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>& wrp) {
+void ControlManager::callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>& wrp) {
 
   if (!is_initialized_)
     return;
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiDiagnostics");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiStatus");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::HwApiDiagnosticsConstPtr state = wrp.getMsg();
+  mrs_msgs::HwApiStatusConstPtr state = wrp.getMsg();
 
   // | ------ detect and print the changes in offboard mode ----- |
   if (state->offboard) {
@@ -4404,8 +4401,8 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     prereq_check = false;
   }
 
-  if (!sh_hw_api_diagnostics_.hasMsg() || (ros::Time::now() - sh_hw_api_diagnostics_.lastMsgTime()).toSec() > 1.0) {
-    ss << "can not switch motors ON, missing HW API diagnostics!";
+  if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
+    ss << "can not switch motors ON, missing HW API status!";
     prereq_check = false;
   }
 
@@ -6492,13 +6489,13 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
 bool ControlManager::isOffboard(void) {
 
-  if (!sh_hw_api_diagnostics_.hasMsg()) {
+  if (!sh_hw_api_status_.hasMsg()) {
     return false;
   }
 
-  mrs_msgs::HwApiDiagnosticsConstPtr hw_api_diag = sh_hw_api_diagnostics_.getMsg();
+  mrs_msgs::HwApiStatusConstPtr hw_api_status = sh_hw_api_status_.getMsg();
 
-  return hw_api_diag->connected && hw_api_diag->offboard;
+  return hw_api_status->connected && hw_api_status->offboard;
 }
 
 //}
@@ -8353,13 +8350,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
     return std::tuple(false, ss.str());
   }
 
-  if (!sh_odometry_local_.hasMsg()) {
-
-    ss << "can not switch tracker, missing PixHawk odometry!";
-    ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
   auto new_tracker_idx = idxInVector(tracker_name, _tracker_names_);
 
   // check if the tracker exists
@@ -8491,13 +8481,6 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   if (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) {
 
     ss << "can not switch controller, missing odometry innovation!";
-    ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (!sh_odometry_local_.hasMsg()) {
-
-    ss << "can not switch controller, missing PixHawk odometry!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }

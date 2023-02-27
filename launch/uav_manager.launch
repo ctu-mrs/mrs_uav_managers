@@ -69,7 +69,7 @@
       <remap from="~mass_estimate_in" to="control_manager/mass_estimate" />
       <remap from="~throttle_in" to="control_manager/throttle" />
       <remap from="~tracker_cmd_in" to="control_manager/tracker_cmd" />
-      <remap from="~hw_api_diagnostics_in" to="hw_api/diagnostics" />
+      <remap from="~hw_api_status_in" to="hw_api/status" />
       <remap from="~hw_api_gnss_in" to="hw_api/gnss" />
       <remap from="~max_height_in" to="odometry/max_altitude" />
       <remap from="~height_in" to="odometry/height" />

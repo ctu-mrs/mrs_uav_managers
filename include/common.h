@@ -28,7 +28,7 @@
 #include <mrs_msgs/HwApiVelocityHdgCmd.h>
 #include <mrs_msgs/HwApiPositionCmd.h>
 
-#include <mrs_msgs/HwApiMode.h>
+#include <mrs_msgs/HwApiCapabilities.h>
 
 #include <nav_msgs/Odometry.h>
 

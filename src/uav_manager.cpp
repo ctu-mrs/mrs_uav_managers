@@ -26,7 +26,7 @@
 #include <mrs_msgs/GainManagerDiagnostics.h>
 #include <mrs_msgs/UavManagerDiagnostics.h>
 #include <mrs_msgs/OdometryDiag.h>
-#include <mrs_msgs/HwApiDiagnostics.h>
+#include <mrs_msgs/HwApiStatus.h>
 #include <mrs_msgs/ControllerDiagnostics.h>
 
 #include <sensor_msgs/NavSatFix.h>
@@ -108,7 +108,7 @@ public:
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_mass_estimate_;
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_throttle_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_height_;
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>             sh_hw_api_diagnostics_;
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>                  sh_hw_api_status_;
   mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>       sh_gains_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_hw_api_gnss_;
@@ -414,7 +414,7 @@ void UavManager::onInit() {
   sh_mass_estimate_          = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "mass_estimate_in");
   sh_throttle_               = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "throttle_in");
   sh_height_                 = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
-  sh_hw_api_diagnostics_     = mrs_lib::SubscribeHandler<mrs_msgs::HwApiDiagnostics>(shopts, "hw_api_diagnostics_in");
+  sh_hw_api_status_          = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in");
   sh_gains_diag_             = mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>(shopts, "gain_manager_diagnostics_in");
   sh_constraints_diag_       = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_hw_api_gnss_            = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "hw_api_gnss_in", &UavManager::callbackHwApiGNSS, this);
@@ -1066,7 +1066,7 @@ void UavManager::timerMidairActivation([[maybe_unused]] const ros::TimerEvent& e
 
   ROS_INFO_THROTTLE(0.1, "[UavManager]: waiting for OFFBOARD");
 
-  if (sh_hw_api_diagnostics_.getMsg()->offboard) {
+  if (sh_hw_api_status_.getMsg()->offboard) {
 
     ROS_INFO("[UavManager]: OFFBOARD detected");
 
@@ -1182,15 +1182,15 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.hasMsg() || (ros::Time::now() - sh_hw_api_diagnostics_.lastMsgTime()).toSec() > 5.0) {
-      ss << "can not takeoff, missing HW API diagnostics!";
+    if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 5.0) {
+      ss << "can not takeoff, missing HW API status!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
       res.success = false;
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.getMsg()->armed) {
+    if (!sh_hw_api_status_.getMsg()->armed) {
       ss << "can not takeoff, UAV not armed!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
@@ -1198,7 +1198,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.getMsg()->offboard) {
+    if (!sh_hw_api_status_.getMsg()->offboard) {
       ss << "can not takeoff, UAV not in offboard mode!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
@@ -1778,15 +1778,15 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.hasMsg() || (ros::Time::now() - sh_hw_api_diagnostics_.lastMsgTime()).toSec() > 5.0) {
-      ss << "can not activate, missing HW API diagnostics!";
+    if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 5.0) {
+      ss << "can not activate, missing HW API status!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
       res.success = false;
       return true;
     }
 
-    if (!sh_hw_api_diagnostics_.getMsg()->armed) {
+    if (!sh_hw_api_status_.getMsg()->armed) {
       ss << "can not activate, UAV not armed!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
@@ -1794,7 +1794,7 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
       return true;
     }
 
-    if (sh_hw_api_diagnostics_.getMsg()->offboard) {
+    if (sh_hw_api_status_.getMsg()->offboard) {
       ss << "can not activate, UAV already in offboard mode!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
