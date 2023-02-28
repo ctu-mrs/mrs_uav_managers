@@ -1,0 +1,12 @@
+gps_garmin:
+  address: "mrs_uav_state_estimators/GpsGarmin"
+gps_baro:
+  address: "mrs_uav_state_estimators/GpsBaro"
+rtk:
+  address: "mrs_uav_state_estimators/Rtk"
+aloam:
+  address: "mrs_uav_state_estimators/Aloam"
+ground_truth:
+  address: "mrs_uav_state_estimators/GroundTruth"
+dummy:
+  address: "mrs_uav_state_estimators/Dummy"

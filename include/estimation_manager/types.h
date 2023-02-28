@@ -1,0 +1,61 @@
+#pragma once
+#ifndef ESTIMATION_MANAGER_TYPES_H
+#define ESTIMATION_MANAGER_TYPES_H
+
+namespace mrs_uav_managers
+{
+
+/*//{ typedef */
+
+typedef enum
+{
+
+  AXIS_X,
+  AXIS_Y,
+  AXIS_Z
+
+} AxisId_t;
+
+typedef enum
+{
+
+  POSITION,
+  VELOCITY,
+  ACCELERATION
+
+} StateId_t;
+const int n_StateId_t = 3;
+
+typedef enum
+{
+
+  UNINITIALIZED_STATE,
+  INITIALIZED_STATE,
+  READY_STATE,
+  STARTED_STATE,
+  RUNNING_STATE,
+  STOPPED_STATE,
+  ERROR_STATE
+
+} SMStates_t;
+/*//}*/
+
+namespace sm
+{
+// clang-format off
+  const std::vector<std::string> state_names = {
+    "UNINITIALIZED_STATE",
+    "INITIALIZED_STATE",
+    "READY_STATE",
+    "STARTED_STATE",
+    "RUNNING_STATE",
+    "STOPPED_STATE",
+    "ERROR_STATE"
+  };
+// clang-format on
+
+}  // namespace sm
+
+}  // namespace mrs_uav_managers
+
+#endif  // ESTIMATION_MANAGER_TYPES_H

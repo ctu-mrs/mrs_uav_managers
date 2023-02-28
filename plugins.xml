@@ -27,3 +27,15 @@
     <description>TfManager nodelet</description>
   </class>
 </library>
+
+<library path="lib/libEstimationManager">
+  <class name="mrs_uav_managers/EstimationManager" type="mrs_uav_managers::estimation_manager::EstimationManager" base_class_type="nodelet::Nodelet">
+    <description>EstimationManager nodelet</description>
+  </class>
+</library>
+
+<library path="lib/libTransformManager">
+  <class name="mrs_uav_managers/TransformManager" type="mrs_uav_managers::transform_manager::TransformManager" base_class_type="nodelet::Nodelet">
+    <description>TransformManager nodelet</description>
+  </class>
+</library>
