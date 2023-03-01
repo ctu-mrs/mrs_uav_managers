@@ -25,6 +25,8 @@
 namespace mrs_uav_managers
 {
 
+namespace estimation_manager
+{
 class Estimator {
 
 protected:
@@ -36,7 +38,7 @@ protected:
   std::string frame_id_;  // cannot be constant - must remain overridable by loaded parameter
   std::string ns_frame_id_;
 
-  std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
+  std::shared_ptr<CommonHandlers_t> ch_;
 
   double max_flight_altitude_agl_ = -1.0;
 
@@ -53,7 +55,7 @@ protected:
 
 public:
   // virtual methods
-  virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<estimation_manager::CommonHandlers_t> &ch) = 0;
+  virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<CommonHandlers_t> &ch) = 0;
   virtual bool start(void)                                                                  = 0;
   virtual bool pause(void)                                                                  = 0;
   virtual bool reset(void)                                                                  = 0;
@@ -88,6 +90,7 @@ public:
   std::optional<double> getHeadingRate(const nav_msgs::Odometry::ConstPtr &odom_msg);
 };
 
+}  // namespace estimation_manager
 
 }  // namespace mrs_uav_managers
 

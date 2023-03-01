@@ -25,6 +25,8 @@ namespace state
 const char type[] = "STATE";
 }
 
+using namespace estimation_manager;
+
 class StateEstimator : public Estimator {
 
 protected:

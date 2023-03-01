@@ -25,6 +25,7 @@ struct CommonHandlers_t
 {
 
   std::string                           nodelet_name;
+  std::string                           package_name;
   std::string                           uav_name;
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;

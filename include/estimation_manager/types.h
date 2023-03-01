@@ -5,6 +5,8 @@
 namespace mrs_uav_managers
 {
 
+namespace estimation_manager
+{
 /*//{ typedef */
 
 typedef enum
@@ -55,6 +57,8 @@ namespace sm
 // clang-format on
 
 }  // namespace sm
+
+}  // namespace estimation_manager
 
 }  // namespace mrs_uav_managers
 

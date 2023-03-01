@@ -281,6 +281,7 @@ class EstimationManager : public nodelet::Nodelet {
 
 private:
   const std::string nodelet_name_ = "EstimationManager";
+  const std::string package_name_ = "mrs_uav_managers";
 
   std::string version_;
 
@@ -375,6 +376,7 @@ void EstimationManager::onInit() {
   ch_ = std::make_shared<CommonHandlers_t>();
 
   ch_->nodelet_name = nodelet_name_;
+  ch_->package_name = package_name_;
 
   mrs_lib::ParamLoader param_loader(nh, getName());
 
