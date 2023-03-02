@@ -11,6 +11,7 @@
 
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/Float64ArrayStamped.h>
+#include <mrs_msgs/HwApiCapabilities.h>
 
 #include "estimation_manager/estimator.h"
 #include "estimation_manager/support.h"
@@ -30,6 +31,8 @@ using namespace estimation_manager;
 class StateEstimator : public Estimator {
 
 protected:
+  ros::NodeHandle nh_;
+
   mrs_msgs::UavState uav_state_;
   mutable std::mutex mtx_uav_state_;
 
@@ -73,6 +76,7 @@ public:
   void                      publishCovariance() const;
   void                      publishInnovation() const;
   geometry_msgs::Quaternion rotateQuaternionByHeading(const geometry_msgs::Quaternion &q, const double hdg) const;
+  bool isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const;
 };
 
 }  // namespace mrs_uav_managers

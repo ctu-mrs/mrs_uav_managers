@@ -19,6 +19,7 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
+#include <mrs_msgs/HwApiCapabilities.h>
 
 /*//{ FIXME: delete after merge with new uav system */
 #include <mrs_msgs/OdometryDiag.h>
@@ -28,6 +29,7 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/subscribe_handler.h>
 
 
 #include "mrs_uav_managers/state_estimator.h"
@@ -414,6 +416,23 @@ void EstimationManager::onInit() {
   }
   /*//}*/
 
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh;
+  shopts.node_name          = getName();
+  shopts.no_message_timeout = ros::Duration(0.5);
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+  while (!sh_hw_api_capabilities_.hasMsg()) {
+    ROS_INFO("[%s]: waiting for hw_api_capabilities message at topic: %s", getName().c_str(), sh_hw_api_capabilities_.topicName().c_str());
+    ros::Duration(1.0).sleep();
+    }
+
+  mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
+
   /*//{ load estimators */
   param_loader.loadParam("state_estimators", estimator_names_);
 
@@ -440,6 +459,11 @@ void EstimationManager::onInit() {
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
+      ros::shutdown();
+    }
+
+    if (!(*estimator_list_.end())->isCompatibleWithHwApi(hw_api_capabilities)) {
+      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator_name.c_str());
       ros::shutdown();
     }
   }
