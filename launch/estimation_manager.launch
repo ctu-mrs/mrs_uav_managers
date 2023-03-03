@@ -49,8 +49,8 @@
 
 <!--//{ Subscribers-->
       <!-- common -->
-      <!-- <remap from="~attitude_command_in" to="control_manager/attitude_cmd" /> -->
-      <remap from="~mavros_odom_in" to="mavros/local_position/odom" />
+      <remap from="~control_input_in" to="control_manager/odometry_input" />
+      <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
 
 <!--//}-->
 
