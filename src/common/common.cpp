@@ -485,11 +485,25 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   model_params.body_height = body_height;
   model_params.prop_radius = prop_radius;
 
-  // create the inertia matrix
-  model_params.inertia       = Eigen::Matrix3d::Zero();
-  model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-  model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-  model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+  Eigen::MatrixXd inertia_matrix = param_loader.loadMatrixDynamic2("model_params/inertial_matrix", 3, 3);
+
+  if (param_loader.loadedSuccessfully()) {
+
+    model_params.inertia = inertia_matrix;
+    ROS_INFO("[%s]: inertia loaded from config file:", node_name.c_str());
+    ROS_INFO_STREAM(model_params.inertia);
+
+  } else {
+
+    // create the inertia matrix
+    model_params.inertia       = Eigen::Matrix3d::Zero();
+    model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+    model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+    model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+
+    ROS_INFO("[%s]: inertia computed form parameters:", node_name.c_str());
+    ROS_INFO_STREAM(model_params.inertia);
+  }
 
   // create the force-torque allocation matrix
   model_params.force_torque_mixer = allocation_matrix;
@@ -533,6 +547,88 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   model_params.control_group_mixer = alloc_tmp;
 
   return model_params;
+}
+
+//}
+
+/* getLowestOutput() //{ */
+
+CONTROL_OUTPUT getLowestOuput(const mrs_uav_managers::ControlOutputModalities_t& outputs) {
+
+  if (outputs.actuators) {
+    return ACTUATORS_CMD;
+  }
+
+  if (outputs.control_group) {
+    return CONTROL_GROUP;
+  }
+
+  if (outputs.attitude_rate) {
+    return ATTITUDE_RATE;
+  }
+
+  if (outputs.attitude) {
+    return ATTITUDE;
+  }
+
+  if (outputs.acceleration_hdg_rate) {
+    return ACCELERATION_HDG_RATE;
+  }
+
+  if (outputs.acceleration_hdg) {
+    return ACCELERATION_HDG;
+  }
+
+  if (outputs.velocity_hdg_rate) {
+    return VELOCITY_HDG_RATE;
+  }
+
+  if (outputs.velocity_hdg) {
+    return VELOCITY_HDG;
+  }
+
+  return POSITION;
+}
+
+//}
+
+/* getHighestOutput() //{ */
+
+CONTROL_OUTPUT getHighestOuput(const mrs_uav_managers::ControlOutputModalities_t& outputs) {
+
+  if (outputs.position) {
+    return POSITION;
+  }
+
+  if (outputs.velocity_hdg) {
+    return VELOCITY_HDG;
+  }
+
+  if (outputs.velocity_hdg_rate) {
+    return VELOCITY_HDG_RATE;
+  }
+
+  if (outputs.acceleration_hdg) {
+    return ACCELERATION_HDG;
+  }
+
+  if (outputs.acceleration_hdg_rate) {
+    return ACCELERATION_HDG_RATE;
+  }
+
+  if (outputs.attitude) {
+    return ATTITUDE;
+  }
+
+  if (outputs.attitude_rate) {
+    return ATTITUDE_RATE;
+  }
+
+  if (outputs.control_group) {
+    return CONTROL_GROUP;
+  }
+
+  return ACTUATORS_CMD;
 }
 
 //}
@@ -861,26 +957,47 @@ bool validateHwApiPositionCmd(const mrs_msgs::HwApiPositionCmd& msg, const std::
 Controller::HwApiOutputVariant initializeDefaultOutput(const ControlOutputModalities_t& possible_outputs, const mrs_msgs::UavState& uav_state,
                                                        const double& min_throttle, const double& n_motors) {
 
+  CONTROL_OUTPUT lowest_output = getLowestOuput(possible_outputs);
+
   Controller::HwApiOutputVariant output;
 
-  if (possible_outputs.actuators) {
-    output = mrs_msgs::HwApiActuatorCmd();
-  } else if (possible_outputs.control_group) {
-    output = mrs_msgs::HwApiControlGroupCmd();
-  } else if (possible_outputs.attitude_rate) {
-    output = mrs_msgs::HwApiAttitudeRateCmd();
-  } else if (possible_outputs.attitude) {
-    output = mrs_msgs::HwApiAttitudeCmd();
-  } else if (possible_outputs.acceleration_hdg_rate) {
-    output = mrs_msgs::HwApiAccelerationHdgRateCmd();
-  } else if (possible_outputs.acceleration_hdg) {
-    output = mrs_msgs::HwApiAccelerationHdgCmd();
-  } else if (possible_outputs.velocity_hdg_rate) {
-    output = mrs_msgs::HwApiVelocityHdgRateCmd();
-  } else if (possible_outputs.velocity_hdg) {
-    output = mrs_msgs::HwApiVelocityHdgCmd();
-  } else if (possible_outputs.position) {
-    output = mrs_msgs::HwApiPositionCmd();
+  switch (lowest_output) {
+    case ACTUATORS_CMD: {
+      output = mrs_msgs::HwApiActuatorCmd();
+      break;
+    }
+    case CONTROL_GROUP: {
+      output = mrs_msgs::HwApiControlGroupCmd();
+      break;
+    }
+    case ATTITUDE_RATE: {
+      output = mrs_msgs::HwApiAttitudeRateCmd();
+      break;
+    }
+    case ATTITUDE: {
+      output = mrs_msgs::HwApiAttitudeCmd();
+      break;
+    }
+    case ACCELERATION_HDG_RATE: {
+      output = mrs_msgs::HwApiAccelerationHdgRateCmd();
+      break;
+    }
+    case ACCELERATION_HDG: {
+      output = mrs_msgs::HwApiAccelerationHdgCmd();
+      break;
+    }
+    case VELOCITY_HDG_RATE: {
+      output = mrs_msgs::HwApiVelocityHdgRateCmd();
+      break;
+    }
+    case VELOCITY_HDG: {
+      output = mrs_msgs::HwApiVelocityHdgCmd();
+      break;
+    }
+    case POSITION: {
+      output = mrs_msgs::HwApiPositionCmd();
+      break;
+    }
   }
 
   std::variant<mrs_msgs::UavState> uav_state_var{uav_state};
@@ -890,7 +1007,7 @@ Controller::HwApiOutputVariant initializeDefaultOutput(const ControlOutputModali
   std::visit(HwApiInitializeVisitor(), output, uav_state_var, min_throttle_var, n_motors_var);
 
   return output;
-}
+}  // namespace mrs_uav_managers
 
 //}
 

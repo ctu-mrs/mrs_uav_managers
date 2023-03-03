@@ -35,6 +35,23 @@
 namespace mrs_uav_managers
 {
 
+enum CONTROL_OUTPUT
+{
+  ACTUATORS_CMD,
+  CONTROL_GROUP,
+  ATTITUDE_RATE,
+  ATTITUDE,
+  ACCELERATION_HDG_RATE,
+  ACCELERATION_HDG,
+  VELOCITY_HDG_RATE,
+  VELOCITY_HDG,
+  POSITION
+};
+
+CONTROL_OUTPUT getLowestOuput(const mrs_uav_managers::ControlOutputModalities_t& outputs);
+
+CONTROL_OUTPUT getHighestOuput(const mrs_uav_managers::ControlOutputModalities_t& outputs);
+
 std::optional<unsigned int> idxInVector(const std::string& str, const std::vector<std::string>& vec);
 
 // checks for invalid values in the result from trackers

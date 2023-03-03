@@ -1430,7 +1430,7 @@ void ControlManager::initialize(void) {
     param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
     param_loader.loadParam(controller_name + "/human_switchable", human_switchable, false);
 
-    // check if the controller cna output some of the required outputs
+    // check if the controller can output some of the required outputs
     {
 
       ControlOutputModalities_t outputs;
@@ -1771,15 +1771,27 @@ void ControlManager::initialize(void) {
   service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
   service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
+  // | --- alter the timer rates based on the hw capabilities --- |
+
+  CONTROL_OUTPUT lowest_output = getLowestOuput(_hw_api_inputs_);
+
+  if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
+    _safety_timer_rate_ = 20.0;
+    _status_timer_rate_ = 1.0;
+  } else if (lowest_output >= VELOCITY_HDG_RATE) {
+    _safety_timer_rate_ = 10.0;
+    _status_timer_rate_ = 1.0;
+  }
+
   // | ------------------------- timers ------------------------- |
 
   timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
   timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this);
+  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this, false, bumper_enabled_);
   timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
-  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
+  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this, false, false);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -3842,6 +3854,8 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
     if (!joystick_start_pressed_) {
 
       ROS_INFO("[ControlManager]: joystick start button pressed");
+
+      timer_joystick_.start();
 
       joystick_start_pressed_    = true;
       joystick_start_press_time_ = ros::Time::now();

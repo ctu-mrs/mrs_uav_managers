@@ -463,17 +463,11 @@ void UavManager::onInit() {
   timer_landing_           = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
   timer_takeoff_           = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
   timer_flighttime_        = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlightTime, this, false, false);
-  timer_maxthrottle_       = nh_.createTimer(ros::Rate(_maxthrottle_timer_rate_), &UavManager::timerMaxthrottle, this, false, false);
+  timer_maxthrottle_       = nh_.createTimer(ros::Rate(_maxthrottle_timer_rate_), &UavManager::timerMaxthrottle, this);
   timer_diagnostics_       = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
   timer_midair_activation_ = nh_.createTimer(ros::Rate(_midair_activation_timer_rate_), &UavManager::timerMidairActivation, this, false, false);
-
-  if (_max_height_enabled_) {
-    timer_max_height_ = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this);
-  }
-
-  if (_min_height_enabled_) {
-    timer_min_height_ = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this);
-  }
+  timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false, _max_height_enabled_);
+  timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false, _min_height_enabled_);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -716,11 +710,6 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
     if (control_manager_diagnostics->active_tracker != _takeoff_tracker_name_ || !control_manager_diagnostics->tracker_status.have_goal) {
 
       ROS_INFO("[UavManager]: take off finished, switching to %s", _after_takeoff_tracker_name_.c_str());
-
-      // if enabled, start the timer for landing after reaching max throttle
-      if (_maxthrottle_timer_enabled_) {
-        timer_maxthrottle_.start();
-      }
 
       switchTrackerSrv(_after_takeoff_tracker_name_);
 
