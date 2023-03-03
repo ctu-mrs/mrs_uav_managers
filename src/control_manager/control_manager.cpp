@@ -8911,7 +8911,7 @@ void ControlManager::publish(void) {
 
     mrs_msgs::MrsOdometryInput msg;
 
-    msg.header.frame_id = uav_state.header.frame_id;
+    msg.header.frame_id = _uav_name_ + "/fcu";
     msg.header.stamp    = ros::Time::now();
 
     if (last_control_output.desired_unbiased_acceleration) {
