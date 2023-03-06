@@ -131,6 +131,8 @@ target_link_libraries(TfManager
 # EstimationManager
 add_library(EstimationManager
   src/estimation_manager/estimation_manager.cpp
+  src/estimation_manager/estimator.cpp
+  src/estimation_manager/estimators/state_estimator.cpp
   )
 
 add_dependencies(EstimationManager

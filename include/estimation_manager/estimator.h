@@ -15,6 +15,7 @@
 
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/param_loader.h>
 
 
 #include "estimation_manager/types.h"
@@ -26,8 +27,8 @@
 namespace mrs_uav_managers
 {
 
-namespace estimation_manager
-{
+using namespace estimation_manager;
+
 class Estimator {
 
 protected:
@@ -35,6 +36,7 @@ protected:
 
   const std::string type_;
   const std::string name_;
+  const std::string package_name_;
 
   std::string frame_id_;  // cannot be constant - must remain overridable by loaded parameter
   std::string ns_frame_id_;
@@ -86,10 +88,9 @@ public:
 
   tf2::Vector3          getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr &input_msg, const geometry_msgs::Quaternion &orientation);
   tf2::Vector3          getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr &input_msg, const double hdg);
-  std::optional<double> getHeadingRate(const nav_msgs::Odometry::ConstPtr &odom_msg);
+  std::optional<double> getHeadingRate(const nav_msgs::OdometryConstPtr &odom_msg);
+  /* std::optional<double> getHeadingRate(const geometry_msgs::Vector3 &att_rate); */
 };
-
-}  // namespace estimation_manager
 
 }  // namespace mrs_uav_managers
 

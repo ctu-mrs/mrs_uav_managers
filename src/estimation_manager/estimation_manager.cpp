@@ -292,11 +292,11 @@ private:
   std::shared_ptr<StateMachine> sm_;
 
   mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics> ph_diagnostics_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>              ph_max_flight_altitude_agl_;
-  mrs_lib::PublisherHandler<mrs_msgs::UavState>                    ph_uav_state_;
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                    ph_odom_main_;
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                    ph_odom_slow_;  // use topic throttler instead?
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                    ph_innovation_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_altitude_agl_;
+  mrs_lib::PublisherHandler<mrs_msgs::UavState>              ph_uav_state_;
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>              ph_odom_main_;
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>              ph_odom_slow_;  // use topic throttler instead?
+  mrs_lib::PublisherHandler<nav_msgs::Odometry>              ph_innovation_;
 
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped> ph_altitude_amsl_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped> ph_altitude_agl_;
@@ -335,16 +335,16 @@ private:
 
   // | ------------- dynamic loading of estimators ------------- |
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> estimator_loader_;  // pluginlib loader of dynamically loaded estimators
-  std::vector<std::string>                                                          estimator_names_;   // list of estimator names
+  std::vector<std::string>                                                  estimator_names_;   // list of estimator names
   /* std::map<std::string, EstimatorParams>                               estimator_params_;        // map between estimator names and estimator params */
   std::vector<boost::shared_ptr<mrs_uav_managers::StateEstimator>> estimator_list_;  // list of estimators
-  std::mutex                                                               mutex_estimator_list_;
-  std::vector<std::string>                                                 switchable_estimator_names_;
+  std::mutex                                                       mutex_estimator_list_;
+  std::vector<std::string>                                         switchable_estimator_names_;
   /* int                                                                      active_estimator_idx_; */
-  std::string                                                 initial_estimator_name_ = "UNDEFINED_INITIAL_ESTIMATOR";
+  std::string                                         initial_estimator_name_ = "UNDEFINED_INITIAL_ESTIMATOR";
   boost::shared_ptr<mrs_uav_managers::StateEstimator> initial_estimator_;
   boost::shared_ptr<mrs_uav_managers::StateEstimator> active_estimator_;
-  std::mutex                                                  mutex_active_estimator_;
+  std::mutex                                          mutex_active_estimator_;
 
   /* std::unique_ptr<AltGeneric> est_alt_agl_; */
   /* const std::string           est_alt_agl_name_ = "est_alt_agl"; */
@@ -425,19 +425,19 @@ void EstimationManager::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
+      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
   while (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO("[%s]: waiting for hw_api_capabilities message at topic: %s", getName().c_str(), sh_hw_api_capabilities_.topicName().c_str());
     ros::Duration(1.0).sleep();
-    }
+  }
 
   mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
 
   /*//{ load estimators */
   param_loader.loadParam("state_estimators", estimator_names_);
 
-  estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers",
-                                                                                                         "mrs_uav_managers::StateEstimator");
+  estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
 
   for (size_t i = 0; i < estimator_names_.size(); i++) {
 
@@ -459,11 +459,6 @@ void EstimationManager::onInit() {
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-      ros::shutdown();
-    }
-
-    if (!(*estimator_list_.end())->isCompatibleWithHwApi(hw_api_capabilities)) {
-      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator_name.c_str());
       ros::shutdown();
     }
   }
@@ -502,6 +497,11 @@ void EstimationManager::onInit() {
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+    }
+
+    if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
+      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator->getName().c_str());
+      ros::shutdown();
     }
   }
 
@@ -648,7 +648,7 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     ph_innovation_.publish(innovation);
 
     mrs_msgs::Float64Stamped alt_agl_msg;
-    alt_agl_msg.header.stamp    = ros::Time::now();
+    alt_agl_msg.header.stamp = ros::Time::now();
     /* alt_agl_msg.header.frame_id = est_alt_agl_->getFrameId(); */
     /* alt_agl_msg.value           = est_alt_agl_->getState(POSITION); */
     ph_altitude_agl_.publish(alt_agl_msg);
@@ -762,7 +762,7 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
     return true;
   }
 
-  bool                                                        target_estimator_found = false;
+  bool                                                target_estimator_found = false;
   boost::shared_ptr<mrs_uav_managers::StateEstimator> target_estimator;
   for (auto estimator : estimator_list_) {
     if (estimator->getName() == req.value) {

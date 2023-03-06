@@ -31,6 +31,9 @@ using namespace estimation_manager;
 class StateEstimator : public Estimator {
 
 protected:
+
+  const std::string package_name_ = "mrs_uav_state_estimators";
+
   ros::NodeHandle nh_;
 
   mrs_msgs::UavState uav_state_;
@@ -55,7 +58,7 @@ protected:
   mutable mrs_lib::PublisherHandler<geometry_msgs::QuaternionStamped> ph_attitude_;
 
 public:
-  StateEstimator(const std::string &name, const std::string &frame_id) : Estimator(state::type, name, frame_id) {
+  StateEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name) : Estimator(state::type, name, frame_id), package_name_(package_name) {
   }
 
   virtual ~StateEstimator(void) {
@@ -66,6 +69,7 @@ public:
   virtual nav_msgs::Odometry  getInnovation() const      = 0;
   virtual std::vector<double> getPoseCovariance() const  = 0;
   virtual std::vector<double> getTwistCovariance() const = 0;
+  /* virtual std::string         getPackageName() const     = 0; */
 
   virtual bool setUavState(const mrs_msgs::UavState &uav_state) = 0;
 
@@ -76,7 +80,7 @@ public:
   void                      publishCovariance() const;
   void                      publishInnovation() const;
   geometry_msgs::Quaternion rotateQuaternionByHeading(const geometry_msgs::Quaternion &q, const double hdg) const;
-  bool isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const;
+  bool                      isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr &hw_api_capabilities) const;
 };
 
 }  // namespace mrs_uav_managers

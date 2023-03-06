@@ -1,6 +1,6 @@
-#include "estimators/state/state_estimator.h"
+#include "mrs_uav_managers/state_estimator.h"
 
-namespace mrs_uav_state_estimators
+namespace mrs_uav_managers
 {
 
 /*//{ publishUavState() */
@@ -61,10 +61,10 @@ geometry_msgs::Quaternion StateEstimator::rotateQuaternionByHeading(const geomet
 /*//{ isCompatibleWithHwApi() */
 bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  Support::loadParamFile(ros::package::getPath(ch_->package_name) + "/config/estimators/" + getName() + ".yaml", nh_.getNamespace());
+  Support::loadParamFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml", nh_.getNamespace());
 
-  mrs_lib::ParamLoader param_loader(nh, getPrintName());
-  param_loader.setPrefix(getNamespacedName() + "/");
+  mrs_lib::ParamLoader param_loader(nh_, getPrintName());
+  param_loader.setPrefix(getName() + "/");
 
   bool requires_gnss, requires_imu, requires_distance_sensor, requires_altitude, requires_magnetometer_heading, requires_position, requires_orientation,
       requires_velocity, requires_angular_velocity;
@@ -127,5 +127,6 @@ bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesCons
 }
 /*//}*/
 
-}  // namespace mrs_uav_state_estimators
+
+}  // namespace mrs_uav_managers
 

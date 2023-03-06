@@ -89,7 +89,7 @@
 
       <!-- Subscribers -->
       <remap from="~uav_state_in" to="estimation_manager/uav_state" />
-      <remap from="~mavros_odom_in" to="mavros/local_position/odom" />
+      <remap from="~orientation_in" to="hw_api/orientation" />
       <remap from="~mavros_utm_in" to="mavros/global_position/global" />
 
       <!-- Publishers -->

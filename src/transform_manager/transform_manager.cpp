@@ -96,14 +96,14 @@ private:
   std::string                                   last_frame_id_;
   bool                                          is_first_frame_id_set_ = false;
 
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_mavros_odom_;
-  void                                          callbackMavrosOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
+  mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
+  void                                          callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp);
 
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_mavros_utm_;
   void                                              callbackMavrosUtm(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   std::atomic<bool>                                 got_mavros_utm_offset_ = false;
 
-  void publishFcuUntiltedTf(const nav_msgs::OdometryConstPtr& msg);
+  void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
 };
 /*//}*/
 
@@ -240,7 +240,7 @@ void TransformManager::onInit() {
 
   sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
-  sh_mavros_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "mavros_odom_in", &TransformManager::callbackMavrosOdom, this);
+  sh_hw_api_orientation_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
   sh_mavros_utm_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_utm_in", &TransformManager::callbackMavrosUtm, this);
   /*//}*/
@@ -402,10 +402,10 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
 }
 /*//}*/
 
-/*//{ callbackMavrosOdom() */
-void TransformManager::callbackMavrosOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
+/*//{ callbackHwApiOrientation() */
+void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
 
-  nav_msgs::OdometryConstPtr msg = wrp.getMsg();
+  geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
 
   if (publish_fcu_untilted_tf_) {
     publishFcuUntiltedTf(msg);
@@ -452,19 +452,19 @@ void TransformManager::callbackMavrosUtm(mrs_lib::SubscribeHandler<sensor_msgs::
 /*//}*/
 
 /*//{ publishFcuUntiltedTf() */
-void TransformManager::publishFcuUntiltedTf(const nav_msgs::OdometryConstPtr& msg) {
+void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg) {
 
   double heading;
 
   try {
-    heading = mrs_lib::AttitudeConverter(msg->pose.pose.orientation).getHeading();
+    heading = mrs_lib::AttitudeConverter(msg->quaternion).getHeading();
   }
   catch (...) {
     ROS_ERROR("[%s]: Exception caught during getting heading", getPrintName().c_str());
     return;
   }
 
-  const Eigen::Matrix3d odom_pixhawk_R = mrs_lib::AttitudeConverter(msg->pose.pose.orientation);
+  const Eigen::Matrix3d odom_pixhawk_R = mrs_lib::AttitudeConverter(msg->quaternion);
   const Eigen::Matrix3d undo_heading_R = mrs_lib::AttitudeConverter(Eigen::AngleAxis(-heading, Eigen::Vector3d(0, 0, 1)));
 
   const tf2::Quaternion q     = mrs_lib::AttitudeConverter(undo_heading_R * odom_pixhawk_R);
