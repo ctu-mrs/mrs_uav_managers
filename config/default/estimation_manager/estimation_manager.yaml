@@ -12,7 +12,7 @@ state_estimators: [
 # "gps_baro",
 # "rtk",
 # "aloam",
-"ground_truth",
+# "ground_truth",
 # "dummy"
 ]
 

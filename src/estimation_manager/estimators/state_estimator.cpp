@@ -78,6 +78,11 @@ bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesCons
   param_loader.loadParam("requires/velocity", requires_velocity);
   param_loader.loadParam("requires/angular_velocity", requires_angular_velocity);
 
+  if (!param_loader.loadedSuccessfully()) {
+    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
+    ros::shutdown();
+  }
+
   if (requires_gnss && !hw_api_capabilities->produces_gnss) {
     ROS_ERROR("[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
     return false;

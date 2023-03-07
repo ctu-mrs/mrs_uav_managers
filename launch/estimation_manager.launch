@@ -57,7 +57,7 @@
 <!--//{ Publishers -->
       <remap from="~profiler" to="profiler" />
       <remap from="~odom_main_out" to="~odom_main" />
-      <remap from="~innovation_out" to="~odom_main_innovation" />
+      <remap from="~innovation_out" to="~innovation" />
       <remap from="~uav_state_out" to="~uav_state" />
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~max_flight_altitude_agl_out" to="~max_flight_altitude_agl" />
@@ -90,7 +90,7 @@
       <!-- Subscribers -->
       <remap from="~uav_state_in" to="estimation_manager/uav_state" />
       <remap from="~orientation_in" to="hw_api/orientation" />
-      <remap from="~mavros_utm_in" to="mavros/global_position/global" />
+      <remap from="~gnss_in" to="hw_api/gnss" />
 
       <!-- Publishers -->
       <remap from="~profiler" to="profiler" />

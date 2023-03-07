@@ -198,7 +198,7 @@
       <remap from="~mpc_tracker/trajectory_processed/poses_out" to="~mpc_tracker/trajectory_processed/poses" />
       <remap from="~mpc_tracker/trajectory_processed/markers_out" to="~mpc_tracker/trajectory_processed/markers" />
       <remap from="~mpc_tracker/collision_avoidance_in" to="~mpc_tracker/collision_avoidance" />
-      <remap from="~mpc_tracker/odometry_diagnostics_in" to="estimation_manager/diagnostics" />
+      <remap from="~mpc_tracker/estimation_diagnostics_in" to="estimation_manager/diagnostics" />
 
       <!-- FlipTracker -->
       <rosparam ns="flip_tracker" file="$(find mrs_uav_trackers)/config/default/flip_tracker.yaml" />
@@ -308,7 +308,7 @@
       <remap from="~bumper_set_params_in" to="~bumper_set_params" />
       <remap from="~set_min_height_in" to="~set_min_height" />
       <remap from="~get_min_height_in" to="~get_min_height" />
-      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
+      <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_service_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~use_safety_area_in" to="~use_safety_area" />
       <remap from="~parachute_out" to="parachute_driver/fire_parachute" />

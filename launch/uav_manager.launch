@@ -62,7 +62,7 @@
 
       <!-- Subscribers -->
       <remap from="~controller_diagnostics_in" to="control_manager/controller_diagnostics" />
-      <remap from="~odometry_in" to="estimatino_manager/odom_main" />
+      <remap from="~odometry_in" to="estimation_manager/odom_main" />
       <remap from="~odometry_diagnostics_in" to="estimation_manager/diagnostics" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~mass_estimate_in" to="control_manager/mass_estimate" />
@@ -96,7 +96,7 @@
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
       <remap from="~pirouette_out" to="control_manager/pirouette" />
-      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
+      <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_seervice_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~offboard_out" to="hw_api/offboard" />
       <remap from="~midair_activation_in" to="~midair_activation" />

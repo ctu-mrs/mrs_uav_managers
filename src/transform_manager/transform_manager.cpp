@@ -97,10 +97,10 @@ private:
   bool                                          is_first_frame_id_set_ = false;
 
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
-  void                                          callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp);
+  void                                                        callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp);
 
-  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_mavros_utm_;
-  void                                              callbackMavrosUtm(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
+  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
+  void                                              callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
   std::atomic<bool>                                 got_mavros_utm_offset_ = false;
 
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
@@ -240,9 +240,10 @@ void TransformManager::onInit() {
 
   sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
-  sh_hw_api_orientation_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
+  sh_hw_api_orientation_ =
+      mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
-  sh_mavros_utm_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "mavros_utm_in", &TransformManager::callbackMavrosUtm, this);
+  sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -413,8 +414,8 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 }
 /*//}*/
 
-/*//{ callbackMavrosUtm() */
-void TransformManager::callbackMavrosUtm(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+/*//{ callbackGnss() */
+void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
 
   if (!got_mavros_utm_offset_) {
 

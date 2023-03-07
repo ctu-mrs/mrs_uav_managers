@@ -9,24 +9,11 @@ scope_timer:
   log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
 
 estimator_types: [
-  "ICP",
-  "VSLAM",
-  "BRICKFLOW",
-  "HECTOR",
-  "T265",
-  "BRICK",
-  "VIO",
-  "LIDAR",
-  "RTK",
-  "OPTFLOWGPS",
-  "GPS",
-  "OPTFLOW",
-  "OTHER",
-  "ALOAM",
-  "ALOAMGARM",
-  "ALOAMREP",
-  "TOWER",
-  "LIOSAM",
+  "gps_garmin",
+  "gps_baro",
+  "rtk",
+  "aloam",
+  "other",
 ]
 
 gains: [
@@ -37,43 +24,17 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
-    ICP: ["default"]
-    VSLAM: ["default"]
-    BRICKFLOW: ["default"]
-    HECTOR: ["default"]
-    ALOAM: ["default"]
-    ALOAMGARM: ["default"]
-    ALOAMREP: ["default"]
-    TOWER: ["default"]
-    T265: ["default"]
-    BRICK: ["default"]
-    VIO: ["default"]
-    LIDAR: ["default"]
-    RTK: ["default"]
-    OPTFLOWGPS: ["default"]
-    GPS: ["default"]
-    OPTFLOW: ["default"]
-    LIOSAM: ["default"]
-    OTHER: ["default"]
+    gps_garmin: ["default"]
+    gps_baro: ["default"]
+    rtk: ["default"]
+    aloam: ["default"]
+    other: ["default"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
-    ICP: "default"
-    VSLAM: "default"
-    BRICKFLOW: "default"
-    HECTOR: "default"
-    ALOAM: "default"
-    ALOAMGARM: "default"
-    ALOAMREP: "default"
-    TOWER: "default"
-    T265: "default"
-    BRICK: "default"
-    VIO: "default"
-    LIDAR: "default"
-    RTK: "default"
-    OPTFLOWGPS: "default"
-    GPS: "default"
-    OPTFLOW: "default"
-    LIOSAM: "default"
-    OTHER: "default"
+    gps_garmin: "default"
+    gps_baro: "default"
+    rtk: "default"
+    aloam: "default"
+    other: "default"

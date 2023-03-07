@@ -25,12 +25,13 @@
 #include "estimation_manager/support.h"
 #include "estimation_manager/common_handlers.h"
 
-namespace mrs_uav_managers {
+namespace mrs_uav_managers
+{
 
 /*//{ class TfSource */
 class TfSource {
 
-using Support = estimation_manager::Support;
+  using Support = estimation_manager::Support;
 
 public:
   /*//{ constructor */
@@ -64,13 +65,32 @@ public:
       param_loader.loadParam(getName() + "/in_utm", is_in_utm_);
     }
 
-    // set initial UTM coordinates to zero for tf sources already in UTF frame
+    // set initial UTM coordinates to zero for tf sources already in UTM frame
     if (is_in_utm_) {
       geometry_msgs::Point origin_pt;
       origin_pt.x = 0;
       origin_pt.y = 0;
       origin_pt.z = 0;
       setUtmOrigin(origin_pt);
+    }
+
+    std::string utm_origin_source;
+    param_loader.loadParam("utm_origin_tf/source", utm_origin_source);
+    if (utm_origin_source == getName()) {
+
+      if (!is_utm_based_) {
+        ROS_ERROR("[%s]: is utm_origin source but is not utm-based. Check your config!", getPrintName().c_str());
+        ros::shutdown();
+      }
+      is_utm_source_ = true;
+
+      std::string utm_origin_parent_frame_id;
+      param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
+      ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
+
+      std::string utm_origin_child_frame_id;
+      param_loader.loadParam("utm_origin_tf/child", utm_origin_child_frame_id);
+      ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
     }
 
     //}
@@ -152,8 +172,11 @@ private:
 
   bool is_inverted_;
 
-  bool is_utm_based_;
-  bool is_in_utm_ = false;
+  bool        is_utm_based_;
+  bool        is_in_utm_     = false;
+  bool        is_utm_source_ = false;
+  std::string ns_utm_origin_parent_frame_id_;
+  std::string ns_utm_origin_child_frame_id_;
 
   bool                 is_utm_origin_set_ = false;
   geometry_msgs::Point utm_origin_;
@@ -226,8 +249,9 @@ private:
   void publishTfFromOdom(const nav_msgs::OdometryConstPtr& odom) {
 
 
-    geometry_msgs::TransformStamped tf_msg;
-    tf_msg.header.stamp = odom->header.stamp;
+    geometry_msgs::TransformStamped tf_msg, tf_utm_msg;
+    tf_msg.header.stamp     = odom->header.stamp;
+    tf_utm_msg.header.stamp = odom->header.stamp;
 
     std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + custom_frame_id_ : odom->header.frame_id;
 
@@ -242,11 +266,23 @@ private:
       tf_msg.transform.translation = Support::pointToVector3(pose_inv.position);
       tf_msg.transform.rotation    = pose_inv.orientation;
 
+      tf_utm_msg.transform.translation = Support::pointToVector3(pose_inv.position);
+      tf_utm_msg.transform.translation.x -= utm_origin_.x;
+      tf_utm_msg.transform.translation.y -= utm_origin_.y;
+      tf_utm_msg.transform.translation.z -= utm_origin_.z;
+      tf_utm_msg.transform.rotation = pose_inv.orientation;
+
     } else {
       tf_msg.header.frame_id       = origin_frame_id;
       tf_msg.child_frame_id        = ch_->frames.ns_fcu;
       tf_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
       tf_msg.transform.rotation    = odom->pose.pose.orientation;
+
+      tf_utm_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
+      tf_utm_msg.transform.translation.x += utm_origin_.x;
+      tf_utm_msg.transform.translation.y += utm_origin_.y;
+      tf_utm_msg.transform.translation.z += utm_origin_.z;
+      tf_utm_msg.transform.rotation = odom->pose.pose.orientation;
     }
 
     if (Support::noNans(tf_msg)) {
@@ -265,6 +301,17 @@ private:
         }
         try {
           broadcaster_->sendTransform(tf_msg);
+        }
+        catch (...) {
+          ROS_ERROR("exception caught ");
+        }
+      }
+
+      if (is_utm_source_) {
+        tf_utm_msg.header.frame_id = ns_utm_origin_parent_frame_id_;
+        tf_utm_msg.child_frame_id  = ns_utm_origin_child_frame_id_;
+        try {
+          broadcaster_->sendTransform(tf_utm_msg);
         }
         catch (...) {
           ROS_ERROR("exception caught ");
@@ -443,6 +490,6 @@ private:
 
 /*//}*/
 
-}
+}  // namespace mrs_uav_managers
 
 #endif
