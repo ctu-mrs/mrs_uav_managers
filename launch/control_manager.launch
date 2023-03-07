@@ -264,6 +264,7 @@
       <remap from="~thrust_force_out" to="~thrust_force" />
       <remap from="~motors_out" to="~motors" />
       <remap from="~throttle_out" to="~throttle" />
+      <remap from="~thrust_out" to="~thrust" />
       <remap from="~offboard_on_out" to="~offboard_on" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
       <remap from="~safety_area_markers_out" to="~safety_area_markers" />

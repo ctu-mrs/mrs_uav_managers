@@ -416,6 +416,7 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_throttle_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_thrust_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_markers_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_coordinates_markers_;
@@ -1661,6 +1662,7 @@ void ControlManager::initialize(void) {
   ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
   ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
   ph_throttle_                           = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "throttle_out", 1, false, 10.0);
+  ph_thrust_                             = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "thrust_out", 1, false, 100.0);
   ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
   ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1, true, 1.0);
   ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1, true, 1.0);
@@ -8889,14 +8891,25 @@ void ControlManager::publish(void) {
 
   ph_controller_diagnostics_.publish(last_control_output.diagnostics);
 
-  // | -------------- publish the applied throttle -------------- |
+  // | --------- publish the applied throttle and thrust -------- |
 
   auto throttle = extractThrottle(last_control_output);
 
   if (throttle) {
-    std_msgs::Float64 msg;
-    msg.data = throttle.value();
-    ph_throttle_.publish(msg);
+
+    {
+      std_msgs::Float64 msg;
+      msg.data = throttle.value();
+      ph_throttle_.publish(msg);
+    }
+
+    double thrust = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value());
+
+    {
+      std_msgs::Float64 msg;
+      msg.data = thrust;
+      ph_thrust_.publish(msg);
+    }
   }
 
   // | ----------------- publish tracker command ---------------- |
