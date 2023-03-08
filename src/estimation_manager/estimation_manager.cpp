@@ -33,6 +33,7 @@
 
 
 #include "mrs_uav_managers/state_estimator.h"
+#include "mrs_uav_managers/agl_estimator.h"
 #include "estimation_manager/support.h"
 #include "estimation_manager/common_handlers.h"
 /*//}*/
@@ -334,8 +335,8 @@ private:
   /* mrs_lib::ServiceClientHandler<std_srvs::SetBool> srvc_enable_callbacks_; */
 
   // | ------------- dynamic loading of estimators ------------- |
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> estimator_loader_;  // pluginlib loader of dynamically loaded estimators
-  std::vector<std::string>                                                  estimator_names_;   // list of estimator names
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
+  std::vector<std::string>                                                  estimator_names_;         // list of estimator names
   /* std::map<std::string, EstimatorParams>                               estimator_params_;        // map between estimator names and estimator params */
   std::vector<boost::shared_ptr<mrs_uav_managers::StateEstimator>> estimator_list_;  // list of estimators
   std::mutex                                                       mutex_estimator_list_;
@@ -346,8 +347,9 @@ private:
   boost::shared_ptr<mrs_uav_managers::StateEstimator> active_estimator_;
   std::mutex                                          mutex_active_estimator_;
 
-  /* std::unique_ptr<AltGeneric> est_alt_agl_; */
-  /* const std::string           est_alt_agl_name_ = "est_alt_agl"; */
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
+  std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
+  boost::shared_ptr<mrs_uav_managers::AglEstimator>                         est_alt_agl_;
 
   double max_safety_area_altitude_;
 
@@ -437,7 +439,7 @@ void EstimationManager::onInit() {
   /*//{ load estimators */
   param_loader.loadParam("state_estimators", estimator_names_);
 
-  estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
+  state_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
 
   for (size_t i = 0; i < estimator_names_.size(); i++) {
 
@@ -449,7 +451,7 @@ void EstimationManager::onInit() {
 
     try {
       ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
-      estimator_list_.push_back(estimator_loader_->createInstance(address.c_str()));
+      estimator_list_.push_back(state_estimator_loader_->createInstance(address.c_str()));
     }
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
@@ -468,11 +470,34 @@ void EstimationManager::onInit() {
   /* est_alt_agl_->initialize(nh, ch_); */
   /* est_alt_agl_->setInputCoeff(0.0);  // no input, just corrections */
 
+  param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
+
+  agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
+
+  // load the estimator parameters
+  std::string address;
+  param_loader.loadParam(est_alt_agl_name_ + "/address", address);
+
+  try {
+    ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+    est_alt_agl_ = agl_estimator_loader_->createInstance(address.c_str());
+  }
+  catch (pluginlib::CreateClassException& ex1) {
+    ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
+    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
+    ros::shutdown();
+  }
+  catch (pluginlib::PluginlibException& ex) {
+    ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
+    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
+    ros::shutdown();
+  }
+
   ROS_INFO("[%s]: estimators were loaded", getName().c_str());
   /*//}*/
 
   /*//{ check whether initial estimator was loaded */
-  param_loader.loadParam("initial_estimator", initial_estimator_name_);
+  param_loader.loadParam("initial_state_estimator", initial_estimator_name_);
   bool initial_estimator_found = false;
   for (auto estimator : estimator_list_) {
     if (estimator->getName() == initial_estimator_name_) {
@@ -505,6 +530,20 @@ void EstimationManager::onInit() {
     }
   }
 
+  // | ----------- agl height estimator initialization ---------- |
+  try {
+    ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
+    est_alt_agl_->initialize(nh, ch_);
+  }
+  catch (std::runtime_error& ex) {
+    ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+  }
+
+  if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
+    ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
+    ros::shutdown();
+  }
+
   ROS_INFO("[%s]: estimators were initialized", getName().c_str());
 
   /*//}*/
@@ -515,7 +554,7 @@ void EstimationManager::onInit() {
   ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh, "innovation_out", 1);
   ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh, "diagnostics_out", 1);
   ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "max_flight_altitude_agl_out", 1);
-  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "altitude_agl_out", 1);
+  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "height_agl_out", 1);
 
   /*//{ FIXME: delete after merge with new uav system */
   ph_diagnostics_legacy_ = mrs_lib::PublisherHandler<mrs_msgs::OdometryDiag>(nh, "diagnostics_legacy_out", 1);
@@ -647,19 +686,15 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       nav_msgs::Odometry innovation = active_estimator_->getInnovation();
       ph_innovation_.publish(innovation);
 
-      mrs_msgs::Float64Stamped alt_agl_msg;
-      alt_agl_msg.header.stamp = ros::Time::now();
-      /* alt_agl_msg.header.frame_id = est_alt_agl_->getFrameId(); */
-      /* alt_agl_msg.value           = est_alt_agl_->getState(POSITION); */
-      ph_altitude_agl_.publish(alt_agl_msg);
+      ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
 
-    ROS_INFO_THROTTLE(5.0, "[%s]: pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(), uav_state.pose.position.x,
-                      uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(), max_flight_altitude_agl, estimator_switch_count_);
+      ROS_INFO_THROTTLE(5.0, "[%s]: pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(),
+                        uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(),
+                        max_flight_altitude_agl, estimator_switch_count_);
 
     } else {
       ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
     }
-
   }
 }
 /*//}*/
@@ -690,9 +725,9 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     }
   }
 
-  /* if (est_alt_agl_->isReady()) { */
-  /*   est_alt_agl_->start(); */
-  /* } */
+  if (est_alt_agl_->isReady()) {
+    est_alt_agl_->start();
+  }
 
   /*//}*/
 

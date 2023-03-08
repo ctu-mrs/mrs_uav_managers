@@ -71,7 +71,7 @@
       <remap from="~hw_api_status_in" to="hw_api/status" />
       <remap from="~hw_api_gnss_in" to="hw_api/gnss" />
       <remap from="~max_height_in" to="estimation_manager/max_altitude" />
-      <remap from="~height_in" to="estimation_manager/agl_altitude" />
+      <remap from="~height_in" to="estimation_manager/height_agl" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
       <remap from="~motors_in" to="control_manager/motors" />

@@ -10,3 +10,5 @@ ground_truth:
   address: "mrs_uav_state_estimators/GroundTruth"
 dummy:
   address: "mrs_uav_state_estimators/Dummy"
+garmin_agl:
+  address: "mrs_uav_state_estimators/GarminAgl"
