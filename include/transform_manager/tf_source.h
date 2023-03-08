@@ -73,7 +73,7 @@ public:
       origin_pt.z = 0;
       setUtmOrigin(origin_pt);
     }
-
+    /*//{ utm source */
     std::string utm_origin_source;
     param_loader.loadParam("utm_origin_tf/source", utm_origin_source);
     if (utm_origin_source == getName()) {
@@ -92,6 +92,28 @@ public:
       param_loader.loadParam("utm_origin_tf/child", utm_origin_child_frame_id);
       ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
     }
+    /*//}*/
+
+    /*//{ world source */
+    std::string world_origin_source;
+    param_loader.loadParam("world_origin_tf/source", world_origin_source);
+    if (world_origin_source == getName()) {
+
+      if (!is_utm_based_) {
+        ROS_ERROR("[%s]: is world_origin source but is not utm-based. Check your config!", getPrintName().c_str());
+        ros::shutdown();
+      }
+      is_world_source_ = true;
+
+      std::string world_origin_parent_frame_id;
+      param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);
+      ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
+
+      std::string world_origin_child_frame_id;
+      param_loader.loadParam("world_origin_tf/child", world_origin_child_frame_id);
+      ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
+    }
+    /*//}*/
 
     //}
 
@@ -181,6 +203,10 @@ private:
   bool                 is_utm_origin_set_ = false;
   geometry_msgs::Point utm_origin_;
 
+  bool        is_world_source_ = false;
+  std::string ns_world_origin_parent_frame_id_;
+  std::string ns_world_origin_child_frame_id_;
+
   bool                 is_world_origin_set_ = false;
   geometry_msgs::Point world_origin_;
 
@@ -249,40 +275,28 @@ private:
   void publishTfFromOdom(const nav_msgs::OdometryConstPtr& odom) {
 
 
-    geometry_msgs::TransformStamped tf_msg, tf_utm_msg;
-    tf_msg.header.stamp     = odom->header.stamp;
-    tf_utm_msg.header.stamp = odom->header.stamp;
+    geometry_msgs::TransformStamped tf_msg;
+    tf_msg.header.stamp = odom->header.stamp;
 
     std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + custom_frame_id_ : odom->header.frame_id;
 
-    if (is_inverted_) {
+    const tf2::Transform      tf       = Support::tf2FromPose(odom->pose.pose);
+    const tf2::Transform      tf_inv   = tf.inverse();
+    const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
 
-      const tf2::Transform      tf       = Support::tf2FromPose(odom->pose.pose);
-      const tf2::Transform      tf_inv   = tf.inverse();
-      const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
+    /*//{ tf source origin */
+    if (is_inverted_) {
 
       tf_msg.header.frame_id       = ch_->frames.ns_fcu;
       tf_msg.child_frame_id        = origin_frame_id;
       tf_msg.transform.translation = Support::pointToVector3(pose_inv.position);
       tf_msg.transform.rotation    = pose_inv.orientation;
 
-      tf_utm_msg.transform.translation = Support::pointToVector3(pose_inv.position);
-      tf_utm_msg.transform.translation.x -= utm_origin_.x;
-      tf_utm_msg.transform.translation.y -= utm_origin_.y;
-      tf_utm_msg.transform.translation.z -= utm_origin_.z;
-      tf_utm_msg.transform.rotation = pose_inv.orientation;
-
     } else {
       tf_msg.header.frame_id       = origin_frame_id;
       tf_msg.child_frame_id        = ch_->frames.ns_fcu;
       tf_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
       tf_msg.transform.rotation    = odom->pose.pose.orientation;
-
-      tf_utm_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
-      tf_utm_msg.transform.translation.x += utm_origin_.x;
-      tf_utm_msg.transform.translation.y += utm_origin_.y;
-      tf_utm_msg.transform.translation.z += utm_origin_.z;
-      tf_utm_msg.transform.rotation = odom->pose.pose.orientation;
     }
 
     if (Support::noNans(tf_msg)) {
@@ -306,10 +320,33 @@ private:
           ROS_ERROR("exception caught ");
         }
       }
+      /*//}*/
 
+      /*//{ tf utm origin */
       if (is_utm_source_) {
+        geometry_msgs::TransformStamped tf_utm_msg;
+        tf_utm_msg.header.stamp    = odom->header.stamp;
         tf_utm_msg.header.frame_id = ns_utm_origin_parent_frame_id_;
         tf_utm_msg.child_frame_id  = ns_utm_origin_child_frame_id_;
+
+        if (is_inverted_) {
+          tf2::Transform tf_utm;
+          tf_utm.setRotation(tf_inv.getRotation());
+          tf2::Vector3 utm_origin_pt(utm_origin_.x, utm_origin_.y, utm_origin_.z);
+          utm_origin_pt                    = tf_utm * utm_origin_pt;  // transform the utm_origin coordinated to fcu frame
+          tf_utm_msg.transform.translation = Support::pointToVector3(pose_inv.position);
+          tf_utm_msg.transform.translation.x -= utm_origin_pt.x();
+          tf_utm_msg.transform.translation.y -= utm_origin_pt.y();
+          tf_utm_msg.transform.translation.z -= utm_origin_pt.z();
+          tf_utm_msg.transform.rotation = pose_inv.orientation;
+
+        } else {
+          tf_utm_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
+          tf_utm_msg.transform.translation.x += utm_origin_.x;
+          tf_utm_msg.transform.translation.y += utm_origin_.y;
+          tf_utm_msg.transform.translation.z += utm_origin_.z;
+          tf_utm_msg.transform.rotation = odom->pose.pose.orientation;
+        }
         try {
           broadcaster_->sendTransform(tf_utm_msg);
         }
@@ -317,6 +354,44 @@ private:
           ROS_ERROR("exception caught ");
         }
       }
+      /*//}*/
+
+      /*//{ tf world origin*/
+      if (is_world_source_) {
+        geometry_msgs::TransformStamped tf_world_msg;
+        tf_world_msg.header.stamp    = odom->header.stamp;
+        tf_world_msg.header.frame_id = ns_world_origin_parent_frame_id_;
+        tf_world_msg.child_frame_id  = ns_world_origin_child_frame_id_;
+
+        if (is_inverted_) {
+          tf2::Transform tf_world;
+          tf_world.setRotation(tf_inv.getRotation());
+
+          tf2::Vector3 world_origin_pt(utm_origin_.x - world_origin_.x, utm_origin_.y - world_origin_.y, utm_origin_.z - world_origin_.z);
+          world_origin_pt                    = tf_world * world_origin_pt;  // transform the world_origin coordinated to fcu frame
+          tf_world_msg.transform.translation = Support::pointToVector3(pose_inv.position);
+          tf_world_msg.transform.translation.x -= world_origin_pt.x();
+          tf_world_msg.transform.translation.y -= world_origin_pt.y();
+          tf_world_msg.transform.translation.z -= world_origin_pt.z();
+          tf_world_msg.transform.rotation = pose_inv.orientation;
+
+        } else {
+          tf_world_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
+          tf_world_msg.transform.translation.x += (world_origin_.x - utm_origin_.x);
+          tf_world_msg.transform.translation.y += (world_origin_.y - utm_origin_.y);
+          tf_world_msg.transform.translation.z += (world_origin_.z - utm_origin_.z);
+          tf_world_msg.transform.rotation = odom->pose.pose.orientation;
+        }
+        try {
+          broadcaster_->sendTransform(tf_world_msg);
+        }
+        catch (...) {
+          ROS_ERROR("exception caught ");
+        }
+      }
+
+      /*//}*/
+
     } else {
       ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
                         tf_msg.child_frame_id.c_str());

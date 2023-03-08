@@ -588,9 +588,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       diagnostics.header.frame_id         = active_estimator_->getFrameId();
       diagnostics.current_state_estimator = active_estimator_->getName();
     } else {
-      max_altitude_msg.header.frame_id    = "NONE";
-      diagnostics.header.frame_id         = "NONE";
-      diagnostics.current_state_estimator = "NONE";
+      max_altitude_msg.header.frame_id    = "";
+      diagnostics.header.frame_id         = "";
+      diagnostics.current_state_estimator = "";
     }
     ph_max_flight_altitude_agl_.publish(max_altitude_msg);
     ph_diagnostics_.publish(diagnostics);
@@ -618,43 +618,48 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     ph_diagnostics_legacy_.publish(legacy_odom_diag_msg);
 
     /*//}*/
-  }
 
-  if (sm_->isInPublishableState()) {
 
-    mrs_msgs::UavState uav_state = active_estimator_->getUavState();
+    if (sm_->isInPublishableState()) {
 
-    uav_state.estimator_iteration = estimator_switch_count_;
+      mrs_msgs::UavState uav_state = active_estimator_->getUavState();
 
-    // TODO state health checks
+      uav_state.estimator_iteration = estimator_switch_count_;
 
-    ph_uav_state_.publish(uav_state);
+      // TODO state health checks
 
-    nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state, ch_->transformer);
+      ph_uav_state_.publish(uav_state);
 
-    const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
-    for (size_t i = 0; i < pose_covariance.size(); i++) {
-      odom_main.pose.covariance[i] = pose_covariance[i];
+      nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state, ch_->transformer);
+
+      const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
+      for (size_t i = 0; i < pose_covariance.size(); i++) {
+        odom_main.pose.covariance[i] = pose_covariance[i];
+      }
+
+      const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
+      for (size_t i = 0; i < twist_covariance.size(); i++) {
+        odom_main.twist.covariance[i] = twist_covariance[i];
+      }
+
+      ph_odom_main_.publish(odom_main);
+
+      nav_msgs::Odometry innovation = active_estimator_->getInnovation();
+      ph_innovation_.publish(innovation);
+
+      mrs_msgs::Float64Stamped alt_agl_msg;
+      alt_agl_msg.header.stamp = ros::Time::now();
+      /* alt_agl_msg.header.frame_id = est_alt_agl_->getFrameId(); */
+      /* alt_agl_msg.value           = est_alt_agl_->getState(POSITION); */
+      ph_altitude_agl_.publish(alt_agl_msg);
+
+    ROS_INFO_THROTTLE(5.0, "[%s]: pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(), uav_state.pose.position.x,
+                      uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(), max_flight_altitude_agl, estimator_switch_count_);
+
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
     }
 
-    const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
-    for (size_t i = 0; i < twist_covariance.size(); i++) {
-      odom_main.twist.covariance[i] = twist_covariance[i];
-    }
-
-    ph_odom_main_.publish(odom_main);
-
-    nav_msgs::Odometry innovation = active_estimator_->getInnovation();
-    ph_innovation_.publish(innovation);
-
-    mrs_msgs::Float64Stamped alt_agl_msg;
-    alt_agl_msg.header.stamp = ros::Time::now();
-    /* alt_agl_msg.header.frame_id = est_alt_agl_->getFrameId(); */
-    /* alt_agl_msg.value           = est_alt_agl_->getState(POSITION); */
-    ph_altitude_agl_.publish(alt_agl_msg);
-
-  } else {
-    ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
   }
 }
 /*//}*/
@@ -803,6 +808,7 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 bool EstimationManager::callbackToggleServiceCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!sm_->isInitialized()) {
+    ROS_ERROR("[%s]: service for toggling callbacks is not available before initialization.", getName().c_str());
     return false;
   }
 

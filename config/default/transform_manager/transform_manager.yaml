@@ -16,10 +16,16 @@ fixed_origin_tf:
   child: "fixed_origin"
 
 utm_origin_tf:
-  enabled: true # fixed_origin tf should be published by default unless some other node already publishes it
+  enabled: true # utm_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "utm_origin"
-  source: "gps_garmin" # the source odometry for publishing the utm_origin tf (must be utm-based)
+  source: "gps_baro" # the source odometry for publishing the utm_origin tf (must be utm-based)
+
+world_origin_tf:
+  enabled: true # world_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "world_origin"
+  source: "gps_baro" # the source odometry for publishing the utm_origin tf (must be utm-based)
 
 fcu_untilted_tf:
   enabled: true # fcu_untilted tf should be published by default unless some other node already publishes it
@@ -27,7 +33,7 @@ fcu_untilted_tf:
   child: "fcu_untilted"
 
 # the list of source topics from which the tfs will be constructed 
-tf_sources: ["gps_garmin"]
+tf_sources: ["gps_garmin", "gps_baro"]
 # tf_sources: ["hw_api", "gps_garmin", "ground_truth"]
 # tf_sources: ["hw_api", "gps_garmin", "gps_baro", "rtk", "aloam", "ground_truth"]
 
