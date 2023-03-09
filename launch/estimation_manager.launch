@@ -20,9 +20,6 @@
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
 
-  <arg name="fcu_frame_id" default="fcu" />
-  <arg name="fcu_untilted_frame_id" default="fcu_untilted" />
-
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
@@ -38,7 +35,6 @@
 
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
-      <param name="fcu_frame_id" value="fcu" />
 
       <rosparam file="$(arg world_file)" command="load" />
       <rosparam file="$(find mrs_uav_managers)/config/default/estimation_manager/estimation_manager.yaml" command="load" />
@@ -75,31 +71,6 @@
 
     </node>
 <!--//}-->
-
-<!--//{ transform_manager -->
-    <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
-
-      <param name="enable_profiler" value="$(arg PROFILER)" />
-      <param name="uav_name" value="$(arg UAV_NAME)" />
-      <param name="frame_id/fcu" value="$(arg fcu_frame_id)" />
-      <param name="frame_id/fcu_untilted" value="$(arg fcu_untilted_frame_id)" />
-
-      <rosparam file="$(arg world_file)" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/transform_manager/transform_manager.yaml" command="load" />
-
-      <!-- Subscribers -->
-      <remap from="~uav_state_in" to="estimation_manager/uav_state" />
-      <remap from="~orientation_in" to="hw_api/orientation" />
-      <remap from="~gnss_in" to="hw_api/gnss" />
-
-      <!-- Publishers -->
-      <remap from="~profiler" to="profiler" />
-
-    </node>
-<!--//}-->
-
-    <!-- RTK antenna to FCU TF (TODO: move to sensors.launch) -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="fcu_to_rtk_antenna" args="0.0 0.0 0.20 0 0 0 $(arg UAV_NAME)/$(arg fcu_frame_id) $(arg UAV_NAME)/rtk_antenna" />
 
   </group>
 

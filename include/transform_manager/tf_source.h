@@ -367,7 +367,7 @@ private:
           tf2::Transform tf_world;
           tf_world.setRotation(tf_inv.getRotation());
 
-          tf2::Vector3 world_origin_pt(utm_origin_.x - world_origin_.x, utm_origin_.y - world_origin_.y, utm_origin_.z - world_origin_.z);
+          tf2::Vector3 world_origin_pt(utm_origin_.x - world_origin_.x, utm_origin_.y - world_origin_.y, world_origin_.z);
           world_origin_pt                    = tf_world * world_origin_pt;  // transform the world_origin coordinated to fcu frame
           tf_world_msg.transform.translation = Support::pointToVector3(pose_inv.position);
           tf_world_msg.transform.translation.x -= world_origin_pt.x();
