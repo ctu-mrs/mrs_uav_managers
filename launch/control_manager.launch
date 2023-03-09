@@ -15,6 +15,7 @@
 
   <!-- other args -->
   <arg name="debug" default="false" />
+  <arg name="profile" default="true" />
   <arg name="custom_config" default="" />
   <arg name="body_frame" default="fcu" />
   <arg name="standalone" default="true" />
@@ -50,8 +51,11 @@
   <arg name="motor_params_file" default="$(find mrs_uav_controllers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/motor_params_$(arg PROPULSION_TYPE).yaml" />
   <arg name="g" default="9.81" />
 
-  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
-  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+  <!-- <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" /> -->
+  <!-- <arg unless="$(arg debug)" name="launch_prefix" value="" /> -->
+
+  <arg     if="$(arg profile)" name="launch_prefix" value="valgrind --tool=callgrind --callgrind-out-file=control_manager.out" />
+  <arg unless="$(arg profile)" name="launch_prefix" value="" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
