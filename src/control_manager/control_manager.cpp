@@ -3485,6 +3485,16 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
 
   nav_msgs::OdometryConstPtr odom = wrp.getMsg();
 
+  // | ------------------ check for time stamp ------------------ |
+
+  {
+    std::scoped_lock lock(mutex_uav_state_);
+
+    if (uav_state_.header.stamp == odom->header.stamp) {
+      return;
+    }
+  }
+
   // | --------------------- check for nans --------------------- |
 
   if (!validateOdometry(*odom, "ControlManager", "odometry")) {
@@ -3636,6 +3646,16 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::UavStateConstPtr uav_state = wrp.getMsg();
+
+  // | ------------------ check for time stamp ------------------ |
+
+  {
+    std::scoped_lock lock(mutex_uav_state_);
+
+    if (uav_state_.header.stamp == uav_state->header.stamp) {
+      return;
+    }
+  }
 
   // | --------------------- check for nans --------------------- |
 
