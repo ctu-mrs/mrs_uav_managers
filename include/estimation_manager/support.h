@@ -258,13 +258,20 @@ public:
   }
 
   //}
+
+  /*//{ isStringInVector() */
+  static bool isStringInVector(const std::string& value, const std::vector<std::string>& str_vec) {
+    return std::find(str_vec.begin(), str_vec.end(), value) != str_vec.end();
+  }
+  /*//}*/
+
 private:
   Support() {
   }
 };
 /*//}*/
 
-}  // namespace estimation_managers
+}  // namespace estimation_manager
 
 }  // namespace mrs_uav_managers
 

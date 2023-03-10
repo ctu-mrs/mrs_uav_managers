@@ -21,6 +21,12 @@ struct CommonFrames_t
   std::string ns_rtk_antenna;
 };
 
+struct UtmOrigin_t
+{
+  double x;
+  double y;
+};
+
 struct CommonHandlers_t
 {
 
@@ -29,6 +35,7 @@ struct CommonHandlers_t
   std::string                           uav_name;
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;
+  UtmOrigin_t utm_origin;
 };
 
 }  // namespace estimation_manager

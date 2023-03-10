@@ -28,50 +28,36 @@
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
 
+  <arg name="fcu_frame_id" default="fcu" />
+
   <group ns="$(arg UAV_NAME)">
 
-<!--//{ estimation_manager -->
-    <node pkg="nodelet" type="nodelet" name="estimation_manager" args="$(arg nodelet) mrs_uav_managers/EstimationManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+<!--//{ transform_manager -->
+    <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
 
       <rosparam file="$(arg world_file)" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/estimation_manager/estimation_manager.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/estimators.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/transform_manager/transform_manager.yaml" command="load" />
       <rosparam file="$(find mrs_uav_managers)/config/default/active_estimators.yaml" command="load" />
 
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
-<!--//{ Subscribers-->
-      <!-- common -->
-      <remap from="~control_input_in" to="control_manager/odometry_input" />
-      <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
+      <!-- Subscribers -->
+      <remap from="~uav_state_in" to="estimation_manager/uav_state" />
+      <remap from="~orientation_in" to="hw_api/orientation" />
+      <remap from="~gnss_in" to="hw_api/gnss" />
 
-<!--//}-->
-
-<!--//{ Publishers -->
+      <!-- Publishers -->
       <remap from="~profiler" to="profiler" />
-      <remap from="~odom_main_out" to="~odom_main" />
-      <remap from="~innovation_out" to="~innovation" />
-      <remap from="~uav_state_out" to="~uav_state" />
-      <remap from="~diagnostics_out" to="~diagnostics" />
-      <remap from="~max_flight_altitude_agl_out" to="~max_flight_altitude_agl" />
-      <remap from="~height_agl_out" to="~height_agl" />
-
-<!--//{ FIXME: delete after merge with new uav system -->
-      <remap from="~diagnostics_legacy_out" to="~diagnostics_legacy" />
-<!--//}-->
-<!--//}-->
-
-<!--//{ Service servers -->
-      <remap from="~change_estimator_in" to="~change_estimator" />
-      <remap from="~toggle_service_callbacks_in" to="~toggle_service_callbacks" />
-<!--//}-->
 
     </node>
 <!--//}-->
+
+    <!-- RTK antenna to FCU TF (TODO: move to sensors.launch) -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fcu_to_rtk_antenna" args="0.0 0.0 0.20 0 0 0 $(arg UAV_NAME)/$(arg fcu_frame_id) $(arg UAV_NAME)/rtk_antenna" />
 
   </group>
 

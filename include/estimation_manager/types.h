@@ -40,6 +40,15 @@ typedef enum
   ERROR_STATE
 
 } SMStates_t;
+
+typedef enum
+{
+
+  METERS,
+  DEGREES
+
+} UtmUnits_t;
+
 /*//}*/
 
 namespace sm

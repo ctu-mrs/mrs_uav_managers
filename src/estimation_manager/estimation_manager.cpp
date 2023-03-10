@@ -30,6 +30,7 @@
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/gps_conversions.h>
 
 
 #include "mrs_uav_managers/state_estimator.h"
@@ -349,7 +350,7 @@ private:
 
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
-  boost::shared_ptr<mrs_uav_managers::AglEstimator>                         est_alt_agl_;
+  boost::shared_ptr<mrs_uav_managers::AglEstimator>                       est_alt_agl_;
 
   double max_safety_area_altitude_;
 
@@ -392,6 +393,26 @@ void EstimationManager::onInit() {
   } else {
     ROS_WARN("[%s]: NOT USING SAFETY AREA!!!", getName().c_str());
     max_safety_area_altitude_ = 100;
+  }
+
+  int utm_origin_units;
+  param_loader.loadParam("utm_origin_units", utm_origin_units);
+  switch (utm_origin_units) {
+    case UtmUnits_t::METERS: {
+      param_loader.loadParam("utm_origin_x", ch_->utm_origin.x);
+      param_loader.loadParam("utm_origin_y", ch_->utm_origin.y);
+      break;
+    }
+    case UtmUnits_t::DEGREES: {
+                                double lat, lon;
+      param_loader.loadParam("utm_origin_lat", lat);
+      param_loader.loadParam("utm_origin_lon", lon);
+      mrs_lib::UTM(lat, lon, &ch_->utm_origin.x, &ch_->utm_origin.y);
+      break;
+    }
+    default:
+      ROS_ERROR("[%s]: invalid units: %d of utm_origin. Allowed are 0 - meters (UTM), 1 - degrees (LATLON).", getName().c_str(), utm_origin_units);
+      ros::shutdown();
   }
 
   // load common parameters into the common handlers structure
@@ -522,6 +543,7 @@ void EstimationManager::onInit() {
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+      ros::shutdown();
     }
 
     if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
@@ -537,6 +559,7 @@ void EstimationManager::onInit() {
   }
   catch (std::runtime_error& ex) {
     ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+    ros::shutdown();
   }
 
   if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
@@ -717,6 +740,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       }
       catch (std::runtime_error& ex) {
         ROS_ERROR("[%s]: exception caught during estimator starting: '%s'", getName().c_str(), ex.what());
+        ros::shutdown();
       }
     }
 

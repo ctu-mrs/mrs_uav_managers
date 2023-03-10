@@ -36,8 +36,8 @@ class TfSource {
 public:
   /*//{ constructor */
   TfSource(const std::string& name, ros::NodeHandle nh, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster,
-           const std::shared_ptr<estimation_manager::CommonHandlers_t> ch)
-      : name_(name), nh_(nh), broadcaster_(broadcaster), ch_(ch) {
+           const std::shared_ptr<estimation_manager::CommonHandlers_t> ch, const bool is_utm_source)
+      : name_(name), nh_(nh), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
 
     ROS_INFO("[%s]: initializing", getPrintName().c_str());
 
@@ -61,28 +61,9 @@ public:
 
     /* coordinate frames origins //{ */
     param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
-    if (is_utm_based_) {
-      param_loader.loadParam(getName() + "/in_utm", is_in_utm_);
-    }
 
-    // set initial UTM coordinates to zero for tf sources already in UTM frame
-    if (is_in_utm_) {
-      geometry_msgs::Point origin_pt;
-      origin_pt.x = 0;
-      origin_pt.y = 0;
-      origin_pt.z = 0;
-      setUtmOrigin(origin_pt);
-    }
     /*//{ utm source */
-    std::string utm_origin_source;
-    param_loader.loadParam("utm_origin_tf/source", utm_origin_source);
-    if (utm_origin_source == getName()) {
-
-      if (!is_utm_based_) {
-        ROS_ERROR("[%s]: is utm_origin source but is not utm-based. Check your config!", getPrintName().c_str());
-        ros::shutdown();
-      }
-      is_utm_source_ = true;
+    if (is_utm_source_) {
 
       std::string utm_origin_parent_frame_id;
       param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
@@ -95,15 +76,12 @@ public:
     /*//}*/
 
     /*//{ world source */
-    std::string world_origin_source;
-    param_loader.loadParam("world_origin_tf/source", world_origin_source);
-    if (world_origin_source == getName()) {
+    if (is_utm_source_) {
 
       if (!is_utm_based_) {
         ROS_ERROR("[%s]: is world_origin source but is not utm-based. Check your config!", getPrintName().c_str());
         ros::shutdown();
       }
-      is_world_source_ = true;
 
       std::string world_origin_parent_frame_id;
       param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);

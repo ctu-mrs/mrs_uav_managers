@@ -84,6 +84,9 @@ private:
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
 
+  std::vector<std::string> utm_source_priority_list_;
+  std::string utm_source_name;
+
   ros::NodeHandle nh_;
 
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
@@ -211,22 +214,33 @@ void TransformManager::onInit() {
   param_loader.loadParam("fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
-  /*//{ initialize tf sources */
   param_loader.loadParam("tf_sources", tf_source_names_);
+  param_loader.loadParam("utm_source_priority", utm_source_priority_list_);
+  for (auto utm_source : utm_source_priority_list_) {
+    if (Support::isStringInVector(utm_source, tf_source_names_)) {
+      ROS_INFO("[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
+      utm_source_name = utm_source;
+      break;
+    }
+  }
+
+  /*//{ initialize tf sources */
   for (size_t i = 0; i < tf_source_names_.size(); i++) {
     const std::string tf_source_name = tf_source_names_[i];
+    const bool is_utm_source = tf_source_name == utm_source_name;
     ROS_INFO("[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
-    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, broadcaster_, ch_));
+    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, broadcaster_, ch_, is_utm_source));
   }
 
   // additionally publish tf of all available estimators
-  /* param_loader.loadParam("/" + ch_->uav_name + "/estimation_manager/state_estimators", estimator_names_); */
-  /* for (int i = 0; i < int(estimator_names_.size()); i++) { */
-  /*   const std::string estimator_name = estimator_names_[i]; */
-  /*   ROS_INFO("[%s]: loading tf source of estimator: %s", getName().c_str(), estimator_name.c_str()); */
-  /*   tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, broadcaster_)); */
-  /* } */
-  /*//}*/
+   param_loader.loadParam("state_estimators", estimator_names_); 
+   for (int i = 0; i < int(estimator_names_.size()); i++) { 
+     const std::string estimator_name = estimator_names_[i]; 
+    const bool is_utm_source = estimator_name == utm_source_name;
+     ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str()); 
+     tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, broadcaster_, ch_, is_utm_source)); 
+   } 
+  //}
 
   /*//{ initialize subscribers */
   mrs_lib::SubscribeHandlerOptions shopts;

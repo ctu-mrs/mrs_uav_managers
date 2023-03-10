@@ -19,23 +19,22 @@ utm_origin_tf:
   enabled: true # utm_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "utm_origin"
-  source: "gps_baro" # the source odometry for publishing the utm_origin tf (must be utm-based)
 
 world_origin_tf:
   enabled: true # world_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "world_origin"
-  source: "gps_baro" # the source odometry for publishing the utm_origin tf (must be utm-based)
 
 fcu_untilted_tf:
   enabled: true # fcu_untilted tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "fcu_untilted"
 
-# the list of source topics from which the tfs will be constructed 
-tf_sources: ["gps_garmin", "gps_baro"]
-# tf_sources: ["hw_api", "gps_garmin", "ground_truth"]
-# tf_sources: ["hw_api", "gps_garmin", "gps_baro", "rtk", "aloam", "ground_truth"]
+# the list of additional source topics from which the tfs will be constructed 
+tf_sources: []
+
+# first available tf source from this list will produce the utm and world origin tfs
+utm_source_priority: ["rtk", "gps_baro", "gps_garmin"]
 
 hw_api:
   odom_topic: "odometry" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -43,7 +42,6 @@ hw_api:
     enabled: false
   namespace: "hw_api" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
-  in_utm: false # if true, the coordinates of the tf source are already in utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -54,7 +52,6 @@ gps_garmin:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/gps_garmin" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
-  in_utm: false # if true, the coordinates of the tf source are already in utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -65,7 +62,6 @@ gps_baro:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/gps_baro" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
-  in_utm: false # if true, the coordinates of the tf source are already in utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -76,7 +72,6 @@ rtk:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/rtk" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
-  in_utm: true # if true, the coordinates of the tf source are already in utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
