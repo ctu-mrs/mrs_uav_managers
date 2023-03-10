@@ -33,7 +33,7 @@ struct MotorParams
 
 class Controller {
 public:
-  virtual ~Controller() = 0;
+  virtual ~Controller() = default;
 
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
