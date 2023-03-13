@@ -266,7 +266,6 @@
       <remap from="~control_error_out" to="~control_error" />
       <remap from="~tilt_error_out" to="~tilt_error" />
       <remap from="~thrust_force_out" to="~thrust_force" />
-      <remap from="~motors_out" to="~motors" />
       <remap from="~throttle_out" to="~throttle" />
       <remap from="~thrust_out" to="~thrust" />
       <remap from="~offboard_on_out" to="~offboard_on" />
@@ -294,7 +293,7 @@
       <remap from="~stop_trajectory_tracking_in" to="~stop_trajectory_tracking" />
       <remap from="~resume_trajectory_tracking_in" to="~resume_trajectory_tracking" />
       <remap from="~goto_trajectory_start_in" to="~goto_trajectory_start" />
-      <remap from="~motors_in" to="~motors" />
+      <remap from="~toggle_output_in" to="~toggle_output" />
       <remap from="~emergency_reference_in" to="~emergency_reference" />
       <remap from="~enable_callbacks_in" to="~enable_callbacks" />
       <remap from="~set_gains_out" to="gain_manager/set_gains" />

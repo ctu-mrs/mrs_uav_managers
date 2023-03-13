@@ -75,7 +75,6 @@
       <remap from="~height_in" to="odometry/height" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
-      <remap from="~motors_in" to="control_manager/motors" />
 
       <!-- Publishers -->
       <remap from="~diagnostics_out" to="~diagnostics" />
@@ -92,7 +91,7 @@
       <remap from="~ehover_out" to="control_manager/ehover" />
       <remap from="~switch_tracker_out" to="control_manager/switch_tracker" />
       <remap from="~switch_controller_out" to="control_manager/switch_controller" />
-      <remap from="~motors_out" to="control_manager/motors" />
+      <remap from="~toggle_control_output_out" to="control_manager/toggle_output" />
       <remap from="~emergency_reference_out" to="control_manager/emergency_reference" />
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />

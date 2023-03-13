@@ -104,7 +104,6 @@ public:
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                     sh_odometry_;
   mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>                 sh_odometry_diagnostics_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>    sh_control_manager_diag_;
-  mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>                  sh_motors_;
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_mass_estimate_;
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_throttle_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_height_;
@@ -144,7 +143,7 @@ public:
   mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_pirouette_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_odometry_callbacks_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_ungrip_;
-  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_motors_;
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_toggle_control_output_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_offboard_;
 
   // service client wrappers
@@ -159,7 +158,7 @@ public:
   void setOdometryCallbacksSrv(const bool& input);
   void setControlCallbacksSrv(const bool& input);
   void ungripSrv(void);
-  bool motorsSrv(const bool in);
+  bool toggleControlOutput(const bool& input);
   void pirouetteSrv(void);
   bool offboardSrv(const bool in);
 
@@ -410,7 +409,6 @@ void UavManager::onInit() {
   sh_odometry_               = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &UavManager::callbackOdometry, this);
   sh_odometry_diagnostics_   = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
   sh_control_manager_diag_   = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-  sh_motors_                 = mrs_lib::SubscribeHandler<mrs_msgs::BoolStamped>(shopts, "motors_in");
   sh_mass_estimate_          = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "mass_estimate_in");
   sh_throttle_               = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "throttle_in");
   sh_height_                 = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
@@ -435,20 +433,20 @@ void UavManager::onInit() {
 
   // | --------------------- service clients -------------------- |
 
-  sch_takeoff_             = mrs_lib::ServiceClientHandler<mrs_msgs::Vec1>(nh_, "takeoff_out");
-  sch_land_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "land_out");
-  sch_eland_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
-  sch_ehover_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ehover_out");
-  sch_switch_tracker_      = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_tracker_out");
-  sch_switch_controller_   = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_controller_out");
-  sch_emergency_reference_ = mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv>(nh_, "emergency_reference_out");
-  sch_control_callbacks_   = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "enable_callbacks_out");
-  sch_arm_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "arm_out");
-  sch_pirouette_           = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "pirouette_out");
-  sch_odometry_callbacks_  = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
-  sch_ungrip_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
-  sch_motors_              = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "motors_out");
-  sch_offboard_            = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "offboard_out");
+  sch_takeoff_               = mrs_lib::ServiceClientHandler<mrs_msgs::Vec1>(nh_, "takeoff_out");
+  sch_land_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "land_out");
+  sch_eland_                 = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
+  sch_ehover_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ehover_out");
+  sch_switch_tracker_        = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_tracker_out");
+  sch_switch_controller_     = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "switch_controller_out");
+  sch_emergency_reference_   = mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv>(nh_, "emergency_reference_out");
+  sch_control_callbacks_     = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "enable_callbacks_out");
+  sch_arm_                   = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "arm_out");
+  sch_pirouette_             = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "pirouette_out");
+  sch_odometry_callbacks_    = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
+  sch_ungrip_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
+  sch_toggle_control_output_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "toggle_control_output_out");
+  sch_offboard_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "offboard_out");
 
   // | ---------------------- state machine --------------------- |
 
@@ -1100,7 +1098,7 @@ void UavManager::timerMidairActivation([[maybe_unused]] const ros::TimerEvent& e
 
     ROS_ERROR("[UavManager]: waiting for OFFBOARD timeouted, reverting");
 
-    motorsSrv(false);
+    toggleControlOutput(false);
 
     timer_midair_activation_.stop();
 
@@ -1196,7 +1194,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     }
 
     {
-      if (!sh_control_manager_diag_.hasMsg()) {
+      if (!sh_control_manager_diag_.hasMsg() && (ros::Time::now() - sh_control_manager_diag_.lastMsgTime()).toSec() > 5.0) {
         ss << "can not takeoff, missing control manager diagnostics!";
         ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
         res.message = ss.str();
@@ -1237,25 +1235,9 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       return true;
     }
 
-    if (!sh_motors_.hasMsg()) {
+    if (!sh_control_manager_diag_.getMsg()->output_enabled) {
 
-      ss << "can not takeoff, missing the motors data!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-      res.message = ss.str();
-      res.success = false;
-      return true;
-
-    } else if ((ros::Time::now() - sh_motors_.lastMsgTime()).toSec() > 1.0) {
-
-      ss << "can not takeoff, the motors data is too old!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-      res.message = ss.str();
-      res.success = false;
-      return true;
-
-    } else if (!sh_motors_.getMsg()->data) {
-
-      ss << "can not takeoff, the motors are off!";
+      ss << "can not takeoff, Control Manager's output is disabled!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
       res.success = false;
@@ -1833,25 +1815,9 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
       return true;
     }
 
-    if (!sh_motors_.hasMsg()) {
+    if (!sh_control_manager_diag_.getMsg()->output_enabled) {
 
-      ss << "can not activate, missing the motors data!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-      res.message = ss.str();
-      res.success = false;
-      return true;
-
-    } else if ((ros::Time::now() - sh_motors_.lastMsgTime()).toSec() > 1.0) {
-
-      ss << "can not activate, the motors data is too old!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-      res.message = ss.str();
-      res.success = false;
-      return true;
-
-    } else if (sh_motors_.getMsg()->data) {
-
-      ss << "can not activate, the motors are already on!";
+      ss << "can not takeoff, Control Manager's output is disabled!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
       res.success = false;
@@ -2058,16 +2024,16 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
     }
   }
 
-  // 2. MOTORS ON, this will enable the control output from the MRS pipeline
+  // 2. turn Control Manager's output ON
   {
-    bool motors_on = motorsSrv(true);
+    bool output_enabled = toggleControlOutput(true);
 
-    if (!motors_on) {
+    if (!output_enabled) {
 
       switchControllerSrv(old_controller);
 
       std::stringstream ss;
-      ss << "could not switch motors on";
+      ss << "could not enabled Control Manager's output";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
 
       return std::tuple(false, ss.str());
@@ -2085,7 +2051,7 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
     if (!tracker_switched) {
 
       switchControllerSrv(old_controller);
-      motorsSrv(false);
+      toggleControlOutput(false);
 
       std::stringstream ss;
       ss << "could not activate '" << _midair_activation_during_tracker_ << "' for midair activation";
@@ -2107,7 +2073,7 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
 
       switchTrackerSrv(old_tracker);
       switchControllerSrv(old_controller);
-      motorsSrv(false);
+      toggleControlOutput(false);
 
       std::stringstream ss;
       ss << "could not activate offboard mode";
@@ -2207,29 +2173,29 @@ void UavManager::ungripSrv(void) {
 
 //}
 
-/* motorsSrv() //{ */
+/* toggleControlOutput() //{ */
 
-bool UavManager::motorsSrv(const bool in) {
+bool UavManager::toggleControlOutput(const bool& input) {
 
-  ROS_DEBUG_THROTTLE(1.0, "[UavManager]: setting motors to %d", in);
+  ROS_DEBUG_THROTTLE(1.0, "[UavManager]: toggling control output %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 
-  srv.request.data = in;
+  srv.request.data = input;
 
-  bool res = sch_motors_.call(srv);
+  bool res = sch_toggle_control_output_.call(srv);
 
   if (res) {
 
     if (!srv.response.success) {
-      ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for motors returned: %s.", srv.response.message.c_str());
+      ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for control output returned: %s.", srv.response.message.c_str());
       return false;
     } else {
       return true;
     }
 
   } else {
-    ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for motors failed!");
+    ROS_DEBUG_THROTTLE(1.0, "[UavManager]: service call for control output failed!");
     return false;
   }
 }

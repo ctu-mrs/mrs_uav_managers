@@ -400,9 +400,8 @@ private:
 
   // | -------------- enabling the output publisher ------------- |
 
-  // motors on/off enables the control output from the control manager
-  void switchMotors(bool in);
-  bool motors_ = false;
+  void toggleOutput(const bool& input);
+  bool output_enabled_ = false;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -411,7 +410,6 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>          ph_mrs_odom_input_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
-  mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>               ph_motors_;
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
@@ -435,7 +433,7 @@ private:
   ros::ServiceServer service_server_ehover_;
   ros::ServiceServer service_server_failsafe_;
   ros::ServiceServer service_server_failsafe_escalating_;
-  ros::ServiceServer service_server_motors_;
+  ros::ServiceServer service_server_toggle_output_;
   ros::ServiceServer service_server_arm_;
   ros::ServiceServer service_server_enable_callbacks_;
   ros::ServiceServer service_server_set_constraints_;
@@ -631,7 +629,7 @@ private:
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -1637,7 +1635,7 @@ void ControlManager::initialize(void) {
     controller_tracker_switch_time_ = ros::Time::now();
   }
 
-  motors_ = false;
+  output_enabled_ = false;
 
   // | --------------- set the default constraints -------------- |
 
@@ -1657,7 +1655,6 @@ void ControlManager::initialize(void) {
   ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>(nh_, "odometry_input_out", 1);
   ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "control_reference_out", 1);
   ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
-  ph_motors_                             = mrs_lib::PublisherHandler<mrs_msgs::BoolStamped>(nh_, "motors_out", 1);
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
   ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
   ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
@@ -1716,7 +1713,7 @@ void ControlManager::initialize(void) {
   service_server_ehover_                     = nh_.advertiseService("ehover_in", &ControlManager::callbackEHover, this);
   service_server_failsafe_                   = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
   service_server_failsafe_escalating_        = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_motors_                     = nh_.advertiseService("motors_in", &ControlManager::callbackMotors, this);
+  service_server_toggle_output_              = nh_.advertiseService("toggle_output_in", &ControlManager::callbackToggleOutput, this);
   service_server_arm_                        = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
   service_server_enable_callbacks_           = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
   service_server_set_constraints_            = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
@@ -1927,16 +1924,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   publishDiagnostics();
-
-  // --------------------------------------------------------------
-  // |                 publishing the motors state                |
-  // --------------------------------------------------------------
-
-  mrs_msgs::BoolStamped motors_out;
-  motors_out.data  = motors_;
-  motors_out.stamp = ros::Time::now();
-
-  ph_motors_.publish(motors_out);
 
   // --------------------------------------------------------------
   // |                publish if the offboard is on               |
@@ -2890,7 +2877,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
 
-        switchMotors(false);
+        toggleOutput(false);
         arming(false);
       }
     }
@@ -2901,9 +2888,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // if we are not in offboard and the drone is in mid air (NullTracker is not active)
   if (offboard_mode_was_true_ && !offboard_mode_ && active_tracker_idx != _null_tracker_idx_) {
 
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: we fell out of OFFBOARD in mid air, switching motors off");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: we fell out of OFFBOARD in mid air, disabling output");
 
-    switchMotors(false);
+    toggleOutput(false);
   }
 }  // namespace control_manager
 
@@ -2973,8 +2960,8 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
       // enable callbacks? ... NO
 
-      ROS_INFO("[ControlManager]: reached cutoff throttle, setting motors OFF");
-      switchMotors(false);
+      ROS_INFO("[ControlManager]: reached cutoff throttle, disabling output");
+      toggleOutput(false);
 
       // disarm the drone
       if (_eland_disarm_enabled_) {
@@ -4140,7 +4127,7 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChann
 
 void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
 
-  if (motors_ && !failsafe_triggered_) {
+  if (output_enabled_ && !failsafe_triggered_) {
 
     // We need to fire up timerFailsafe, which will regularly trigger the controllers
     // in place of the callbackUavState/callbackOdometry().
@@ -4404,14 +4391,14 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
 //}
 
-/* //{ callbackMotors() */
+/* //{ callbackToggleOutput() */
 
-bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
   if (!is_initialized_)
     return false;
 
-  ROS_INFO("[ControlManager]: setting motors by service");
+  ROS_INFO("[ControlManager]: toggling output by service");
 
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -4427,23 +4414,23 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
     current_coord.reference.position.y = uav_state.pose.position.y;
 
     if (!isPointInSafetyArea2d(current_coord)) {
-      ss << "can not switch motors on, the UAV is outside of the safety area!";
+      ss << "cannot toggle output, the UAV is outside of the safety area!";
       prereq_check = false;
     }
   }
 
   if (req.data && (failsafe_triggered_ || eland_triggered_ || rc_escalating_failsafe_triggered_)) {
-    ss << "can not switch motors ON, we landed in emergency";
+    ss << "cannot toggle output ON, we landed in emergency";
     prereq_check = false;
   }
 
   if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
-    ss << "can not switch motors ON, missing HW API status!";
+    ss << "cannot toggle output ON, missing HW API status!";
     prereq_check = false;
   }
 
   if (bumper_enabled_ && !sh_bumper_.hasMsg()) {
-    ss << "can not switch motors on, missing bumper data!";
+    ss << "cannot toggle output ON, missing bumper data!";
     prereq_check = false;
   }
 
@@ -4458,13 +4445,15 @@ bool ControlManager::callbackMotors(std_srvs::SetBool::Request& req, std_srvs::S
 
   } else {
 
-    switchMotors(req.data);
+    toggleOutput(req.data);
 
-    ss << "Motors: " << (motors_ ? "ON" : "OFF");
+    ss << "Output: " << (output_enabled_ ? "ON" : "OFF");
     res.message = ss.str();
     res.success = true;
 
     ROS_INFO_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+
+    publishDiagnostics();
 
     return true;
   }
@@ -4537,7 +4526,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
   std::stringstream ss;
 
-  ss << "callbacks " << (motors_ ? "enabled" : "disabled");
+  ss << "callbacks " << (output_enabled_ ? "enabled" : "disabled");
 
   res.message = ss.str();
   res.success = true;
@@ -6575,7 +6564,7 @@ void ControlManager::publishDiagnostics(void) {
   diagnostics_msg.stamp    = ros::Time::now();
   diagnostics_msg.uav_name = _uav_name_;
 
-  diagnostics_msg.motors = motors_;
+  diagnostics_msg.output_enabled = output_enabled_;
 
   diagnostics_msg.rc_mode = rc_goto_active_;
 
@@ -6742,7 +6731,7 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraints
 
 bool ControlManager::isFlyingNormally(void) {
 
-  return (motors_) && (offboard_mode_) && (armed_) &&
+  return (output_enabled_) && (offboard_mode_) && (armed_) &&
          (((active_controller_idx_ != _eland_controller_idx_) && (active_controller_idx_ != _failsafe_controller_idx_)) || _controller_names_.size() == 1) &&
          (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
 }
@@ -7614,9 +7603,9 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 
   if (_rc_emergency_handoff_) {
 
-    switchMotors(false);
+    toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, switching motors OFF");
+    return std::tuple(true, "RC emergency handoff is ON, disabling output");
   }
 
   {
@@ -7706,9 +7695,9 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   if (_rc_emergency_handoff_) {
 
-    switchMotors(false);
+    toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, switching motors OFF");
+    return std::tuple(true, "RC emergency handoff is ON, disabling output");
   }
 
   if (_parachute_enabled_) {
@@ -7801,9 +7790,9 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     return std::tuple(false, ss.str());
   }
 
-  if (!motors_) {
+  if (!output_enabled_) {
 
-    ss << "not escalating failsafe, motors are off";
+    ss << "not escalating failsafe, output is disabled";
     ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
 
     return std::tuple(false, ss.str());
@@ -8143,7 +8132,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
       if (!input) {
 
-        switchMotors(false);
+        toggleOutput(false);
 
         ROS_DEBUG("[ControlManager]: stopping failsafe timer");
         timer_failsafe_.stop();
@@ -8295,27 +8284,27 @@ void ControlManager::ungripSrv(void) {
 
 // | ------------------------ routines ------------------------ |
 
-/* switchMotors() //{ */
+/* toggleOutput() //{ */
 
-void ControlManager::switchMotors(bool input) {
+void ControlManager::toggleOutput(const bool& input) {
 
-  if (input == motors_) {
-    ROS_WARN_THROTTLE(0.1, "[ControlManager]: motors already set to %s", input ? "ON" : "OFF");
+  if (input == output_enabled_) {
+    ROS_WARN_THROTTLE(0.1, "[ControlManager]: output is already %s", input ? "ON" : "OFF");
     return;
   }
 
-  ROS_INFO("[ControlManager]: switching motors %s", input ? "ON" : "OFF");
+  ROS_INFO("[ControlManager]: switching output %s", input ? "ON" : "OFF");
 
-  motors_ = input;
+  output_enabled_ = input;
 
-  // if switching motors off, switch to NullTracker
-  if (!motors_) {
+  // if switching output off, switch to NullTracker
+  if (!output_enabled_) {
 
-    ROS_INFO("[ControlManager]: switching to 'NullTracker' after switching motors off");
+    ROS_INFO("[ControlManager]: switching to 'NullTracker' after switching output off");
 
     switchTracker(_null_tracker_name_);
 
-    ROS_INFO_STREAM("[ControlManager]: switching to the controller '" << _eland_controller_name_ << "' after switching motors off");
+    ROS_INFO_STREAM("[ControlManager]: switching to the controller '" << _eland_controller_name_ << "' after switching output off");
 
     switchController(_eland_controller_name_);
 
@@ -8825,7 +8814,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
         ROS_ERROR("[ControlManager]: failsafe controller returned empty command, disabling control");
 
-        switchMotors(false);
+        toggleOutput(false);
 
       } else if (active_controller_idx_ == _eland_controller_idx_) {
 
@@ -8871,9 +8860,9 @@ void ControlManager::publish(void) {
   mrs_msgs::HwApiAttitudeRateCmd attitude_rate_target;
   attitude_rate_target.stamp = ros::Time::now();
 
-  if (!motors_) {
+  if (!output_enabled_) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: motors are off");
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: output is disabled");
 
   } else if (active_tracker_idx == _null_tracker_idx_) {
 
