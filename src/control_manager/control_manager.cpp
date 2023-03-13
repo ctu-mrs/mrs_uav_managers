@@ -285,8 +285,8 @@ private:
 
   // | ------------ tracker and controller switching ------------ |
 
-  std::tuple<bool, std::string> switchController(const std::string controller_name);
-  std::tuple<bool, std::string> switchTracker(const std::string tracker_name);
+  std::tuple<bool, std::string> switchController(const std::string& controller_name);
+  std::tuple<bool, std::string> switchTracker(const std::string& tracker_name);
 
   // the time of last switching of a tracker or a controller
   ros::Time  controller_tracker_switch_time_;
@@ -8361,7 +8361,7 @@ void ControlManager::switchMotors(bool input) {
 
 /* switchTracker() //{ */
 
-std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tracker_name) {
+std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
@@ -8495,7 +8495,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string tr
 
 /* switchController() //{ */
 
-std::tuple<bool, std::string> ControlManager::switchController(const std::string controller_name) {
+std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
