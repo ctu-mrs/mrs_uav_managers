@@ -51,8 +51,6 @@ namespace mrs_uav_managers
 class Tracker {
 
 public:
-  virtual ~Tracker() = 0;
-
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
    *
@@ -200,9 +198,9 @@ public:
    * @return a service response
    */
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
-};
 
-Tracker::~Tracker(){};
+  virtual ~Tracker() = default;
+};
 
 }  // namespace mrs_uav_managers
 

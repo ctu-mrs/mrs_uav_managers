@@ -62,8 +62,6 @@ public:
     std::optional<double> desired_heading_rate;
   } ControlOutput;
 
-  virtual ~Controller() = 0;
-
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
    *
@@ -129,10 +127,9 @@ public:
    * @return a service response
    */
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
-};
 
-// A pure virtual destructor requires a function body.
-/* Controller::~Controller(){}; */
+  virtual ~Controller() = default;
+};
 
 }  // namespace mrs_uav_managers
 
