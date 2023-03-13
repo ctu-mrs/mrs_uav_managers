@@ -34,16 +34,16 @@ fcu_untilted_tf:
 tf_sources: []
 
 # first available tf source from this list will produce the utm and world origin tfs
-utm_source_priority: ["rtk", "gps_baro", "gps_garmin"]
+utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
 
-hw_api:
+hw_api_raw:
   odom_topic: "odometry" # name of the topic (expects nav_msgs/Odometry topic type)
   tf_from_attitude: # used for transforming velocities before full transform is available
     enabled: false
   namespace: "hw_api" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
 gps_garmin:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -53,7 +53,7 @@ gps_garmin:
   namespace: "estimation_manager/gps_garmin" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
 gps_baro:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -63,7 +63,7 @@ gps_baro:
   namespace: "estimation_manager/gps_baro" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
 rtk:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -73,7 +73,7 @@ rtk:
   namespace: "estimation_manager/rtk" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
 aloam:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -83,7 +83,7 @@ aloam:
   namespace: "estimation_manager/aloam" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
 ground_truth:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -92,4 +92,4 @@ ground_truth:
   namespace: "estimation_manager/ground_truth" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames

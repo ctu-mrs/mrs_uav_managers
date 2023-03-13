@@ -85,13 +85,15 @@ private:
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
 
   std::vector<std::string> utm_source_priority_list_;
-  std::string utm_source_name;
+  std::string              utm_source_name;
 
   ros::NodeHandle nh_;
 
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
 
   std::shared_ptr<mrs_lib::TransformBroadcaster> broadcaster_;
+
+  void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
 
   mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
   void                                          callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
@@ -104,7 +106,7 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
   void                                              callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
-  std::atomic<bool>                                 got_mavros_utm_offset_ = false;
+  std::atomic<bool>                                 got_utm_offset_ = false;
 
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
 };
@@ -214,10 +216,12 @@ void TransformManager::onInit() {
   param_loader.loadParam("fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
+  param_loader.loadParam("state_estimators", estimator_names_);
   param_loader.loadParam("tf_sources", tf_source_names_);
+
   param_loader.loadParam("utm_source_priority", utm_source_priority_list_);
   for (auto utm_source : utm_source_priority_list_) {
-    if (Support::isStringInVector(utm_source, tf_source_names_)) {
+    if (Support::isStringInVector(utm_source, estimator_names_)) {
       ROS_INFO("[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
       utm_source_name = utm_source;
       break;
@@ -227,19 +231,18 @@ void TransformManager::onInit() {
   /*//{ initialize tf sources */
   for (size_t i = 0; i < tf_source_names_.size(); i++) {
     const std::string tf_source_name = tf_source_names_[i];
-    const bool is_utm_source = tf_source_name == utm_source_name;
+    const bool        is_utm_source  = tf_source_name == utm_source_name;
     ROS_INFO("[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
     tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, broadcaster_, ch_, is_utm_source));
   }
 
   // additionally publish tf of all available estimators
-   param_loader.loadParam("state_estimators", estimator_names_); 
-   for (int i = 0; i < int(estimator_names_.size()); i++) { 
-     const std::string estimator_name = estimator_names_[i]; 
-    const bool is_utm_source = estimator_name == utm_source_name;
-     ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str()); 
-     tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, broadcaster_, ch_, is_utm_source)); 
-   } 
+  for (int i = 0; i < int(estimator_names_.size()); i++) {
+    const std::string estimator_name = estimator_names_[i];
+    const bool        is_utm_source  = estimator_name == utm_source_name;
+    ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
+    tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, broadcaster_, ch_, is_utm_source));
+  }
   //}
 
   /*//{ initialize subscribers */
@@ -252,12 +255,14 @@ void TransformManager::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
+  sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this,
+                                                                &TransformManager::timeoutCallback, this);
 
-  sh_hw_api_orientation_ =
-      mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
+  sh_hw_api_orientation_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation,
+                                                                                       this, &TransformManager::timeoutCallback, this);
 
-  sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+  sh_gnss_ =
+      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this, &TransformManager::timeoutCallback, this);
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -431,7 +436,7 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 /*//{ callbackGnss() */
 void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
 
-  if (!got_mavros_utm_offset_) {
+  if (!got_utm_offset_) {
 
     sensor_msgs::NavSatFixConstPtr msg = wrp.getMsg();
 
@@ -461,8 +466,15 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
       tf_sources_[i]->setUtmOrigin(utm_origin);
       tf_sources_[i]->setWorldOrigin(world_origin_);
     }
-    got_mavros_utm_offset_ = true;
+    got_utm_offset_ = true;
   }
+}
+/*//}*/
+
+/*//{ timeoutCallback() */
+void TransformManager::timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
+  ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
+                    (ros::Time::now() - last_msg).toSec(), n_pubs);
 }
 /*//}*/
 

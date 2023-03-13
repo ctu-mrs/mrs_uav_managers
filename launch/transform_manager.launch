@@ -15,6 +15,7 @@
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg name="custom_config" default="" />
+  <arg name="custom_config_active_estimators" default="" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
@@ -43,7 +44,7 @@
       <rosparam file="$(find mrs_uav_managers)/config/default/active_estimators.yaml" command="load" />
 
       <!-- Load a user param file -->
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+      <rosparam if="$(eval not arg('custom_config_active_estimators') == '')" file="$(arg custom_config_active_estimators)" />
 
       <!-- Subscribers -->
       <remap from="~uav_state_in" to="estimation_manager/uav_state" />
@@ -56,7 +57,7 @@
     </node>
 <!--//}-->
 
-    <!-- RTK antenna to FCU TF (TODO: move to sensors.launch) -->
+    <!-- RTK antenna to FCU TF (TODO: should be published by hw_api) -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="fcu_to_rtk_antenna" args="0.0 0.0 0.20 0 0 0 $(arg UAV_NAME)/$(arg fcu_frame_id) $(arg UAV_NAME)/rtk_antenna" />
 
   </group>

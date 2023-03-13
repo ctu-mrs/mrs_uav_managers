@@ -15,6 +15,7 @@
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg name="custom_config" default="" />
+  <arg name="custom_config_active_estimators" default="" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
@@ -43,6 +44,7 @@
 
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+      <rosparam if="$(eval not arg('custom_config_active_estimators') == '')" file="$(arg custom_config_active_estimators)" />
 
 <!--//{ Subscribers-->
       <!-- common -->

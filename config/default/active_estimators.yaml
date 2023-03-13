@@ -1,6 +1,7 @@
 version: "0.0.0.1"
 
 # loaded state estimator plugins
+# available in mrs_uav_state_estimators: gps_garmin, gps_baro, rtk, aloam, ground_truth, dummy
 state_estimators: [
 "gps_garmin",
 "gps_baro",

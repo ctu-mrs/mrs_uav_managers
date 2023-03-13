@@ -112,9 +112,9 @@ public:
     shopts.queue_size         = 10;
     shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-    sh_tf_source_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this);
+    sh_tf_source_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this, &TfSource::timeoutCallback, this);
     if (tf_from_attitude_enabled_) {
-      sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this);
+      sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this, &TfSource::timeoutCallback, this);
     }
     /*//}*/
 
@@ -207,6 +207,13 @@ private:
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>               sh_tf_source_odom_;
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_tf_source_att_;
   nav_msgs::OdometryConstPtr                                  first_msg_;
+
+/*//{ timeoutCallback() */
+void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
+  ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
+                    (ros::Time::now() - last_msg).toSec(), n_pubs);
+}
+/*//}*/
 
   /*//{ callbackTfSourceOdom()*/
   void callbackTfSourceOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
@@ -327,6 +334,7 @@ private:
         }
         try {
           broadcaster_->sendTransform(tf_utm_msg);
+          ROS_INFO_ONCE("[%s]: publishing utm_origin tf", getPrintName().c_str());
         }
         catch (...) {
           ROS_ERROR("exception caught ");
@@ -335,7 +343,7 @@ private:
       /*//}*/
 
       /*//{ tf world origin*/
-      if (is_world_source_) {
+      if (is_utm_source_) {
         geometry_msgs::TransformStamped tf_world_msg;
         tf_world_msg.header.stamp    = odom->header.stamp;
         tf_world_msg.header.frame_id = ns_world_origin_parent_frame_id_;
@@ -362,6 +370,7 @@ private:
         }
         try {
           broadcaster_->sendTransform(tf_world_msg);
+          ROS_INFO_ONCE("[%s]: publishing world_origin tf", getPrintName().c_str());
         }
         catch (...) {
           ROS_ERROR("exception caught ");
