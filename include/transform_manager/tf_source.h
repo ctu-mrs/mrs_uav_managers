@@ -41,80 +41,84 @@ public:
 
     ROS_INFO("[%s]: initializing", getPrintName().c_str());
 
-    /*//{ load parameters */
-    mrs_lib::ParamLoader param_loader(nh_, getPrintName());
-    std::string          odom_topic, attitude_topic, ns;
-    param_loader.loadParam(getName() + "/odom_topic", odom_topic);
-    param_loader.loadParam(getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
-    if (custom_frame_id_enabled_) {
-      param_loader.loadParam(getName() + "/custom_frame_id/frame_id", custom_frame_id_);
-    }
-    param_loader.loadParam(getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
-    if (tf_from_attitude_enabled_) {
-      param_loader.loadParam(getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
-    }
-    param_loader.loadParam(getName() + "/namespace", ns);
-    full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
-    full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
-    param_loader.loadParam(getName() + "/inverted", is_inverted_);
-    param_loader.loadParam(getName() + "/republish_in_frames", republish_in_frames_);
+    if (name != "dummy") {
+      /*//{ load parameters */
+      mrs_lib::ParamLoader param_loader(nh_, getPrintName());
+      std::string          odom_topic, attitude_topic, ns;
+      param_loader.loadParam(getName() + "/odom_topic", odom_topic);
+      param_loader.loadParam(getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
+      if (custom_frame_id_enabled_) {
+        param_loader.loadParam(getName() + "/custom_frame_id/frame_id", custom_frame_id_);
+      }
+      param_loader.loadParam(getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
+      if (tf_from_attitude_enabled_) {
+        param_loader.loadParam(getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
+      }
+      param_loader.loadParam(getName() + "/namespace", ns);
+      full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
+      full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
+      param_loader.loadParam(getName() + "/inverted", is_inverted_);
+      param_loader.loadParam(getName() + "/republish_in_frames", republish_in_frames_);
 
-    /* coordinate frames origins //{ */
-    param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
+      /* coordinate frames origins //{ */
+      param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
 
-    /*//{ utm source */
-    if (is_utm_source_) {
+      /*//{ utm source */
+      if (is_utm_source_) {
 
-      std::string utm_origin_parent_frame_id;
-      param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
-      ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
+        std::string utm_origin_parent_frame_id;
+        param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
+        ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
 
-      std::string utm_origin_child_frame_id;
-      param_loader.loadParam("utm_origin_tf/child", utm_origin_child_frame_id);
-      ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
-    }
-    /*//}*/
+        std::string utm_origin_child_frame_id;
+        param_loader.loadParam("utm_origin_tf/child", utm_origin_child_frame_id);
+        ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
+      }
+      /*//}*/
 
-    /*//{ world source */
-    if (is_utm_source_) {
+      /*//{ world source */
+      if (is_utm_source_) {
 
-      if (!is_utm_based_) {
-        ROS_ERROR("[%s]: is world_origin source but is not utm-based. Check your config!", getPrintName().c_str());
+        if (!is_utm_based_) {
+          ROS_ERROR("[%s]: is world_origin source but is not utm-based. Check your config!", getPrintName().c_str());
+          ros::shutdown();
+        }
+
+        std::string world_origin_parent_frame_id;
+        param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);
+        ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
+
+        std::string world_origin_child_frame_id;
+        param_loader.loadParam("world_origin_tf/child", world_origin_child_frame_id);
+        ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
+      }
+      /*//}*/
+
+      //}
+
+      if (!param_loader.loadedSuccessfully()) {
+        ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
         ros::shutdown();
       }
 
-      std::string world_origin_parent_frame_id;
-      param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);
-      ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
+      /*//}*/
 
-      std::string world_origin_child_frame_id;
-      param_loader.loadParam("world_origin_tf/child", world_origin_child_frame_id);
-      ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
-    }
-    /*//}*/
+      /*//{ initialize subscribers */
+      mrs_lib::SubscribeHandlerOptions shopts;
+      shopts.nh                 = nh_;
+      shopts.node_name          = getPrintName();
+      shopts.no_message_timeout = ros::Duration(0.5);
+      shopts.threadsafe         = true;
+      shopts.autostart          = true;
+      shopts.queue_size         = 10;
+      shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-    //}
-
-    if (!param_loader.loadedSuccessfully()) {
-      ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-      ros::shutdown();
-    }
-
-    /*//}*/
-
-    /*//{ initialize subscribers */
-    mrs_lib::SubscribeHandlerOptions shopts;
-    shopts.nh                 = nh_;
-    shopts.node_name          = getPrintName();
-    shopts.no_message_timeout = ros::Duration(0.5);
-    shopts.threadsafe         = true;
-    shopts.autostart          = true;
-    shopts.queue_size         = 10;
-    shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
-
-    sh_tf_source_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this, &TfSource::timeoutCallback, this);
-    if (tf_from_attitude_enabled_) {
-      sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this, &TfSource::timeoutCallback, this);
+      sh_tf_source_odom_ =
+          mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this, &TfSource::timeoutCallback, this);
+      if (tf_from_attitude_enabled_) {
+        sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this,
+                                                                                        &TfSource::timeoutCallback, this);
+      }
     }
     /*//}*/
 
@@ -208,12 +212,12 @@ private:
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_tf_source_att_;
   nav_msgs::OdometryConstPtr                                  first_msg_;
 
-/*//{ timeoutCallback() */
-void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
-  ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
-                    (ros::Time::now() - last_msg).toSec(), n_pubs);
-}
-/*//}*/
+  /*//{ timeoutCallback() */
+  void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
+    ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
+                      (ros::Time::now() - last_msg).toSec(), n_pubs);
+  }
+  /*//}*/
 
   /*//{ callbackTfSourceOdom()*/
   void callbackTfSourceOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {

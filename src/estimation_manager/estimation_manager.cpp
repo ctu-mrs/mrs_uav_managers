@@ -117,6 +117,13 @@ public:
   /*//{ changeState() */
   bool changeState(const SMState_t& target_state) {
 
+    if (target_state == current_state_) {
+
+    ROS_WARN("[%s]: requested change to same state %s -> %s", getPrintName().c_str(), getStateAsString(current_state_).c_str(),
+             getStateAsString(target_state).c_str());
+    return true;
+    }
+
     switch (target_state) {
 
       case UNINITIALIZED_STATE: {
@@ -826,6 +833,9 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
     return true;
   }
 
+  // we do not want the switch to be disturbed by a service call
+  callbacks_enabled_ = false;
+
   bool                                                target_estimator_found = false;
   boost::shared_ptr<mrs_uav_managers::StateEstimator> target_estimator;
   for (auto estimator : estimator_list_) {
@@ -843,7 +853,7 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
       switchToEstimator(target_estimator);
       sm_->changeToPreSwitchState();
     } else {
-      ROS_WARN("[%s]: Not running estimator %s requested", getName().c_str(), req.value.c_str());
+      ROS_WARN("[%s]: Switch to not running estimator %s requested", getName().c_str(), req.value.c_str());
       res.success = false;
       res.message = ("Requested estimator is not running");
       return true;
@@ -858,6 +868,9 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 
   res.success = true;
   res.message = "Estimator switch successful";
+
+  // allow service calllbacks after switch again
+  callbacks_enabled_ = true;
 
   return true;
 }

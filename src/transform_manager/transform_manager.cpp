@@ -159,10 +159,6 @@ void TransformManager::onInit() {
   world_origin_.y = world_origin_y;
   world_origin_.z = 0;
 
-  /*     is_origin_param_ok &= param_loader.loadParam("init_gps_origin_local", init_gps_origin_local_); */
-  /*     is_origin_param_ok &= param_loader.loadParam("init_gps_offset_x", init_gps_offset_x_); */
-  /*     is_origin_param_ok &= param_loader.loadParam("init_gps_offset_y", init_gps_offset_y_); */
-
   if (!is_origin_param_ok) {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
     ros::shutdown();

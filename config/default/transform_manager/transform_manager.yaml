@@ -31,7 +31,7 @@ fcu_untilted_tf:
   child: "fcu_untilted"
 
 # the list of additional source topics from which the tfs will be constructed 
-tf_sources: []
+tf_sources: ["hw_api_raw"]
 
 # first available tf source from this list will produce the utm and world origin tfs
 utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
