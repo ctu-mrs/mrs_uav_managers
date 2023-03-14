@@ -13,6 +13,9 @@ estimator_types: [
   "gps_baro",
   "rtk",
   "aloam",
+  "hector",
+  "vio",
+  "optflow",
   "other",
 ]
 
@@ -28,6 +31,9 @@ gain_management:
     gps_baro: ["default"]
     rtk: ["default"]
     aloam: ["default"]
+    hector: ["default"]
+    vio: ["default"]
+    optflow: ["default"]
     other: ["default"]
 
   # those gains will be used automatically when a localization mode switches
@@ -37,4 +43,7 @@ gain_management:
     gps_baro: "default"
     rtk: "default"
     aloam: "default"
+    hector: "default"
+    vio: "default"
+    optflow: "default"
     other: "default"

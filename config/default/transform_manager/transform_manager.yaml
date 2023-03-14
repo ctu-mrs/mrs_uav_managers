@@ -36,6 +36,7 @@ tf_sources: []
 # first available tf source from this list will produce the utm and world origin tfs
 utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
 
+# configuration of individual tf sources
 hw_api_raw:
   odom_topic: "odometry" # name of the topic (expects nav_msgs/Odometry topic type)
   tf_from_attitude: # used for transforming velocities before full transform is available

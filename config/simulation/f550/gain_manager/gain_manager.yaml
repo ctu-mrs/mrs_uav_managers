@@ -12,6 +12,9 @@ gain_management:
     gps_baro: ["supersoft", 'soft', 'tight']
     rtk: ["supersoft", "soft", "tight"]
     aloam: ["soft"]
+    hector: ["soft"]
+    vio: ["soft"]
+    optflow: ["supersoft"]
     other: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
@@ -21,4 +24,7 @@ gain_management:
     gps_baro: "soft"
     rtk: "soft"
     aloam: "soft"
+    hector: "soft"
+    vio: "soft"
+    optflow: "supersoft"
     other: "supersoft"

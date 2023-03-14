@@ -18,7 +18,7 @@
   <arg name="custom_config_active_estimators" default="" />
 
     <!-- other args -->
-  <arg name="standalone" default="true" />
+  <arg name="standalone" default="false" />
   <arg name="debug" default="false" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />

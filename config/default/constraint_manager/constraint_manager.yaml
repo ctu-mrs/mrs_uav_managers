@@ -12,7 +12,11 @@ estimator_types: [
   "gps_garmin",
   "gps_baro",
   "rtk",
-  "aloam"
+  "aloam",
+  "hector",
+  "vio",
+  "optflow",
+  "other"
 ]
 
 constraints: [
@@ -29,6 +33,9 @@ constraint_management:
     gps_baro: ["slow", "medium", "fast"]
     rtk: ["slow", "medium", "fast"]
     aloam: ["slow"]
+    hector: ["slow"]
+    vio: ["slow"]
+    optflow: ["slow"]
     other: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
@@ -38,4 +45,7 @@ constraint_management:
     gps_baro: "medium"
     rtk: "medium"
     aloam: "slow"
+    hector: "slow"
+    vio: "slow"
+    optflow: "slow"
     other: "slow"
