@@ -8,7 +8,7 @@
 #include <std_msgs/String.h>
 
 #include <mrs_msgs/String.h>
-#include <mrs_msgs/OdometryDiag.h>
+#include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/EstimatorType.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
@@ -59,7 +59,7 @@ private:
 
   // | ----------------------- parameters ----------------------- |
 
-  std::vector<std::string> _estimator_type_names_;
+  std::vector<std::string> _current_state_estimators_;
 
   std::vector<std::string>       _gain_names_;
   std::map<std::string, Gains_t> _gains_;
@@ -73,7 +73,7 @@ private:
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>              sh_odom_diag_;
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>              sh_estimation_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
 
   // | --------------------- gain management -------------------- |
@@ -83,8 +83,8 @@ private:
   ros::ServiceServer service_server_set_gains_;
   bool               callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
-  mrs_msgs::EstimatorType::_type_type last_estimator_type_;
-  std::mutex                          mutex_last_estimator_type_;
+  std::string last_estimator_name_;
+  std::mutex                          mutex_last_estimator_name_;
 
   void       timerGainManagement(const ros::TimerEvent& event);
   ros::Timer timer_gain_management_;
@@ -144,7 +144,7 @@ void GainManager::onInit() {
 
   param_loader.loadParam("gains", _gain_names_);
 
-  param_loader.loadParam("estimator_types", _estimator_type_names_);
+  param_loader.loadParam("estimator_types", _current_state_estimators_);
 
   param_loader.loadParam("rate", _gain_management_rate_);
   param_loader.loadParam("diagnostics_rate", _diagnostics_rate_);
@@ -185,7 +185,7 @@ void GainManager::onInit() {
   }
 
   // loading the allowed gains lists
-  for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
+  for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
     param_loader.loadParam("gain_management/allowed_gains/" + *it, temp_vector);
@@ -202,7 +202,7 @@ void GainManager::onInit() {
   }
 
   // loading the fallback gains
-  for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
+  for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::string temp_str;
     param_loader.loadParam("gain_management/fallback_gains/" + *it, temp_str);
@@ -218,7 +218,7 @@ void GainManager::onInit() {
   ROS_INFO("[GainManager]: done loading dynamical params");
 
   current_gains_       = "";
-  last_estimator_type_ = -1;
+  last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
@@ -237,7 +237,7 @@ void GainManager::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_odom_diag_            = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
+  sh_estimation_diag_            = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
 
   // | ----------------------- publishers ----------------------- |
@@ -387,9 +387,9 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
 
   std::stringstream ss;
 
-  if (!sh_odom_diag_.hasMsg()) {
+  if (!sh_estimation_diag_.hasMsg()) {
 
-    ss << "missing odometry diagnostics";
+    ss << "missing estimation diagnostics";
 
     ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
 
@@ -398,7 +398,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
     return true;
   }
 
-  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
+  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
 
   if (!stringInVector(req.value, _gain_names_)) {
 
@@ -411,9 +411,9 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
+  if (!stringInVector(req.value, _map_type_allowed_gains_.at(estimation_diagnostics.current_state_estimator))) {
 
-    ss << "the gains '" << req.value.c_str() << "' are not allowed given the current odometry type";
+    ss << "the gains '" << req.value.c_str() << "' are not allowed given the current state estimator";
 
     ROS_WARN_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
 
@@ -462,52 +462,52 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("gainManagementTimer", _gain_management_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::gainManagementTimer", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_odom_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing odometry diagnostics!");
+  if (!sh_estimation_diag_.hasMsg()) {
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing estimation diagnostics!");
     return;
   }
 
-  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
+  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
 
   if (!sh_control_manager_diag_.hasMsg()) {
     ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing control manager diagnostics!");
     return;
   }
 
-  auto control_manager_diagnostics = *sh_odom_diag_.getMsg();
+  auto control_manager_diagnostics = *sh_estimation_diag_.getMsg();
 
   auto current_gains       = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
-  auto last_estimator_type = mrs_lib::get_mutexed(mutex_last_estimator_type_, last_estimator_type_);
+  auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
-  // | --- automatically set _gains_ when odometry.type changes -- |
-  if (odometry_diagnostics.estimator_type.type != last_estimator_type) {
+  // | --- automatically set _gains_ when currrent state estimator changes -- |
+  if (estimation_diagnostics.current_state_estimator != last_estimator_name) {
 
-    ROS_INFO_THROTTLE(1.0, "[GainManager]: the odometry type has changed! %d -> %d", last_estimator_type, odometry_diagnostics.estimator_type.type);
+    ROS_INFO_THROTTLE(1.0, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics.current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_fallback_gains_.find(odometry_diagnostics.estimator_type.name);
+    it = _map_type_fallback_gains_.find(estimation_diagnostics.current_state_estimator);
 
     if (it == _map_type_fallback_gains_.end()) {
 
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry type '%s' was not specified in the gain_manager's config!",
-                        odometry_diagnostics.estimator_type.name.c_str());
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
+                        estimation_diagnostics.current_state_estimator.c_str());
 
     } else {
 
-      // if the current gains are within the allowed odometry types, do nothing
-      if (stringInVector(current_gains, _map_type_allowed_gains_.at(odometry_diagnostics.estimator_type.name))) {
+      // if the current gains are within the allowed estimator types, do nothing
+      if (stringInVector(current_gains, _map_type_allowed_gains_.at(estimation_diagnostics.current_state_estimator))) {
 
-        last_estimator_type = odometry_diagnostics.estimator_type.type;
+        last_estimator_name = estimation_diagnostics.current_state_estimator;
 
         // else, try to set the fallback gains
       } else {
 
         ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
-                          odometry_diagnostics.estimator_type.name.c_str());
+                          estimation_diagnostics.current_state_estimator.c_str());
 
         if (setGains(it->second)) {
 
-          last_estimator_type = odometry_diagnostics.estimator_type.type;
+          last_estimator_name = estimation_diagnostics.current_state_estimator;
 
           ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: '%s'", it->second.c_str());
 
@@ -519,7 +519,7 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
     }
   }
 
-  mrs_lib::set_mutexed(mutex_last_estimator_type_, last_estimator_type, last_estimator_type_);
+  mrs_lib::set_mutexed(mutex_last_estimator_name_, last_estimator_name, last_estimator_name_);
 }
 
 //}
@@ -535,12 +535,12 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_odom_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing odometry diagnostics!");
+  if (!sh_estimation_diag_.hasMsg()) {
+    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing estimator diagnostics!");
     return;
   }
 
-  auto odometry_diagnostics = *sh_odom_diag_.getMsg();
+  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
 
   auto current_gains = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
@@ -553,11 +553,11 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   // get the available gains
   {
     std::map<std::string, std::vector<std::string>>::iterator it;
-    it = _map_type_allowed_gains_.find(odometry_diagnostics.estimator_type.name);
+    it = _map_type_allowed_gains_.find(estimation_diagnostics.current_state_estimator);
 
     if (it == _map_type_allowed_gains_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the odometry.type '%s' was not specified in the gain_manager's config!",
-                        odometry_diagnostics.estimator_type.name.c_str());
+      ROS_WARN_THROTTLE(1.0, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!",
+                        estimation_diagnostics.current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }

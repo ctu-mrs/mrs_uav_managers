@@ -25,7 +25,7 @@
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
 #include <mrs_msgs/UavManagerDiagnostics.h>
-#include <mrs_msgs/OdometryDiag.h>
+#include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiStatus.h>
 #include <mrs_msgs/ControllerDiagnostics.h>
 
@@ -102,7 +102,7 @@ public:
   // subscribers
   mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>        sh_controller_diagnostics_;
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                     sh_odometry_;
-  mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>                 sh_odometry_diagnostics_;
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>        sh_estimation_diagnostics_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>    sh_control_manager_diag_;
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_mass_estimate_;
   mrs_lib::SubscribeHandler<std_msgs::Float64>                      sh_throttle_;
@@ -407,7 +407,7 @@ void UavManager::onInit() {
 
   sh_controller_diagnostics_ = mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>(shopts, "controller_diagnostics_in");
   sh_odometry_               = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &UavManager::callbackOdometry, this);
-  sh_odometry_diagnostics_   = mrs_lib::SubscribeHandler<mrs_msgs::OdometryDiag>(shopts, "odometry_diagnostics_in");
+  sh_estimation_diagnostics_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "odometry_diagnostics_in");
   sh_control_manager_diag_   = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_mass_estimate_          = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "mass_estimate_in");
   sh_throttle_               = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "throttle_in");
@@ -987,13 +987,14 @@ void UavManager::timerDiagnostics(const ros::TimerEvent& event) {
   bool got_gps_est = false;
   bool got_rtk_est = false;
 
-  if (sh_odometry_diagnostics_.hasMsg()) {  // get current position in lat-lon
+  if (sh_estimation_diagnostics_.hasMsg()) {  // get current position in lat-lon
 
-    auto                     odom_diag      = sh_odometry_diagnostics_.getMsg();
-    std::vector<std::string> lat_estimators = odom_diag.get()->available_lat_estimators;
+    auto                     estimation_diag  = sh_estimation_diagnostics_.getMsg();
+    std::vector<std::string> state_estimators = estimation_diag.get()->switchable_state_estimators;
 
-    got_gps_est = std::find(lat_estimators.begin(), lat_estimators.end(), "GPS") != lat_estimators.end();
-    got_rtk_est = std::find(lat_estimators.begin(), lat_estimators.end(), "RTK") != lat_estimators.end();
+    got_gps_est = std::find(state_estimators.begin(), state_estimators.end(), "gps_garmin") != state_estimators.end() ||
+                  std::find(state_estimators.begin(), state_estimators.end(), "gps_baro") != state_estimators.end();
+    got_rtk_est = std::find(state_estimators.begin(), state_estimators.end(), "rtk") != state_estimators.end();
   }
 
   mrs_msgs::UavManagerDiagnostics diag;

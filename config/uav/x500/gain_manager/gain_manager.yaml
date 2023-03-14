@@ -10,45 +10,23 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
-    ICP: ["supersoft", "soft"]
-    VSLAM: ["supersoft", "soft"]
-    BRICKFLOW: ["supersoft", "soft", "tight"]
-    HECTOR: ["supersoft"]
-    ALOAM: ["supersoft", "soft"]
-    ALOAMGARM: ["supersoft", "soft", "tight", "supertight"]
-    ALOAMREP: ["supersoft", "soft", "tight", "supertight"]
-    BRICK: ["supersoft", "soft"]
-    T265: ["supersoft", "soft"]
-    OBJECT: ["supersoft"]
-    VIO: ["supersoft"]
-    LIDAR: ["supersoft"]
-    RTK: ["supersoft"]
-    OPTFLOWGPS: ["supersoft"]
-    GPS: ["supersoft", "soft"]
-    OPTFLOW: ["supersoft"]
-    TOWER: ["supersoft", "soft"]
-    LIOSAM: ["supersoft", "soft"]
-    OTHER: ["supersoft"]
+    hector: ["supersoft"]
+    aloam: ["supersoft", "soft"]
+    vio: ["supersoft"]
+    rtk: ["supersoft"]
+    gps_garmin: ["supersoft", "soft"]
+    gps_baro: ["supersoft", "soft"]
+    optflow: ["supersoft"]
+    other: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
-    ICP: "supersoft"
-    VSLAM: "supersoft"
-    BRICKFLOW: "supersoft"
-    HECTOR: "supersoft"
-    ALOAM: "soft"
-    ALOAMGARM: "soft"
-    ALOAMREP: "soft"
-    BRICK: "supersoft"
-    T265: "supersoft"
-    OBJECT: "supersoft"
-    VIO: "supersoft"
-    LIDAR: "supersoft"
-    RTK: "supersoft"
-    OPTFLOWGPS: "supersoft"
-    GPS: "soft"
-    OPTFLOW: "supersoft"
-    TOWER: "supersoft"
-    LIOSAM: "supersoft"
-    OTHER: "supersoft"
+    hector: "supersoft"
+    aloam: "soft"
+    vio: "supersoft"
+    rtk: "supersoft"
+    gps_garmin: "soft"
+    gps_baro: "soft"
+    optflow: "supersoft"
+    other: "supersoft"

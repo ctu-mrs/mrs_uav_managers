@@ -1,0 +1,96 @@
+version: "0.0.0.1"
+
+local_origin_tf:
+  enabled: true # local_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "local_origin"
+
+stable_origin_tf:
+  enabled: true # stable_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "stable_origin"
+
+fixed_origin_tf:
+  enabled: true # fixed_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "fixed_origin"
+
+utm_origin_tf:
+  enabled: true # utm_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "utm_origin"
+
+world_origin_tf:
+  enabled: true # world_origin tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "world_origin"
+
+fcu_untilted_tf:
+  enabled: true # fcu_untilted tf should be published by default unless some other node already publishes it
+  parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+  child: "fcu_untilted"
+
+# the list of additional source topics from which the tfs will be constructed 
+tf_sources: ["hw_api_raw"]
+
+# first available tf source from this list will produce the utm and world origin tfs
+utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
+
+# configuration of individual tf sources
+hw_api_raw:
+  odom_topic: "odometry" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: false
+  namespace: "hw_api" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: true # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+
+gps_garmin:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: true
+    attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+  namespace: "estimation_manager/gps_garmin" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: true # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+
+gps_baro:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: true
+    attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+  namespace: "estimation_manager/gps_baro" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: true # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+
+rtk:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: true
+    attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+  namespace: "estimation_manager/rtk" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: true # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+
+aloam:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: true
+    attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+  namespace: "estimation_manager/aloam" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: false # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+
+ground_truth:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: false
+  namespace: "estimation_manager/ground_truth" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: false # if true, will publish tf to utm_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames

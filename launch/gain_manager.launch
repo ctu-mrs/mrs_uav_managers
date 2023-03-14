@@ -42,7 +42,7 @@
 
       <!-- Subscribers -->
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
-      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+      <remap from="~estimation_diagnostics_in" to="estimation_manager/diagnostics" />
 
       <!-- Services -->
       <remap from="~set_gains_in" to="~set_gains" />

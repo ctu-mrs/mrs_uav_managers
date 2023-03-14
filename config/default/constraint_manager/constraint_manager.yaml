@@ -9,24 +9,14 @@ scope_timer:
   log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
 
 estimator_types: [
-  "ICP",
-  "VSLAM",
-  "BRICKFLOW",
-  "HECTOR",
-  "TOWER",
-  "T265",
-  "BRICK",
-  "VIO",
-  "LIDAR",
-  "RTK",
-  "OPTFLOWGPS",
-  "GPS",
-  "OPTFLOW",
-  "OTHER",
-  "ALOAM",
-  "ALOAMGARM",
-  "ALOAMREP",
-  "LIOSAM"
+  "gps_garmin",
+  "gps_baro",
+  "rtk",
+  "aloam",
+  "hector",
+  "vio",
+  "optflow",
+  "other"
 ]
 
 constraints: [
@@ -39,44 +29,23 @@ constraint_management:
 
   # list of allowed gains per odometry mode
   allowed_constraints:
-    ICP: ["slow", "medium"]
-    VSLAM: ["slow", "medium"]
-    BRICKFLOW: ["slow"]
-    OPTFLOW: ["slow", "medium"]
-    HECTOR: ["slow"]
-    ALOAM: ["slow"]
-    ALOAMGARM: ["slow"]
-    ALOAMREP: ["slow"]
-    TOWER: ["slow"]
-    T265: ["slow"]
-    BRICK: ["slow"]
-    VIO: ["slow", "medium"]
-    LIDAR: ["slow", "medium"]
-    RTK: ["slow", "medium", "fast"]
-    OPTFLOWGPS: ["slow"]
-    GPS: ["slow", "medium", "fast"]
-    OPTFLOW: ["slow", "medium"]
-    LIOSAM: ["slow", "medium"]
-    OTHER: ["slow"]
+    gps_garmin: ["slow", "medium", "fast"]
+    gps_baro: ["slow", "medium", "fast"]
+    rtk: ["slow", "medium", "fast"]
+    aloam: ["slow"]
+    hector: ["slow"]
+    vio: ["slow"]
+    optflow: ["slow"]
+    other: ["slow"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_constraints:
-    ICP: "slow"
-    VSLAM: "slow"
-    BRICKFLOW: "slow"
-    HECTOR: "slow"
-    ALOAM: "slow"
-    ALOAMGARM: "slow"
-    ALOAMREP: "slow"
-    TOWER: "slow"
-    T265: "slow"
-    BRICK: "slow"
-    VIO: "slow"
-    LIDAR: "slow"
-    RTK: "medium"
-    OPTFLOWGPS: "slow"
-    GPS: "medium"
-    OPTFLOW: "slow"
-    LIOSAM: "slow"
-    OTHER: "slow"
+    gps_garmin: "medium"
+    gps_baro: "medium"
+    rtk: "medium"
+    aloam: "slow"
+    hector: "slow"
+    vio: "slow"
+    optflow: "slow"
+    other: "slow"

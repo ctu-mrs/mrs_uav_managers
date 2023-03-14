@@ -1,0 +1,65 @@
+<launch>
+
+  <!-- args corresponding to environment variables -->
+  <arg name="UAV_NAME" default="$(env UAV_NAME)" />
+  <arg name="PROFILER" default="$(optenv PROFILER false)" />
+  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
+  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
+  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="true" />
+  <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="false" />
+
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('simulation'))" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
+
+  <arg name="custom_config" default="" />
+  <arg name="custom_config_active_estimators" default="" />
+
+    <!-- other args -->
+  <arg name="standalone" default="false" />
+  <arg name="debug" default="false" />
+
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+
+  <arg name="fcu_frame_id" default="fcu" />
+
+  <group ns="$(arg UAV_NAME)">
+
+<!--//{ transform_manager -->
+    <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+
+      <param name="enable_profiler" value="$(arg PROFILER)" />
+      <param name="uav_name" value="$(arg UAV_NAME)" />
+
+      <rosparam file="$(arg world_file)" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/transform_manager/transform_manager.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/default/active_estimators.yaml" command="load" />
+
+      <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config_active_estimators') == '')" file="$(arg custom_config_active_estimators)" />
+
+      <!-- Subscribers -->
+      <remap from="~uav_state_in" to="estimation_manager/uav_state" />
+      <remap from="~orientation_in" to="hw_api/orientation" />
+      <remap from="~gnss_in" to="hw_api/gnss" />
+
+      <!-- Publishers -->
+      <remap from="~profiler" to="profiler" />
+
+    </node>
+<!--//}-->
+
+    <!-- RTK antenna to FCU TF (TODO: should be published by hw_api) -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="fcu_to_rtk_antenna" args="0.0 0.0 0.20 0 0 0 $(arg UAV_NAME)/$(arg fcu_frame_id) $(arg UAV_NAME)/rtk_antenna" />
+
+  </group>
+
+</launch>

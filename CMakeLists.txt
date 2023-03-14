@@ -22,7 +22,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 set(LIBRARIES
-  GainManager ConstraintManager ControlManager UavManager TfManager NullTracker
+  GainManager ConstraintManager ControlManager UavManager TfManager EstimationManager TransformManager NullTracker
   )
 
 catkin_package(
@@ -124,6 +124,39 @@ add_dependencies(TfManager
   )
 
 target_link_libraries(TfManager
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+  )
+
+# EstimationManager
+add_library(EstimationManager
+  src/estimation_manager/estimation_manager.cpp
+  src/estimation_manager/estimator.cpp
+  src/estimation_manager/estimators/state_estimator.cpp
+  src/estimation_manager/estimators/agl_estimator.cpp
+  )
+
+add_dependencies(EstimationManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(EstimationManager
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+  )
+
+# TransformManager
+add_library(TransformManager
+  src/transform_manager/transform_manager.cpp
+  )
+
+add_dependencies(TransformManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(TransformManager
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )

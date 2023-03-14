@@ -6,7 +6,6 @@
   <arg name="PROPULSION_TYPE" default="$(optenv PROPULSION_TYPE)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
-  <arg name="ODOMETRY_TYPE" default="$(optenv ODOMETRY_TYPE)" />
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
@@ -63,16 +62,16 @@
 
       <!-- Subscribers -->
       <remap from="~controller_diagnostics_in" to="control_manager/controller_diagnostics" />
-      <remap from="~odometry_in" to="odometry/odom_main" />
-      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+      <remap from="~odometry_in" to="estimation_manager/odom_main" />
+      <remap from="~odometry_diagnostics_in" to="estimation_manager/diagnostics" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~mass_estimate_in" to="control_manager/mass_estimate" />
       <remap from="~throttle_in" to="control_manager/throttle" />
       <remap from="~tracker_cmd_in" to="control_manager/tracker_cmd" />
       <remap from="~hw_api_status_in" to="hw_api/status" />
       <remap from="~hw_api_gnss_in" to="hw_api/gnss" />
-      <remap from="~max_height_in" to="odometry/max_altitude" />
-      <remap from="~height_in" to="odometry/height" />
+      <remap from="~max_height_in" to="estimation_manager/max_altitude" />
+      <remap from="~height_in" to="estimation_manager/height_agl" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />
 
@@ -96,7 +95,7 @@
       <remap from="~enable_callbacks_out" to="control_manager/enable_callbacks" />
       <remap from="~arm_out" to="control_manager/arm" />
       <remap from="~pirouette_out" to="control_manager/pirouette" />
-      <remap from="~set_odometry_callbacks_out" to="odometry/toggle_callbacks" />
+      <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_service_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~offboard_out" to="hw_api/offboard" />
       <remap from="~midair_activation_in" to="~midair_activation" />

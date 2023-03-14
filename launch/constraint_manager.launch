@@ -41,7 +41,7 @@
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+      <remap from="~estimation_diagnostics_in" to="estimation_manager/diagnostics" />
 
       <!-- Services -->
       <remap from="~set_constraints_in" to="~set_constraints" />
