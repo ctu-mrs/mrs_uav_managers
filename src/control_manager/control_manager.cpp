@@ -400,8 +400,8 @@ private:
 
   // | -------------- enabling the output publisher ------------- |
 
-  void toggleOutput(const bool& input);
-  bool output_enabled_ = false;
+  void              toggleOutput(const bool& input);
+  std::atomic<bool> output_enabled_ = false;
 
   // | ----------------------- publishers ----------------------- |
 
