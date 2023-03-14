@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/scope_timer.h>
 
 namespace mrs_uav_managers
 {
@@ -27,6 +28,12 @@ struct UtmOrigin_t
   double y;
 };
 
+struct ScopeTimer_t
+{
+  bool                                       enabled;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> logger;
+};
+
 struct CommonHandlers_t
 {
 
@@ -35,7 +42,8 @@ struct CommonHandlers_t
   std::string                           uav_name;
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;
-  UtmOrigin_t utm_origin;
+  UtmOrigin_t                           utm_origin;
+  ScopeTimer_t                          scope_timer;
 };
 
 }  // namespace estimation_manager

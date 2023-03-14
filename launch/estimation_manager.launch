@@ -20,6 +20,7 @@
     <!-- other args -->
   <arg name="standalone" default="false" />
   <arg name="debug" default="false" />
+  <arg name="valgrind" default="false" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
@@ -27,7 +28,7 @@
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
-  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+  <arg unless="$(eval arg('debug'))" name="launch_prefix" value="" />
 
   <group ns="$(arg UAV_NAME)">
 

@@ -11,3 +11,5 @@ rate:
   uav_state: 100 # used by the control_manager for feedback control (default: 100)
   health: 100 # checks if everything is ok (default: 100)
 
+scope_timer:
+  enabled: true
