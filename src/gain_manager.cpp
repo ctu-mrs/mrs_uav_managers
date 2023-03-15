@@ -9,7 +9,6 @@
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
-#include <mrs_msgs/EstimatorType.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/GainManagerDiagnostics.h>
 

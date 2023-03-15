@@ -48,7 +48,7 @@
 
 <!--//{ Subscribers-->
       <!-- common -->
-      <remap from="~control_input_in" to="control_manager/odometry_input" />
+      <remap from="~control_input_in" to="control_manager/estimator_input" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
 
 <!--//}-->

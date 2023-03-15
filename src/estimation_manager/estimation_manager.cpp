@@ -21,10 +21,6 @@
 #include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiCapabilities.h>
 
-/*//{ FIXME: delete after merge with new uav system */
-#include <mrs_msgs/OdometryDiag.h>
-/*//}*/
-
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
@@ -312,10 +308,6 @@ private:
 
   mrs_lib::PublisherHandler<geometry_msgs::QuaternionStamped> ph_orientation_;
 
-  /*//{ FIXME: delete after merge with new uav system */
-  mrs_lib::PublisherHandler<mrs_msgs::OdometryDiag> ph_diagnostics_legacy_;
-  /*//}*/
-
   ros::Timer timer_publish_;
   double     timer_rate_publish_;
   void       timerPublish(const ros::TimerEvent& event);
@@ -586,9 +578,6 @@ void EstimationManager::onInit() {
   ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "max_flight_altitude_agl_out", 1);
   ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "height_agl_out", 1);
 
-  /*//{ FIXME: delete after merge with new uav system */
-  ph_diagnostics_legacy_ = mrs_lib::PublisherHandler<mrs_msgs::OdometryDiag>(nh, "diagnostics_legacy_out", 1);
-  /*//}*/
   /*//}*/
 
   /*//{ initialize timers */
@@ -663,31 +652,6 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     }
     ph_max_flight_altitude_agl_.publish(max_altitude_msg);
     ph_diagnostics_.publish(diagnostics);
-
-    /*//{ FIXME: delete after merge with new uav system */
-    mrs_msgs::OdometryDiag legacy_odom_diag_msg;
-    legacy_odom_diag_msg.header.stamp = ros::Time::now();
-    mrs_msgs::EstimatorType est_type;
-    est_type.name                       = "OTHER";
-    est_type.type                       = 1;
-    legacy_odom_diag_msg.estimator_type = est_type;
-    mrs_msgs::AltitudeType alt_type;
-    alt_type.name                      = "OTHER";
-    alt_type.type                      = 1;
-    legacy_odom_diag_msg.altitude_type = alt_type;
-    mrs_msgs::HeadingType hdg_type;
-    hdg_type.name                                 = "OTHER";
-    hdg_type.type                                 = 1;
-    legacy_odom_diag_msg.heading_type             = hdg_type;
-    legacy_odom_diag_msg.available_lat_estimators = {""};
-    legacy_odom_diag_msg.available_hdg_estimators = {""};
-    legacy_odom_diag_msg.available_alt_estimators = {""};
-
-    legacy_odom_diag_msg.max_altitude = max_flight_altitude_agl;
-    ph_diagnostics_legacy_.publish(legacy_odom_diag_msg);
-
-    /*//}*/
-
 
     if (sm_->isInPublishableState()) {
 

@@ -258,7 +258,7 @@
       <remap from="~hw_api_position_cmd_out" to="hw_api/position_cmd" />
       <remap from="~control_reference_out" to="~control_reference" />
       <remap from="~tracker_cmd_out" to="~tracker_cmd" />
-      <remap from="~odometry_input_out" to="~odometry_input" />
+      <remap from="~estimator_input_out" to="~estimator_input" />
       <remap from="~control_error_out" to="~control_error" />
       <remap from="~tilt_error_out" to="~tilt_error" />
       <remap from="~thrust_force_out" to="~thrust_force" />
