@@ -10,7 +10,7 @@
 #include <nav_msgs/Odometry.h>
 
 #include <mrs_msgs/UavState.h>
-#include <mrs_msgs/MrsOdometryInput.h>
+#include <mrs_msgs/EstimatorInput.h>
 #include <mrs_msgs/EstimatorDiagnostics.h>
 
 #include <mrs_lib/publisher_handler.h>
@@ -86,8 +86,8 @@ public:
 
   void publishDiagnostics() const;
 
-  tf2::Vector3          getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr &input_msg, const geometry_msgs::Quaternion &orientation);
-  tf2::Vector3          getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr &input_msg, const double hdg);
+  tf2::Vector3          getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr &input_msg, const geometry_msgs::Quaternion &orientation);
+  tf2::Vector3          getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr &input_msg, const double hdg);
   std::optional<double> getHeadingRate(const nav_msgs::OdometryConstPtr &odom_msg);
   /* std::optional<double> getHeadingRate(const geometry_msgs::Vector3 &att_rate); */
 };

@@ -9,7 +9,6 @@
 
 #include <mrs_msgs/ConstraintManagerDiagnostics.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
-#include <mrs_msgs/EstimatorType.h>
 #include <mrs_msgs/DynamicsConstraintsSrv.h>
 #include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/String.h>

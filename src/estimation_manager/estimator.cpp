@@ -121,11 +121,11 @@ void Estimator::publishDiagnostics() const {
 /*//}*/
 
 /*//{ getAccGlobal() */
-tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr& input_msg, const geometry_msgs::Quaternion& orientation) {
+tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const geometry_msgs::Quaternion& orientation) {
   return getAccGlobal(input_msg, mrs_lib::AttitudeConverter(orientation).getHeading());
 }
 
-tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::MrsOdometryInput::ConstPtr& input_msg, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const double hdg) {
 
   // untilt the desired acceleration vector
   geometry_msgs::PointStamped des_acc;

@@ -25,7 +25,7 @@
 #include <mrs_msgs/ValidateReferenceList.h>
 #include <mrs_msgs/BumperParamsSrv.h>
 #include <mrs_msgs/TrackerCommand.h>
-#include <mrs_msgs/MrsOdometryInput.h>
+#include <mrs_msgs/EstimatorInput.h>
 
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -407,7 +407,7 @@ private:
 
   mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>     ph_controller_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>          ph_mrs_odom_input_;
+  mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>          ph_mrs_odom_input_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
@@ -1652,7 +1652,7 @@ void ControlManager::initialize(void) {
 
   ph_controller_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>(nh_, "controller_diagnostics_out", 1);
   ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
-  ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::MrsOdometryInput>(nh_, "odometry_input_out", 1);
+  ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>(nh_, "estimator_input_out", 1);
   ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "control_reference_out", 1);
   ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
@@ -8931,7 +8931,7 @@ void ControlManager::publish(void) {
 
   if (last_control_output.control_output) {
 
-    mrs_msgs::MrsOdometryInput msg;
+    mrs_msgs::EstimatorInput msg;
 
     msg.header.frame_id = _uav_name_ + "/fcu";
     msg.header.stamp    = ros::Time::now();
