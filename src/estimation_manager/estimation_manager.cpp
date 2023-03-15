@@ -31,6 +31,7 @@
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/gps_conversions.h>
+#include <mrs_lib/scope_timer.h>
 
 
 #include "mrs_uav_managers/state_estimator.h"
@@ -390,6 +391,7 @@ void EstimationManager::onInit() {
   ch_->nodelet_name = nodelet_name_;
   ch_->package_name = package_name_;
 
+/*//{ load parameters */
   mrs_lib::ParamLoader param_loader(nh, getName());
 
   // load maximum flight altitude from safety area
@@ -435,6 +437,7 @@ void EstimationManager::onInit() {
 
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh, getName());
   ch_->transformer->retryLookupNewest(true);
+/*//}*/
 
   /*//{ check version */
   param_loader.loadParam("version", version_);
@@ -446,6 +449,7 @@ void EstimationManager::onInit() {
   }
   /*//}*/
 
+/*//{ initialize hw api subscriber*/
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh;
   shopts.node_name          = getName();
@@ -463,6 +467,7 @@ void EstimationManager::onInit() {
   }
 
   mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
+/*//}*/
 
   /*//{ load estimators */
   param_loader.loadParam("state_estimators", estimator_names_);
@@ -610,6 +615,11 @@ void EstimationManager::onInit() {
   srvs_toggle_callbacks_ = nh.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
+    param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
+    std::string filepath;
+    const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/scope_timer.txt";
+    ch_->scope_timer.logger = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
+
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getName().c_str());
     ros::shutdown();
@@ -636,10 +646,14 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
   if (!sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
     double max_flight_altitude_agl = max_safety_area_altitude_;
     if (active_estimator_ && active_estimator_->isInitialized()) {
       max_flight_altitude_agl = std::min(max_flight_altitude_agl, active_estimator_->getMaxFlightAltitudeAgl());
     }
+
+    scope_timer.checkpoint("agl");
 
     // publish diagnostics
     mrs_msgs::Float64Stamped max_altitude_msg;
@@ -662,7 +676,10 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       diagnostics.current_state_estimator = "";
     }
     ph_max_flight_altitude_agl_.publish(max_altitude_msg);
+
+    scope_timer.checkpoint("msg fill");
     ph_diagnostics_.publish(diagnostics);
+    scope_timer.checkpoint("diag pub");
 
     /*//{ FIXME: delete after merge with new uav system */
     mrs_msgs::OdometryDiag legacy_odom_diag_msg;
@@ -684,10 +701,13 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     legacy_odom_diag_msg.available_alt_estimators = {""};
 
     legacy_odom_diag_msg.max_altitude = max_flight_altitude_agl;
+    scope_timer.checkpoint("legacy diag fill");
     ph_diagnostics_legacy_.publish(legacy_odom_diag_msg);
+    scope_timer.checkpoint("legacy diag pub");
 
     /*//}*/
 
+    scope_timer.checkpoint("after diagnostics published");
 
     if (sm_->isInPublishableState()) {
 
