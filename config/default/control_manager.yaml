@@ -20,10 +20,10 @@ controllers : [
 #- this is the "do nothing tracker", which is active when no other is
 null_tracker: "NullTracker"
 
-#tracker used for landing and takeoff
+# tracker used for landing and takeoff
 landing_takeoff_tracker: "LandoffTracker"
 
-status_timer_rate: 10 # [Hz]
+status_timer_rate: 10 # [Hz] # will be overriden for VELOCITY+ output mode
 
 state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
 
@@ -55,6 +55,7 @@ safety:
   failsafe_controller: "FailsafeController"
 
   # after not receiving odometry for more than this, the failsafe landing will trigger
+  # will be overriden for ACCELERATION+ output mode
   odometry_max_missing_time: 0.1 # [s]
 
   # trigger eland when the odometry corrections are too unreliable
