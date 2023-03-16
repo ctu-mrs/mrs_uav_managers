@@ -23,7 +23,7 @@ null_tracker: "NullTracker"
 #tracker used for landing and takeoff
 landing_takeoff_tracker: "LandoffTracker"
 
-status_timer_rate:  10 # [Hz]
+status_timer_rate: 10 # [Hz]
 
 state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
 

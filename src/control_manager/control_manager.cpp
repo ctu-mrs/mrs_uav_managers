@@ -274,6 +274,8 @@ private:
 
   ControlOutputModalities_t _hw_api_inputs_;
 
+  double desired_uav_state_rate_ = 100.0;
+
   // this timer will check till we already got the hardware api diagnostics
   // then it will trigger the initialization of the controllers and finish
   // the initialization of the ControlManager
@@ -407,7 +409,7 @@ private:
 
   mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>     ph_controller_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>          ph_mrs_odom_input_;
+  mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>            ph_mrs_odom_input_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
@@ -1774,12 +1776,20 @@ void ControlManager::initialize(void) {
 
   CONTROL_OUTPUT lowest_output = getLowestOuput(_hw_api_inputs_);
 
-  if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
-    _safety_timer_rate_ = 20.0;
-    _status_timer_rate_ = 1.0;
+  if (lowest_output == ACTUATORS_CMD || lowest_output == CONTROL_GROUP) {
+    _safety_timer_rate_     = 200.0;
+    desired_uav_state_rate_ = 250.0;
+  } else if (lowest_output == ATTITUDE_RATE || lowest_output == ATTITUDE) {
+    _safety_timer_rate_     = 100.0;
+    desired_uav_state_rate_ = 100.0;
+  } else if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
+    _safety_timer_rate_     = 30.0;
+    _status_timer_rate_     = 1.0;
+    desired_uav_state_rate_ = 30.0;
   } else if (lowest_output >= VELOCITY_HDG_RATE) {
-    _safety_timer_rate_ = 10.0;
-    _status_timer_rate_ = 1.0;
+    _safety_timer_rate_     = 20.0;
+    _status_timer_rate_     = 1.0;
+    desired_uav_state_rate_ = 20.0;
   }
 
   // | ------------------------- timers ------------------------- |
@@ -6563,6 +6573,8 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.stamp    = ros::Time::now();
   diagnostics_msg.uav_name = _uav_name_;
+
+  diagnostics_msg.desired_uav_state_rate = desired_uav_state_rate_;
 
   diagnostics_msg.output_enabled = output_enabled_;
 
