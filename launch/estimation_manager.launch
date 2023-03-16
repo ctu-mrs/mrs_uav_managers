@@ -20,7 +20,6 @@
     <!-- other args -->
   <arg name="standalone" default="true" />
   <arg name="debug" default="false" />
-  <arg name="valgrind" default="false" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />

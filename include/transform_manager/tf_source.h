@@ -105,19 +105,17 @@ public:
 
       /*//{ initialize subscribers */
       mrs_lib::SubscribeHandlerOptions shopts;
-      shopts.nh                 = nh_;
-      shopts.node_name          = getPrintName();
-      shopts.no_message_timeout = ros::Duration(0.5);
-      shopts.threadsafe         = true;
-      shopts.autostart          = true;
-      shopts.queue_size         = 10;
-      shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+      shopts.nh        = nh_;
+      shopts.node_name = getPrintName();
+      shopts.no_message_timeout = mrs_lib::no_timeout;
+      shopts.threadsafe      = true;
+      shopts.autostart       = true;
+      shopts.queue_size      = 10;
+      shopts.transport_hints = ros::TransportHints().tcpNoDelay();
 
-      sh_tf_source_odom_ =
-          mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this, &TfSource::timeoutCallback, this);
+      sh_tf_source_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this);
       if (tf_from_attitude_enabled_) {
-        sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this,
-                                                                                        &TfSource::timeoutCallback, this);
+        sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this);
       }
     }
     /*//}*/
@@ -211,13 +209,6 @@ private:
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>               sh_tf_source_odom_;
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_tf_source_att_;
   nav_msgs::OdometryConstPtr                                  first_msg_;
-
-  /*//{ timeoutCallback() */
-  void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
-    ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
-                      (ros::Time::now() - last_msg).toSec(), n_pubs);
-  }
-  /*//}*/
 
   /*//{ callbackTfSourceOdom()*/
   void callbackTfSourceOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
@@ -320,9 +311,10 @@ private:
 
         if (is_inverted_) {
           tf2::Transform tf_utm;
+          tf_utm.setOrigin(tf2::Vector3(0,0,0));
           tf_utm.setRotation(tf_inv.getRotation());
           tf2::Vector3 utm_origin_pt(utm_origin_.x, utm_origin_.y, utm_origin_.z);
-          utm_origin_pt                    = tf_utm * utm_origin_pt;  // transform the utm_origin coordinated to fcu frame
+          utm_origin_pt                    = tf_utm * utm_origin_pt;  // transform the utm_origin coordinates to fcu frame
           tf_utm_msg.transform.translation = Support::pointToVector3(pose_inv.position);
           tf_utm_msg.transform.translation.x -= utm_origin_pt.x();
           tf_utm_msg.transform.translation.y -= utm_origin_pt.y();
@@ -355,6 +347,7 @@ private:
 
         if (is_inverted_) {
           tf2::Transform tf_world;
+          tf_world.setOrigin(tf2::Vector3(0,0,0));
           tf_world.setRotation(tf_inv.getRotation());
 
           tf2::Vector3 world_origin_pt(utm_origin_.x - world_origin_.x, utm_origin_.y - world_origin_.y, world_origin_.z);

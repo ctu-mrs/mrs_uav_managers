@@ -243,22 +243,21 @@ void TransformManager::onInit() {
 
   /*//{ initialize subscribers */
   mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = getPrintName();
-  shopts.no_message_timeout = ros::Duration(0.5);
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+  shopts.nh        = nh_;
+  shopts.node_name = getPrintName();
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe      = true;
+  shopts.autostart       = true;
+  shopts.queue_size      = 10;
+  shopts.transport_hints = ros::TransportHints().tcpNoDelay();
 
-  sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this,
-                                                                &TransformManager::timeoutCallback, this);
+  sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
-  sh_hw_api_orientation_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation,
-                                                                                       this, &TransformManager::timeoutCallback, this);
+  sh_hw_api_orientation_ =
+      mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
   sh_gnss_ =
-      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this, &TransformManager::timeoutCallback, this);
+      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -464,13 +463,6 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
     }
     got_utm_offset_ = true;
   }
-}
-/*//}*/
-
-/*//{ timeoutCallback() */
-void TransformManager::timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs) {
-  ROS_WARN_THROTTLE(5.0, "[%s]: Did not receive message from topic '%s' for %.2f seconds (%d publishers on topic)", getPrintName().c_str(), topic.c_str(),
-                    (ros::Time::now() - last_msg).toSec(), n_pubs);
 }
 /*//}*/
 

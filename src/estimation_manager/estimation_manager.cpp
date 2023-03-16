@@ -445,7 +445,7 @@ void EstimationManager::onInit() {
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh;
   shopts.node_name          = getName();
-  shopts.no_message_timeout = ros::Duration(0.5);
+  shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
   shopts.queue_size         = 10;
