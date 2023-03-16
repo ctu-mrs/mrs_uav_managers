@@ -20,6 +20,7 @@
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiCapabilities.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
@@ -297,6 +298,8 @@ private:
 
   std::shared_ptr<StateMachine> sm_;
 
+  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
+
   mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_altitude_agl_;
   mrs_lib::PublisherHandler<mrs_msgs::UavState>              ph_uav_state_;
@@ -441,7 +444,6 @@ void EstimationManager::onInit() {
   }
   /*//}*/
 
-/*//{ initialize hw api subscriber*/
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh;
   shopts.node_name          = getName();
@@ -451,6 +453,8 @@ void EstimationManager::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
+/*//{ wait for hw api message */
+
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
   while (!sh_hw_api_capabilities_.hasMsg()) {
@@ -459,6 +463,18 @@ void EstimationManager::onInit() {
   }
 
   mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
+/*//}*/
+
+/*//{ wait for desired uav_state rate*/
+      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  while (!sh_control_manager_diag_.hasMsg()) {
+    ROS_INFO("[%s]: waiting for control_manager_diagnostics message at topic: %s", getName().c_str(), sh_control_manager_diag_.topicName().c_str());
+    ros::Duration(1.0).sleep();
+  }
+
+  mrs_msgs::ControlManagerDiagnosticsConstPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
+  ch_->desired_uav_state_rate = control_manager_diag_msg->desired_uav_state_rate;
+  ROS_INFO("[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
 /*//}*/
 
   /*//{ load estimators */
@@ -586,11 +602,9 @@ void EstimationManager::onInit() {
   /*//}*/
 
   /*//{ initialize timers */
-  param_loader.loadParam("rate/uav_state", timer_rate_publish_);
-  timer_publish_ = nh.createTimer(ros::Rate(timer_rate_publish_), &EstimationManager::timerPublish, this);
+  timer_publish_ = nh.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerPublish, this);
 
-  param_loader.loadParam("rate/health", timer_rate_check_health_);
-  timer_check_health_ = nh.createTimer(ros::Rate(timer_rate_check_health_), &EstimationManager::timerCheckHealth, this);
+  timer_check_health_ = nh.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerCheckHealth, this);
   /*//}*/
 
   /*//{ initialize service clients */

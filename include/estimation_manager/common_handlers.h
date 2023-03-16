@@ -42,6 +42,7 @@ struct CommonHandlers_t
   std::string                           uav_name;
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;
+  double                                desired_uav_state_rate;
   UtmOrigin_t                           utm_origin;
   ScopeTimer_t                          scope_timer;
 };
