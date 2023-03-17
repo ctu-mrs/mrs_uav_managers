@@ -117,9 +117,9 @@ public:
 
     if (target_state == current_state_) {
 
-    ROS_WARN("[%s]: requested change to same state %s -> %s", getPrintName().c_str(), getStateAsString(current_state_).c_str(),
-             getStateAsString(target_state).c_str());
-    return true;
+      ROS_WARN("[%s]: requested change to same state %s -> %s", getPrintName().c_str(), getStateAsString(current_state_).c_str(),
+               getStateAsString(target_state).c_str());
+      return true;
     }
 
     switch (target_state) {
@@ -294,6 +294,8 @@ private:
 
   std::string version_;
 
+  ros::NodeHandle nh_;
+
   std::shared_ptr<CommonHandlers_t> ch_;
 
   std::shared_ptr<StateMachine> sm_;
@@ -313,12 +315,13 @@ private:
   mrs_lib::PublisherHandler<geometry_msgs::QuaternionStamped> ph_orientation_;
 
   ros::Timer timer_publish_;
-  double     timer_rate_publish_;
   void       timerPublish(const ros::TimerEvent& event);
 
   ros::Timer timer_check_health_;
-  double     timer_rate_check_health_;
   void       timerCheckHealth(const ros::TimerEvent& event);
+
+  ros::Timer timer_initialization_;
+  void       timerInitialization(const ros::TimerEvent& event);
 
   ros::ServiceServer srvs_change_estimator_;
   bool               callbackChangeEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
@@ -373,7 +376,7 @@ public:
 /*//{ onInit() */
 void EstimationManager::onInit() {
 
-  ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
@@ -386,251 +389,8 @@ void EstimationManager::onInit() {
   ch_->nodelet_name = nodelet_name_;
   ch_->package_name = package_name_;
 
-/*//{ load parameters */
-  mrs_lib::ParamLoader param_loader(nh, getName());
-
-  // load maximum flight altitude from safety area
-  bool use_safety_area;
-  param_loader.loadParam("safety_area/use_safety_area", use_safety_area);
-  if (use_safety_area) {
-    param_loader.loadParam("safety_area/max_height", max_safety_area_altitude_);
-  } else {
-    ROS_WARN("[%s]: NOT USING SAFETY AREA!!!", getName().c_str());
-    max_safety_area_altitude_ = 100;
-  }
-
-  int utm_origin_units;
-  param_loader.loadParam("utm_origin_units", utm_origin_units);
-  switch (utm_origin_units) {
-    case UtmUnits_t::METERS: {
-      param_loader.loadParam("utm_origin_x", ch_->utm_origin.x);
-      param_loader.loadParam("utm_origin_y", ch_->utm_origin.y);
-      break;
-    }
-    case UtmUnits_t::DEGREES: {
-                                double lat, lon;
-      param_loader.loadParam("utm_origin_lat", lat);
-      param_loader.loadParam("utm_origin_lon", lon);
-      mrs_lib::UTM(lat, lon, &ch_->utm_origin.x, &ch_->utm_origin.y);
-      break;
-    }
-    default:
-      ROS_ERROR("[%s]: invalid units: %d of utm_origin. Allowed are 0 - meters (UTM), 1 - degrees (LATLON).", getName().c_str(), utm_origin_units);
-      ros::shutdown();
-  }
-
-  // load common parameters into the common handlers structure
-  param_loader.loadParam("uav_name", ch_->uav_name);
-  param_loader.loadParam("frame_id/fcu", ch_->frames.fcu);
-  ch_->frames.ns_fcu = ch_->uav_name + "/" + ch_->frames.fcu;
-
-  param_loader.loadParam("frame_id/fcu_untilted", ch_->frames.fcu_untilted);
-  ch_->frames.ns_fcu_untilted = ch_->uav_name + "/" + ch_->frames.fcu_untilted;
-
-  param_loader.loadParam("frame_id/rtk_antenna", ch_->frames.rtk_antenna);
-  ch_->frames.ns_rtk_antenna = ch_->uav_name + "/" + ch_->frames.rtk_antenna;
-
-  ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh, getName());
-  ch_->transformer->retryLookupNewest(true);
-/*//}*/
-
-  /*//{ check version */
-  param_loader.loadParam("version", version_);
-
-  if (version_ != VERSION) {
-
-    ROS_ERROR("[%s]: the version of the binary (%s) does not match the config file (%s), please build me!", getName().c_str(), VERSION, version_.c_str());
-    ros::shutdown();
-  }
-  /*//}*/
-
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh;
-  shopts.node_name          = getName();
-  shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
-
-/*//{ wait for hw api message */
-
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
-      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
-  while (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO("[%s]: waiting for hw_api_capabilities message at topic: %s", getName().c_str(), sh_hw_api_capabilities_.topicName().c_str());
-    ros::Duration(1.0).sleep();
-  }
-
-  mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
-/*//}*/
-
-/*//{ wait for desired uav_state rate*/
-      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-  while (!sh_control_manager_diag_.hasMsg()) {
-    ROS_INFO("[%s]: waiting for control_manager_diagnostics message at topic: %s", getName().c_str(), sh_control_manager_diag_.topicName().c_str());
-    ros::Duration(1.0).sleep();
-  }
-
-  mrs_msgs::ControlManagerDiagnosticsConstPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
-  ch_->desired_uav_state_rate = control_manager_diag_msg->desired_uav_state_rate;
-  ROS_INFO("[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
-/*//}*/
-
-  /*//{ load estimators */
-  param_loader.loadParam("state_estimators", estimator_names_);
-
-  state_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
-
-  for (size_t i = 0; i < estimator_names_.size(); i++) {
-
-    const std::string estimator_name = estimator_names_[i];
-
-    // load the estimator parameters
-    std::string address;
-    param_loader.loadParam(estimator_name + "/address", address);
-
-    try {
-      ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
-      estimator_list_.push_back(state_estimator_loader_->createInstance(address.c_str()));
-    }
-    catch (pluginlib::CreateClassException& ex1) {
-      ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
-      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
-      ros::shutdown();
-    }
-    catch (pluginlib::PluginlibException& ex) {
-      ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
-      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-      ros::shutdown();
-    }
-  }
-
-  // initialize standalone height estimator
-  /* est_alt_agl_ = std::make_unique<AltGeneric>(est_alt_agl_name_, "agl_origin", Support::toSnakeCase(getName())); */
-  /* est_alt_agl_->initialize(nh, ch_); */
-  /* est_alt_agl_->setInputCoeff(0.0);  // no input, just corrections */
-
-  param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
-
-  agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
-
-  // load the estimator parameters
-  std::string address;
-  param_loader.loadParam(est_alt_agl_name_ + "/address", address);
-
-  try {
-    ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
-    est_alt_agl_ = agl_estimator_loader_->createInstance(address.c_str());
-  }
-  catch (pluginlib::CreateClassException& ex1) {
-    ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
-    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
-    ros::shutdown();
-  }
-  catch (pluginlib::PluginlibException& ex) {
-    ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
-    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-    ros::shutdown();
-  }
-
-  ROS_INFO("[%s]: estimators were loaded", getName().c_str());
-  /*//}*/
-
-  /*//{ check whether initial estimator was loaded */
-  param_loader.loadParam("initial_state_estimator", initial_estimator_name_);
-  bool initial_estimator_found = false;
-  for (auto estimator : estimator_list_) {
-    if (estimator->getName() == initial_estimator_name_) {
-      initial_estimator_      = estimator;
-      initial_estimator_found = true;
-      break;
-    }
-  }
-
-  if (!initial_estimator_found) {
-    ROS_ERROR("[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(), initial_estimator_name_.c_str());
-    ros::shutdown();
-  }
-  /*//}*/
-
-  /*//{ initialize estimators */
-  for (auto estimator : estimator_list_) {
-
-    try {
-      ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
-      estimator->initialize(nh, ch_);
-    }
-    catch (std::runtime_error& ex) {
-      ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
-      ros::shutdown();
-    }
-
-    if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
-      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator->getName().c_str());
-      ros::shutdown();
-    }
-  }
-
-  // | ----------- agl height estimator initialization ---------- |
-  try {
-    ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
-    est_alt_agl_->initialize(nh, ch_);
-  }
-  catch (std::runtime_error& ex) {
-    ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
-    ros::shutdown();
-  }
-
-  if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
-    ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
-    ros::shutdown();
-  }
-
-  ROS_INFO("[%s]: estimators were initialized", getName().c_str());
-
-  /*//}*/
-
-  /*//{ initialize publishers */
-  ph_uav_state_               = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh, "uav_state_out", 1);
-  ph_odom_main_               = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh, "odom_main_out", 1);
-  ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh, "innovation_out", 1);
-  ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh, "diagnostics_out", 1);
-  ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "max_flight_altitude_agl_out", 1);
-  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh, "height_agl_out", 1);
-
-  /*//}*/
-
-  /*//{ initialize timers */
-  timer_publish_ = nh.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerPublish, this);
-
-  timer_check_health_ = nh.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerCheckHealth, this);
-  /*//}*/
-
-  /*//{ initialize service clients */
-
-  srvch_failsafe_.initialize(nh, "failsafe_out");
-
-  /*//}*/
-
-  /*//{ initialize service servers */
-  srvs_change_estimator_ = nh.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
-  srvs_toggle_callbacks_ = nh.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
-  /*//}*/
-
-    param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
-    std::string filepath;
-    const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/scope_timer.txt";
-    ch_->scope_timer.logger = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
-
-  if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getName().c_str());
-    ros::shutdown();
-  }
-
-  sm_->changeState(StateMachine::INITIALIZED_STATE);
-
-  ROS_INFO("[%s]: initialized", getName().c_str());
+  // finish initialization in a oneshot timer, so that we don't block loading of other nodelets by the nodelet manager
+  timer_initialization_ = nh_.createTimer(ros::Rate(1.0), &EstimationManager::timerInitialization, this, true, true);
 }
 /*//}*/
 
@@ -800,6 +560,261 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   if (sm_->isInState(StateMachine::TAKING_OFF_STATE)) {
     sm_->changeState(StateMachine::FLYING_STATE);
   }
+}
+/*//}*/
+
+/*//{ timerInitialization() */
+void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEvent& event) {
+
+  mrs_lib::ParamLoader param_loader(nh_, getName());
+
+  /*//{ check version */
+  param_loader.loadParam("version", version_);
+
+  if (version_ != VERSION) {
+
+    ROS_ERROR("[%s]: the version of the binary (%s) does not match the config file (%s), please build me!", getName().c_str(), VERSION, version_.c_str());
+    ros::shutdown();
+  }
+  /*//}*/
+
+  /*//{ load parameters */
+
+  // load maximum flight altitude from safety area
+  bool use_safety_area;
+  param_loader.loadParam("safety_area/use_safety_area", use_safety_area);
+  if (use_safety_area) {
+    param_loader.loadParam("safety_area/max_height", max_safety_area_altitude_);
+  } else {
+    ROS_WARN("[%s]: NOT USING SAFETY AREA!!!", getName().c_str());
+    max_safety_area_altitude_ = 100;
+  }
+
+  int utm_origin_units;
+  param_loader.loadParam("utm_origin_units", utm_origin_units);
+  switch (utm_origin_units) {
+    case UtmUnits_t::METERS: {
+      param_loader.loadParam("utm_origin_x", ch_->utm_origin.x);
+      param_loader.loadParam("utm_origin_y", ch_->utm_origin.y);
+      break;
+    }
+    case UtmUnits_t::DEGREES: {
+      double lat, lon;
+      param_loader.loadParam("utm_origin_lat", lat);
+      param_loader.loadParam("utm_origin_lon", lon);
+      mrs_lib::UTM(lat, lon, &ch_->utm_origin.x, &ch_->utm_origin.y);
+      break;
+    }
+    default:
+      ROS_ERROR("[%s]: invalid units: %d of utm_origin. Allowed are 0 - meters (UTM), 1 - degrees (LATLON).", getName().c_str(), utm_origin_units);
+      ros::shutdown();
+  }
+
+  // load common parameters into the common handlers structure
+  param_loader.loadParam("uav_name", ch_->uav_name);
+  param_loader.loadParam("frame_id/fcu", ch_->frames.fcu);
+  ch_->frames.ns_fcu = ch_->uav_name + "/" + ch_->frames.fcu;
+
+  param_loader.loadParam("frame_id/fcu_untilted", ch_->frames.fcu_untilted);
+  ch_->frames.ns_fcu_untilted = ch_->uav_name + "/" + ch_->frames.fcu_untilted;
+
+  param_loader.loadParam("frame_id/rtk_antenna", ch_->frames.rtk_antenna);
+  ch_->frames.ns_rtk_antenna = ch_->uav_name + "/" + ch_->frames.rtk_antenna;
+
+  ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh_, getName());
+  ch_->transformer->retryLookupNewest(true);
+  /*//}*/
+
+
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = getName();
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  /*//{ wait for hw api message */
+
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
+      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+  while (!sh_hw_api_capabilities_.hasMsg()) {
+    ROS_INFO("[%s]: waiting for hw_api_capabilities message at topic: %s", getName().c_str(), sh_hw_api_capabilities_.topicName().c_str());
+    ros::Duration(1.0).sleep();
+  }
+
+  mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
+  /*//}*/
+
+  /*//{ wait for desired uav_state rate*/
+  sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  while (!sh_control_manager_diag_.hasMsg()) {
+    ROS_INFO("[%s]: waiting for control_manager_diagnostics message at topic: %s", getName().c_str(), sh_control_manager_diag_.topicName().c_str());
+    ros::Duration(1.0).sleep();
+  }
+
+  mrs_msgs::ControlManagerDiagnosticsConstPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
+  ch_->desired_uav_state_rate                                          = control_manager_diag_msg->desired_uav_state_rate;
+  ROS_INFO("[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
+  /*//}*/
+
+  /*//{ load estimators */
+  param_loader.loadParam("state_estimators", estimator_names_);
+
+  state_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
+
+  for (size_t i = 0; i < estimator_names_.size(); i++) {
+
+    const std::string estimator_name = estimator_names_[i];
+
+    // load the estimator parameters
+    std::string address;
+    param_loader.loadParam(estimator_name + "/address", address);
+
+    try {
+      ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+      estimator_list_.push_back(state_estimator_loader_->createInstance(address.c_str()));
+    }
+    catch (pluginlib::CreateClassException& ex1) {
+      ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
+      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
+      ros::shutdown();
+    }
+    catch (pluginlib::PluginlibException& ex) {
+      ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
+      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
+      ros::shutdown();
+    }
+  }
+
+  // initialize standalone height estimator
+  /* est_alt_agl_ = std::make_unique<AltGeneric>(est_alt_agl_name_, "agl_origin", Support::toSnakeCase(getName())); */
+  /* est_alt_agl_->initialize(nh, ch_); */
+  /* est_alt_agl_->setInputCoeff(0.0);  // no input, just corrections */
+
+  param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
+
+  agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
+
+  // load the estimator parameters
+  std::string address;
+  param_loader.loadParam(est_alt_agl_name_ + "/address", address);
+
+  try {
+    ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+    est_alt_agl_ = agl_estimator_loader_->createInstance(address.c_str());
+  }
+  catch (pluginlib::CreateClassException& ex1) {
+    ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
+    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
+    ros::shutdown();
+  }
+  catch (pluginlib::PluginlibException& ex) {
+    ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
+    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
+    ros::shutdown();
+  }
+
+  ROS_INFO("[%s]: estimators were loaded", getName().c_str());
+  /*//}*/
+
+  /*//{ check whether initial estimator was loaded */
+  param_loader.loadParam("initial_state_estimator", initial_estimator_name_);
+  bool initial_estimator_found = false;
+  for (auto estimator : estimator_list_) {
+    if (estimator->getName() == initial_estimator_name_) {
+      initial_estimator_      = estimator;
+      initial_estimator_found = true;
+      break;
+    }
+  }
+
+  if (!initial_estimator_found) {
+    ROS_ERROR("[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(), initial_estimator_name_.c_str());
+    ros::shutdown();
+  }
+  /*//}*/
+
+  /*//{ initialize estimators */
+  for (auto estimator : estimator_list_) {
+
+    try {
+      ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
+      estimator->initialize(nh_, ch_);
+    }
+    catch (std::runtime_error& ex) {
+      ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+      ros::shutdown();
+    }
+
+    if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
+      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator->getName().c_str());
+      ros::shutdown();
+    }
+  }
+
+  // | ----------- agl height estimator initialization ---------- |
+  try {
+    ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
+    est_alt_agl_->initialize(nh_, ch_);
+  }
+  catch (std::runtime_error& ex) {
+    ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+    ros::shutdown();
+  }
+
+  if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
+    ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
+    ros::shutdown();
+  }
+
+  ROS_INFO("[%s]: estimators were initialized", getName().c_str());
+
+  /*//}*/
+
+  /*//{ initialize publishers */
+  ph_uav_state_               = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh_, "uav_state_out", 1);
+  ph_odom_main_               = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "odom_main_out", 1);
+  ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "innovation_out", 1);
+  ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh_, "diagnostics_out", 1);
+  ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "max_flight_altitude_agl_out", 1);
+  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "height_agl_out", 1);
+
+  /*//}*/
+
+  /*//{ initialize timers */
+  timer_publish_ = nh_.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerPublish, this);
+
+  timer_check_health_ = nh_.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerCheckHealth, this);
+  /*//}*/
+
+  /*//{ initialize service clients */
+
+  srvch_failsafe_.initialize(nh_, "failsafe_out");
+
+  /*//}*/
+
+  /*//{ initialize service servers */
+  srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
+  srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
+  /*//}*/
+
+  /*//{ initialize scope timer */
+  param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
+  std::string       filepath;
+  const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/scope_timer.txt";
+  ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
+  /*//}*/
+
+  if (!param_loader.loadedSuccessfully()) {
+    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getName().c_str());
+    ros::shutdown();
+  }
+
+  sm_->changeState(StateMachine::INITIALIZED_STATE);
+
+  ROS_INFO("[%s]: initialized", getName().c_str());
 }
 /*//}*/
 
