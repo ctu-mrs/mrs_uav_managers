@@ -17,6 +17,7 @@ estimator_types: [
   "vio",
   "optflow",
   "other",
+  "ground_truth",
 ]
 
 gains: [
@@ -35,6 +36,7 @@ gain_management:
     vio: ["default"]
     optflow: ["default"]
     other: ["default"]
+    ground_truth: ["default"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -47,3 +49,4 @@ gain_management:
     vio: "default"
     optflow: "default"
     other: "default"
+    ground_truth: "default"

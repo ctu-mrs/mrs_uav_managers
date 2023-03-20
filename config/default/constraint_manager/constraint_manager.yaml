@@ -16,7 +16,8 @@ estimator_types: [
   "hector",
   "vio",
   "optflow",
-  "other"
+  "other",
+  "ground_truth",
 ]
 
 constraints: [
@@ -37,6 +38,7 @@ constraint_management:
     vio: ["slow"]
     optflow: ["slow"]
     other: ["slow"]
+    ground_truth: ["slow", "medium", "fast"]
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -49,3 +51,4 @@ constraint_management:
     vio: "slow"
     optflow: "slow"
     other: "slow"
+    ground_truth: "medium"

@@ -16,6 +16,7 @@ gain_management:
     hector: ["soft"]
     optflow: ["supersoft", "soft"]
     other: ["supersoft"]
+    ground_truth: ["supersoft", 'soft', 'tight']
 
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
@@ -28,3 +29,4 @@ gain_management:
     hector: "soft"
     optflow: "supersoft"
     other: "supersoft"
+    ground_truth: "soft"
