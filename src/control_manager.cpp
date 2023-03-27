@@ -7334,6 +7334,12 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
+  if (eland_triggered_)
+    return std::tuple(false, "cannot hover, eland already triggered");
+
+  if (failsafe_triggered_)
+    return std::tuple(false, "cannot hover, failsafe already triggered");
+
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
