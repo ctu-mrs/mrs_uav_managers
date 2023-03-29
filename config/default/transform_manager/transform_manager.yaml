@@ -31,7 +31,7 @@ fcu_untilted_tf:
   child: "fcu_untilted"
 
 # the list of additional source topics from which the tfs will be constructed 
-tf_sources: ["hw_api_raw"]
+tf_sources: ["hw_api_raw", "aloam_mapping"]
 
 # first available tf source from this list will produce the utm and world origin tfs
 utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
@@ -45,6 +45,18 @@ hw_api_raw:
   utm_based: true # if true, will publish tf to utm_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+
+aloam_mapping:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: false
+  namespace: "slam" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: false # if true, will publish tf to utm_origin
+  inverted: false # publish as inverted tf (the default for inverted mrs tf tree convention)
+  custom_frame_id:
+    enabled: true
+    frame_id: "slam_mapping_origin"
+  republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
 
 gps_garmin:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
