@@ -153,51 +153,23 @@ public:
 
   //}
 
-  /*//{ rotateTwist() */
-  static geometry_msgs::Vector3 rotateTwist(const geometry_msgs::Vector3& twist_in, const tf2::Quaternion& q_in,
-                                            const std::shared_ptr<mrs_lib::Transformer> transformer) {
+  /*//{ rotateVector() */
+  static geometry_msgs::Vector3 rotateVector(const geometry_msgs::Vector3& vec_in, const geometry_msgs::Quaternion& q_in) {
 
-    geometry_msgs::TransformStamped tf;
-    tf.header.stamp            = ros::Time::now();
-    tf.header.frame_id         = "fake_id";
-    tf.transform.translation.x = 0;
-    tf.transform.translation.y = 0;
-    tf.transform.translation.z = 0;
-    tf.transform.rotation      = tf2::toMsg(q_in);
+    Eigen::Matrix3d R = mrs_lib::AttitudeConverter(q_in);
+    Eigen::Vector3d vec_in_eigen(vec_in.x, vec_in.y, vec_in.z);
+    Eigen::Vector3d vec_eigen_rotated = R * vec_in_eigen;
 
-    geometry_msgs::PointStamped twist_stamped;
-    twist_stamped.header.stamp    = ros::Time::now();
-    twist_stamped.header.frame_id = "fake_id";
-    twist_stamped.point.x         = twist_in.x;
-    twist_stamped.point.y         = twist_in.y;
-    twist_stamped.point.z         = twist_in.z;
-
-    auto response = transformer->transform(twist_stamped, tf);
-    if (response) {
-      geometry_msgs::Vector3 twist_out;
-      twist_out.x = response.value().point.x;
-      twist_out.y = response.value().point.y;
-      twist_out.z = response.value().point.z;
-      return twist_out;
-    } else {
-      ROS_ERROR("[support]: could not rotate twist by quaternion");
-      return twist_in;
-    }
-  }
-  /*//}*/
-
-  /*//{ loadParamFile() */
-  static void loadParamFile(const std::string& file_path, const std::string& ns = "") {
-    std::string command = "rosparam load " + file_path + " " + ns;
-    int         result  = std::system(command.c_str());
-    if (result != 0) {
-      ROS_ERROR_STREAM("Could not set config file " << file_path << " to the parameter server.");
-    }
+    geometry_msgs::Vector3 vec_out;
+    vec_out.x = vec_eigen_rotated[0];
+    vec_out.y = vec_eigen_rotated[1];
+    vec_out.z = vec_eigen_rotated[2];
+    return vec_out;
   }
   /*//}*/
 
   /*//{ uavStateToOdom() */
-  static nav_msgs::Odometry uavStateToOdom(const mrs_msgs::UavState& uav_state, const std::shared_ptr<mrs_lib::Transformer>& transformer) {
+  static nav_msgs::Odometry uavStateToOdom(const mrs_msgs::UavState& uav_state) {
     nav_msgs::Odometry odom;
     odom.header              = uav_state.header;
     odom.child_frame_id      = uav_state.child_frame_id;
@@ -206,7 +178,7 @@ public:
 
     tf2::Quaternion q;
     tf2::fromMsg(odom.pose.pose.orientation, q);
-    odom.twist.twist.linear = Support::rotateTwist(uav_state.velocity.linear, q.inverse(), transformer);
+    odom.twist.twist.linear = Support::rotateVector(uav_state.velocity.linear, mrs_lib::AttitudeConverter(q.inverse()));
 
     return odom;
   }
@@ -258,6 +230,16 @@ public:
   }
 
   //}
+
+  /*//{ loadParamFile() */
+  static void loadParamFile(const std::string& file_path, const std::string& ns = "") {
+    std::string command = "rosparam load " + file_path + " " + ns;
+    int         result  = std::system(command.c_str());
+    if (result != 0) {
+      ROS_ERROR_STREAM("Could not set config file " << file_path << " to the parameter server.");
+    }
+  }
+  /*//}*/
 
   /*//{ isStringInVector() */
   static bool isStringInVector(const std::string& value, const std::vector<std::string>& str_vec) {

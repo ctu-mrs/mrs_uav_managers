@@ -448,13 +448,18 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
       mrs_msgs::UavState uav_state = active_estimator_->getUavState();
 
+      if (!Support::noNans(uav_state.pose.orientation)) {
+        ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str() );
+        return;
+      }
+
       uav_state.estimator_iteration = estimator_switch_count_;
 
       // TODO state health checks
 
       ph_uav_state_.publish(uav_state);
 
-      nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state, ch_->transformer);
+      nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state);
 
       const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
       for (size_t i = 0; i < pose_covariance.size(); i++) {

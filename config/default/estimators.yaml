@@ -6,6 +6,8 @@ rtk:
   address: "mrs_uav_state_estimators/Rtk"
 aloam:
   address: "mrs_uav_state_estimators/Aloam"
+passthrough:
+  address: "mrs_uav_state_estimators/Passthrough"
 ground_truth:
   address: "mrs_uav_state_estimators/GroundTruth"
 dummy:

@@ -27,7 +27,9 @@
 namespace mrs_uav_managers
 {
 
-using namespace estimation_manager;
+/* using namespace estimation_manager; */
+
+using namespace mrs_uav_managers::estimation_manager;
 
 class Estimator {
 

@@ -14,7 +14,6 @@
 #include <mrs_msgs/HwApiCapabilities.h>
 
 #include "estimation_manager/estimator.h"
-#include "estimation_manager/support.h"
 
 //}
 
@@ -31,7 +30,6 @@ using namespace estimation_manager;
 class StateEstimator : public Estimator {
 
 protected:
-
   const std::string package_name_ = "mrs_uav_state_estimators";
 
   ros::NodeHandle nh_;
@@ -58,7 +56,8 @@ protected:
   mutable mrs_lib::PublisherHandler<geometry_msgs::QuaternionStamped> ph_attitude_;
 
 public:
-  StateEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name) : Estimator(state::type, name, frame_id), package_name_(package_name) {
+  StateEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name)
+      : Estimator(state::type, name, frame_id), package_name_(package_name) {
   }
 
   virtual ~StateEstimator(void) {
