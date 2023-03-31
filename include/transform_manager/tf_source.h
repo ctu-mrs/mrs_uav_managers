@@ -106,13 +106,13 @@ public:
 
       /*//{ initialize subscribers */
       mrs_lib::SubscribeHandlerOptions shopts;
-      shopts.nh        = nh_;
-      shopts.node_name = getPrintName();
+      shopts.nh                 = nh_;
+      shopts.node_name          = getPrintName();
       shopts.no_message_timeout = mrs_lib::no_timeout;
-      shopts.threadsafe      = true;
-      shopts.autostart       = true;
-      shopts.queue_size      = 10;
-      shopts.transport_hints = ros::TransportHints().tcpNoDelay();
+      shopts.threadsafe         = true;
+      shopts.autostart          = true;
+      shopts.queue_size         = 10;
+      shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
       sh_tf_source_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this);
       if (tf_from_attitude_enabled_) {
@@ -211,6 +211,7 @@ private:
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>               sh_tf_source_odom_;
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_tf_source_att_;
   nav_msgs::OdometryConstPtr                                  first_msg_;
+  bool                                                        got_first_msg_ = false;
 
   /*//{ callbackTfSourceOdom()*/
   void callbackTfSourceOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
@@ -220,7 +221,10 @@ private:
     }
 
     nav_msgs::OdometryConstPtr msg = wrp.getMsg();
-    first_msg_                     = msg;
+    if (!got_first_msg_) {
+      first_msg_     = msg;
+      got_first_msg_ = true;
+    }
     publishTfFromOdom(msg);
 
     if (publish_local_tf_ && !is_local_static_tf_published_) {
@@ -256,17 +260,14 @@ private:
   /* publishTfFromOdom() //{*/
   void publishTfFromOdom(const nav_msgs::OdometryConstPtr& odom) {
 
-
-    geometry_msgs::TransformStamped tf_msg;
-    tf_msg.header.stamp = odom->header.stamp;
-
-    std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + custom_frame_id_ : odom->header.frame_id;
-
     const tf2::Transform      tf       = Support::tf2FromPose(odom->pose.pose);
     const tf2::Transform      tf_inv   = tf.inverse();
     const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
 
     /*//{ tf source origin */
+    geometry_msgs::TransformStamped tf_msg;
+    tf_msg.header.stamp         = odom->header.stamp;
+    std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + custom_frame_id_ : odom->header.frame_id;
     if (is_inverted_) {
 
       tf_msg.header.frame_id       = ch_->frames.ns_fcu;
@@ -305,31 +306,26 @@ private:
       /*//}*/
 
       /*//{ tf utm origin */
+      geometry_msgs::TransformStamped tf_utm_msg;
       if (is_utm_source_) {
-        geometry_msgs::TransformStamped tf_utm_msg;
+
+
+        geometry_msgs::Pose pose_utm = odom->pose.pose;
+        pose_utm.position.x += utm_origin_.x - first_msg_->pose.pose.position.x;
+        pose_utm.position.y += utm_origin_.y - first_msg_->pose.pose.position.y;
+
         tf_utm_msg.header.stamp    = odom->header.stamp;
         tf_utm_msg.header.frame_id = ns_utm_origin_parent_frame_id_;
         tf_utm_msg.child_frame_id  = ns_utm_origin_child_frame_id_;
 
+        tf2::Transform tf_utm;
         if (is_inverted_) {
-          tf2::Transform tf_utm;
-          tf_utm.setOrigin(tf2::Vector3(0,0,0));
-          tf_utm.setRotation(tf_inv.getRotation());
-          tf2::Vector3 utm_origin_pt(utm_origin_.x, utm_origin_.y, utm_origin_.z);
-          utm_origin_pt                    = tf_utm * utm_origin_pt;  // transform the utm_origin coordinates to fcu frame
-          tf_utm_msg.transform.translation = Support::pointToVector3(pose_inv.position);
-          tf_utm_msg.transform.translation.x -= utm_origin_pt.x();
-          tf_utm_msg.transform.translation.y -= utm_origin_pt.y();
-          tf_utm_msg.transform.translation.z -= utm_origin_pt.z();
-          tf_utm_msg.transform.rotation = pose_inv.orientation;
-
+          tf_utm = Support::tf2FromPose(pose_utm).inverse();
         } else {
-          tf_utm_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
-          tf_utm_msg.transform.translation.x += utm_origin_.x;
-          tf_utm_msg.transform.translation.y += utm_origin_.y;
-          tf_utm_msg.transform.translation.z += utm_origin_.z;
-          tf_utm_msg.transform.rotation = odom->pose.pose.orientation;
+          tf_utm = Support::tf2FromPose(pose_utm);
         }
+        tf_utm_msg.transform = Support::msgFromTf2(tf_utm);
+
         try {
           broadcaster_->sendTransform(tf_utm_msg);
           ROS_INFO_ONCE("[%s]: publishing utm_origin tf", getPrintName().c_str());
@@ -340,33 +336,20 @@ private:
       }
       /*//}*/
 
-      /*//{ tf world origin*/
+      /*//{ tf world origin */
       if (is_utm_source_) {
         geometry_msgs::TransformStamped tf_world_msg;
         tf_world_msg.header.stamp    = odom->header.stamp;
         tf_world_msg.header.frame_id = ns_world_origin_parent_frame_id_;
         tf_world_msg.child_frame_id  = ns_world_origin_child_frame_id_;
 
-        if (is_inverted_) {
-          tf2::Transform tf_world;
-          tf_world.setOrigin(tf2::Vector3(0,0,0));
-          tf_world.setRotation(tf_inv.getRotation());
+        tf2::Transform tf_world;
+        tf_world.setOrigin(tf2::Vector3(world_origin_.x, world_origin_.y, world_origin_.z));
+        tf_world.setRotation(tf2::Quaternion(0, 0, 0, 1));
 
-          tf2::Vector3 world_origin_pt(utm_origin_.x - world_origin_.x, utm_origin_.y - world_origin_.y, world_origin_.z);
-          world_origin_pt                    = tf_world * world_origin_pt;  // transform the world_origin coordinated to fcu frame
-          tf_world_msg.transform.translation = Support::pointToVector3(pose_inv.position);
-          tf_world_msg.transform.translation.x -= world_origin_pt.x();
-          tf_world_msg.transform.translation.y -= world_origin_pt.y();
-          tf_world_msg.transform.translation.z -= world_origin_pt.z();
-          tf_world_msg.transform.rotation = pose_inv.orientation;
+        tf_world_msg.transform          = Support::msgFromTf2(Support::tf2FromMsg(tf_utm_msg.transform) * tf_world);
+        tf_world_msg.transform.rotation = pose_inv.orientation;
 
-        } else {
-          tf_world_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
-          tf_world_msg.transform.translation.x += (world_origin_.x - utm_origin_.x);
-          tf_world_msg.transform.translation.y += (world_origin_.y - utm_origin_.y);
-          tf_world_msg.transform.translation.z += (world_origin_.z - utm_origin_.z);
-          tf_world_msg.transform.rotation = odom->pose.pose.orientation;
-        }
         try {
           broadcaster_->sendTransform(tf_world_msg);
           ROS_INFO_ONCE("[%s]: publishing world_origin tf", getPrintName().c_str());

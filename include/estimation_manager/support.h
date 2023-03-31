@@ -139,6 +139,31 @@ public:
 
   //}
 
+  /* msgFromTf2() //{ */
+  static geometry_msgs::Transform msgFromTf2(const tf2::Transform& tf_in) {
+
+    geometry_msgs::Transform tf_out;
+    tf_out.translation.x = tf_in.getOrigin().getX();
+    tf_out.translation.y = tf_in.getOrigin().getY();
+    tf_out.translation.z = tf_in.getOrigin().getZ();
+    tf_out.rotation = tf2::toMsg(tf_in.getRotation());
+
+    return tf_out;
+  }
+
+  //}
+  
+  /* tf2FromMsg() //{ */
+  static tf2::Transform tf2FromMsg(const geometry_msgs::Transform& tf_in) {
+
+    tf2::Transform tf_out;
+    tf_out.setOrigin(tf2::Vector3(tf_in.translation.x, tf_in.translation.y, tf_in.translation.z));
+    tf_out.setRotation(tf2::Quaternion(tf_in.rotation.x, tf_in.rotation.y, tf_in.rotation.z, tf_in.rotation.w));
+
+    return tf_out;
+  }
+
+  //}
   /* pointToVector3() //{ */
 
   static geometry_msgs::Vector3 pointToVector3(const geometry_msgs::Point& point_in) {
