@@ -13,7 +13,7 @@ gain_management:
     rtk: ["supersoft", 'soft', 'tight']
     aloam: ["soft"]
     vio: ["supersoft","soft"]
-    hector: ["soft"]
+    hector_garmin: ["soft"]
     optflow: ["supersoft", "soft"]
     other: ["supersoft"]
 
@@ -25,6 +25,6 @@ gain_management:
     rtk: "soft"
     aloam: "soft"
     vio: "supersoft"
-    hector: "soft"
+    hector_garmin: "soft"
     optflow: "supersoft"
     other: "supersoft"

@@ -74,12 +74,12 @@ public:
 
 
   // implemented methods
-  void                      publishUavState() const;
-  void                      publishOdom() const;
-  void                      publishCovariance() const;
-  void                      publishInnovation() const;
-  geometry_msgs::Quaternion rotateQuaternionByHeading(const geometry_msgs::Quaternion &q, const double hdg) const;
-  bool                      isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr &hw_api_capabilities) const;
+  void                                     publishUavState() const;
+  void                                     publishOdom() const;
+  void                                     publishCovariance() const;
+  void                                     publishInnovation() const;
+  std::optional<geometry_msgs::Quaternion> rotateQuaternionByHeading(const geometry_msgs::Quaternion &q, const double hdg) const;
+  bool                                     isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr &hw_api_capabilities) const;
 };
 
 }  // namespace mrs_uav_managers

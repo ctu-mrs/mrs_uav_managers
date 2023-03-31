@@ -6,6 +6,8 @@ rtk:
   address: "mrs_uav_state_estimators/Rtk"
 aloam:
   address: "mrs_uav_state_estimators/Aloam"
+hector_garmin:
+  address: "mrs_uav_state_estimators/HectorGarmin"
 passthrough:
   address: "mrs_uav_state_estimators/Passthrough"
 ground_truth:

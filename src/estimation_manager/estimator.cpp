@@ -122,7 +122,15 @@ void Estimator::publishDiagnostics() const {
 
 /*//{ getAccGlobal() */
 tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const geometry_msgs::Quaternion& orientation) {
-  return getAccGlobal(input_msg, mrs_lib::AttitudeConverter(orientation).getHeading());
+
+  double hdg = 0;
+  try {
+    hdg = mrs_lib::AttitudeConverter(orientation).getHeading();
+  }
+  catch (...) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: failed getting heading", getPrintName().c_str());
+  }
+  return getAccGlobal(input_msg, hdg);
 }
 
 tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const double hdg) {
@@ -183,7 +191,15 @@ std::optional<double> Estimator::getHeadingRate(const nav_msgs::OdometryConstPtr
   /* att_rate.y = odom_msg->twist.twist.angular.y; */
   /* att_rate.z = odom_msg->twist.twist.angular.z; */
 
-  return mrs_lib::AttitudeConverter(odom_msg->pose.pose.orientation).getHeadingRate(odom_msg->twist.twist.angular);
+  double hdg_rate;
+  try {
+    hdg_rate = mrs_lib::AttitudeConverter(odom_msg->pose.pose.orientation).getHeadingRate(odom_msg->twist.twist.angular);
+  }
+  catch (...) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: failed getting heading rate", getPrintName().c_str());
+    return {};
+  }
+  return hdg_rate;
 }
 /*//}*/
 

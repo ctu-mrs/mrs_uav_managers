@@ -13,8 +13,9 @@ gain_management:
     rtk: ["supersoft", 'soft', 'tight']
     aloam: ["soft"]
     vio: ["supersoft"]
-    hector: ["soft"]
+    hector_garmin: ["soft"]
     optflow: ["supersoft", "soft"]
+    ground_truth: ["supersoft", 'soft', 'tight']
     other: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
@@ -25,6 +26,7 @@ gain_management:
     rtk: "soft"
     aloam: "soft"
     vio: "supersoft"
-    hector: "soft"
+    hector_garmin: "soft"
     optflow: "supersoft"
+    ground_truth: "soft"
     other: "supersoft"

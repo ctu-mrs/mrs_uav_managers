@@ -13,7 +13,7 @@ estimator_types: [
   "gps_baro",
   "rtk",
   "aloam",
-  "hector",
+  "hector_garmin",
   "vio",
   "optflow",
   "other",
@@ -32,7 +32,7 @@ gain_management:
     gps_baro: ["default"]
     rtk: ["default"]
     aloam: ["default"]
-    hector: ["default"]
+    hector_garmin: ["default"]
     vio: ["default"]
     optflow: ["default"]
     other: ["default"]
@@ -45,7 +45,7 @@ gain_management:
     gps_baro: "default"
     rtk: "default"
     aloam: "default"
-    hector: "default"
+    hector_garmin: "default"
     vio: "default"
     optflow: "default"
     other: "default"

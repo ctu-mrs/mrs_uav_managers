@@ -13,7 +13,7 @@ estimator_types: [
   "gps_baro",
   "rtk",
   "aloam",
-  "hector",
+  "hector_garmin",
   "vio",
   "optflow",
   "other",
@@ -34,7 +34,7 @@ constraint_management:
     gps_baro: ["slow", "medium", "fast"]
     rtk: ["slow", "medium", "fast"]
     aloam: ["slow"]
-    hector: ["slow"]
+    hector_garmin: ["slow"]
     vio: ["slow"]
     optflow: ["slow"]
     other: ["slow"]
@@ -47,7 +47,7 @@ constraint_management:
     gps_baro: "medium"
     rtk: "medium"
     aloam: "slow"
-    hector: "slow"
+    hector_garmin: "slow"
     vio: "slow"
     optflow: "slow"
     other: "slow"

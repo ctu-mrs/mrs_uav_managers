@@ -35,26 +35,26 @@ void StateEstimator::publishInnovation() const {
 /*//}*/
 
 /*//{ rotateQuaternionByHeading() */
-geometry_msgs::Quaternion StateEstimator::rotateQuaternionByHeading(const geometry_msgs::Quaternion& q, const double hdg) const {
+std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeading(const geometry_msgs::Quaternion& q, const double hdg) const {
 
-  tf2::Quaternion tf2_q = mrs_lib::AttitudeConverter(q);
-
-  // Obtain heading from quaternion
-  double q_hdg = 0;
   try {
-    q_hdg = mrs_lib::AttitudeConverter(q).getHeading();
+    tf2::Quaternion tf2_q = mrs_lib::AttitudeConverter(q);
+
+    // Obtain heading from quaternion
+    double q_hdg = 0;
+    q_hdg        = mrs_lib::AttitudeConverter(q).getHeading();
+
+    // Build rotation matrix from difference between new heading and quaternion heading
+    tf2::Matrix3x3 rot_mat = mrs_lib::AttitudeConverter(Eigen::AngleAxisd(hdg - q_hdg, Eigen::Vector3d::UnitZ()));
+
+    // Transform the quaternion orientation by the rotation matrix
+    geometry_msgs::Quaternion q_new = mrs_lib::AttitudeConverter(tf2::Transform(rot_mat) * tf2_q);
+    return q_new;
   }
   catch (...) {
-    ROS_WARN("[rotateQuaternionByHeading()]: failed to getHeading() from quaternion");
+    ROS_WARN("[rotateQuaternionByHeading()]: failed to rotate quaternion by heading");
+    return {};
   }
-
-  // Build rotation matrix from difference between new heading and quaternion heading
-  tf2::Matrix3x3 rot_mat = mrs_lib::AttitudeConverter(Eigen::AngleAxisd(hdg - q_hdg, Eigen::Vector3d::UnitZ()));
-
-  // Transform the quaternion orientation by the rotation matrix
-  geometry_msgs::Quaternion q_new = mrs_lib::AttitudeConverter(tf2::Transform(rot_mat) * tf2_q);
-
-  return q_new;
 }
 /*//}*/
 

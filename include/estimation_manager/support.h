@@ -156,15 +156,20 @@ public:
   /*//{ rotateVector() */
   static geometry_msgs::Vector3 rotateVector(const geometry_msgs::Vector3& vec_in, const geometry_msgs::Quaternion& q_in) {
 
-    Eigen::Matrix3d R = mrs_lib::AttitudeConverter(q_in);
-    Eigen::Vector3d vec_in_eigen(vec_in.x, vec_in.y, vec_in.z);
-    Eigen::Vector3d vec_eigen_rotated = R * vec_in_eigen;
-
-    geometry_msgs::Vector3 vec_out;
-    vec_out.x = vec_eigen_rotated[0];
-    vec_out.y = vec_eigen_rotated[1];
-    vec_out.z = vec_eigen_rotated[2];
-    return vec_out;
+    try {
+      Eigen::Matrix3d        R = mrs_lib::AttitudeConverter(q_in);
+      Eigen::Vector3d        vec_in_eigen(vec_in.x, vec_in.y, vec_in.z);
+      Eigen::Vector3d        vec_eigen_rotated = R * vec_in_eigen;
+      geometry_msgs::Vector3 vec_out;
+      vec_out.x = vec_eigen_rotated[0];
+      vec_out.y = vec_eigen_rotated[1];
+      vec_out.z = vec_eigen_rotated[2];
+      return vec_out;
+    }
+    catch (...) {
+      ROS_ERROR_THROTTLE(1.0, "[Support::rotateVector()]: failed");
+      return vec_in;
+    }
   }
   /*//}*/
 
