@@ -42,9 +42,10 @@ hw_api_raw:
   tf_from_attitude: # used for transforming velocities before full transform is available
     enabled: false
   namespace: "hw_api" # the namespace of the topic (usually the node that publishes the topic)
-  utm_based: true # if true, will publish tf to utm_origin
-  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+  utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
+  inverted: false # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
 
 aloam_mapping:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -52,6 +53,7 @@ aloam_mapping:
     enabled: false
   namespace: "slam" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: false # publish as inverted tf (the default for inverted mrs tf tree convention)
   custom_frame_id:
     enabled: true
@@ -65,6 +67,7 @@ gps_garmin:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/gps_garmin" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -75,6 +78,7 @@ gps_baro:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/gps_baro" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -85,6 +89,7 @@ rtk:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/rtk" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: true # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -95,6 +100,18 @@ aloam:
     attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
   namespace: "estimation_manager/aloam" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
+  inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+
+hector_garmin:
+  odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+  tf_from_attitude: # used for transforming velocities before full transform is available
+    enabled: true
+    attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+  namespace: "estimation_manager/hector_garmin" # the namespace of the topic (usually the node that publishes the topic)
+  utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -104,6 +121,7 @@ passthrough:
     enabled: false
   namespace: "estimation_manager/passthrough" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
@@ -113,5 +131,6 @@ ground_truth:
     enabled: false
   namespace: "estimation_manager/ground_truth" # the namespace of the topic (usually the node that publishes the topic)
   utm_based: false # if true, will publish tf to utm_origin
+  publish_local_tf: false # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames

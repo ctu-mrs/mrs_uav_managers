@@ -62,6 +62,7 @@ public:
 
       /* coordinate frames origins //{ */
       param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
+      param_loader.loadParam(getName() + "/publish_local_tf", publish_local_tf_);
 
       /*//{ utm source */
       if (is_utm_source_) {
@@ -175,6 +176,7 @@ private:
   bool is_inverted_;
 
   bool        is_utm_based_;
+  bool        publish_local_tf_;
   bool        is_in_utm_     = false;
   bool        is_utm_source_ = false;
   std::string ns_utm_origin_parent_frame_id_;
@@ -221,7 +223,7 @@ private:
     first_msg_                     = msg;
     publishTfFromOdom(msg);
 
-    if (!is_local_static_tf_published_) {
+    if (publish_local_tf_ && !is_local_static_tf_published_) {
       publishLocalTf(msg->header.frame_id);
     }
 
