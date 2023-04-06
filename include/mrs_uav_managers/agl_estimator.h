@@ -37,9 +37,11 @@ protected:
   ros::NodeHandle nh_;
 
   mrs_msgs::Float64Stamped agl_height_;
+  mrs_msgs::Float64Stamped agl_height_init_;
   mutable std::mutex       mtx_agl_height_;
 
   mrs_msgs::Float64ArrayStamped agl_height_cov_;
+  mrs_msgs::Float64ArrayStamped agl_height_cov_init_;
   mutable std::mutex            mtx_agl_height_cov_;
 
   bool is_override_frame_id_ = false;

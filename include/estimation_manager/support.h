@@ -164,6 +164,7 @@ public:
   }
 
   //}
+ 
   /* pointToVector3() //{ */
 
   static geometry_msgs::Vector3 pointToVector3(const geometry_msgs::Point& point_in) {

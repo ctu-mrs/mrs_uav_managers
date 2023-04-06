@@ -3,34 +3,80 @@
 namespace mrs_uav_managers
 {
 
+
+/*//{ getUavState() */
+mrs_msgs::UavState StateEstimator::getUavState() {
+
+  if (!isRunning()) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: getUavState() was called before estimators running", getPrintName().c_str());
+    return mrs_msgs::UavState();
+  }
+
+  return mrs_lib::get_mutexed(mtx_uav_state_, uav_state_);
+}
+/*//}*/
+
+/*//{ getInnovation() */
+nav_msgs::Odometry StateEstimator::getInnovation() const {
+  return mrs_lib::get_mutexed(mtx_innovation_, innovation_);
+}
+/*//}*/
+
+/*//{ getPoseCovariance() */
+std::vector<double> StateEstimator::getPoseCovariance() const {
+  return mrs_lib::get_mutexed(mtx_covariance_, pose_covariance_.values);
+}
+/*//}*/
+
+/*//{ getTwistCovariance() */
+std::vector<double> StateEstimator::getTwistCovariance() const {
+  return mrs_lib::get_mutexed(mtx_covariance_, twist_covariance_.values);
+}
+/*//}*/
+
 /*//{ publishUavState() */
 void StateEstimator::publishUavState() const {
-  std::scoped_lock lock(mtx_uav_state_);
-  ph_uav_state_.publish(uav_state_);
+
+  if (!ch_->debug_topics.state) {
+    return;
+  }
+
+  auto uav_state = mrs_lib::get_mutexed(mtx_uav_state_, uav_state_);
+  ph_uav_state_.publish(uav_state);
 }
 /*//}*/
 
 /*//{ publishOdom() */
 void StateEstimator::publishOdom() const {
 
-  std::scoped_lock lock(mtx_odom_);
-  ph_odom_.publish(odom_);
+  auto odom = mrs_lib::get_mutexed(mtx_odom_, odom_);
+  ph_odom_.publish(odom);
 }
 /*//}*/
 
 /*//{ publishCovariance() */
 void StateEstimator::publishCovariance() const {
-  std::scoped_lock lock(mtx_covariance_);
-  ph_pose_covariance_.publish(pose_covariance_);
-  ph_twist_covariance_.publish(twist_covariance_);
+
+  if (!ch_->debug_topics.covariance) {
+    return;
+  }
+
+  auto pose_cov = mrs_lib::get_mutexed(mtx_covariance_, pose_covariance_);
+  auto twist_cov = mrs_lib::get_mutexed(mtx_covariance_, twist_covariance_);
+  ph_pose_covariance_.publish(pose_cov);
+  ph_twist_covariance_.publish(twist_cov);
 }
 /*//}*/
 
 /*//{ publishInnovation() */
 void StateEstimator::publishInnovation() const {
 
-  std::scoped_lock lock(mtx_innovation_);
-  ph_innovation_.publish(innovation_);
+  if (!ch_->debug_topics.innovation) {
+    return;
+  }
+
+  auto innovation = mrs_lib::get_mutexed(mtx_innovation_, innovation_);
+  ph_innovation_.publish(innovation);
 }
 /*//}*/
 

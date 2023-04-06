@@ -5,16 +5,18 @@ namespace mrs_uav_managers
 
 /*//{ publishAglHeight() */
 void AglEstimator::publishAglHeight() const {
-
-  std::scoped_lock lock(mtx_agl_height_);
-  ph_agl_height_.publish(agl_height_);
+  ph_agl_height_.publish(mrs_lib::get_mutexed(mtx_agl_height_, agl_height_));
 }
 /*//}*/
 
 /*//{ publishCovariance() */
 void AglEstimator::publishCovariance() const {
-  std::scoped_lock lock(mtx_agl_height_cov_);
-  ph_agl_height_cov_.publish(agl_height_cov_);
+  
+  if (!ch_->debug_topics.covariance) {
+    return;
+  }
+
+  ph_agl_height_cov_.publish(mrs_lib::get_mutexed(mtx_agl_height_, agl_height_cov_));
 }
 /*//}*/
 

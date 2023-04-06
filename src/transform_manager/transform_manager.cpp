@@ -48,6 +48,7 @@ public:
     ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
 
     ch_->nodelet_name = nodelet_name_;
+    ch_->package_name = package_name_;
   }
 
   void onInit();
@@ -57,6 +58,7 @@ public:
   std::string getPrintName() const;
 
 private:
+  const std::string package_name_ = "mrs_uav_managers";
   const std::string nodelet_name_ = "TransformManager";
   const std::string name_         = "transform_manager";
 
@@ -154,6 +156,13 @@ void TransformManager::onInit() {
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
   }
+
+  /*//{ initialize scope timer */
+  param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
+  std::string       filepath;
+  const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/transform_manager_scope_timer.txt";
+  ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
+  /*//}*/
 
   world_origin_.x = world_origin_x;
   world_origin_.y = world_origin_y;
@@ -272,6 +281,8 @@ void TransformManager::onInit() {
 /*//{ callbackUavState() */
 
 void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
+
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   // obtain first frame_id
   mrs_msgs::UavStateConstPtr msg = wrp.getMsg();
@@ -420,6 +431,8 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
 /*//{ callbackHwApiOrientation() */
 void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
   geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
 
   if (publish_fcu_untilted_tf_) {
@@ -430,6 +443,8 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 
 /*//{ callbackGnss() */
 void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   if (!got_utm_offset_) {
 
@@ -469,6 +484,8 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
 /*//{ publishFcuUntiltedTf() */
 void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
   double heading;
 
   try {
@@ -478,12 +495,15 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
     ROS_ERROR("[%s]: Exception caught during getting heading", getPrintName().c_str());
     return;
   }
+  scope_timer.checkpoint("heading");
 
   const Eigen::Matrix3d odom_pixhawk_R = mrs_lib::AttitudeConverter(msg->quaternion);
   const Eigen::Matrix3d undo_heading_R = mrs_lib::AttitudeConverter(Eigen::AngleAxis(-heading, Eigen::Vector3d(0, 0, 1)));
 
   const tf2::Quaternion q     = mrs_lib::AttitudeConverter(undo_heading_R * odom_pixhawk_R);
   const tf2::Quaternion q_inv = q.inverse();
+
+  scope_timer.checkpoint("q inverse");
 
   geometry_msgs::TransformStamped tf;
   tf.header.stamp            = msg->header.stamp;  // TODO(petrlmat) ros::Time::now()?
@@ -494,11 +514,13 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
   tf.transform.translation.z = 0.0;
   tf.transform.rotation      = mrs_lib::AttitudeConverter(q_inv);
 
+  scope_timer.checkpoint("tf fill");
   if (Support::noNans(tf)) {
     broadcaster_->sendTransform(tf);
   } else {
     ROS_ERROR_THROTTLE(1.0, "[%s]: NaN encountered in fcu_untilted tf", getPrintName().c_str());
   }
+  scope_timer.checkpoint("tf pub");
 }
 /*//}*/
 

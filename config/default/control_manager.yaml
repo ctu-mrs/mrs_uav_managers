@@ -12,7 +12,7 @@ trackers : [
 #- list of names of dynamically loaded controllers
 controllers : [
   "Se3Controller",
-  "MpcController",
+  # "MpcController",
   "FailsafeController",
   "EmergencyController",
 ]
@@ -280,5 +280,5 @@ pirouette:
 
 scope_timer:
 
-  enabled: false
-  log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+  enabled: true
+  log_filename: "/tmp/control_manager_scope_timer.txt" # if empty, scope timers output to terminal; otherwise log to file

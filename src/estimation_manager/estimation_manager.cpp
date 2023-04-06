@@ -78,34 +78,30 @@ public:
   }
 
   bool isInState(const SMState_t& state) const {
-    std::scoped_lock lock(mtx_state_);
-    return state == current_state_;
+    return mrs_lib::get_mutexed(mtx_state_, current_state_) == state;
   }
 
   bool isInitialized() const {
-    std::scoped_lock lock(mtx_state_);
-    return current_state_ != UNINITIALIZED_STATE;
+    return mrs_lib::get_mutexed(mtx_state_, current_state_) != UNINITIALIZED_STATE;
   }
 
   bool isInPublishableState() const {
-    std::scoped_lock lock(mtx_state_);
-    return current_state_ == READY_FOR_TAKEOFF_STATE || current_state_ == TAKING_OFF_STATE || current_state_ == HOVER_STATE || current_state_ == FLYING_STATE ||
-           current_state_ == LANDING_STATE || current_state_ == DUMMY_STATE;
+    const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
+    return current_state == READY_FOR_TAKEOFF_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+           current_state == LANDING_STATE || current_state == DUMMY_STATE;
   }
 
   bool isInTheAir() const {
-    std::scoped_lock lock(mtx_state_);
-    return current_state_ == TAKING_OFF_STATE || current_state_ == HOVER_STATE || current_state_ == FLYING_STATE || current_state_ == LANDING_STATE;
+    const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
+    return current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE || current_state == LANDING_STATE;
   }
 
   SMState_t getCurrentState() const {
-    std::scoped_lock lock(mtx_state_);
-    return current_state_;
+    return mrs_lib::get_mutexed(mtx_state_, current_state_);
   }
 
   std::string getCurrentStateString() const {
-    std::scoped_lock lock(mtx_state_);
-    return sm_state_names_[current_state_];
+    return mrs_lib::get_mutexed(mtx_state_, sm_state_names_[current_state_]);
   }
 
   std::string getStateAsString(const SMState_t& state) const {
@@ -438,9 +434,10 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       diagnostics.header.frame_id         = "";
       diagnostics.current_state_estimator = "";
     }
+    scope_timer.checkpoint("diag fill");
     ph_max_flight_altitude_agl_.publish(max_altitude_msg);
 
-    scope_timer.checkpoint("msg fill");
+    scope_timer.checkpoint("agl pub");
     ph_diagnostics_.publish(diagnostics);
     scope_timer.checkpoint("diag pub");
 
@@ -449,18 +446,21 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       mrs_msgs::UavState uav_state = active_estimator_->getUavState();
 
       if (!Support::noNans(uav_state.pose.orientation)) {
-        ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str() );
+        ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
         return;
       }
 
       uav_state.estimator_iteration = estimator_switch_count_;
 
+      scope_timer.checkpoint("get uav state");
       // TODO state health checks
 
       ph_uav_state_.publish(uav_state);
 
+      scope_timer.checkpoint("pub uav state");
       nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state);
 
+      scope_timer.checkpoint("uav state to odom");
       const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
       for (size_t i = 0; i < pose_covariance.size(); i++) {
         odom_main.pose.covariance[i] = pose_covariance[i];
@@ -471,6 +471,7 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
         odom_main.twist.covariance[i] = twist_covariance[i];
       }
 
+      scope_timer.checkpoint("get covariance");
       ph_odom_main_.publish(odom_main);
 
       nav_msgs::Odometry innovation = active_estimator_->getInnovation();
@@ -495,6 +496,8 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   if (!sm_->isInitialized()) {
     return;
   }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerCheckHealth", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   /*//{ start ready estimators, check switchable estimators */
   switchable_estimator_names_.clear();
@@ -584,6 +587,14 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ load parameters */
+  param_loader.loadParam("debug_topics/input", ch_->debug_topics.input);
+  param_loader.loadParam("debug_topics/output", ch_->debug_topics.output);
+  param_loader.loadParam("debug_topics/state", ch_->debug_topics.state);
+  param_loader.loadParam("debug_topics/covariance", ch_->debug_topics.covariance);
+  param_loader.loadParam("debug_topics/innovation", ch_->debug_topics.innovation);
+  param_loader.loadParam("debug_topics/diagnostics", ch_->debug_topics.diag);
+  param_loader.loadParam("debug_topics/correction", ch_->debug_topics.correction);
+  param_loader.loadParam("debug_topics/correction_delay", ch_->debug_topics.corr_delay);
 
   // load maximum flight altitude from safety area
   bool use_safety_area;
@@ -700,25 +711,28 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
 
-  agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
+  if (est_alt_agl_name_ != "") {
 
-  // load the estimator parameters
-  std::string address;
-  param_loader.loadParam(est_alt_agl_name_ + "/address", address);
+    agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
 
-  try {
-    ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
-    est_alt_agl_ = agl_estimator_loader_->createInstance(address.c_str());
-  }
-  catch (pluginlib::CreateClassException& ex1) {
-    ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
-    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
-    ros::shutdown();
-  }
-  catch (pluginlib::PluginlibException& ex) {
-    ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
-    ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-    ros::shutdown();
+    // load the estimator parameters
+    std::string address;
+    param_loader.loadParam(est_alt_agl_name_ + "/address", address);
+
+    try {
+      ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+      est_alt_agl_ = agl_estimator_loader_->createInstance(address.c_str());
+    }
+    catch (pluginlib::CreateClassException& ex1) {
+      ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
+      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
+      ros::shutdown();
+    }
+    catch (pluginlib::PluginlibException& ex) {
+      ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
+      ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
+      ros::shutdown();
+    }
   }
 
   ROS_INFO("[%s]: estimators were loaded", getName().c_str());
@@ -779,12 +793,12 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ initialize publishers */
-  ph_uav_state_               = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh_, "uav_state_out", 1);
-  ph_odom_main_               = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "odom_main_out", 1);
-  ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "innovation_out", 1);
-  ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh_, "diagnostics_out", 1);
-  ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "max_flight_altitude_agl_out", 1);
-  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "height_agl_out", 1);
+  ph_uav_state_               = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh_, "uav_state_out", 10);
+  ph_odom_main_               = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "odom_main_out", 10);
+  ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "innovation_out", 10);
+  ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh_, "diagnostics_out", 10);
+  ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "max_flight_altitude_agl_out", 10);
+  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "height_agl_out", 10);
 
   /*//}*/
 

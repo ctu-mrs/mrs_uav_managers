@@ -6629,8 +6629,9 @@ void ControlManager::publishDiagnostics(void) {
   }
 
   // | ------------------------- publish ------------------------ |
-
+  timer.checkpoint("before pub");
   ph_diagnostics_.publish(diagnostics_msg);
+  timer.checkpoint("after pub");
 }
 
 //}

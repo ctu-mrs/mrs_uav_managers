@@ -109,6 +109,10 @@ double Estimator::getMaxFlightAltitudeAgl(void) const {
 /*//{ publishDiagnostics() */
 void Estimator::publishDiagnostics() const {
 
+  if (!ch_->debug_topics.diag) {
+    return;
+  }
+
   mrs_msgs::EstimatorDiagnostics msg;
   msg.header.stamp       = ros::Time::now();
   msg.header.frame_id    = getFrameId();
@@ -136,18 +140,18 @@ tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& i
 tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const double hdg) {
 
   // untilt the desired acceleration vector
-  geometry_msgs::PointStamped des_acc;
+  geometry_msgs::Vector3Stamped des_acc;
   geometry_msgs::Vector3      des_acc_untilted;
-  des_acc.point.x         = input_msg->control_acceleration.x;
-  des_acc.point.y         = input_msg->control_acceleration.y;
-  des_acc.point.z         = input_msg->control_acceleration.z;
+  des_acc.vector.x         = input_msg->control_acceleration.x;
+  des_acc.vector.y         = input_msg->control_acceleration.y;
+  des_acc.vector.z         = input_msg->control_acceleration.z;
   des_acc.header.frame_id = ch_->frames.ns_fcu;
   des_acc.header.stamp    = input_msg->header.stamp;
   auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);
   if (response_acc) {
-    des_acc_untilted.x = response_acc.value().point.x;
-    des_acc_untilted.y = response_acc.value().point.y;
-    des_acc_untilted.z = response_acc.value().point.z;
+    des_acc_untilted.x = response_acc.value().vector.x;
+    des_acc_untilted.y = response_acc.value().vector.y;
+    des_acc_untilted.z = response_acc.value().vector.z;
   } else {
     ROS_WARN_THROTTLE(1.0, "[%s]: Transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
                       ch_->frames.ns_fcu_untilted.c_str());

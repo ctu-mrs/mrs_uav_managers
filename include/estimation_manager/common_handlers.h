@@ -28,6 +28,18 @@ struct UtmOrigin_t
   double y;
 };
 
+struct DebugTopics_t
+{
+  bool input;
+  bool output;
+  bool state;
+  bool covariance;
+  bool innovation;
+  bool diag;
+  bool correction;
+  bool corr_delay;
+};
+
 struct ScopeTimer_t
 {
   bool                                       enabled;
@@ -45,6 +57,7 @@ struct CommonHandlers_t
   double                                desired_uav_state_rate;
   UtmOrigin_t                           utm_origin;
   ScopeTimer_t                          scope_timer;
+  DebugTopics_t                         debug_topics;
 };
 
 }  // namespace estimation_manager

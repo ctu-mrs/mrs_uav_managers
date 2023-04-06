@@ -35,12 +35,14 @@ protected:
   ros::NodeHandle nh_;
 
   mrs_msgs::UavState uav_state_;
+  mrs_msgs::UavState uav_state_init_;
   mutable std::mutex mtx_uav_state_;
 
   nav_msgs::Odometry odom_;
   mutable std::mutex mtx_odom_;
 
   nav_msgs::Odometry innovation_;
+  nav_msgs::Odometry innovation_init_;
   mutable std::mutex mtx_innovation_;
 
   mrs_msgs::Float64ArrayStamped pose_covariance_, twist_covariance_;
@@ -64,16 +66,20 @@ public:
   }
 
   // virtual methods
-  virtual mrs_msgs::UavState  getUavState() const        = 0;
-  virtual nav_msgs::Odometry  getInnovation() const      = 0;
-  virtual std::vector<double> getPoseCovariance() const  = 0;
-  virtual std::vector<double> getTwistCovariance() const = 0;
+  /* virtual mrs_msgs::UavState  getUavState()              = 0; */
+  /* virtual nav_msgs::Odometry  getInnovation() const      = 0; */
+  /* virtual std::vector<double> getPoseCovariance() const  = 0; */
+  /* virtual std::vector<double> getTwistCovariance() const = 0; */
   /* virtual std::string         getPackageName() const     = 0; */
 
   virtual bool setUavState(const mrs_msgs::UavState &uav_state) = 0;
 
 
   // implemented methods
+  mrs_msgs::UavState  getUavState();
+  nav_msgs::Odometry  getInnovation() const;
+  std::vector<double> getPoseCovariance() const;
+  std::vector<double> getTwistCovariance() const;
   void                                     publishUavState() const;
   void                                     publishOdom() const;
   void                                     publishCovariance() const;

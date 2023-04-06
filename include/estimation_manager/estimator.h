@@ -16,6 +16,7 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/param_loader.h>
+#include <mrs_lib/mutex.h>
 
 
 #include "estimation_manager/types.h"

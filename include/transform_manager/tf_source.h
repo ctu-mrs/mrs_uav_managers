@@ -220,23 +220,32 @@ private:
       return;
     }
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::callbackTfSourceOdom", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
     nav_msgs::OdometryConstPtr msg = wrp.getMsg();
+    scope_timer.checkpoint("get msg");
+
     if (!got_first_msg_) {
       first_msg_     = msg;
       got_first_msg_ = true;
     }
+
     publishTfFromOdom(msg);
+    scope_timer.checkpoint("pub tf");
 
     if (publish_local_tf_ && !is_local_static_tf_published_) {
       publishLocalTf(msg->header.frame_id);
+    scope_timer.checkpoint("pub local tf");
     }
 
     if (is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) {
       publishUtmTf(msg->header.frame_id);
+    scope_timer.checkpoint("pub utm tf");
     }
 
     if (is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) {
       publishWorldTf(msg->header.frame_id);
+    scope_timer.checkpoint("pub world tf");
     }
 
     for (auto republisher : republishers_) {
@@ -252,13 +261,18 @@ private:
       return;
     }
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::callbackTfSourceAtt", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
     geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
+    scope_timer.checkpoint("get msg");
     publishTfFromAtt(msg);
   }
   /*//}*/
 
   /* publishTfFromOdom() //{*/
   void publishTfFromOdom(const nav_msgs::OdometryConstPtr& odom) {
+
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishTfFromOdom", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     const tf2::Transform      tf       = Support::tf2FromPose(odom->pose.pose);
     const tf2::Transform      tf_inv   = tf.inverse();
@@ -373,6 +387,8 @@ private:
   /* publishTfFromAtt() //{*/
   void publishTfFromAtt(const geometry_msgs::QuaternionStampedConstPtr& msg) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishTfFromAtt", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp = msg->header.stamp;
 
@@ -398,7 +414,9 @@ private:
 
     if (Support::noNans(tf_msg)) {
       try {
+        scope_timer.checkpoint("before pub");
         broadcaster_->sendTransform(tf_msg);
+        scope_timer.checkpoint("after pub");
       }
       catch (...) {
         ROS_ERROR("exception caught ");
@@ -415,6 +433,7 @@ private:
   /* publishLocalTf() //{*/
   void publishLocalTf(const std::string& frame_id) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp = ros::Time::now();
@@ -444,6 +463,7 @@ private:
   /* publishUtmTf() //{*/
   void publishUtmTf(const std::string& frame_id) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishUtmTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp = ros::Time::now();
@@ -478,6 +498,7 @@ private:
   /* publishWorldTf() //{*/
   void publishWorldTf(const std::string& frame_id) {
 
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishWorldTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp = ros::Time::now();
@@ -511,6 +532,8 @@ private:
 
   /* republishInFrame() //{*/
   void republishInFrame(const nav_msgs::OdometryConstPtr& msg, const std::string& frame_id, mrs_lib::PublisherHandler<nav_msgs::Odometry>& ph) {
+
+    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::republishInFrame", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     nav_msgs::Odometry msg_out = *msg;
     msg_out.header.frame_id    = frame_id;

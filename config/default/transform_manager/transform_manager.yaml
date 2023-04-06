@@ -1,17 +1,20 @@
 version: "0.0.0.1"
 
+scope_timer:
+  enabled: false
+
 local_origin_tf:
   enabled: true # local_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "local_origin"
 
 stable_origin_tf:
-  enabled: true # stable_origin tf should be published by default unless some other node already publishes it
+  enabled: false # stable_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "stable_origin"
 
 fixed_origin_tf:
-  enabled: true # fixed_origin tf should be published by default unless some other node already publishes it
+  enabled: false # fixed_origin tf should be published by default unless some other node already publishes it
   parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
   child: "fixed_origin"
 
@@ -31,7 +34,8 @@ fcu_untilted_tf:
   child: "fcu_untilted"
 
 # the list of additional source topics from which the tfs will be constructed 
-tf_sources: ["hw_api_raw", "aloam_mapping"]
+# tf_sources: ["hw_api_raw", "aloam_mapping"]
+tf_sources: []
 
 # first available tf source from this list will produce the utm and world origin tfs
 utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
@@ -69,7 +73,8 @@ gps_garmin:
   utm_based: true # if true, will publish tf to utm_origin
   publish_local_tf: true # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+  # republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
 gps_baro:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -80,7 +85,7 @@ gps_baro:
   utm_based: true # if true, will publish tf to utm_origin
   publish_local_tf: true # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
 rtk:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -91,7 +96,7 @@ rtk:
   utm_based: true # if true, will publish tf to utm_origin
   publish_local_tf: true # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
-  republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
+  republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 
 aloam:
   odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
