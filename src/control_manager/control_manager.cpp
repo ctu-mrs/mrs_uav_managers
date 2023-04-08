@@ -2619,8 +2619,6 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         position_error_ = Eigen::Vector3d::Zero(3);
       }
 
-      position_error_ = Eigen::Vector3d::Zero(3);
-
       position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
     }
   }
