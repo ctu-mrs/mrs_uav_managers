@@ -6629,6 +6629,7 @@ void ControlManager::publishDiagnostics(void) {
   }
 
   // | ------------------------- publish ------------------------ |
+
   ph_diagnostics_.publish(diagnostics_msg);
 }
 
