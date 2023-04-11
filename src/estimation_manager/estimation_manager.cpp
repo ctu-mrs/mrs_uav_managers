@@ -340,15 +340,13 @@ private:
   // | ------------- dynamic loading of estimators ------------- |
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
   std::vector<std::string>                                                  estimator_names_;         // list of estimator names
-  /* std::map<std::string, EstimatorParams>                               estimator_params_;        // map between estimator names and estimator params */
-  std::vector<boost::shared_ptr<mrs_uav_managers::StateEstimator>> estimator_list_;  // list of estimators
-  std::mutex                                                       mutex_estimator_list_;
-  std::vector<std::string>                                         switchable_estimator_names_;
-  /* int                                                                      active_estimator_idx_; */
-  std::string                                         initial_estimator_name_ = "UNDEFINED_INITIAL_ESTIMATOR";
-  boost::shared_ptr<mrs_uav_managers::StateEstimator> initial_estimator_;
-  boost::shared_ptr<mrs_uav_managers::StateEstimator> active_estimator_;
-  std::mutex                                          mutex_active_estimator_;
+  std::vector<boost::shared_ptr<mrs_uav_managers::StateEstimator>>          estimator_list_;          // list of estimators
+  std::mutex                                                                mutex_estimator_list_;
+  std::vector<std::string>                                                  switchable_estimator_names_;
+  std::string                                                               initial_estimator_name_ = "UNDEFINED_INITIAL_ESTIMATOR";
+  boost::shared_ptr<mrs_uav_managers::StateEstimator>                       initial_estimator_;
+  boost::shared_ptr<mrs_uav_managers::StateEstimator>                       active_estimator_;
+  std::mutex                                                                mutex_active_estimator_;
 
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
@@ -411,8 +409,7 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     if (active_estimator_ && active_estimator_->isInitialized()) {
       max_flight_altitude_agl = std::min(max_flight_altitude_agl, active_estimator_->getMaxFlightAltitudeAgl());
     }
-
-    scope_timer.checkpoint("agl");
+    scope_timer.checkpoint("get max flight altitude");
 
     // publish diagnostics
     mrs_msgs::Float64Stamped max_altitude_msg;
@@ -437,7 +434,7 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     scope_timer.checkpoint("diag fill");
     ph_max_flight_altitude_agl_.publish(max_altitude_msg);
 
-    scope_timer.checkpoint("agl pub");
+    scope_timer.checkpoint("max flight pub");
     ph_diagnostics_.publish(diagnostics);
     scope_timer.checkpoint("diag pub");
 
@@ -675,7 +672,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   ROS_INFO("[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
   /*//}*/
 
-  /*//{ load estimators */
+  /*//{ load state estimator plugins */
   param_loader.loadParam("state_estimators", estimator_names_);
 
   state_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
@@ -704,11 +701,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     }
   }
 
-  // initialize standalone height estimator
-  /* est_alt_agl_ = std::make_unique<AltGeneric>(est_alt_agl_name_, "agl_origin", Support::toSnakeCase(getName())); */
-  /* est_alt_agl_->initialize(nh, ch_); */
-  /* est_alt_agl_->setInputCoeff(0.0);  // no input, just corrections */
-
+  /*//{ load agl estimator plugins */
   param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
 
   if (est_alt_agl_name_ != "") {
@@ -734,7 +727,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
       ros::shutdown();
     }
   }
-
+  /*//}*/
   ROS_INFO("[%s]: estimators were loaded", getName().c_str());
   /*//}*/
 

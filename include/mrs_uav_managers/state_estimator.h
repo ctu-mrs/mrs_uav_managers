@@ -65,21 +65,13 @@ public:
   virtual ~StateEstimator(void) {
   }
 
-  // virtual methods
-  /* virtual mrs_msgs::UavState  getUavState()              = 0; */
-  /* virtual nav_msgs::Odometry  getInnovation() const      = 0; */
-  /* virtual std::vector<double> getPoseCovariance() const  = 0; */
-  /* virtual std::vector<double> getTwistCovariance() const = 0; */
-  /* virtual std::string         getPackageName() const     = 0; */
-
   virtual bool setUavState(const mrs_msgs::UavState &uav_state) = 0;
 
-
   // implemented methods
-  mrs_msgs::UavState  getUavState();
-  nav_msgs::Odometry  getInnovation() const;
-  std::vector<double> getPoseCovariance() const;
-  std::vector<double> getTwistCovariance() const;
+  mrs_msgs::UavState                       getUavState();
+  nav_msgs::Odometry                       getInnovation() const;
+  std::vector<double>                      getPoseCovariance() const;
+  std::vector<double>                      getTwistCovariance() const;
   void                                     publishUavState() const;
   void                                     publishOdom() const;
   void                                     publishCovariance() const;

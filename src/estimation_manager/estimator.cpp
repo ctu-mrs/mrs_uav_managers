@@ -125,28 +125,32 @@ void Estimator::publishDiagnostics() const {
 /*//}*/
 
 /*//{ getAccGlobal() */
-tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const geometry_msgs::Quaternion& orientation) {
+tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::Imu::ConstPtr& input_msg, const double hdg) {
 
-  double hdg = 0;
-  try {
-    hdg = mrs_lib::AttitudeConverter(orientation).getHeading();
-  }
-  catch (...) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: failed getting heading", getPrintName().c_str());
-  }
-  return getAccGlobal(input_msg, hdg);
+  geometry_msgs::Vector3Stamped acc_stamped;
+  acc_stamped.vector = input_msg->linear_acceleration;
+  acc_stamped.header = input_msg->header;
+  return getAccGlobal(acc_stamped, hdg);
 }
 
 tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const double hdg) {
 
+  geometry_msgs::Vector3Stamped acc_stamped;
+  acc_stamped.vector = input_msg->control_acceleration;
+  acc_stamped.header = input_msg->header;
+  return getAccGlobal(acc_stamped, hdg);
+}
+
+tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::Vector3Stamped& acc_stamped, const double hdg) {
+
   // untilt the desired acceleration vector
   geometry_msgs::Vector3Stamped des_acc;
   geometry_msgs::Vector3      des_acc_untilted;
-  des_acc.vector.x         = input_msg->control_acceleration.x;
-  des_acc.vector.y         = input_msg->control_acceleration.y;
-  des_acc.vector.z         = input_msg->control_acceleration.z;
+  des_acc.vector.x         = acc_stamped.vector.x;
+  des_acc.vector.y         = acc_stamped.vector.y;
+  des_acc.vector.z         = acc_stamped.vector.z;
   des_acc.header.frame_id = ch_->frames.ns_fcu;
-  des_acc.header.stamp    = input_msg->header.stamp;
+  des_acc.header.stamp    = acc_stamped.header.stamp;
   auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);
   if (response_acc) {
     des_acc_untilted.x = response_acc.value().vector.x;
@@ -165,35 +169,7 @@ tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& i
 /*//}*/
 
 /*//{ getHeadingRate() */
-/* std::optional<double> Estimator::getHeadingRate(const geometry_msgs::Vector3& att_rate) { */
-
-/*   // untilt the */
-/*   geometry_msgs::PointStamped des_acc; */
-/*   geometry_msgs::Vector3      des_acc_untilted; */
-/*   des_acc.point.x         = input_msg->control_acceleration.x; */
-/*   des_acc.point.y         = input_msg->control_acceleration.y; */
-/*   des_acc.point.z         = input_msg->control_acceleration.z; */
-/*   des_acc.header.frame_id = ch_->frames.ns_fcu; */
-/*   des_acc.header.stamp    = input_msg->header.stamp; */
-/*   auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted); */
-/*   if (response_acc) { */
-/*     des_acc_untilted.x = response_acc.value().point.x; */
-/*     des_acc_untilted.y = response_acc.value().point.y; */
-/*     des_acc_untilted.z = response_acc.value().point.z; */
-/*   } else { */
-/*     ROS_WARN_THROTTLE(1.0, "[%s]: Transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
- * ch_->frames.ns_fcu_untilted.c_str()); */
-/*   } */
-
-/*   return hdg_rate; */
-/* } */
-
 std::optional<double> Estimator::getHeadingRate(const nav_msgs::OdometryConstPtr& odom_msg) {
-
-  /* geometry_msgs::Vector3 att_rate; */
-  /* att_rate.x = odom_msg->twist.twist.angular.x; */
-  /* att_rate.y = odom_msg->twist.twist.angular.y; */
-  /* att_rate.z = odom_msg->twist.twist.angular.z; */
 
   double hdg_rate;
   try {

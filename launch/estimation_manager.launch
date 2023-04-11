@@ -49,6 +49,7 @@
 <!--//{ Subscribers-->
       <!-- common -->
       <remap from="~control_input_in" to="control_manager/estimator_input" />
+      <remap from="~imu_in" to="hw_api/imu" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
 
