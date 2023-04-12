@@ -38,7 +38,7 @@ fcu_untilted_tf:
 tf_sources: []
 
 # first available tf source from this list will produce the utm and world origin tfs
-utm_source_priority: ["rtk", "gps_garmin", "gps_baro"]
+utm_source_priority: ["ground_truth", "rtk", "gps_garmin", "gps_baro"]
 
 # configuration of individual tf sources
 hw_api_raw:
@@ -135,7 +135,7 @@ ground_truth:
   tf_from_attitude: # used for transforming velocities before full transform is available
     enabled: false
   namespace: "estimation_manager/ground_truth" # the namespace of the topic (usually the node that publishes the topic)
-  utm_based: false # if true, will publish tf to utm_origin
+  utm_based: true # if true, will publish tf to utm_origin
   publish_local_tf: true # if true, will publish tf to local_origin
   inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
   republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
