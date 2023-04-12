@@ -351,6 +351,7 @@ private:
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
   boost::shared_ptr<mrs_uav_managers::AglEstimator>                       est_alt_agl_;
+  bool                                                                    is_using_agl_estimator_;
 
   double max_safety_area_altitude_;
 
@@ -474,7 +475,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
       nav_msgs::Odometry innovation = active_estimator_->getInnovation();
       ph_innovation_.publish(innovation);
 
-      ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
+      if (is_using_agl_estimator_) {
+        ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
+      }
 
       ROS_INFO_THROTTLE(5.0, "[%s]: pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(),
                         uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(),
@@ -502,7 +505,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
 
     if (estimator->isReady()) {
       try {
-        ROS_INFO("[%s]: starting the estimator '%s'", getName().c_str(), estimator->getName().c_str());
+        ROS_INFO_THROTTLE(1.0, "[%s]: starting the estimator '%s'", getName().c_str(), estimator->getName().c_str());
         estimator->start();
       }
       catch (std::runtime_error& ex) {
@@ -516,7 +519,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     }
   }
 
-  if (est_alt_agl_->isReady()) {
+  if (is_using_agl_estimator_ && est_alt_agl_->isReady()) {
     est_alt_agl_->start();
   }
 
@@ -703,8 +706,11 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   /*//{ load agl estimator plugins */
   param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
+  is_using_agl_estimator_ = est_alt_agl_name_ != "";
+  ROS_WARN_COND(!is_using_agl_estimator_, "[%s]: not using AGL estimator for min height safe checking", getName().c_str());
 
-  if (est_alt_agl_name_ != "") {
+
+  if (is_using_agl_estimator_) {
 
     agl_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>>("mrs_uav_managers", "mrs_uav_managers::AglEstimator");
 
@@ -728,6 +734,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     }
   }
   /*//}*/
+
   ROS_INFO("[%s]: estimators were loaded", getName().c_str());
   /*//}*/
 
@@ -767,18 +774,20 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   }
 
   // | ----------- agl height estimator initialization ---------- |
-  try {
-    ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
-    est_alt_agl_->initialize(nh_, ch_);
-  }
-  catch (std::runtime_error& ex) {
-    ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
-    ros::shutdown();
-  }
+  if (is_using_agl_estimator_) {
+    try {
+      ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
+      est_alt_agl_->initialize(nh_, ch_);
+    }
+    catch (std::runtime_error& ex) {
+      ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+      ros::shutdown();
+    }
 
-  if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
-    ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
-    ros::shutdown();
+    if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
+      ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
+      ros::shutdown();
+    }
   }
 
   ROS_INFO("[%s]: estimators were initialized", getName().c_str());
