@@ -8,7 +8,8 @@ gain_management:
 
   # list of allowed gains per odometry mode
   allowed_gains:
-    gps_garmin: ["supersoft", 'soft', 'tight']
+    ground_truth: ["supersoft", 'soft', 'tight']
+    gps_garmin: ["supersoft", 'soft']
     gps_baro: ["supersoft", 'soft', 'tight']
     rtk: ["supersoft", 'soft', 'tight']
     aloam: ["soft"]
@@ -20,6 +21,7 @@ gain_management:
   # those gains will be used automatically when a localization mode switches
   # and the current gains are not in the allowed list (next paragraphs)
   fallback_gains:
+    ground_truth: "tight"
     gps_garmin: "soft"
     gps_baro: "soft"
     rtk: "soft"

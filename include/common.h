@@ -61,6 +61,7 @@ bool validateTrackerCommand(const std::optional<mrs_msgs::TrackerCommand>& msg, 
 bool validateOdometry(const nav_msgs::Odometry& msg, const std::string& node_name, const std::string& var_name);
 bool validateUavState(const mrs_msgs::UavState& msg, const std::string& node_name, const std::string& var_nam);
 bool validateVelocityReference(const mrs_msgs::VelocityReference& msg, const std::string& node_name, const std::string& var_name);
+bool validateReference(const mrs_msgs::Reference& msg, const std::string& node_name, const std::string& var_name);
 
 std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name);
 

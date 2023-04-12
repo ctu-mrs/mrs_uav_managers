@@ -2,7 +2,7 @@ supersoft:
 
   horizontal:
     kp: 4.0
-    kv: 2.0
+    kv: 3.0
     ka: 1.0
 
     attitude:
@@ -29,8 +29,8 @@ supersoft:
 soft:
 
   horizontal:
-    kp: 6.0
-    kv: 4.0
+    kp: 5.0
+    kv: 3.0
     ka: 1.0
 
     attitude:
@@ -57,8 +57,8 @@ soft:
 tight:
 
   horizontal:
-    kp: 8.0
-    kv: 6.0
+    kp: 6.0
+    kv: 4.0
     ka: 1.0
 
     attitude:

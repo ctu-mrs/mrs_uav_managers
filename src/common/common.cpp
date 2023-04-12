@@ -141,6 +141,16 @@ bool validateTrackerCommand(const std::optional<mrs_msgs::TrackerCommand>& msg, 
     return false;
   }
 
+  if (!std::isfinite(msg->heading_acceleration)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->heading_acceleration'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
+  if (!std::isfinite(msg->heading_jerk)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s->heading_jerk'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
   // check throttle
 
   if (!std::isfinite(msg->throttle)) {
@@ -251,6 +261,39 @@ bool validateVelocityReference(const mrs_msgs::VelocityReference& msg, const std
 
   if (!std::isfinite(msg.heading_rate)) {
     ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s.heading_rate'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* validateReference() //{ */
+
+bool validateReference(const mrs_msgs::Reference& msg, const std::string& node_name, const std::string& var_name) {
+
+  // check position
+
+  if (!std::isfinite(msg.position.x)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s.position.x'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
+  if (!std::isfinite(msg.position.y)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s.position.y'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
+  if (!std::isfinite(msg.position.z)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s.position.z'!!!", node_name.c_str(), var_name.c_str());
+    return false;
+  }
+
+  // check heading
+
+  if (!std::isfinite(msg.heading)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in variable '%s.heading'!!!", node_name.c_str(), var_name.c_str());
     return false;
   }
 
