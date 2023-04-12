@@ -1816,17 +1816,7 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
       return true;
     }
 
-    if (!sh_control_manager_diag_.getMsg()->output_enabled) {
-
-      ss << "can not takeoff, Control Manager's output is disabled!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
-      res.message = ss.str();
-      res.success = false;
-      return true;
-    }
-
     if (number_of_takeoffs_ > 0) {
-
       ss << "can not activate, we flew already!";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
       res.message = ss.str();
@@ -2034,7 +2024,7 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
       switchControllerSrv(old_controller);
 
       std::stringstream ss;
-      ss << "could not enabled Control Manager's output";
+      ss << "could not enable Control Manager's output";
       ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
 
       return std::tuple(false, ss.str());
