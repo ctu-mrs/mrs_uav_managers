@@ -3289,15 +3289,16 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
-  // copy member variables
-  auto active_tracker_idx = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
-
   if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
     return;
   }
 
-  // do not use the bumper, unless with non-special tracker
-  if (active_tracker_idx == _ehover_tracker_idx_ || active_tracker_idx == _null_tracker_idx_ || active_tracker_idx == _landoff_tracker_idx_) {
+  /* // do not use the bumper, unless with non-special tracker */
+  /* if (active_tracker_idx == _ehover_tracker_idx_ || active_tracker_idx == _null_tracker_idx_ || active_tracker_idx == _landoff_tracker_idx_) { */
+  /*   return; */
+  /* } */
+
+  if (!isFlyingNormally()) {
     return;
   }
 
@@ -5099,31 +5100,9 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
-  // TODO these checks should be offloaded to a function !!!
-  if (!std::isfinite(req.reference.reference.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.y'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.z'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.heading)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.heading'!!!");
-    res.message = "NaNs/infs in the goal!";
+  if (!validateReference(req.reference.reference, "ControlManager", "reference_for_validation")) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference'!!!");
+    res.message = "NaNs/infs in input!";
     res.success = false;
     return true;
   }
@@ -5197,30 +5176,9 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
     return true;
   }
 
-  if (!std::isfinite(req.reference.reference.position.x)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.x'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.position.y)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.y'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.position.z)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.position.z'!!!");
-    res.message = "NaNs/infs in the goal!";
-    res.success = false;
-    return true;
-  }
-
-  if (!std::isfinite(req.reference.reference.heading)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference.heading'!!!");
-    res.message = "NaNs/infs in the goal!";
+  if (!validateReference(req.reference.reference, "ControlManager", "reference_for_validation")) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'req.reference'!!!");
+    res.message = "NaNs/infs in input!";
     res.success = false;
     return true;
   }
@@ -5317,25 +5275,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
     original_reference.header    = req.list.header;
     original_reference.reference = req.list.list[i];
 
-    if (!std::isfinite(original_reference.reference.position.x)) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.x'!!!");
-      res.success[i] = false;
-    }
-
-    if (!std::isfinite(original_reference.reference.position.y)) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.y'!!!");
-      res.success[i] = false;
-    }
-
-    if (!std::isfinite(original_reference.reference.position.z)) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.position.z'!!!");
-      res.success[i] = false;
-    }
-
-    if (!std::isfinite(original_reference.reference.heading)) {
-      ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: NaN detected in variable 'original_reference.reference.heading'!!!");
-      res.success[i] = false;
-    }
+    res.success[i] = validateReference(original_reference.reference, "ControlManager", "reference_list");
 
     auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
@@ -5743,26 +5683,8 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
-  if (!std::isfinite(reference_in.reference.position.x)) {
-    ss << "NaN detected in variable 'reference_in.reference.position.x'!!!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (!std::isfinite(reference_in.reference.position.y)) {
-    ss << "NaN detected in variable 'reference_in.reference.position.y'!!!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (!std::isfinite(reference_in.reference.position.z)) {
-    ss << "NaN detected in variable 'reference_in.reference.position.z'!!!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (!std::isfinite(reference_in.reference.heading)) {
-    ss << "NaN detected in variable 'reference_in.reference.heading'!!!";
+  if (!validateReference(reference_in.reference, "ControlManager", "reference")) {
+    ss << "incoming reference is not finite!!!";
     ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
@@ -6029,29 +5951,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
   for (int i = 0; i < int(trajectory_in.points.size()); i++) {
 
     // check the point for NaN/inf
-    bool no_nans = true;
+    bool valid = validateReference(trajectory_in.points[i], "ControlManager", "trajectory_in.points[]");
 
-    if (!std::isfinite(trajectory_in.points[i].position.x)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].x'!!!", i);
-      no_nans = false;
-    }
-
-    if (!std::isfinite(trajectory_in.points[i].position.y)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].y'!!!", i);
-      no_nans = false;
-    }
-
-    if (!std::isfinite(trajectory_in.points[i].position.z)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].z'!!!", i);
-      no_nans = false;
-    }
-
-    if (!std::isfinite(trajectory_in.points[i].heading)) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: NaN/inf detected in variable 'trajectory_in.points[%d].heading'!!!", i);
-      no_nans = false;
-    }
-
-    if (no_nans == false) {
+    if (!valid) {
 
       ss << "trajectory contains NaNs/infs.";
       ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
@@ -6144,40 +6046,6 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
   int trajectory_size = int(processed_trajectory.points.size());
 
   bool trajectory_modified = false;
-
-  /* bumper check //{ */
-
-  if (bumper_enabled_) {
-
-    for (int i = 0; i < trajectory_size; i++) {
-
-      mrs_msgs::ReferenceStamped des_reference;
-      des_reference.header    = processed_trajectory.header;
-      des_reference.reference = processed_trajectory.points[i];
-
-      if (!bumperValidatePoint(des_reference)) {
-
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: trajectory violates bumper and can not be fixed, shortening it!");
-        trajectory_size     = i;
-        trajectory_modified = true;
-        processed_trajectory.points.resize(trajectory_size);
-        break;
-
-      } else {
-
-        processed_trajectory.points[i] = des_reference.reference;
-      }
-    }
-  }
-
-  if (trajectory_size == 0) {
-
-    ss << "the whole trajectory violates bumper, can not execute it!";
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-  }
-
-  //}
 
   /* transform the trajectory to the safety area frame //{ */
 
@@ -6744,7 +6612,9 @@ bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraints
 bool ControlManager::isFlyingNormally(void) {
 
   return (output_enabled_) && (offboard_mode_) && (armed_) &&
-         (((active_controller_idx_ != _eland_controller_idx_) && (active_controller_idx_ != _failsafe_controller_idx_)) || _controller_names_.size() == 1) &&
+         (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) &&
+           (active_controller_idx_ != _failsafe_controller_idx_)) ||
+          _controller_names_.size() == 1) &&
          (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
 }
 

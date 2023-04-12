@@ -15,7 +15,7 @@ model_params:
   propulsion:
 
     # force [N] = force_constant * rpm^2
-    force_constant: 0.00000022970
+    force_constant: 0.00000027087
 
     # torque [Nm] = torque_constant * force [N]
     torque_constant: 0.07
@@ -38,5 +38,5 @@ model_params:
     ]
 
     rpm:
-      min: 895  # [revolutions/minute]
-      max: 8951 # [revolutions/minute]
+      min: 1170 # [revolutions/minute]
+      max: 7800 # [revolutions/minute]
