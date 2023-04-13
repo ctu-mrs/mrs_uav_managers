@@ -88,7 +88,7 @@ public:
   bool isInPublishableState() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
     return current_state == READY_FOR_TAKEOFF_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
-           current_state == LANDING_STATE || current_state == DUMMY_STATE;
+           current_state == LANDING_STATE || current_state == DUMMY_STATE  || current_state == FAILSAFE_STATE;
   }
 
   bool isInTheAir() const {
@@ -217,6 +217,11 @@ public:
         break;
       }
 
+      case FAILSAFE_STATE: {
+        ROS_WARN("[%s]: transition to %s", getPrintName().c_str(), getStateAsString(FAILSAFE_STATE).c_str());
+        break;
+      }
+
       default: {
         ROS_ERROR("[%s]: rejected transition to unknown state id %d", getPrintName().c_str(), target_state);
         return false;
@@ -331,6 +336,8 @@ private:
 
   bool                                             callFailsafeService();
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> srvch_failsafe_;
+  bool                                             failsafe_call_succeeded_ = false;
+
   // TODO service clients
   /* mrs_lib::ServiceClientHandler<std_srvs::Trigger> srvc_hover_; */
   /* mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> srvc_reference_; */
@@ -479,7 +486,7 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
         ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
       }
 
-      ROS_INFO_THROTTLE(5.0, "[%s]: pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(),
+      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(), sm_->getCurrentStateString().c_str(),
                         uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(),
                         max_flight_altitude_agl, estimator_switch_count_);
 
@@ -535,7 +542,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   // activate initial estimator
   if (sm_->isInState(StateMachine::INITIALIZED_STATE) && initial_estimator_->isRunning()) {
     std::scoped_lock lock(mutex_active_estimator_);
-    ROS_INFO("[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
+    ROS_INFO_THROTTLE(1.0, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
     active_estimator_ = initial_estimator_;
     if (active_estimator_->getName() == "dummy") {
       sm_->changeState(StateMachine::DUMMY_STATE);
@@ -553,12 +560,17 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     if (switchToHealthyEstimator()) {
       sm_->changeToPreSwitchState();
     } else {  // cannot switch to healthy estimator - failsafe necessary
-      ROS_ERROR("[%s]: Cannot switch to any healthy estimator. Triggering failsafe.", getName().c_str());
-      if (callFailsafeService()) {
-        ROS_INFO("[%s]: failsafe called successfully", getName().c_str());
-        sm_->changeState(StateMachine::FAILSAFE_STATE);
-      }
+      ROS_ERROR_THROTTLE(1.0, "[%s]: Cannot switch to any healthy estimator. Triggering failsafe.", getName().c_str());
+      sm_->changeState(StateMachine::FAILSAFE_STATE);
     }
+  }
+
+  if (sm_->isInState(StateMachine::FAILSAFE_STATE)) {
+    if (!failsafe_call_succeeded_ && callFailsafeService()) {
+      ROS_INFO_THROTTLE(1.0, "[%s]: failsafe called successfully", getName().c_str());
+      failsafe_call_succeeded_ = true;
+    }
+    ROS_ERROR_THROTTLE(1.0, "[%s]: we are in failsafe state", getName().c_str());
   }
 
   if (sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE)) {
