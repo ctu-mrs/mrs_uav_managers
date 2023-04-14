@@ -69,14 +69,15 @@
       <remap from="~max_flight_altitude_agl_out" to="~max_flight_altitude_agl" />
       <remap from="~height_agl_out" to="~height_agl" />
 
-<!--//{ FIXME: delete after merge with new uav system -->
-      <remap from="~diagnostics_legacy_out" to="~diagnostics_legacy" />
-<!--//}-->
 <!--//}-->
 
 <!--//{ Service servers -->
       <remap from="~change_estimator_in" to="~change_estimator" />
       <remap from="~toggle_service_callbacks_in" to="~toggle_service_callbacks" />
+<!--//}-->
+
+<!--//{ Service clients -->
+      <remap from="~failsafe_out" to="control_manager/failsafe" />
 <!--//}-->
 
     </node>
