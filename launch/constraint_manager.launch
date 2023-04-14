@@ -11,13 +11,18 @@
   <arg name="debug" default="false" />
   <arg name="custom_config" default="" />
   <arg name="standalone" default="true" />
+  <arg name="bond" default="$(optenv BOND true)" />
+  <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
+
+  <arg     if="$(arg bond)" name="bond_suffix" value="" />
+  <arg unless="$(arg bond)" name="bond_suffix" value="--no-bond" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
-  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
@@ -25,7 +30,7 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- Constraint Manager -->
-    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_managers/ConstraintManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_managers/ConstraintManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
       <rosparam file="$(find mrs_uav_managers)/config/default/constraint_manager/constraint_manager.yaml" />
