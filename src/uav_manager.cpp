@@ -200,7 +200,7 @@ public:
   // mass estimation during landing
   double    throttle_mass_estimate_;
   bool      throttle_under_threshold_ = false;
-  ros::Time throttle_mass_estimate_firm_time_;
+  ros::Time throttle_mass_estimate_first_time_;
 
   bool _gain_manager_required_       = false;
   bool _constraint_manager_required_ = false;
@@ -638,18 +638,18 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
           if (!throttle_under_threshold_) {
 
-            throttle_mass_estimate_firm_time_ = ros::Time::now();
-            throttle_under_threshold_         = true;
+            throttle_mass_estimate_first_time_ = ros::Time::now();
+            throttle_under_threshold_          = true;
           }
 
-          ROS_INFO_THROTTLE(0.5, "[UavManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_firm_time_).toSec());
+          ROS_INFO_THROTTLE(0.5, "[UavManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_first_time_).toSec());
 
         } else {
 
           throttle_under_threshold_ = false;
         }
 
-        if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_firm_time_).toSec() > _landing_cutoff_mass_timeout_)) {
+        if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _landing_cutoff_mass_timeout_)) {
 
           switchTrackerSrv(_null_tracker_name_);
 
@@ -1592,6 +1592,9 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     takingoff_           = false;
     timer_takeoff_.stop();
 
+    throttle_under_threshold_          = false;
+    throttle_mass_estimate_first_time_ = ros::Time(0);
+
     changeLandingState(FLY_THERE_STATE);
 
     timer_landing_.start();
@@ -1708,6 +1711,9 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
     waiting_for_takeoff_ = false;
     takingoff_           = false;
     timer_takeoff_.stop();
+
+    throttle_under_threshold_          = false;
+    throttle_mass_estimate_first_time_ = ros::Time(0);
 
     changeLandingState(FLY_THERE_STATE);
 
@@ -1909,6 +1915,9 @@ std::tuple<bool, std::string> UavManager::landImpl(void) {
 
       changeLandingState(LANDING_STATE);
 
+      throttle_under_threshold_          = false;
+      throttle_mass_estimate_first_time_ = ros::Time(0);
+
       timer_landing_.start();
 
       std::stringstream ss;
@@ -1973,6 +1982,9 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
         timer_takeoff_.stop();
 
         changeLandingState(FLY_THERE_STATE);
+
+        throttle_under_threshold_          = false;
+        throttle_mass_estimate_first_time_ = ros::Time(0);
 
         timer_landing_.start();
 

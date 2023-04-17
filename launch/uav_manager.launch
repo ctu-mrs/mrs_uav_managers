@@ -12,7 +12,9 @@
 
   <!-- other args -->
   <arg name="standalone" default="true" />
+  <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
   <arg name="debug" default="false" />
+  <arg name="bond" default="$(optenv BOND true)" />
   <arg name="custom_config" default="" />
   <arg name="custom_config_motor_params" default="" />
 
@@ -27,10 +29,13 @@
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
+  <arg     if="$(arg bond)" name="bond_suffix" value="" />
+  <arg unless="$(arg bond)" name="bond_suffix" value="--no-bond" />
+
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
-  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
@@ -38,7 +43,7 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- UAV manager -->
-    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_managers/UavManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="uav_manager" args="$(arg nodelet) mrs_uav_managers/UavManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
       <rosparam file="$(find mrs_uav_managers)/config/default/uav_manager.yaml" />

@@ -19,12 +19,17 @@
 
     <!-- other args -->
   <arg name="standalone" default="true" />
+  <arg name="bond" default="$(optenv BOND true)" />
+  <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
   <arg name="debug" default="false" />
+
+  <arg     if="$(arg bond)" name="bond_suffix" value="" />
+  <arg unless="$(arg bond)" name="bond_suffix" value="--no-bond" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
-  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
@@ -34,7 +39,7 @@
   <group ns="$(arg UAV_NAME)">
 
 <!--//{ transform_manager -->
-    <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />

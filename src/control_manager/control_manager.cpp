@@ -598,7 +598,7 @@ private:
   void callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp);
 
   // topic timeouts
-  void timeoutUavState(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
+  void timeoutUavState(const double& missing_for);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
@@ -1509,6 +1509,28 @@ void ControlManager::initialize(void) {
       }
     }
 
+    // | --- alter the timer rates based on the hw capabilities --- |
+
+    CONTROL_OUTPUT lowest_output = getLowestOuput(_hw_api_inputs_);
+
+    if (lowest_output == ACTUATORS_CMD || lowest_output == CONTROL_GROUP) {
+      _safety_timer_rate_     = 200.0;
+      desired_uav_state_rate_ = 250.0;
+    } else if (lowest_output == ATTITUDE_RATE || lowest_output == ATTITUDE) {
+      _safety_timer_rate_     = 100.0;
+      desired_uav_state_rate_ = 100.0;
+    } else if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
+      _safety_timer_rate_          = 30.0;
+      _status_timer_rate_          = 1.0;
+      desired_uav_state_rate_      = 30.0;
+      _uav_state_max_missing_time_ = 0.2;
+    } else if (lowest_output >= VELOCITY_HDG_RATE) {
+      _safety_timer_rate_          = 20.0;
+      _status_timer_rate_          = 1.0;
+      desired_uav_state_rate_      = 20.0;
+      _uav_state_max_missing_time_ = 0.2;
+    }
+
     if (eland_threshold == 0) {
       eland_threshold = 1e6;
     }
@@ -1675,8 +1697,6 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- subscribers ---------------------- |
 
-  ros::Duration uav_state_timeout(_uav_state_max_missing_time_);
-
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
   shopts.node_name          = "ControlManager";
@@ -1687,11 +1707,9 @@ void ControlManager::initialize(void) {
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   if (_state_input_ == INPUT_UAV_STATE) {
-    sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
-                                                                  &ControlManager::callbackUavState, this);
+    sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETRY) {
-    sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", uav_state_timeout, &ControlManager::timeoutUavState, this,
-                                                                 &ControlManager::callbackOdometry, this);
+    sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &ControlManager::callbackOdometry, this);
   }
 
   if (_odometry_innovation_check_enabled_) {
@@ -1771,28 +1789,6 @@ void ControlManager::initialize(void) {
 
   service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
   service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
-
-  // | --- alter the timer rates based on the hw capabilities --- |
-
-  CONTROL_OUTPUT lowest_output = getLowestOuput(_hw_api_inputs_);
-
-  if (lowest_output == ACTUATORS_CMD || lowest_output == CONTROL_GROUP) {
-    _safety_timer_rate_     = 200.0;
-    desired_uav_state_rate_ = 250.0;
-  } else if (lowest_output == ATTITUDE_RATE || lowest_output == ATTITUDE) {
-    _safety_timer_rate_     = 100.0;
-    desired_uav_state_rate_ = 100.0;
-  } else if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
-    _safety_timer_rate_          = 30.0;
-    _status_timer_rate_          = 1.0;
-    desired_uav_state_rate_      = 30.0;
-    _uav_state_max_missing_time_ = 0.2;
-  } else if (lowest_output >= VELOCITY_HDG_RATE) {
-    _safety_timer_rate_          = 20.0;
-    _status_timer_rate_          = 1.0;
-    desired_uav_state_rate_      = 20.0;
-    _uav_state_max_missing_time_ = 0.2;
-  }
 
   // | ------------------------- timers ------------------------- |
 
@@ -2568,6 +2564,24 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   if (odometry_switch_in_progress_) {
     ROS_WARN("[ControlManager]: timerSafety tried to run while odometry switch in progress");
     return;
+  }
+
+  // | ------------------------ timeouts ------------------------ |
+
+  if (_state_input_ == INPUT_UAV_STATE && sh_uav_state_.hasMsg()) {
+    double missing_for = (ros::Time::now() - sh_uav_state_.lastMsgTime()).toSec();
+
+    if (missing_for > _uav_state_max_missing_time_) {
+      timeoutUavState(missing_for);
+    }
+  }
+
+  if (_state_input_ == INPUT_ODOMETRY && sh_odometry_.hasMsg()) {
+    double missing_for = (ros::Time::now() - sh_odometry_.lastMsgTime()).toSec();
+
+    if (missing_for > _uav_state_max_missing_time_) {
+      timeoutUavState(missing_for);
+    }
   }
 
   // | -------------- eland and failsafe thresholds ------------- |
@@ -4136,14 +4150,14 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChann
 
 /* timeoutUavState() //{ */
 
-void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
+void ControlManager::timeoutUavState(const double& missing_for) {
 
   if (output_enabled_ && !failsafe_triggered_) {
 
     // We need to fire up timerFailsafe, which will regularly trigger the controllers
     // in place of the callbackUavState/callbackOdometry().
 
-    ROS_ERROR_THROTTLE(0.1, "[ControlManager]: not receiving '%s' for %.3f s, initiating failsafe land", topic.c_str(), (ros::Time::now() - last_msg).toSec());
+    ROS_ERROR_THROTTLE(0.1, "[ControlManager]: not receiving uav_state/odometry for %.3f s, initiating failsafe land", missing_for);
 
     failsafe();
   }
