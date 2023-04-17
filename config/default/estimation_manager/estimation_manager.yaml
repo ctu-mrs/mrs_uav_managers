@@ -8,11 +8,11 @@ frame_id:
 
 debug_topics:
   input: true
-  output: false
+  output: true
   state: true
   covariance: false
   innovation: false
-  correction: false
+  correction: true
   correction_delay: false
   diagnostics: false
 
