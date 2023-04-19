@@ -62,7 +62,7 @@ public:
 
       /* coordinate frames origins //{ */
       param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
-      param_loader.loadParam(getName() + "/publish_local_tf", publish_local_tf_);
+      /* param_loader.loadParam(getName() + "/publish_local_tf", publish_local_tf_); */
 
       /*//{ utm source */
       if (is_utm_source_) {
@@ -176,7 +176,9 @@ private:
   bool is_inverted_;
 
   bool        is_utm_based_;
-  bool        publish_local_tf_;
+  bool        publish_local_tf_ = true;
+  bool        publish_utm_tf_ = false;
+  bool        publish_world_tf_ = false;
   bool        is_in_utm_     = false;
   bool        is_utm_source_ = false;
   std::string ns_utm_origin_parent_frame_id_;
@@ -238,12 +240,12 @@ private:
     scope_timer.checkpoint("pub local tf");
     }
 
-    if (is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) {
+    if (publish_utm_tf_ && is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) {
       publishUtmTf(msg->header.frame_id);
     scope_timer.checkpoint("pub utm tf");
     }
 
-    if (is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) {
+    if (publish_world_tf_ && is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) {
       publishWorldTf(msg->header.frame_id);
     scope_timer.checkpoint("pub world tf");
     }
@@ -507,7 +509,8 @@ private:
     tf_msg.child_frame_id          = frame_id.substr(0, frame_id.find("_origin")) + "_world_origin";
     tf_msg.transform.translation.x = -(utm_origin_.x - world_origin_.x);  // minus because inverse tf tree
     tf_msg.transform.translation.y = -(utm_origin_.y - world_origin_.y);  // minus because inverse tf tree
-    tf_msg.transform.translation.z = -(utm_origin_.z);                    // minus because inverse tf tree
+    /* tf_msg.transform.translation.z = -(utm_origin_.z);                    // minus because inverse tf tree */
+    tf_msg.transform.translation.z = 0;
     tf_msg.transform.rotation.x    = 0;
     tf_msg.transform.rotation.y    = 0;
     tf_msg.transform.rotation.z    = 0;
