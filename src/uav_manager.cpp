@@ -1328,6 +1328,10 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
     }
   }
 
+  // let's sleep before calling take off.. the motors are rumping-up anyway
+  // this solves on-time-happening race condition in the landoff tracker
+  ros::Duration(0.3).sleep();
+
   // now the takeoff tracker and controller are active
   // the UAV is basically hovering on the ground
   // (the controller is probably rumping up the throttle now)
