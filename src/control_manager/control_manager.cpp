@@ -743,7 +743,7 @@ private:
   bool                       _escalating_failsafe_ehover_   = false;
   bool                       _escalating_failsafe_eland_    = false;
   bool                       _escalating_failsafe_failsafe_ = false;
-  int                        _rc_escalating_failsafe_threshold_;
+  double                     _rc_escalating_failsafe_threshold_;
   int                        _rc_escalating_failsafe_channel_  = 0;
   bool                       rc_escalating_failsafe_triggered_ = false;
   EscalatingFailsafeStates_t state_escalating_failsafe_        = ESC_NONE_STATE;
@@ -1798,7 +1798,7 @@ void ControlManager::initialize(void) {
   timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
-  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this, false, false);
+  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -3888,8 +3888,6 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
     if (!joystick_start_pressed_) {
 
       ROS_INFO("[ControlManager]: joystick start button pressed");
-
-      timer_joystick_.start();
 
       joystick_start_pressed_    = true;
       joystick_start_press_time_ = ros::Time::now();
@@ -8772,6 +8770,12 @@ void ControlManager::publish(void) {
 
     Controller::HwApiOutputVariant output =
         initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
+
+    {
+      std::scoped_lock lock(mutex_last_control_output_);
+
+      last_control_output_.control_output = output;
+    }
 
     control_output_publisher_.publish(output);
 
