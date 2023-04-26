@@ -75,7 +75,7 @@
       <remap from="~tracker_cmd_in" to="control_manager/tracker_cmd" />
       <remap from="~hw_api_status_in" to="hw_api/status" />
       <remap from="~hw_api_gnss_in" to="hw_api/gnss" />
-      <remap from="~max_z_in" to="estimation_manager/max_z" />
+      <remap from="~max_z_in" to="estimation_manager/max_flight_z_agl" />
       <remap from="~height_in" to="estimation_manager/height_agl" />
       <remap from="~gain_manager_diagnostics_in" to="gain_manager/diagnostics" />
       <remap from="~constraint_manager_diagnostics_in" to="constraint_manager/diagnostics" />

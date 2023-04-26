@@ -408,6 +408,7 @@ void UavManager::onInit() {
   sh_control_manager_diag_   = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_mass_estimate_          = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "mass_estimate_in");
   sh_throttle_               = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "throttle_in");
+  sh_height_                 = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
   sh_hw_api_status_          = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in");
   sh_gains_diag_             = mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>(shopts, "gain_manager_diagnostics_in");
   sh_constraints_diag_       = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
