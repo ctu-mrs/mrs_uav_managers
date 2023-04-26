@@ -86,7 +86,7 @@ safety:
     rc:
       enabled: true # can be triggered by RC button
       channel_number: 7 # [-],  activation RC channel
-      threshold: 1500 # [us]
+      threshold: 0.5 # [%/100]
 
     # how often does it allow to escalate
     timeout: 2.0 # [s]

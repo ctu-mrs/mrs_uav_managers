@@ -16,6 +16,7 @@ gain_management:
     gps_garmin: ["supersoft", "soft", "tight"]
     gps_baro: ["supersoft", "soft", "tight"]
     optflow: ["supersoft"]
+    ground_truth: ["supersoft"]
     other: ["supersoft"]
 
   # those gains will be used automatically when a localization mode switches
@@ -28,4 +29,5 @@ gain_management:
     gps_garmin: "soft"
     gps_baro: "soft"
     optflow: "supersoft"
+    ground_truth: "supersoft"
     other: "supersoft"
