@@ -417,12 +417,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
     mrs_msgs::Float64Stamped max_flight_z_msg;
     max_flight_z_msg.header.stamp = ros::Time::now();
-    if (active_estimator_ && active_estimator_->isInitialized() && active_estimator_->getMaxFlightZ() < max_safety_area_z_) {
+    if (active_estimator_ && active_estimator_->isInitialized()) {
       max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
       max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
-    } else {
-      max_flight_z_msg.header.frame_id = safety_area_frame_id_;
-      max_flight_z_msg.value           = max_safety_area_z_;
     }
     max_flight_z_ = max_flight_z_msg.value;
 
