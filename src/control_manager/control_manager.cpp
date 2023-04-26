@@ -365,11 +365,10 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
 
-  // | ------------------ max height subscriber ----------------- |
+  // | -------------- safety area max z subscriber -------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_height_;
-  double                                              _max_height_ = 0;
-  std::mutex                                          mutex_min_height_;
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
+  double                                              _safety_area_max_z_ = 0;
 
   // | ------------- odometry innovation subscriber ------------- |
 
@@ -492,9 +491,9 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_set_odometry_callbacks_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_parachute_;
 
-  // min height client
-  ros::ServiceServer service_server_set_min_height_;
-  ros::ServiceServer service_server_get_min_height_;
+  // safety area min z servers
+  ros::ServiceServer service_server_set_min_z_;
+  ros::ServiceServer service_server_get_min_z_;
 
   // | --------- trackers' and controllers' last results -------- |
 
@@ -574,7 +573,8 @@ private:
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
   bool                                 use_safety_area_ = false;
   std::string                          _safety_area_frame_;
-  double                               min_height_                 = 0;
+  double                               safety_area_min_z_ = 0;
+  std::mutex                           mutex_safety_area_min_z_;
   bool                                 _obstacle_points_enabled_   = false;
   bool                                 _obstacle_polygons_enabled_ = false;
 
@@ -584,8 +584,8 @@ private:
   bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
   bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
-  double getMinHeight(void);
-  double getMaxHeight(void);
+  double getMinZ(void);
+  double getMaxZ(void);
   double getMass(void);
 
   // | ------------------------ callbacks ----------------------- |
@@ -639,8 +639,8 @@ private:
   bool callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
-  bool callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
-  bool callbackGetMinHeight(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
+  bool callbackSetMinZ(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
+  bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
   bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
   bool callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
@@ -1181,8 +1181,8 @@ void ControlManager::initialize(void) {
 
   param_loader.loadParam("safety_area/use_safety_area", use_safety_area_);
   param_loader.loadParam("safety_area/frame_name", _safety_area_frame_);
-  param_loader.loadParam("safety_area/min_height", min_height_);
-  param_loader.loadParam("safety_area/max_height", _max_height_);
+  param_loader.loadParam("safety_area/min_z", safety_area_min_z_);
+  param_loader.loadParam("safety_area/max_z", _safety_area_max_z_);
 
   if (use_safety_area_) {
     Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/safety_area", -1, 2);
@@ -1250,8 +1250,8 @@ void ControlManager::initialize(void) {
   common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  common_handlers_->safety_area.getMinHeight          = boost::bind(&ControlManager::getMinHeight, this);
-  common_handlers_->safety_area.getMaxHeight          = boost::bind(&ControlManager::getMaxHeight, this);
+  common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this);
+  common_handlers_->safety_area.getMaxZ               = boost::bind(&ControlManager::getMaxZ, this);
 
   common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
 
@@ -1716,11 +1716,11 @@ void ControlManager::initialize(void) {
     sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
   }
 
-  sh_bumper_     = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_height_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
-  sh_joystick_   = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_gnss_       = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_  = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_bumper_    = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_z_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
+  sh_joystick_  = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_      = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
+  sh_hw_api_rc_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
 
   sh_hw_api_status_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
@@ -1747,8 +1747,8 @@ void ControlManager::initialize(void) {
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_bumper_set_params_          = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
   service_server_bumper_repulsion_enabler_   = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsion, this);
-  service_server_set_min_height_             = nh_.advertiseService("set_min_height_in", &ControlManager::callbackSetMinHeight, this);
-  service_server_get_min_height_             = nh_.advertiseService("get_min_height_in", &ControlManager::callbackGetMinHeight, this);
+  service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
+  service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
   service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
@@ -2065,8 +2065,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       mrs_lib::Polygon border = safety_zone_->getBorder();
 
-      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinHeight());
-      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxHeight());
+      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ());
+      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ());
 
       std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
       std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
@@ -2222,8 +2222,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto polygon : polygon_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinHeight());
-        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxHeight());
+        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinZ());
+        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxZ());
 
         // transform border bottom points to local origin
         for (size_t i = 0; i < points_bot.size(); i++) {
@@ -2295,7 +2295,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto point : point_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinHeight());
+        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinZ());
         std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
 
         // transform bottom points to local origin
@@ -5061,20 +5061,21 @@ bool ControlManager::callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request&
 
 //}
 
-/* //{ callbackSetMinHeight() */
+/* //{ callbackSetMinZ() */
 
-bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res) {
+bool ControlManager::callbackSetMinZ(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
-  double min_height = req.value;
+  double min_z = req.value;
 
   std::stringstream message;
 
-  mrs_lib::set_mutexed(mutex_min_height_, min_height, min_height_);
+  mrs_lib::set_mutexed(mutex_safety_area_min_z_, min_z, safety_area_min_z_);
 
-  message << "the minimum height set to " << min_height;
+  message << "Setting safety area min Z to " << min_z;
   ROS_INFO_STREAM("[ControlManager]: " << message.str());
 
   res.success = true;
@@ -5085,17 +5086,15 @@ bool ControlManager::callbackSetMinHeight(mrs_msgs::Float64Srv::Request& req, mr
 
 //}
 
-/* //{ callbackGetMinHeight() */
+/* //{ callbackGetMinZ() */
 
-bool ControlManager::callbackGetMinHeight([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
+bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
 
   if (!is_initialized_)
     return false;
 
-  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
-
   res.success = true;
-  res.value   = min_height;
+  res.value   = mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
 
   return true;
 }
@@ -5844,7 +5843,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     }
   }
 
-  // transform the height and the heading
+  // transform the z and the heading
   {
     geometry_msgs::PoseStamped pose;
     pose.header           = reference_in.header;
@@ -6145,25 +6144,25 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     int last_valid_idx    = 0;
     int first_invalid_idx = -1;
 
-    double min_height = getMinHeight();
-    double max_height = getMaxHeight();
+    double min_z = getMinZ();
+    double max_z = getMaxZ();
 
     for (int i = 0; i < trajectory_size; i++) {
 
       if (_snap_trajectory_to_safety_area_) {
 
-        // saturate the trajectory to min and max height
-        if (processed_trajectory.points[i].position.z < min_height) {
+        // saturate the trajectory to min and max Z
+        if (processed_trajectory.points[i].position.z < min_z) {
 
-          processed_trajectory.points[i].position.z = min_height;
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the minimum height!");
+          processed_trajectory.points[i].position.z = min_z;
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the minimum Z!");
           trajectory_modified = true;
         }
 
-        if (processed_trajectory.points[i].position.z > max_height) {
+        if (processed_trajectory.points[i].position.z > max_z) {
 
-          processed_trajectory.points[i].position.z = max_height;
-          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the maximum height!");
+          processed_trajectory.points[i].position.z = max_z;
+          ROS_WARN_THROTTLE(1.0, "[ControlManager]: the trajectory violates the maximum Z!");
           trajectory_modified = true;
         }
       }
@@ -6643,7 +6642,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   // copy member variables
-  auto min_height = mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+  auto min_z = mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
 
   auto ret = transformer_->transformSingle(point, _safety_area_frame_);
 
@@ -6657,7 +6656,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   if (safety_zone_->isPointValid3d(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
-      point_transformed.reference.position.z >= min_height && point_transformed.reference.position.z <= getMaxHeight()) {
+      point_transformed.reference.position.z >= min_z && point_transformed.reference.position.z <= getMaxZ()) {
     return true;
   }
 
@@ -6774,34 +6773,44 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 //}
 
-/* //{ getMaxHeight() */
+/* //{ getMaxZ() */
 
-double ControlManager::getMaxHeight(void) {
+double ControlManager::getMaxZ(void) {
 
-  double max_height;
+  // set the default max z from the safety area
+  double max_z = _safety_area_max_z_;
 
-  if (sh_max_height_.hasMsg()) {
+  // if possible, override it with max z from the estimation manager
+  if (sh_max_z_.hasMsg()) {
 
-    double max_height_external = sh_max_height_.getMsg()->value;
+    auto msg = sh_max_z_.getMsg();
 
-    max_height = _max_height_ > max_height_external ? max_height_external : _max_height_;
+    // transform it into the safety area frame
+    geometry_msgs::PointStamped point;
+    point.header  = msg->header;
+    point.point.x = 0;
+    point.point.y = 0;
+    point.point.z = msg->value;
 
-  } else {
+    auto ret = transformer_->transformSingle(point, _safety_area_frame_);
 
-    max_height = _max_height_;
+    if (ret) {
+
+      max_z = _safety_area_max_z_ > ret->point.z ? ret->point.z : _safety_area_max_z_;
+    }
   }
 
-  return max_height;
+  return max_z;
 }
 
 //}
 
-/* //{ getMinHeight() */
+/* //{ getMinZ() */
 
-double ControlManager::getMinHeight(void) {
+double ControlManager::getMinZ(void) {
 
   if (use_safety_area_) {
-    return mrs_lib::get_mutexed(mutex_min_height_, min_height_);
+    return mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
   } else {
     return std::numeric_limits<double>::lowest();
   }

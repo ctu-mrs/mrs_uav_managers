@@ -12,15 +12,15 @@ namespace mrs_uav_managers
 
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea3d_t;
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea2d_t;
-typedef boost::function<double(void)>                                 getMaxHeight_t;
-typedef boost::function<double(void)>                                 getMinHeight_t;
+typedef boost::function<double(void)>                                 getMaxZ_t;
+typedef boost::function<double(void)>                                 getMinZ_t;
 
 struct SafetyArea_t
 {
   mrs_uav_managers::isPointInSafetyArea3d_t isPointInSafetyArea3d;
   mrs_uav_managers::isPointInSafetyArea2d_t isPointInSafetyArea2d;
-  mrs_uav_managers::getMaxHeight_t          getMaxHeight;
-  mrs_uav_managers::getMinHeight_t          getMinHeight;
+  mrs_uav_managers::getMaxZ_t               getMaxZ;
+  mrs_uav_managers::getMinZ_t               getMinZ;
   std::string                               frame_id;
   bool                                      use_safety_area;
 };
