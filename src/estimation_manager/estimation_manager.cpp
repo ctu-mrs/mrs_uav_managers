@@ -304,7 +304,7 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
 
   mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics> ph_diagnostics_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_altitude_agl_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_z_;
   mrs_lib::PublisherHandler<mrs_msgs::UavState>              ph_uav_state_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>              ph_odom_main_;
   mrs_lib::PublisherHandler<nav_msgs::Odometry>              ph_odom_slow_;  // use topic throttler instead?
@@ -360,7 +360,9 @@ private:
   boost::shared_ptr<mrs_uav_managers::AglEstimator>                       est_alt_agl_;
   bool                                                                    is_using_agl_estimator_;
 
-  double max_safety_area_altitude_;
+  double      max_flight_z_;
+  double      max_safety_area_z_;
+  std::string safety_area_frame_id_;
 
   bool switchToHealthyEstimator();
   void switchToEstimator(const boost::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator);
@@ -413,34 +415,35 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-    double max_flight_altitude_agl = max_safety_area_altitude_;
-    if (active_estimator_ && active_estimator_->isInitialized()) {
-      max_flight_altitude_agl = std::min(max_flight_altitude_agl, active_estimator_->getMaxFlightAltitudeAgl());
+    mrs_msgs::Float64Stamped max_flight_z_msg;
+    max_flight_z_msg.header.stamp = ros::Time::now();
+    if (active_estimator_ && active_estimator_->isInitialized() && active_estimator_->getMaxFlightZ() < max_safety_area_z_) {
+      max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
+      max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
+    } else {
+      max_flight_z_msg.header.frame_id = safety_area_frame_id_;
+      max_flight_z_msg.value           = max_safety_area_z_;
     }
-    scope_timer.checkpoint("get max flight altitude");
+    max_flight_z_ = max_flight_z_msg.value;
+
+    scope_timer.checkpoint("get max flight z");
 
     // publish diagnostics
-    mrs_msgs::Float64Stamped max_altitude_msg;
-    max_altitude_msg.header.stamp = ros::Time::now();
-    max_altitude_msg.value        = max_flight_altitude_agl;
-
     mrs_msgs::EstimationDiagnostics diagnostics;
     diagnostics.header.stamp                = ros::Time::now();
     diagnostics.current_sm_state            = sm_->getCurrentStateString();
     diagnostics.running_state_estimators    = estimator_names_;
     diagnostics.switchable_state_estimators = switchable_estimator_names_;
-    diagnostics.max_flight_altitude_agl     = max_flight_altitude_agl;
+    diagnostics.max_flight_z                = max_flight_z_msg.value;
     if (active_estimator_ && active_estimator_->isInitialized()) {
-      max_altitude_msg.header.frame_id    = active_estimator_->getFrameId();
       diagnostics.header.frame_id         = active_estimator_->getFrameId();
       diagnostics.current_state_estimator = active_estimator_->getName();
     } else {
-      max_altitude_msg.header.frame_id    = "";
       diagnostics.header.frame_id         = "";
       diagnostics.current_state_estimator = "";
     }
     scope_timer.checkpoint("diag fill");
-    ph_max_flight_altitude_agl_.publish(max_altitude_msg);
+    ph_max_flight_z_.publish(max_flight_z_msg);
 
     scope_timer.checkpoint("max flight pub");
     ph_diagnostics_.publish(diagnostics);
@@ -493,9 +496,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
         ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
       }
 
-      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(),
+      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
                         sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
-                        active_estimator_->getName().c_str(), max_flight_altitude_agl, estimator_switch_count_);
+                        active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
 
     } else {
       ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
@@ -606,6 +609,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ load parameters */
+
+  /*//{ publish debug topics parameters */
   param_loader.loadParam("debug_topics/input", ch_->debug_topics.input);
   param_loader.loadParam("debug_topics/output", ch_->debug_topics.output);
   param_loader.loadParam("debug_topics/state", ch_->debug_topics.state);
@@ -614,36 +619,55 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   param_loader.loadParam("debug_topics/diagnostics", ch_->debug_topics.diag);
   param_loader.loadParam("debug_topics/correction", ch_->debug_topics.correction);
   param_loader.loadParam("debug_topics/correction_delay", ch_->debug_topics.corr_delay);
+  /*//}*/
 
-  // load maximum flight altitude from safety area
+  // load maximum flight z from safety area
   bool use_safety_area;
   param_loader.loadParam("safety_area/use_safety_area", use_safety_area);
   if (use_safety_area) {
-    param_loader.loadParam("safety_area/max_height", max_safety_area_altitude_);
+    param_loader.loadParam("safety_area/max_z", max_safety_area_z_);
+    param_loader.loadParam("safety_area/frame_name", safety_area_frame_id_);
   } else {
     ROS_WARN("[%s]: NOT USING SAFETY AREA!!!", getName().c_str());
-    max_safety_area_altitude_ = 100;
+    safety_area_frame_id_ = "";
+    max_safety_area_z_    = std::numeric_limits<double>::max();
   }
 
-  int utm_origin_units;
-  param_loader.loadParam("utm_origin_units", utm_origin_units);
-  switch (utm_origin_units) {
-    case UtmUnits_t::METERS: {
-      param_loader.loadParam("utm_origin_x", ch_->utm_origin.x);
-      param_loader.loadParam("utm_origin_y", ch_->utm_origin.y);
-      break;
-    }
-    case UtmUnits_t::DEGREES: {
-      double lat, lon;
-      param_loader.loadParam("utm_origin_lat", lat);
-      param_loader.loadParam("utm_origin_lon", lon);
-      mrs_lib::UTM(lat, lon, &ch_->utm_origin.x, &ch_->utm_origin.y);
-      break;
-    }
-    default:
-      ROS_ERROR("[%s]: invalid units: %d of utm_origin. Allowed are 0 - meters (UTM), 1 - degrees (LATLON).", getName().c_str(), utm_origin_units);
-      ros::shutdown();
+  /*//{ load world_origin parameters */
+
+  std::string world_origin_units;
+  bool        is_origin_param_ok = true;
+  double      world_origin_x     = 0;
+  double      world_origin_y     = 0;
+
+  param_loader.loadParam("world_origin_units", world_origin_units);
+
+  if (Support::toLowercase(world_origin_units) == "utm") {
+    ROS_INFO("[%s]: Loading world origin in UTM units.", getName().c_str());
+    is_origin_param_ok &= param_loader.loadParam("world_origin_x", world_origin_x);
+    is_origin_param_ok &= param_loader.loadParam("world_origin_y", world_origin_y);
+
+  } else if (Support::toLowercase(world_origin_units) == "latlon") {
+    double lat, lon;
+    ROS_INFO("[%s]: Loading world origin in LatLon units.", getName().c_str());
+    is_origin_param_ok &= param_loader.loadParam("world_origin_x", lat);
+    is_origin_param_ok &= param_loader.loadParam("world_origin_y", lon);
+    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+    ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getName().c_str(), world_origin_x, world_origin_y);
+
+  } else {
+    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got %s", getName().c_str(), world_origin_units.c_str());
+    ros::shutdown();
   }
+
+  ch_->world_origin.x = world_origin_x;
+  ch_->world_origin.y = world_origin_y;
+
+  if (!is_origin_param_ok) {
+    ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getName().c_str());
+    ros::shutdown();
+  }
+  /*//}*/
 
   // load common parameters into the common handlers structure
   param_loader.loadParam("uav_name", ch_->uav_name);
@@ -814,12 +838,12 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ initialize publishers */
-  ph_uav_state_               = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh_, "uav_state_out", 10);
-  ph_odom_main_               = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "odom_main_out", 10);
-  ph_innovation_              = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "innovation_out", 10);
-  ph_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh_, "diagnostics_out", 10);
-  ph_max_flight_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "max_flight_altitude_agl_out", 10);
-  ph_altitude_agl_            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "height_agl_out", 10);
+  ph_uav_state_    = mrs_lib::PublisherHandler<mrs_msgs::UavState>(nh_, "uav_state_out", 10);
+  ph_odom_main_    = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "odom_main_out", 10);
+  ph_innovation_   = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "innovation_out", 10);
+  ph_diagnostics_  = mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics>(nh_, "diagnostics_out", 10);
+  ph_max_flight_z_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "max_flight_z_agl_out", 10);
+  ph_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "height_agl_out", 10);
 
   /*//}*/
 

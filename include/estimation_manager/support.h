@@ -49,6 +49,26 @@ public:
   }
   /*//}*/
 
+/* toLowercase //{ */
+
+static std::string toLowercase(const std::string str_in) {
+  std::string str_out = str_in;
+  std::transform(str_out.begin(), str_out.end(), str_out.begin(), ::tolower);
+  return str_out;
+}
+
+//}
+
+/* toUppercase //{ */
+
+static std::string toUppercase(const std::string str_in) {
+  std::string str_out = str_in;
+  std::transform(str_out.begin(), str_out.end(), str_out.begin(), ::toupper);
+  return str_out;
+}
+
+//}
+
   /*//{ stateCovToString() */
   template <typename StateCov>
   static std::string stateCovToString(const StateCov& sc) {

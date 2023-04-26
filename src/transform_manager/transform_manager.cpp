@@ -80,7 +80,7 @@ private:
   geometry_msgs::Pose pose_fixed_;
   geometry_msgs::Pose pose_fixed_diff_;
 
-  int                  world_origin_units_;
+  std::string          world_origin_units_;
   geometry_msgs::Point world_origin_;
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
@@ -140,22 +140,7 @@ void TransformManager::onInit() {
   }
   /*//}*/
 
-  bool   is_origin_param_ok = true;
-  double world_origin_x, world_origin_y;
   param_loader.loadParam("uav_name", ch_->uav_name);
-  param_loader.loadParam("utm_origin_units", world_origin_units_);
-  if (world_origin_units_ == 0) {
-    ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("utm_origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("utm_origin_y", world_origin_y);
-  } else {
-    double lat, lon;
-    ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("utm_origin_lat", lat);
-    is_origin_param_ok &= param_loader.loadParam("utm_origin_lon", lon);
-    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-    ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
-  }
 
   /*//{ initialize scope timer */
   param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
@@ -163,6 +148,32 @@ void TransformManager::onInit() {
   const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/transform_manager_scope_timer.txt";
   ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
   /*//}*/
+
+/*//{ load world_origin parameters */
+
+  bool   is_origin_param_ok = true;
+  double world_origin_x     = 0;
+  double world_origin_y     = 0;
+
+  param_loader.loadParam("world_origin_units", world_origin_units_);
+
+  if (Support::toLowercase(world_origin_units_) == "utm") {
+    ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
+    is_origin_param_ok &= param_loader.loadParam("world_origin_x", world_origin_x);
+    is_origin_param_ok &= param_loader.loadParam("world_origin_y", world_origin_y);
+
+  } else if (Support::toLowercase(world_origin_units_) == "latlon") {
+    double lat, lon;
+    ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
+    is_origin_param_ok &= param_loader.loadParam("world_origin_x", lat);
+    is_origin_param_ok &= param_loader.loadParam("world_origin_y", lon);
+    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+    ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
+
+  } else {
+    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got %s", getPrintName().c_str(), world_origin_units_.c_str());
+    ros::shutdown();
+  }
 
   world_origin_.x = world_origin_x;
   world_origin_.y = world_origin_y;
@@ -172,6 +183,7 @@ void TransformManager::onInit() {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
     ros::shutdown();
   }
+/*//}*/
 
   /*//{ load local_origin parameters */
   std::string local_origin_parent_frame_id;
@@ -252,21 +264,20 @@ void TransformManager::onInit() {
 
   /*//{ initialize subscribers */
   mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh        = nh_;
-  shopts.node_name = getPrintName();
+  shopts.nh                 = nh_;
+  shopts.node_name          = getPrintName();
   shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe      = true;
-  shopts.autostart       = true;
-  shopts.queue_size      = 10;
-  shopts.transport_hints = ros::TransportHints().tcpNoDelay();
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
   sh_hw_api_orientation_ =
       mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
-  sh_gnss_ =
-      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+  sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -282,7 +293,7 @@ void TransformManager::onInit() {
 
 void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
 
-    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   // obtain first frame_id
   mrs_msgs::UavStateConstPtr msg = wrp.getMsg();
@@ -431,7 +442,7 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
 /*//{ callbackHwApiOrientation() */
 void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
 
-    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
 
@@ -444,7 +455,7 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 /*//{ callbackGnss() */
 void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
 
-    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   if (!got_utm_offset_) {
 
@@ -484,7 +495,7 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
 /*//{ publishFcuUntiltedTf() */
 void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg) {
 
-    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   double heading;
 

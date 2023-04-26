@@ -22,7 +22,7 @@ struct CommonFrames_t
   std::string ns_rtk_antenna;
 };
 
-struct UtmOrigin_t
+struct WorldOrigin_t
 {
   double x;
   double y;
@@ -55,7 +55,7 @@ struct CommonHandlers_t
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;
   double                                desired_uav_state_rate;
-  UtmOrigin_t                           utm_origin;
+  WorldOrigin_t                         world_origin;
   ScopeTimer_t                          scope_timer;
   DebugTopics_t                         debug_topics;
 };

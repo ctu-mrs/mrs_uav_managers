@@ -100,9 +100,9 @@ std::string Estimator::getFrameId(void) const {
 }
 /*//}*/
 
-/*//{ getMaxFlightAltitudeAgl() */
-double Estimator::getMaxFlightAltitudeAgl(void) const {
-  return max_flight_altitude_agl_;
+/*//{ getMaxFlightZ() */
+double Estimator::getMaxFlightZ(void) const {
+  return max_flight_z_;
 }
 /*//}*/
 

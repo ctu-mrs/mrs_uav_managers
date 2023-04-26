@@ -48,7 +48,7 @@ protected:
 
   std::shared_ptr<CommonHandlers_t> ch_;
 
-  double max_flight_altitude_agl_ = -1.0;
+  double max_flight_z_ = -1.0;
 
 private:
   SMStates_t previous_sm_state_ = UNINITIALIZED_STATE;
@@ -74,7 +74,7 @@ public:
   std::string getPrintName(void) const;
   std::string getType(void) const;
   std::string getFrameId(void) const;
-  double      getMaxFlightAltitudeAgl(void) const;
+  double      getMaxFlightZ(void) const;
   std::string getSmStateString(const SMStates_t &state) const;
   std::string getCurrentSmStateString(void) const;
   SMStates_t  getCurrentSmState() const;
