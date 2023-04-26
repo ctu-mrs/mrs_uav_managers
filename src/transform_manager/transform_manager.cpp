@@ -14,6 +14,7 @@
 #include <mrs_lib/gps_conversions.h>
 
 #include <mrs_msgs/UavState.h>
+#include <mrs_msgs/Float64Stamped.h>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -52,6 +53,7 @@ public:
   }
 
   void onInit();
+  bool is_initialized_ = false;
 
   std::string getName() const;
 
@@ -103,6 +105,9 @@ private:
   std::string                                   last_frame_id_;
   bool                                          is_first_frame_id_set_ = false;
 
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_height_agl_;
+  void                                                callbackHeightAgl(mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>& wrp);
+
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
   void                                                        callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp);
 
@@ -149,7 +154,7 @@ void TransformManager::onInit() {
   ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
   /*//}*/
 
-/*//{ load world_origin parameters */
+  /*//{ load world_origin parameters */
 
   bool   is_origin_param_ok = true;
   double world_origin_x     = 0;
@@ -183,7 +188,7 @@ void TransformManager::onInit() {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
     ros::shutdown();
   }
-/*//}*/
+  /*//}*/
 
   /*//{ load local_origin parameters */
   std::string local_origin_parent_frame_id;
@@ -224,10 +229,12 @@ void TransformManager::onInit() {
   /*//{ load fcu_untilted parameters */
   std::string fcu_frame_id;
   param_loader.loadParam("fcu_untilted_tf/parent", fcu_frame_id);
+  ch_->frames.fcu    = fcu_frame_id;
   ch_->frames.ns_fcu = ch_->uav_name + "/" + fcu_frame_id;
 
   std::string fcu_untilted_frame_id;
   param_loader.loadParam("fcu_untilted_tf/child", fcu_untilted_frame_id);
+  ch_->frames.fcu_untilted    = fcu_untilted_frame_id;
   ch_->frames.ns_fcu_untilted = ch_->uav_name + "/" + fcu_untilted_frame_id;
 
   param_loader.loadParam("fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
@@ -274,6 +281,8 @@ void TransformManager::onInit() {
 
   sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
+  sh_height_agl_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_agl_in", &TransformManager::callbackHeightAgl, this);
+
   sh_hw_api_orientation_ =
       mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
@@ -285,6 +294,7 @@ void TransformManager::onInit() {
     ros::shutdown();
   }
 
+  is_initialized_ = true;
   ROS_INFO("[%s]: initialized", getPrintName().c_str());
 }
 /*//}*/
@@ -292,6 +302,10 @@ void TransformManager::onInit() {
 /*//{ callbackUavState() */
 
 void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
+
+  if (!is_initialized_) {
+    return;
+  }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -439,8 +453,54 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
 }
 /*//}*/
 
+/*//{ callbackHeightAgl() */
+
+void TransformManager::callbackHeightAgl(mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>& wrp) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publish>HeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  // obtain first frame_id
+  mrs_msgs::Float64StampedConstPtr msg = wrp.getMsg();
+
+  geometry_msgs::TransformStamped tf_msg;
+  tf_msg.header.stamp    = msg->header.stamp;
+  tf_msg.header.frame_id = ch_->frames.ns_fcu_untilted;
+  tf_msg.child_frame_id  = msg->header.frame_id;
+
+  tf_msg.transform.translation.x = 0;
+  tf_msg.transform.translation.y = 0;
+  tf_msg.transform.translation.z = -msg->value;
+  tf_msg.transform.rotation.x    = 0;
+  tf_msg.transform.rotation.y    = 0;
+  tf_msg.transform.rotation.z    = 0;
+  tf_msg.transform.rotation.w    = 1;
+
+  if (Support::noNans(tf_msg)) {
+    try {
+      broadcaster_->sendTransform(tf_msg);
+    }
+    catch (...) {
+      ROS_ERROR("exception caught ");
+    }
+  } else {
+    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                      tf_msg.child_frame_id.c_str());
+  }
+  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                tf_msg.child_frame_id.c_str());
+}
+/*//}*/
+
 /*//{ callbackHwApiOrientation() */
 void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
+
+  if (!is_initialized_) {
+    return;
+  }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -454,6 +514,10 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 
 /*//{ callbackGnss() */
 void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+
+  if (!is_initialized_) {
+    return;
+  }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
