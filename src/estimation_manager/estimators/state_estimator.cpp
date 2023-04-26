@@ -5,11 +5,11 @@ namespace mrs_uav_managers
 
 
 /*//{ getUavState() */
-mrs_msgs::UavState StateEstimator::getUavState() {
+std::optional<mrs_msgs::UavState> StateEstimator::getUavState() {
 
   if (!isRunning()) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: getUavState() was called before estimators running", getPrintName().c_str());
-    return mrs_msgs::UavState();
+    ROS_ERROR_THROTTLE(1.0, "[%s]: getUavState() was called while estimator is not running", getPrintName().c_str());
+    return {};
   }
 
   return mrs_lib::get_mutexed(mtx_uav_state_, uav_state_);
@@ -61,7 +61,7 @@ void StateEstimator::publishCovariance() const {
     return;
   }
 
-  auto pose_cov = mrs_lib::get_mutexed(mtx_covariance_, pose_covariance_);
+  auto pose_cov  = mrs_lib::get_mutexed(mtx_covariance_, pose_covariance_);
   auto twist_cov = mrs_lib::get_mutexed(mtx_covariance_, twist_covariance_);
   ph_pose_covariance_.publish(pose_cov);
   ph_twist_covariance_.publish(twist_cov);
