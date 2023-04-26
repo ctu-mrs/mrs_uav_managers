@@ -111,7 +111,7 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>       sh_gains_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_hw_api_gnss_;
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_z_;
   mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>               sh_tracker_cmd_;
 
   void callbackHwApiGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
@@ -187,7 +187,6 @@ public:
   bool              _max_height_enabled_ = false;
   int               _max_height_checking_rate_;
   double            _max_height_offset_;
-  double            _max_height_;
   std::atomic<bool> fixing_max_height_ = false;
 
   // min height checking
@@ -360,8 +359,6 @@ void UavManager::onInit() {
   param_loader.loadParam("min_height_checking/safety_height_offset", _min_height_offset_);
   param_loader.loadParam("min_height_checking/min_height", _min_height_);
 
-  param_loader.loadParam("safety_area/max_height", _max_height_);
-
   param_loader.loadParam("require_gain_manager", _gain_manager_required_);
   param_loader.loadParam("require_constraint_manager", _constraint_manager_required_);
 
@@ -411,12 +408,11 @@ void UavManager::onInit() {
   sh_control_manager_diag_   = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_mass_estimate_          = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "mass_estimate_in");
   sh_throttle_               = mrs_lib::SubscribeHandler<std_msgs::Float64>(shopts, "throttle_in");
-  sh_height_                 = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
   sh_hw_api_status_          = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in");
   sh_gains_diag_             = mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>(shopts, "gain_manager_diagnostics_in");
   sh_constraints_diag_       = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_hw_api_gnss_            = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "hw_api_gnss_in", &UavManager::callbackHwApiGNSS, this);
-  sh_max_height_             = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
+  sh_max_z_                  = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
   sh_tracker_cmd_            = mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>(shopts, "tracker_cmd_in");
 
   // | ----------------------- publishers ----------------------- |
@@ -737,13 +733,35 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxHeight", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
+  if (!sh_max_z_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: maxHeightTimer() not spinning, missing data");
     return;
   }
 
-  double                     max_height = sh_max_height_.getMsg()->value;
-  double                     height     = sh_height_.getMsg()->value;
-  nav_msgs::OdometryConstPtr odometry   = sh_odometry_.getMsg();
+  auto control_manager_diag = sh_control_manager_diag_.getMsg();
+
+  if (!control_manager_diag->flying_normally) {
+    return;
+  }
+
+  auto   odometry = sh_odometry_.getMsg();
+  double height   = sh_height_.getMsg()->value;
+
+  // transform max z to the height frame
+  geometry_msgs::PointStamped point;
+  point.header  = sh_max_z_.getMsg()->header;
+  point.point.z = sh_max_z_.getMsg()->value;
+
+  auto res = transformer_->transformSingle(point, sh_height_.getMsg()->header.frame_id);
+
+  double max_z_in_height;
+
+  if (res) {
+    max_z_in_height = res->point.z;
+  } else {
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: timerMaxHeight() not working, cannot transform max z to the height frame");
+    return;
+  }
 
   auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
 
@@ -756,9 +774,9 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
     return;
   }
 
-  if (height > max_height) {
+  if (height > max_z_in_height) {
 
-    ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_height);
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_z_in_height);
 
     mrs_msgs::ReferenceStamped reference_out;
     reference_out.header.frame_id = odometry->header.frame_id;
@@ -766,7 +784,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
     reference_out.reference.position.x = odometry_x;
     reference_out.reference.position.y = odometry_y;
-    reference_out.reference.position.z = odometry_z + ((max_height - _max_height_offset_) - height);
+    reference_out.reference.position.z = odometry_z + ((max_z_in_height - _max_height_offset_) - height);
 
     reference_out.reference.heading = odometry_heading;
 
@@ -788,7 +806,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
     }
   }
 
-  if (fixing_max_height_ && height < max_height) {
+  if (fixing_max_height_ && height < max_z_in_height) {
 
     setControlCallbacksSrv(true);
 
@@ -812,7 +830,8 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMinHeight", _min_height_checking_rate_, 0.1, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMinHeight", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_height_.hasMsg() || !sh_odometry_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
+  if (!sh_odometry_.hasMsg() || !sh_height_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
+    ROS_WARN_THROTTLE(1.0, "[UavManager]: minHeightTimer() not spinning, missing data");
     return;
   }
 
