@@ -227,7 +227,7 @@
       <remap from="~odometry_innovation_in" to="estimation_manager/innovation" />
       <remap from="~local_odometry_in" to="hw_api/odometry" />
       <remap from="~gnss_in" to="hw_api/gnss" />
-      <remap from="~max_height_in" to="estimation_manager/max_altitude" />
+      <remap from="~max_z_in" to="estimation_manager/max_altitude" />
       <remap from="~joystick_in" to="joy" />
       <remap from="~bumper_sectors_in" to="bumper/obstacle_sectors" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
@@ -312,8 +312,8 @@
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
       <remap from="~bumper_set_params_in" to="~bumper_set_params" />
-      <remap from="~set_min_height_in" to="~set_min_height" />
-      <remap from="~get_min_height_in" to="~get_min_height" />
+      <remap from="~set_min_z_in" to="~set_min_z" />
+      <remap from="~get_min_z_in" to="~get_min_z" />
       <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_service_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~use_safety_area_in" to="~use_safety_area" />
