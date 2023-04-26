@@ -88,7 +88,7 @@ public:
   bool isInPublishableState() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
     return current_state == READY_FOR_TAKEOFF_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
-           current_state == LANDING_STATE || current_state == DUMMY_STATE  || current_state == FAILSAFE_STATE;
+           current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
   }
 
   bool isInTheAir() const {
@@ -448,7 +448,14 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
     if (sm_->isInPublishableState()) {
 
-      mrs_msgs::UavState uav_state = active_estimator_->getUavState();
+      mrs_msgs::UavState uav_state;
+      auto               ret = active_estimator_->getUavState();
+      if (ret) {
+        uav_state = ret.value();
+      } else {
+        ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
+        return;
+      }
 
       if (!Support::noNans(uav_state.pose.orientation)) {
         ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
@@ -486,9 +493,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
         ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
       }
 
-      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(), sm_->getCurrentStateString().c_str(),
-                        uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(),
-                        max_flight_altitude_agl, estimator_switch_count_);
+      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. alt.: %.2f m. Estimator switches: %d.", getName().c_str(),
+                        sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
+                        active_estimator_->getName().c_str(), max_flight_altitude_agl, estimator_switch_count_);
 
     } else {
       ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());

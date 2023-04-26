@@ -68,7 +68,7 @@ public:
   virtual bool setUavState(const mrs_msgs::UavState &uav_state) = 0;
 
   // implemented methods
-  mrs_msgs::UavState                       getUavState();
+  std::optional<mrs_msgs::UavState>        getUavState();
   nav_msgs::Odometry                       getInnovation() const;
   std::vector<double>                      getPoseCovariance() const;
   std::vector<double>                      getTwistCovariance() const;
