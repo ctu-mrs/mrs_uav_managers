@@ -49,6 +49,7 @@ protected:
   std::shared_ptr<CommonHandlers_t> ch_;
 
   double max_flight_z_ = -1.0;
+  double pos_innovation_limit_;
 
 private:
   SMStates_t previous_sm_state_ = UNINITIALIZED_STATE;

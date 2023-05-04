@@ -7,6 +7,10 @@ namespace mrs_uav_managers
 /*//{ changeState() */
 bool Estimator::changeState(SMStates_t new_state) {
 
+  if (new_state == current_sm_state_) {
+    return true;
+  }
+
   previous_sm_state_ = current_sm_state_;
   current_sm_state_  = new_state;
 
