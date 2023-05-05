@@ -80,6 +80,12 @@ std::string Estimator::getCurrentSmStateString(void) const {
 }
 /*//}*/
 
+/*//{ isMitigatingJump() */
+bool Estimator::isMitigatingJump(void) const {
+  return is_mitigating_jump_;
+}
+/*//}*/
+
 /*//{ getName() */
 std::string Estimator::getName(void) const {
   return name_;

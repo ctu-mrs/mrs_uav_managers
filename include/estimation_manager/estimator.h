@@ -49,7 +49,8 @@ protected:
   std::shared_ptr<CommonHandlers_t> ch_;
 
   double max_flight_z_ = -1.0;
-  double pos_innovation_limit_;
+
+  std::atomic_bool is_mitigating_jump_ = false;
 
 private:
   SMStates_t previous_sm_state_ = UNINITIALIZED_STATE;
@@ -79,6 +80,8 @@ public:
   std::string getSmStateString(const SMStates_t &state) const;
   std::string getCurrentSmStateString(void) const;
   SMStates_t  getCurrentSmState() const;
+
+  bool isMitigatingJump() const;
 
   // state machine methods
   bool changeState(SMStates_t new_state);

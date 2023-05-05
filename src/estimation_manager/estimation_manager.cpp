@@ -462,6 +462,9 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
         return;
       }
 
+      if (active_estimator_->isMitigatingJump()) {
+        estimator_switch_count_++;
+      }
       uav_state.estimator_iteration = estimator_switch_count_;
 
       scope_timer.checkpoint("get uav state");
