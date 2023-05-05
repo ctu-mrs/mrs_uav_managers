@@ -418,9 +418,9 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
       ROS_WARN("[%s]: Detected estimator change from %s to %s. Updating offset for fixed origin.", getPrintName().c_str(), last_frame_id_.c_str(),
                msg->header.frame_id.c_str());
 
-      last_frame_id_   = msg->header.frame_id;
       pose_fixed_diff_ = Support::getPoseDiff(msg->pose, pose_fixed_);
     }
+
 
     pose_fixed_ = Support::applyPoseDiff(msg->pose, pose_fixed_diff_);
 
@@ -450,6 +450,27 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
                   tf_msg.child_frame_id.c_str());
     /*//}*/
   }
+
+/*//{ choose another source of utm and world tfs after estimator switch */
+  if (msg->header.frame_id != last_frame_id_) {
+    const std::string last_estimator_name    = Support::frameIdToEstimatorName(last_frame_id_);
+    const std::string current_estimator_name = Support::frameIdToEstimatorName(msg->header.frame_id);
+
+    ROS_INFO("[%s]: Detected estimator switch: %s -> %s", getPrintName().c_str(), last_estimator_name.c_str(), current_estimator_name.c_str());
+
+    for (size_t i = 0; i < tf_sources_.size(); i++) {
+      if (tf_sources_.at(i)->getName() == last_estimator_name) {
+        tf_sources_.at(i)->setIsUtmSource(false);
+    ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
+      }
+      if (tf_sources_.at(i)->getName() == current_estimator_name) {
+        tf_sources_.at(i)->setIsUtmSource(true);
+    ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+      }
+    }
+  }
+/*//}*/
+  last_frame_id_ = msg->header.frame_id;
 }
 /*//}*/
 
@@ -519,7 +540,7 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   if (!got_utm_offset_) {
 

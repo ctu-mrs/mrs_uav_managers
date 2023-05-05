@@ -49,7 +49,7 @@ public:
   }
   /*//}*/
 
-/* toLowercase //{ */
+/* toLowercase() //{ */
 
 static std::string toLowercase(const std::string str_in) {
   std::string str_out = str_in;
@@ -59,7 +59,7 @@ static std::string toLowercase(const std::string str_in) {
 
 //}
 
-/* toUppercase //{ */
+/* toUppercase() //{ */
 
 static std::string toUppercase(const std::string str_in) {
   std::string str_out = str_in;
@@ -295,6 +295,13 @@ static std::string toUppercase(const std::string str_in) {
   /*//{ isStringInVector() */
   static bool isStringInVector(const std::string& value, const std::vector<std::string>& str_vec) {
     return std::find(str_vec.begin(), str_vec.end(), value) != str_vec.end();
+  }
+  /*//}*/
+
+  /*//{ frameIdToEstimatorName() */
+  static std::string frameIdToEstimatorName(const std::string& str_in) {
+    const std::string str_tmp = str_in.substr(str_in.find("/")+1, str_in.size());
+    return str_tmp.substr(0, str_tmp.find("_origin") );
   }
   /*//}*/
 

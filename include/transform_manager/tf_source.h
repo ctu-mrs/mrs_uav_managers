@@ -65,8 +65,7 @@ public:
       /* param_loader.loadParam(getName() + "/publish_local_tf", publish_local_tf_); */
 
       /*//{ utm source */
-      if (is_utm_source_) {
-
+      if (is_utm_based_) {
         std::string utm_origin_parent_frame_id;
         param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
         ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
@@ -78,13 +77,7 @@ public:
       /*//}*/
 
       /*//{ world source */
-      if (is_utm_source_) {
-
-        if (!is_utm_based_) {
-          ROS_ERROR("[%s]: is world_origin source but is not utm-based. Check your config!", getPrintName().c_str());
-          ros::shutdown();
-        }
-
+      if (is_utm_based_) {
         std::string world_origin_parent_frame_id;
         param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);
         ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
@@ -142,6 +135,12 @@ public:
   }
   /*//}*/
 
+  /*//{ setIsUtmSource() */
+  void setIsUtmSource(const bool is_utm_source) {
+    is_utm_source_ = is_utm_source;
+  }
+  /*//}*/
+
   /*//{ setUtmOrigin() */
   void setUtmOrigin(const geometry_msgs::Point& pt) {
 
@@ -175,14 +174,14 @@ private:
 
   bool is_inverted_;
 
-  bool        is_utm_based_;
-  bool        publish_local_tf_ = true;
-  bool        publish_utm_tf_ = false;
-  bool        publish_world_tf_ = false;
-  bool        is_in_utm_     = false;
-  bool        is_utm_source_ = false;
-  std::string ns_utm_origin_parent_frame_id_;
-  std::string ns_utm_origin_child_frame_id_;
+  bool             is_utm_based_;
+  bool             publish_local_tf_ = true;
+  bool             publish_utm_tf_   = false;
+  bool             publish_world_tf_ = false;
+  bool             is_in_utm_        = false;
+  std::atomic_bool is_utm_source_    = false;
+  std::string      ns_utm_origin_parent_frame_id_;
+  std::string      ns_utm_origin_child_frame_id_;
 
   bool                 is_utm_origin_set_ = false;
   geometry_msgs::Point utm_origin_;
@@ -237,17 +236,17 @@ private:
 
     if (publish_local_tf_ && !is_local_static_tf_published_) {
       publishLocalTf(msg->header.frame_id);
-    scope_timer.checkpoint("pub local tf");
+      scope_timer.checkpoint("pub local tf");
     }
 
     if (publish_utm_tf_ && is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) {
       publishUtmTf(msg->header.frame_id);
-    scope_timer.checkpoint("pub utm tf");
+      scope_timer.checkpoint("pub utm tf");
     }
 
     if (publish_world_tf_ && is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) {
       publishWorldTf(msg->header.frame_id);
-    scope_timer.checkpoint("pub world tf");
+      scope_timer.checkpoint("pub world tf");
     }
 
     for (auto republisher : republishers_) {
