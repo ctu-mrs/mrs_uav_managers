@@ -4,6 +4,7 @@
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
+	<arg name="OLD_PX4_FW" default="$(optenv OLD_PX4_FW false)" />
 
   <!-- other args -->
   <arg name="debug" default="false" />
@@ -40,7 +41,8 @@
       <param name="imu_mode" type="bool" value="$(arg imu_mode)" />
 
       <!-- Subscribers -->
-      <remap from="~odom_mavros_in" to="mavros/local_position/odom" />
+      <remap if="$(eval arg('OLD_PX4_FW') == 0)" from="~odom_mavros_in" to="mavros/odometry/in" />
+      <remap if="$(eval arg('OLD_PX4_FW') == 1)" from="~odom_mavros_in" to="mavros/local_position/odom" />
       <remap from="~imu_in" to="imu/data" />
 
       <!-- Publishers -->
