@@ -51,7 +51,7 @@ namespace mrs_uav_managers
 class Tracker {
 
 public:
-  virtual ~Tracker() = 0;
+  virtual ~Tracker() = default;
 
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
