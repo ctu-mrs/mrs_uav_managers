@@ -567,15 +567,15 @@ private:
   // | ------------------------ callbacks ----------------------- |
 
   // topic callbacks
-  void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
-  void callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
-  void callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::State>& wrp);
-  void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
-  void callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wrp);
+  void callbackOdometry(const nav_msgs::Odometry::ConstPtr odom);
+  void callbackUavState(const mrs_msgs::UavState::ConstPtr uav_state);
+  void callbackMavrosState(const mavros_msgs::State::ConstPtr state);
+  void callbackMavrosGps(const sensor_msgs::NavSatFix::ConstPtr data);
+  void callbackRC(const mavros_msgs::RCIn::ConstPtr rc);
 
   // topic timeouts
-  void timeoutUavState(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
-  void timeoutMavrosState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs);
+  void timeoutUavState(const std::string& topic, const ros::Time& last_msg);
+  void timeoutMavrosState(const std::string& topic, const ros::Time& last_msg);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
@@ -771,7 +771,7 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::Joy> sh_joystick_;
 
-  void callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy>& msg);
+  void callbackJoystick(const sensor_msgs::Joy::ConstPtr joystick_data);
   bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
@@ -3315,15 +3315,13 @@ void ControlManager::asyncControl(void) {
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
+void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr odom) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
-
-  nav_msgs::OdometryConstPtr odom = wrp.getMsg();
 
   // | --------------------- check for nans --------------------- |
 
@@ -3469,15 +3467,13 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
+void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr uav_state) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
-
-  mrs_msgs::UavStateConstPtr uav_state = wrp.getMsg();
 
   // | --------------------- check for nans --------------------- |
 
@@ -3639,15 +3635,13 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
 
 /* //{ callbackMavrosGps() */
 
-void ControlManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+void ControlManager::callbackMavrosGps(const sensor_msgs::NavSatFix::ConstPtr data) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosGps");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosGps", scope_timer_logger_, scope_timer_enabled_);
-
-  sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
   transformer_->setLatLon(data->latitude, data->longitude);
 }
@@ -3656,7 +3650,7 @@ void ControlManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::Na
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy>& wrp) {
+void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr joystick_data) {
 
   if (!is_initialized_)
     return;
@@ -3667,8 +3661,6 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
   // copy member variables
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
-
-  sensor_msgs::JoyConstPtr joystick_data = wrp.getMsg();
 
   // TODO check if the array is smaller than the largest idx
   if (joystick_data->buttons.size() == 0 || joystick_data->axes.size() == 0) {
@@ -3777,15 +3769,13 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
 /* //{ callbackMavrosState() */
 
-void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::State>& wrp) {
+void ControlManager::callbackMavrosState(const mavros_msgs::State::ConstPtr state) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosState");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackMavrosState", scope_timer_logger_, scope_timer_enabled_);
-
-  mavros_msgs::StateConstPtr state = wrp.getMsg();
 
   // | ------ detect and print the changes in offboard mode ----- |
   if (state->mode == "OFFBOARD") {
@@ -3825,15 +3815,13 @@ void ControlManager::callbackMavrosState(mrs_lib::SubscribeHandler<mavros_msgs::
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wrp) {
+void ControlManager::callbackRC(const mavros_msgs::RCIn::ConstPtr rc) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
-
-  mavros_msgs::RCInConstPtr rc = wrp.getMsg();
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
@@ -3958,7 +3946,7 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mavros_msgs::RCIn>& wr
 
 /* timeoutUavState() //{ */
 
-void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
+void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& last_msg) {
 
   if (motors_ && !failsafe_triggered_) {
 
@@ -3975,7 +3963,7 @@ void ControlManager::timeoutUavState(const std::string& topic, const ros::Time& 
 
 /* timeoutMavrosState() //{ */
 
-void ControlManager::timeoutMavrosState([[maybe_unused]] const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
+void ControlManager::timeoutMavrosState([[maybe_unused]] const std::string& topic, const ros::Time& last_msg) {
 
   ros::Duration time = ros::Time::now() - last_msg;
 

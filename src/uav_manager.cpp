@@ -113,8 +113,8 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
   mrs_lib::SubscribeHandler<mrs_msgs::PositionCommand>              sh_position_cmd_;
 
-  void callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
-  void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
+  void callbackMavrosGps(const sensor_msgs::NavSatFix::ConstPtr data);
+  void callbackOdometry(const nav_msgs::Odometry::ConstPtr wrp);
 
   // service servers
   ros::ServiceServer service_server_takeoff_;
@@ -1111,15 +1111,13 @@ void UavManager::timerMidairActivation([[maybe_unused]] const ros::TimerEvent& e
 
 /* //{ callbackMavrosGps() */
 
-void UavManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+void UavManager::callbackMavrosGps(const sensor_msgs::NavSatFix::ConstPtr data) {
 
   if (!is_initialized_)
     return;
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackMavrosGps");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::callbackMavrosGps", scope_timer_logger_, scope_timer_enabled_);
-
-  sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
 
   transformer_->setLatLon(data->latitude, data->longitude);
 }
@@ -1128,12 +1126,10 @@ void UavManager::callbackMavrosGps(mrs_lib::SubscribeHandler<sensor_msgs::NavSat
 
 /* //{ callbackOdometry() */
 
-void UavManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
+void UavManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr data) {
 
   if (!is_initialized_)
     return;
-
-  nav_msgs::OdometryConstPtr data = wrp.getMsg();
 
   transformer_->setDefaultFrame(data->header.frame_id);
 }
