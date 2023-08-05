@@ -15,6 +15,7 @@
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg name="custom_config" default="" />
+  <arg name="platform_config" default="" />
   <arg name="custom_config_active_estimators" default="" />
 
     <!-- other args -->
@@ -38,18 +39,19 @@
 
   <group ns="$(arg UAV_NAME)">
 
-<!--//{ transform_manager -->
     <node pkg="nodelet" type="nodelet" name="transform_manager" args="$(arg nodelet) mrs_uav_managers/TransformManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
 
       <rosparam file="$(arg world_file)" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/transform_manager/transform_manager.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/active_estimators.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/transform_manager/transform_manager.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/transform_manager/transform_manager.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/active_estimators.yaml" command="load" />
 
       <!-- Load a user param file -->
-      <rosparam if="$(eval not arg('custom_config_active_estimators') == '')" file="$(arg custom_config_active_estimators)" />
+      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <!-- Subscribers -->
       <remap from="~uav_state_in" to="estimation_manager/uav_state" />
@@ -61,7 +63,6 @@
       <remap from="~profiler" to="profiler" />
 
     </node>
-<!--//}-->
 
     <!-- RTK antenna to FCU TF (TODO: should be published by hw_api) -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="fcu_to_rtk_antenna" args="0.0 0.0 0.20 0 0 0 $(arg UAV_NAME)/$(arg fcu_frame_id) $(arg UAV_NAME)/rtk_antenna" />

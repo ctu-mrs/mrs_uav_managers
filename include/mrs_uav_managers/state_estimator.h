@@ -13,7 +13,7 @@
 #include <mrs_msgs/Float64ArrayStamped.h>
 #include <mrs_msgs/HwApiCapabilities.h>
 
-#include "estimation_manager/estimator.h"
+#include <mrs_uav_managers/estimation_manager/estimator.h>
 
 //}
 

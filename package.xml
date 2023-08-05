@@ -12,13 +12,14 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>roscpp</depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav_msgs</depend>
-  <depend>std_msgs</depend>
   <depend>cmake_modules</depend>
-  <depend>mrs_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
   <depend>nodelet</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>mrs_msgs</depend>
   <depend>mrs_lib</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>

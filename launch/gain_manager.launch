@@ -9,6 +9,7 @@
 
     <!-- other args -->
   <arg name="custom_config" default="" />
+  <arg name="platform_config" default="" />
   <arg name="standalone" default="true" />
   <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
   <arg name="bond" default="$(optenv BOND true)" />
@@ -33,14 +34,16 @@
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_managers/GainManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/default/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/gain_manager/gains.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gain_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gains.yaml" />
 
         <!-- Load the particular param files -->
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
 
       <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />

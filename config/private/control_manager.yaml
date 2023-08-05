@@ -1,0 +1,54 @@
+mrs_uav_managers:
+
+  control_manager:
+
+    #- this is the "do nothing tracker", which is active when no other is
+    null_tracker: "NullTracker"
+
+    status_timer_rate: 10 # [Hz] # will be overriden for VELOCITY+ output mode
+
+    safety:
+
+      safety_timer_rate: 100 # [Hz]
+      failsafe_timer_rate: 100 # [Hz]
+
+    # these constraints are normally overridden by the ConstraintManager.
+    default_constraints:
+
+      horizontal:
+        speed: 1.0
+        acceleration: 1.0
+        jerk: 20.0
+        snap: 20.0
+
+      vertical:
+
+        ascending:
+          speed: 1.0
+          acceleration: 1.0
+          jerk: 20.0
+          snap: 20.0
+
+        descending:
+          speed: 1.0
+          acceleration: 1.0
+          jerk: 20.0
+          snap: 20.0
+
+      heading:
+        speed: 1.0
+        acceleration: 1.0
+        jerk: 10.0
+        snap: 10.0
+
+      angular_speed:
+        roll: 20.0
+        pitch: 20.0
+        yaw: 10.0
+
+      tilt: deg(60)
+
+    scope_timer:
+
+      enabled: false
+      log_filename: "" # if empty, scope timers output to terminal; otherwise log to file

@@ -5,7 +5,8 @@
 
 #include <ros/ros.h>
 
-#include <mrs_uav_managers/common_handlers.h>
+#include <mrs_uav_managers/control_manager/common_handlers.h>
+#include <mrs_uav_managers/control_manager/private_handlers.h>
 
 #include <mrs_msgs/HwApiActuatorCmd.h>
 #include <mrs_msgs/HwApiControlGroupCmd.h>
@@ -65,15 +66,16 @@ public:
   /**
    * @brief Initializes the controller. It is called once for every controller. The runtime is not limited.
    *
-   * @param parent_nh the node handle of the ControlManager
+   * @param nh the node handle of the ControlManager
    * @param name of the controller for distinguishing multiple running instances of the same code
    * @param name_space the parameter namespace of the controller, can be used during initialization of the private node handle
-   * @param uav_mass the net mass of the UAV
    * @param common_handlers handlers shared between trackers and controllers
-   * @param output_modalities declares which output command does the hardware API of the UAV accept
+   * @param private_handlers handlers provided individually to each controller
+   *
+   * @return true if success
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string name, const std::string name_space,
-                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
+  virtual bool initialize(const ros::NodeHandle &nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+                          std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) = 0;
 
   /**
    * @brief It is called before the controller output will be required and used. Should not take much time (within miliseconds).

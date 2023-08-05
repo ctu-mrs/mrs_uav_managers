@@ -12,7 +12,9 @@ class NullTracker : public mrs_uav_managers::Tracker {
 public:
   ~NullTracker(){};
 
-  void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers);
+  bool initialize(const ros::NodeHandle &parent_nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+                  std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers);
+
   std::tuple<bool, std::string> activate([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand> &last_tracker_cmd);
   void                          deactivate(void);
   bool                          resetStatic(void);
@@ -40,7 +42,7 @@ private:
   bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 
-  std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers;
+  std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers;
 };
 
 //}
@@ -49,8 +51,9 @@ private:
 
 /* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] const std::string uav_name,
-                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) {
+bool NullTracker::initialize(const ros::NodeHandle &                                                                parent_nh,
+                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t>  common_handlers,
+                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -61,6 +64,8 @@ void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] 
   this->common_handlers = common_handlers;
 
   ROS_INFO("[NullTracker]: initialized");
+
+  return true;
 }
 
 //}

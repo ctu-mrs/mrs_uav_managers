@@ -22,8 +22,8 @@
 #include <memory>
 #include <string>
 
-#include "estimation_manager/support.h"
-#include "estimation_manager/common_handlers.h"
+#include <mrs_uav_managers/estimation_manager/support.h>
+#include <mrs_uav_managers/estimation_manager/common_handlers.h>
 
 namespace mrs_uav_managers
 {
@@ -44,34 +44,38 @@ public:
     if (name != "dummy") {
       /*//{ load parameters */
       mrs_lib::ParamLoader param_loader(nh_, getPrintName());
+
+      const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
+
       std::string          odom_topic, attitude_topic, ns;
-      param_loader.loadParam(getName() + "/odom_topic", odom_topic);
-      param_loader.loadParam(getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
+
+      param_loader.loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
+      param_loader.loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
       if (custom_frame_id_enabled_) {
-        param_loader.loadParam(getName() + "/custom_frame_id/frame_id", custom_frame_id_);
+        param_loader.loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
       }
-      param_loader.loadParam(getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
+      param_loader.loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
       if (tf_from_attitude_enabled_) {
-        param_loader.loadParam(getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
+        param_loader.loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
       }
-      param_loader.loadParam(getName() + "/namespace", ns);
+      param_loader.loadParam(yaml_prefix + getName() + "/namespace", ns);
       full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
       full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
-      param_loader.loadParam(getName() + "/inverted", is_inverted_);
-      param_loader.loadParam(getName() + "/republish_in_frames", republish_in_frames_);
+      param_loader.loadParam(yaml_prefix + getName() + "/inverted", is_inverted_);
+      param_loader.loadParam(yaml_prefix + getName() + "/republish_in_frames", republish_in_frames_);
 
       /* coordinate frames origins //{ */
-      param_loader.loadParam(getName() + "/utm_based", is_utm_based_);
-      /* param_loader.loadParam(getName() + "/publish_local_tf", publish_local_tf_); */
+      param_loader.loadParam(yaml_prefix + getName() + "/utm_based", is_utm_based_);
+      /* param_loader.loadParam(yaml_prefix + getName() + "/publish_local_tf", publish_local_tf_); */
 
       /*//{ utm source */
       if (is_utm_based_) {
         std::string utm_origin_parent_frame_id;
-        param_loader.loadParam("utm_origin_tf/parent", utm_origin_parent_frame_id);
+        param_loader.loadParam(yaml_prefix + "utm_origin_tf/parent", utm_origin_parent_frame_id);
         ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
 
         std::string utm_origin_child_frame_id;
-        param_loader.loadParam("utm_origin_tf/child", utm_origin_child_frame_id);
+        param_loader.loadParam(yaml_prefix + "utm_origin_tf/child", utm_origin_child_frame_id);
         ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
       }
       /*//}*/
@@ -79,11 +83,11 @@ public:
       /*//{ world source */
       if (is_utm_based_) {
         std::string world_origin_parent_frame_id;
-        param_loader.loadParam("world_origin_tf/parent", world_origin_parent_frame_id);
+        param_loader.loadParam(yaml_prefix + "world_origin_tf/parent", world_origin_parent_frame_id);
         ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
 
         std::string world_origin_child_frame_id;
-        param_loader.loadParam("world_origin_tf/child", world_origin_child_frame_id);
+        param_loader.loadParam(yaml_prefix + "world_origin_tf/child", world_origin_child_frame_id);
         ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
       }
       /*//}*/

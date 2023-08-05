@@ -5,7 +5,8 @@
 
 #include <ros/ros.h>
 
-#include <mrs_uav_managers/common_handlers.h>
+#include <mrs_uav_managers/control_manager/common_handlers.h>
+#include <mrs_uav_managers/control_manager/private_handlers.h>
 
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
@@ -54,12 +55,15 @@ public:
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
    *
-   * @param parent_nh the node handle of the ControlManager
+   * @param nh the node handle of the ControlManager
    * @param uav_name the UAV name (e.g., "uav1")
    * @param common_handlers handlers shared between trackers and controllers
+   * @param private_handlers handlers provided individually to each tracker
+   *
+   * @return true if success
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name,
-                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
+  virtual bool initialize(const ros::NodeHandle &nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+                          std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) = 0;
 
   /**
    * @brief It is called before the trackers output will be required and used. Should not take much time (within miliseconds).

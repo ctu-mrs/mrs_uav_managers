@@ -1,0 +1,100 @@
+mrs_uav_managers:
+
+  control_manager:
+
+    Se3Controller:
+      address: "mrs_uav_controllers/Se3Controller"
+      namespace: "se3_controller"
+      eland_threshold: 1.5 # [m], position error triggering eland
+      failsafe_threshold: 2.5 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 1.5 # [m], position odometry innovation threshold
+      human_switchable: true
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    MpcController:
+      address: "mrs_uav_controllers/MpcController"
+      namespace: "mpc_controller"
+      eland_threshold: 2.5 # [m], position error triggering eland
+      failsafe_threshold: 3.5 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 2.5 # [m], position odometry innovation threshold
+      human_switchable: true
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    FailsafeController:
+      address: "mrs_uav_controllers/FailsafeController"
+      namespace: "failsafe_controller"
+      eland_threshold: 0.0 # [m], position error triggering eland
+      failsafe_threshold: 0.0 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 0.0 # [m], position odometry innovation threshold
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    EmergencyController:
+      address: "mrs_uav_controllers/MpcController"
+      namespace: "emergency_controller"
+      eland_threshold: 3.0 # [m], position error triggering eland
+      failsafe_threshold: 4.0 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    MidairActivationController:
+      address: "mrs_uav_controllers/MidairActivationController"
+      namespace: "midair_activation_controller"
+      eland_threshold: 3.0 # [m], position error triggering eland
+      failsafe_threshold: 4.0 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true

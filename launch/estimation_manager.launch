@@ -15,7 +15,7 @@
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg name="custom_config" default="" />
-  <arg name="custom_config_active_estimators" default="" />
+  <arg name="platform_config" default="" />
 
     <!-- other args -->
   <arg name="standalone" default="true" />
@@ -36,31 +36,27 @@
 
   <group ns="$(arg UAV_NAME)">
 
-<!--//{ estimation_manager -->
     <node pkg="nodelet" type="nodelet" name="estimation_manager" args="$(arg nodelet) mrs_uav_managers/EstimationManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
 
       <rosparam file="$(arg world_file)" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/estimation_manager/estimation_manager.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/estimators.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/active_estimators.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/estimation_manager/estimation_manager.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/estimation_manager/estimation_manager.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/estimators.yaml" command="load" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/active_estimators.yaml" command="load" />
 
       <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
-      <rosparam if="$(eval not arg('custom_config_active_estimators') == '')" file="$(arg custom_config_active_estimators)" />
 
-<!--//{ Subscribers-->
       <!-- common -->
       <remap from="~control_input_in" to="control_manager/estimator_input" />
       <remap from="~imu_in" to="hw_api/imu" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
 
-<!--//}-->
-
-<!--//{ Publishers -->
       <remap from="~profiler" to="profiler" />
       <remap from="~odom_main_out" to="~odom_main" />
       <remap from="~innovation_out" to="~innovation" />
@@ -69,19 +65,12 @@
       <remap from="~max_flight_z_agl_out" to="~max_flight_z_agl" />
       <remap from="~height_agl_out" to="~height_agl" />
 
-<!--//}-->
-
-<!--//{ Service servers -->
       <remap from="~change_estimator_in" to="~change_estimator" />
       <remap from="~toggle_service_callbacks_in" to="~toggle_service_callbacks" />
-<!--//}-->
 
-<!--//{ Service clients -->
       <remap from="~failsafe_out" to="control_manager/failsafe" />
-<!--//}-->
 
     </node>
-<!--//}-->
 
   </group>
 

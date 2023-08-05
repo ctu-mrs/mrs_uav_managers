@@ -1,5 +1,3 @@
-#define VERSION "1.0.4.0"
-
 /*//{ includes */
 #include <ros/ros.h>
 #include <ros/package.h>
@@ -81,15 +79,17 @@ void TfManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh, "TfManager");
 
-  param_loader.loadParam("frames/fcu_frame_id", fcu_frame_id_);
-  param_loader.loadParam("frames/fcu_untilted_frame_id", fcu_untilted_frame_id_);
+  const std::string yaml_prefix = "mrs_uav_managers/tf_manager/";
+
+  param_loader.loadParam(yaml_prefix + "frames/fcu_frame_id", fcu_frame_id_);
+  param_loader.loadParam(yaml_prefix + "frames/fcu_untilted_frame_id", fcu_untilted_frame_id_);
 
   bool imu_mode = false;
-  param_loader.loadParam("imu_mode", imu_mode);
+  param_loader.loadParam(yaml_prefix + "imu_mode", imu_mode);
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -131,7 +131,7 @@ void TfManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[TfManager]: initialized, version %s", VERSION);
+  ROS_INFO("[TfManager]: initialized");
 
   ROS_DEBUG("[TfManager]: debug output is enabled");
 }

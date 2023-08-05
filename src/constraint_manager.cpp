@@ -1,5 +1,3 @@
-#define VERSION "1.0.4.0"
-
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -43,7 +41,6 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  std::string     _version_;
   bool            is_initialized_ = false;
 
   // | ----------------------- parameters ----------------------- |
@@ -130,22 +127,17 @@ void ConstraintManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
 
-  param_loader.loadParam("version", _version_);
+  const std::string yaml_prefix = "mrs_uav_managers/constraint_manager/";
 
-  if (_version_ != VERSION) {
-
-    ROS_ERROR("[ConstraintManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::shutdown();
-  }
-
+  // params passed from the launch file are not prefixed
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.loadParam("constraints", _constraint_names_);
+  param_loader.loadParam(yaml_prefix + "constraints", _constraint_names_);
 
-  param_loader.loadParam("estimator_types", _estimator_type_names_);
+  param_loader.loadParam(yaml_prefix + "estimator_types", _estimator_type_names_);
 
-  param_loader.loadParam("rate", _constraint_management_rate_);
-  param_loader.loadParam("diagnostics_rate", _diagnostics_rate_);
+  param_loader.loadParam(yaml_prefix + "rate", _constraint_management_rate_);
+  param_loader.loadParam(yaml_prefix + "diagnostics_rate", _diagnostics_rate_);
 
   std::vector<std::string>::iterator it;
 
@@ -156,31 +148,31 @@ void ConstraintManager::onInit() {
 
     mrs_msgs::DynamicsConstraintsSrvRequest new_constraints;
 
-    param_loader.loadParam(*it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
-    param_loader.loadParam(*it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
-    param_loader.loadParam(*it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
-    param_loader.loadParam(*it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
 
-    param_loader.loadParam(*it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
-    param_loader.loadParam(*it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
-    param_loader.loadParam(*it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
-    param_loader.loadParam(*it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
 
-    param_loader.loadParam(*it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
-    param_loader.loadParam(*it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
-    param_loader.loadParam(*it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
-    param_loader.loadParam(*it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
 
-    param_loader.loadParam(*it + "/heading/speed", new_constraints.constraints.heading_speed);
-    param_loader.loadParam(*it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
-    param_loader.loadParam(*it + "/heading/jerk", new_constraints.constraints.heading_jerk);
-    param_loader.loadParam(*it + "/heading/snap", new_constraints.constraints.heading_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/speed", new_constraints.constraints.heading_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/jerk", new_constraints.constraints.heading_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/snap", new_constraints.constraints.heading_snap);
 
-    param_loader.loadParam(*it + "/angular_speed/roll", new_constraints.constraints.roll_rate);
-    param_loader.loadParam(*it + "/angular_speed/pitch", new_constraints.constraints.pitch_rate);
-    param_loader.loadParam(*it + "/angular_speed/yaw", new_constraints.constraints.yaw_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/roll", new_constraints.constraints.roll_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/pitch", new_constraints.constraints.pitch_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/yaw", new_constraints.constraints.yaw_rate);
 
-    param_loader.loadParam(*it + "/tilt", new_constraints.constraints.tilt);
+    param_loader.loadParam(yaml_prefix + *it + "/tilt", new_constraints.constraints.tilt);
 
     _constraints_.insert(std::pair<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>(*it, new_constraints));
   }
@@ -189,7 +181,7 @@ void ConstraintManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.loadParam("constraint_management/allowed_constraints/" + *it, temp_vector);
+    param_loader.loadParam(yaml_prefix + "constraint_management/allowed_constraints/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -206,7 +198,7 @@ void ConstraintManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.loadParam("constraint_management/fallback_constraints/" + *it, temp_str);
+    param_loader.loadParam(yaml_prefix + "constraint_management/fallback_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
       ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
@@ -257,7 +249,7 @@ void ConstraintManager::onInit() {
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -270,7 +262,7 @@ void ConstraintManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[ConstraintManager]: initialized, version %s", VERSION);
+  ROS_INFO("[ConstraintManager]: initialized");
 
   ROS_DEBUG("[ConstraintManager]: debug output is enabled");
 }

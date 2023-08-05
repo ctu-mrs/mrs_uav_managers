@@ -1,5 +1,3 @@
-#define VERSION "1.0.4.0"
-
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -37,10 +35,11 @@ namespace gain_manager
 typedef struct
 {
 
-  double kpxy, kiwxy, kibxy, kvxy, kaxy, kqxy;
-  double kpz, kvz, kaz, kqz;
+  double kpxy, kiwxy, kibxy, kvxy, kaxy;
+  double kpz, kvz, kaz;
   double kiwxy_lim, kibxy_lim;
   double km, km_lim;
+  double kqrp, kqy;
 
   std::string name;
 
@@ -53,7 +52,6 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  std::string     _version_;
   bool            is_initialized_ = false;
 
   // | ----------------------- parameters ----------------------- |
@@ -72,7 +70,7 @@ private:
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>              sh_estimation_diag_;
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>     sh_estimation_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
 
   // | --------------------- gain management -------------------- |
@@ -83,7 +81,7 @@ private:
   bool               callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
   std::string last_estimator_name_;
-  std::mutex                          mutex_last_estimator_name_;
+  std::mutex  mutex_last_estimator_name_;
 
   void       timerGainManagement(const ros::TimerEvent& event);
   ros::Timer timer_gain_management_;
@@ -131,26 +129,21 @@ void GainManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
 
-  param_loader.loadParam("version", _version_);
+  const std::string yaml_prefix = "mrs_uav_managers/gain_manager/";
 
-  if (_version_ != VERSION) {
-
-    ROS_ERROR("[GainManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::shutdown();
-  }
-
+  // params passed from the launch file are not prefixed
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
 
-  param_loader.loadParam("gains", _gain_names_);
+  param_loader.loadParam(yaml_prefix + "gains", _gain_names_);
 
-  param_loader.loadParam("estimator_types", _current_state_estimators_);
+  param_loader.loadParam(yaml_prefix + "estimator_types", _current_state_estimators_);
 
-  param_loader.loadParam("rate", _gain_management_rate_);
-  param_loader.loadParam("diagnostics_rate", _diagnostics_rate_);
+  param_loader.loadParam(yaml_prefix + "rate", _gain_management_rate_);
+  param_loader.loadParam(yaml_prefix + "diagnostics_rate", _diagnostics_rate_);
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -163,22 +156,23 @@ void GainManager::onInit() {
 
     Gains_t new_gains;
 
-    param_loader.loadParam(*it + "/horizontal/kp", new_gains.kpxy);
-    param_loader.loadParam(*it + "/horizontal/kv", new_gains.kvxy);
-    param_loader.loadParam(*it + "/horizontal/ka", new_gains.kaxy);
-    param_loader.loadParam(*it + "/horizontal/attitude/kq", new_gains.kqxy);
-    param_loader.loadParam(*it + "/horizontal/kib", new_gains.kibxy);
-    param_loader.loadParam(*it + "/horizontal/kiw", new_gains.kiwxy);
-    param_loader.loadParam(*it + "/horizontal/kib_lim", new_gains.kibxy_lim);
-    param_loader.loadParam(*it + "/horizontal/kiw_lim", new_gains.kiwxy_lim);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kp", new_gains.kpxy);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kv", new_gains.kvxy);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/ka", new_gains.kaxy);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kib", new_gains.kibxy);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kiw", new_gains.kiwxy);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kib_lim", new_gains.kibxy_lim);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/kiw_lim", new_gains.kiwxy_lim);
 
-    param_loader.loadParam(*it + "/vertical/kp", new_gains.kpz);
-    param_loader.loadParam(*it + "/vertical/kv", new_gains.kvz);
-    param_loader.loadParam(*it + "/vertical/ka", new_gains.kaz);
-    param_loader.loadParam(*it + "/vertical/attitude/kq", new_gains.kqz);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/kp", new_gains.kpz);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/kv", new_gains.kvz);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ka", new_gains.kaz);
 
-    param_loader.loadParam(*it + "/mass_estimator/km", new_gains.km);
-    param_loader.loadParam(*it + "/mass_estimator/km_lim", new_gains.km_lim);
+    param_loader.loadParam(yaml_prefix + *it + "/attitude/kq_roll_pitch", new_gains.kqrp);
+    param_loader.loadParam(yaml_prefix + *it + "/attitude/kq_yaw", new_gains.kqy);
+
+    param_loader.loadParam(yaml_prefix + *it + "/mass_estimator/km", new_gains.km);
+    param_loader.loadParam(yaml_prefix + *it + "/mass_estimator/km_lim", new_gains.km_lim);
 
     _gains_.insert(std::pair<std::string, Gains_t>(*it, new_gains));
   }
@@ -187,7 +181,7 @@ void GainManager::onInit() {
   for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.loadParam("gain_management/allowed_gains/" + *it, temp_vector);
+    param_loader.loadParam(yaml_prefix + "gain_management/allowed_gains/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -204,7 +198,7 @@ void GainManager::onInit() {
   for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.loadParam("gain_management/fallback_gains/" + *it, temp_str);
+    param_loader.loadParam(yaml_prefix + "gain_management/fallback_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
@@ -236,7 +230,7 @@ void GainManager::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_estimation_diag_            = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
+  sh_estimation_diag_      = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
 
   // | ----------------------- publishers ----------------------- |
@@ -261,7 +255,7 @@ void GainManager::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[GainManager]: initialized, version %s", VERSION);
+  ROS_INFO("[GainManager]: initialized");
 
   ROS_DEBUG("[GainManager]: debug output is enabled");
 }
@@ -299,8 +293,8 @@ bool GainManager::setGains(std::string gains_name) {
   param.value = it->second.kaxy;
   conf.doubles.push_back(param);
 
-  param.name  = "kqxy";
-  param.value = it->second.kqxy;
+  param.name  = "kq_roll_pitch";
+  param.value = it->second.kqrp;
   conf.doubles.push_back(param);
 
   param.name  = "kibxy";
@@ -331,8 +325,8 @@ bool GainManager::setGains(std::string gains_name) {
   param.value = it->second.kaz;
   conf.doubles.push_back(param);
 
-  param.name  = "kqz";
-  param.value = it->second.kqz;
+  param.name  = "kq_yaw";
+  param.value = it->second.kqy;
   conf.doubles.push_back(param);
 
   param.name  = "km";
@@ -481,7 +475,8 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
   // | --- automatically set _gains_ when currrent state estimator changes -- |
   if (estimation_diagnostics.current_state_estimator != last_estimator_name) {
 
-    ROS_INFO_THROTTLE(1.0, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics.current_state_estimator.c_str());
+    ROS_INFO_THROTTLE(1.0, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
+                      estimation_diagnostics.current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_fallback_gains_.find(estimation_diagnostics.current_state_estimator);
@@ -571,8 +566,7 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
     diagnostics.current_values.kvxy = it->second.kvxy;
     diagnostics.current_values.kaxy = it->second.kaxy;
 
-    diagnostics.current_values.kqxy = it->second.kqxy;
-    diagnostics.current_values.kqxy = it->second.kqxy;
+    diagnostics.current_values.kqrp = it->second.kqrp;
 
     diagnostics.current_values.kibxy     = it->second.kibxy;
     diagnostics.current_values.kibxy_lim = it->second.kibxy_lim;
@@ -584,8 +578,7 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
     diagnostics.current_values.kvz = it->second.kvz;
     diagnostics.current_values.kaz = it->second.kaz;
 
-    diagnostics.current_values.kqz = it->second.kqz;
-    diagnostics.current_values.kqz = it->second.kqz;
+    diagnostics.current_values.kqy = it->second.kqy;
 
     diagnostics.current_values.km     = it->second.km;
     diagnostics.current_values.km_lim = it->second.km_lim;

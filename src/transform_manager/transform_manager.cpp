@@ -1,5 +1,3 @@
-#define VERSION "0.0.0.1"
-
 /* //{ includes */
 
 #include <ros/ros.h>
@@ -27,9 +25,9 @@
 #include <memory>
 #include <string>
 
-#include "estimation_manager/support.h"
-#include "estimation_manager/common_handlers.h"
-#include "transform_manager/tf_source.h"
+#include <mrs_uav_managers/estimation_manager/support.h>
+#include <mrs_uav_managers/estimation_manager/common_handlers.h>
+#include <transform_manager/tf_source.h>
 
 /*//}*/
 
@@ -63,8 +61,6 @@ private:
   const std::string package_name_ = "mrs_uav_managers";
   const std::string nodelet_name_ = "TransformManager";
   const std::string name_         = "transform_manager";
-
-  std::string version_;
 
   bool publish_fcu_untilted_tf_;
 
@@ -135,20 +131,12 @@ void TransformManager::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
 
-  /*//{ check version */
-  param_loader.loadParam("version", version_);
-
-  if (version_ != VERSION) {
-
-    ROS_ERROR("[%s]: the version of the binary (%s) does not match the config file (%s), please build me!", getPrintName().c_str(), VERSION, version_.c_str());
-    ros::shutdown();
-  }
-  /*//}*/
+  const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
   param_loader.loadParam("uav_name", ch_->uav_name);
 
   /*//{ initialize scope timer */
-  param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
+  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", ch_->scope_timer.enabled);
   std::string       filepath;
   const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/transform_manager_scope_timer.txt";
   ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
@@ -176,7 +164,7 @@ void TransformManager::onInit() {
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got %s", getPrintName().c_str(), world_origin_units_.c_str());
+    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
     ros::shutdown();
   }
 
@@ -192,58 +180,58 @@ void TransformManager::onInit() {
 
   /*//{ load local_origin parameters */
   std::string local_origin_parent_frame_id;
-  param_loader.loadParam("local_origin_tf/parent", local_origin_parent_frame_id);
+  param_loader.loadParam(yaml_prefix + "local_origin_tf/parent", local_origin_parent_frame_id);
   ns_local_origin_parent_frame_id_ = ch_->uav_name + "/" + local_origin_parent_frame_id;
 
   std::string local_origin_child_frame_id;
-  param_loader.loadParam("local_origin_tf/child", local_origin_child_frame_id);
+  param_loader.loadParam(yaml_prefix + "local_origin_tf/child", local_origin_child_frame_id);
   ns_local_origin_child_frame_id_ = ch_->uav_name + "/" + local_origin_child_frame_id;
 
-  param_loader.loadParam("local_origin_tf/enabled", publish_local_origin_tf_);
+  param_loader.loadParam(yaml_prefix + "local_origin_tf/enabled", publish_local_origin_tf_);
   /*//}*/
 
   /*//{ load stable_origin parameters */
   std::string stable_origin_parent_frame_id;
-  param_loader.loadParam("stable_origin_tf/parent", stable_origin_parent_frame_id);
+  param_loader.loadParam(yaml_prefix + "stable_origin_tf/parent", stable_origin_parent_frame_id);
   ns_stable_origin_parent_frame_id_ = ch_->uav_name + "/" + stable_origin_parent_frame_id;
 
   std::string stable_origin_child_frame_id;
-  param_loader.loadParam("stable_origin_tf/child", stable_origin_child_frame_id);
+  param_loader.loadParam(yaml_prefix + "stable_origin_tf/child", stable_origin_child_frame_id);
   ns_stable_origin_child_frame_id_ = ch_->uav_name + "/" + stable_origin_child_frame_id;
 
-  param_loader.loadParam("stable_origin_tf/enabled", publish_stable_origin_tf_);
+  param_loader.loadParam(yaml_prefix + "stable_origin_tf/enabled", publish_stable_origin_tf_);
   /*//}*/
 
   /*//{ load fixed_origin parameters */
   std::string fixed_origin_parent_frame_id;
-  param_loader.loadParam("fixed_origin_tf/parent", fixed_origin_parent_frame_id);
+  param_loader.loadParam(yaml_prefix + "fixed_origin_tf/parent", fixed_origin_parent_frame_id);
   ns_fixed_origin_parent_frame_id_ = ch_->uav_name + "/" + fixed_origin_parent_frame_id;
 
   std::string fixed_origin_child_frame_id;
-  param_loader.loadParam("fixed_origin_tf/child", fixed_origin_child_frame_id);
+  param_loader.loadParam(yaml_prefix + "fixed_origin_tf/child", fixed_origin_child_frame_id);
   ns_fixed_origin_child_frame_id_ = ch_->uav_name + "/" + fixed_origin_child_frame_id;
 
-  param_loader.loadParam("fixed_origin_tf/enabled", publish_fixed_origin_tf_);
+  param_loader.loadParam(yaml_prefix + "fixed_origin_tf/enabled", publish_fixed_origin_tf_);
   /*//}*/
 
   /*//{ load fcu_untilted parameters */
   std::string fcu_frame_id;
-  param_loader.loadParam("fcu_untilted_tf/parent", fcu_frame_id);
+  param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/parent", fcu_frame_id);
   ch_->frames.fcu    = fcu_frame_id;
   ch_->frames.ns_fcu = ch_->uav_name + "/" + fcu_frame_id;
 
   std::string fcu_untilted_frame_id;
-  param_loader.loadParam("fcu_untilted_tf/child", fcu_untilted_frame_id);
+  param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/child", fcu_untilted_frame_id);
   ch_->frames.fcu_untilted    = fcu_untilted_frame_id;
   ch_->frames.ns_fcu_untilted = ch_->uav_name + "/" + fcu_untilted_frame_id;
 
-  param_loader.loadParam("fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
+  param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
-  param_loader.loadParam("state_estimators", estimator_names_);
-  param_loader.loadParam("tf_sources", tf_source_names_);
+  param_loader.loadParam("mrs_uav_managers/estimation_manager/state_estimators", estimator_names_);
+  param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
 
-  param_loader.loadParam("utm_source_priority", utm_source_priority_list_);
+  param_loader.loadParam(yaml_prefix + "utm_source_priority", utm_source_priority_list_);
   for (auto utm_source : utm_source_priority_list_) {
     if (Support::isStringInVector(utm_source, estimator_names_)) {
       ROS_INFO("[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());

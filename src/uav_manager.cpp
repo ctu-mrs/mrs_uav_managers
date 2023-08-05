@@ -1,5 +1,3 @@
-#define VERSION "1.0.4.0"
-
 /* includes //{ */
 
 #include <ros/ros.h>
@@ -28,6 +26,7 @@
 #include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiStatus.h>
 #include <mrs_msgs/ControllerDiagnostics.h>
+#include <mrs_msgs/HwApiCapabilities.h>
 
 #include <sensor_msgs/NavSatFix.h>
 
@@ -83,7 +82,6 @@ class UavManager : public nodelet::Nodelet {
 
 private:
   ros::NodeHandle nh_;
-  std::string     _version_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
 
@@ -97,9 +95,23 @@ public:
 public:
   virtual void onInit();
 
-  void changeLandingState(LandingStates_t new_state);
+  // | ------------------------- HW API ------------------------- |
 
-  // subscribers
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+
+  // this timer will check till we already got the hardware api diagnostics
+  // then it will trigger the initialization of the controllers and finish
+  // the initialization of the ControlManager
+  ros::Timer timer_hw_api_capabilities_;
+  void       timerHwApiCapabilities(const ros::TimerEvent& event);
+
+  void preinitialize(void);
+  void initialize(void);
+
+  mrs_msgs::HwApiCapabilities hw_api_capabilities_;
+
+  // | ----------------------- subscribers ---------------------- |
+
   mrs_lib::SubscribeHandler<mrs_msgs::ControllerDiagnostics>        sh_controller_diagnostics_;
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                     sh_odometry_;
   mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>        sh_estimation_diagnostics_;
@@ -111,7 +123,7 @@ public:
   mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>       sh_gains_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics> sh_constraints_diag_;
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>                 sh_hw_api_gnss_;
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_z_;
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>               sh_max_height_;
   mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>               sh_tracker_cmd_;
 
   void callbackHwApiGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
@@ -289,94 +301,118 @@ public:
   std::string _midair_activation_during_tracker_;
   std::string _midair_activation_after_controller_;
   std::string _midair_activation_after_tracker_;
+
+  void changeLandingState(LandingStates_t new_state);
 };
 
 //}
 
-/* //{ onInit() */
+/* onInit() //{ */
 
 void UavManager::onInit() {
+  preinitialize();
+}
+
+//}
+
+/* preinitialize() //{ */
+
+void UavManager::preinitialize(void) {
 
   nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
 
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = "ControlManager";
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+
+  timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &UavManager::timerHwApiCapabilities, this);
+}
+
+//}
+
+/* initialize() //{ */
+
+void UavManager::initialize() {
+
   ROS_INFO("[UavManager]: initializing");
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
 
-  param_loader.loadParam("version", _version_);
+  const std::string yaml_prefix = "mrs_uav_managers/uav_manager/";
 
-  if (_version_ != VERSION) {
-
-    ROS_ERROR("[UavManager]: the version of the binary (%s) does not match the config file (%s), please build me!", VERSION, _version_.c_str());
-    ros::shutdown();
-  }
-
+  // params passed from the launch file are not prefixed
   param_loader.loadParam("uav_name", _uav_name_);
-
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
-
-  param_loader.loadParam("null_tracker", _null_tracker_name_);
-
-  param_loader.loadParam("takeoff/rate", _takeoff_timer_rate_);
-  param_loader.loadParam("takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
-  param_loader.loadParam("takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
-  param_loader.loadParam("takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
-  param_loader.loadParam("takeoff/during_takeoff/controller", _takeoff_controller_name_);
-  param_loader.loadParam("takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
-  param_loader.loadParam("takeoff/takeoff_height", _takeoff_height_);
-
-  param_loader.loadParam("landing/rate", _landing_timer_rate_);
-  param_loader.loadParam("landing/landing_tracker", _landing_tracker_name_);
-  param_loader.loadParam("landing/landing_controller", _landing_controller_name_);
-  param_loader.loadParam("landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
-  param_loader.loadParam("landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
-  param_loader.loadParam("landing/disarm", _landing_disarm_);
-  param_loader.loadParam("landing/descend_height", _landing_descend_height_);
-  param_loader.loadParam("landing/tracking_tolerance/translation", _landing_tracking_tolerance_translation_);
-  param_loader.loadParam("landing/tracking_tolerance/heading", _landing_tracking_tolerance_heading_);
-
-  param_loader.loadParam("midair_activation/rate", _midair_activation_timer_rate_);
-  param_loader.loadParam("midair_activation/during_activation/controller", _midair_activation_during_controller_);
-  param_loader.loadParam("midair_activation/during_activation/tracker", _midair_activation_during_tracker_);
-  param_loader.loadParam("midair_activation/after_activation/controller", _midair_activation_after_controller_);
-  param_loader.loadParam("midair_activation/after_activation/tracker", _midair_activation_after_tracker_);
-
   param_loader.loadParam("uav_mass", _uav_mass_);
   param_loader.loadParam("g", _g_);
 
+  // motor params are also not prefixed, since they are common to more nodes
   param_loader.loadParam("motor_params/n_motors", _throttle_model_.n_motors);
   param_loader.loadParam("motor_params/a", _throttle_model_.A);
   param_loader.loadParam("motor_params/b", _throttle_model_.B);
 
-  param_loader.loadParam("max_height_checking/enabled", _max_height_enabled_);
-  param_loader.loadParam("max_height_checking/rate", _max_height_checking_rate_);
-  param_loader.loadParam("max_height_checking/safety_height_offset", _max_height_offset_);
+  param_loader.loadParam(yaml_prefix + "null_tracker", _null_tracker_name_);
 
-  param_loader.loadParam("min_height_checking/enabled", _min_height_enabled_);
-  param_loader.loadParam("min_height_checking/rate", _min_height_checking_rate_);
-  param_loader.loadParam("min_height_checking/safety_height_offset", _min_height_offset_);
-  param_loader.loadParam("min_height_checking/min_height", _min_height_);
+  param_loader.loadParam(yaml_prefix + "takeoff/rate", _takeoff_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
+  param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
+  param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
+  param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/controller", _takeoff_controller_name_);
+  param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
+  param_loader.loadParam(yaml_prefix + "takeoff/takeoff_height", _takeoff_height_);
 
-  param_loader.loadParam("require_gain_manager", _gain_manager_required_);
-  param_loader.loadParam("require_constraint_manager", _constraint_manager_required_);
+  param_loader.loadParam(yaml_prefix + "landing/rate", _landing_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "landing/landing_tracker", _landing_tracker_name_);
+  param_loader.loadParam(yaml_prefix + "landing/landing_controller", _landing_controller_name_);
+  param_loader.loadParam(yaml_prefix + "landing/landing_cutoff_mass_factor", _landing_cutoff_mass_factor_);
+  param_loader.loadParam(yaml_prefix + "landing/landing_cutoff_timeout", _landing_cutoff_mass_timeout_);
+  param_loader.loadParam(yaml_prefix + "landing/disarm", _landing_disarm_);
+  param_loader.loadParam(yaml_prefix + "landing/descend_height", _landing_descend_height_);
+  param_loader.loadParam(yaml_prefix + "landing/tracking_tolerance/translation", _landing_tracking_tolerance_translation_);
+  param_loader.loadParam(yaml_prefix + "landing/tracking_tolerance/heading", _landing_tracking_tolerance_heading_);
 
-  param_loader.loadParam("flight_timer/enabled", _flighttime_timer_enabled_);
-  param_loader.loadParam("flight_timer/rate", _flighttime_timer_rate_);
-  param_loader.loadParam("flight_timer/max_time", _flighttime_max_time_);
+  param_loader.loadParam(yaml_prefix + "midair_activation/rate", _midair_activation_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "midair_activation/during_activation/controller", _midair_activation_during_controller_);
+  param_loader.loadParam(yaml_prefix + "midair_activation/during_activation/tracker", _midair_activation_during_tracker_);
+  param_loader.loadParam(yaml_prefix + "midair_activation/after_activation/controller", _midair_activation_after_controller_);
+  param_loader.loadParam(yaml_prefix + "midair_activation/after_activation/tracker", _midair_activation_after_tracker_);
 
-  param_loader.loadParam("max_throttle/enabled", _maxthrottle_timer_enabled_);
-  param_loader.loadParam("max_throttle/rate", _maxthrottle_timer_rate_);
-  param_loader.loadParam("max_throttle/max_throttle", _maxthrottle_max_throttle_);
-  param_loader.loadParam("max_throttle/eland_timeout", _maxthrottle_eland_timeout_);
-  param_loader.loadParam("max_throttle/ungrip_timeout", _maxthrottle_ungrip_timeout_);
+  param_loader.loadParam(yaml_prefix + "max_height_checking/enabled", _max_height_enabled_);
+  param_loader.loadParam(yaml_prefix + "max_height_checking/rate", _max_height_checking_rate_);
+  param_loader.loadParam(yaml_prefix + "max_height_checking/safety_height_offset", _max_height_offset_);
 
-  param_loader.loadParam("diagnostics/rate", _diagnostics_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", _min_height_enabled_);
+  param_loader.loadParam(yaml_prefix + "min_height_checking/rate", _min_height_checking_rate_);
+  param_loader.loadParam(yaml_prefix + "min_height_checking/safety_height_offset", _min_height_offset_);
+  param_loader.loadParam(yaml_prefix + "min_height_checking/min_height", _min_height_);
+
+  param_loader.loadParam(yaml_prefix + "require_gain_manager", _gain_manager_required_);
+  param_loader.loadParam(yaml_prefix + "require_constraint_manager", _constraint_manager_required_);
+
+  param_loader.loadParam(yaml_prefix + "flight_timer/enabled", _flighttime_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "flight_timer/rate", _flighttime_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "flight_timer/max_time", _flighttime_max_time_);
+
+  param_loader.loadParam(yaml_prefix + "max_throttle/enabled", _maxthrottle_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "max_throttle/rate", _maxthrottle_timer_rate_);
+  param_loader.loadParam(yaml_prefix + "max_throttle/max_throttle", _maxthrottle_max_throttle_);
+  param_loader.loadParam(yaml_prefix + "max_throttle/eland_timeout", _maxthrottle_eland_timeout_);
+  param_loader.loadParam(yaml_prefix + "max_throttle/ungrip_timeout", _maxthrottle_ungrip_timeout_);
+
+  param_loader.loadParam(yaml_prefix + "diagnostics/rate", _diagnostics_timer_rate_);
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -413,7 +449,7 @@ void UavManager::onInit() {
   sh_gains_diag_             = mrs_lib::SubscribeHandler<mrs_msgs::GainManagerDiagnostics>(shopts, "gain_manager_diagnostics_in");
   sh_constraints_diag_       = mrs_lib::SubscribeHandler<mrs_msgs::ConstraintManagerDiagnostics>(shopts, "constraint_manager_diagnostics_in");
   sh_hw_api_gnss_            = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "hw_api_gnss_in", &UavManager::callbackHwApiGNSS, this);
-  sh_max_z_                  = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
+  sh_max_height_             = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_height_in");
   sh_tracker_cmd_            = mrs_lib::SubscribeHandler<mrs_msgs::TrackerCommand>(shopts, "tracker_cmd_in");
 
   // | ----------------------- publishers ----------------------- |
@@ -461,17 +497,21 @@ void UavManager::onInit() {
   timer_maxthrottle_       = nh_.createTimer(ros::Rate(_maxthrottle_timer_rate_), &UavManager::timerMaxthrottle, this);
   timer_diagnostics_       = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
   timer_midair_activation_ = nh_.createTimer(ros::Rate(_midair_activation_timer_rate_), &UavManager::timerMidairActivation, this, false, false);
-  timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false, _max_height_enabled_);
-  timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false, _min_height_enabled_);
+  timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false,
+                                      _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
+  timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false,
+                                      _min_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
 
   // | ----------------------- finish init ---------------------- |
 
   is_initialized_ = true;
 
-  ROS_INFO("[UavManager]: initialized, version %s", VERSION);
+  ROS_INFO("[UavManager]: initialized");
 
   ROS_DEBUG("[UavManager]: debug output is enabled");
 }
+
+//}
 
 //}
 
@@ -513,6 +553,29 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
+
+/* timerHwApiCapabilities() //{ */
+
+void UavManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
+
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", 1.0, 1.0, event);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+
+  if (!sh_hw_api_capabilities_.hasMsg()) {
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
+    return;
+  }
+
+  hw_api_capabilities_ = *sh_hw_api_capabilities_.getMsg();
+
+  ROS_INFO("[ControlManager]: got HW API capabilities, initializing");
+
+  initialize();
+
+  timer_hw_api_capabilities_.stop();
+}
+
+//}
 
 /* //{ timerLanding() */
 
@@ -734,7 +797,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxHeight", _max_height_checking_rate_, 0.1, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxHeight", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_max_z_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
+  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
     ROS_WARN_THROTTLE(1.0, "[UavManager]: maxHeightTimer() not spinning, missing data");
     return;
   }
@@ -750,8 +813,8 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   // transform max z to the height frame
   geometry_msgs::PointStamped point;
-  point.header  = sh_max_z_.getMsg()->header;
-  point.point.z = sh_max_z_.getMsg()->value;
+  point.header  = sh_max_height_.getMsg()->header;
+  point.point.z = sh_max_height_.getMsg()->value;
 
   auto res = transformer_->transformSingle(point, sh_height_.getMsg()->header.frame_id);
 

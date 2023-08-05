@@ -1,19 +1,23 @@
 cmake_minimum_required(VERSION 3.1.2)
 project(mrs_uav_managers)
 
-find_package(catkin REQUIRED COMPONENTS
+set(CATKIN_DEPENDENCIES
+  cmake_modules
   roscpp
+  rospy
+  nodelet
   geometry_msgs
   std_msgs
-  geometry_msgs
   nav_msgs
   mrs_msgs
   mrs_lib
-  cmake_modules
-  nodelet
-  tf2_geometry_msgs
   tf2
   tf2_ros
+  tf2_geometry_msgs
+  )
+
+find_package(catkin REQUIRED COMPONENTS
+  ${CATKIN_DEPENDENCIES}
   )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -28,7 +32,7 @@ set(LIBRARIES
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${LIBRARIES}
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
+  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
 include_directories(
@@ -41,7 +45,7 @@ include_directories(
 add_library(ControlManager
   src/control_manager/control_manager.cpp
   src/control_manager/output_publisher.cpp
-  src/common/common.cpp
+  src/control_manager/common/common.cpp
   )
 
 add_dependencies(ControlManager
@@ -175,11 +179,10 @@ install(DIRECTORY launch config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
-install(DIRECTORY include/
-  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
+install(DIRECTORY include/mrs_uav_managers/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
   )
 
-install(DIRECTORY ./
+install(FILES plugins.xml null_tracker.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  FILES_MATCHING PATTERN "*.xml"
   )
