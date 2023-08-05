@@ -11,7 +11,7 @@
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/param_loader.h>
 
-#include <mrs_uav_managers/common_handlers.h>
+#include <mrs_uav_managers/control_manager/common_handlers.h>
 #include <mrs_uav_managers/controller.h>
 
 #include <mrs_msgs/TrackerCommand.h>
