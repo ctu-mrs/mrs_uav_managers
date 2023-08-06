@@ -7,7 +7,7 @@ class ParamsGetter:
 
     def __init__(self):
 
-        package_name = "mrs_uav_managers"
+        package_name = "mrs_uav_trackers"
 
         rospack = rospkg.RosPack()
 

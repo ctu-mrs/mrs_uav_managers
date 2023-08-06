@@ -12,3 +12,11 @@ mrs_uav_managers:
 
       enabled: false
       log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+
+    midair_activation:
+
+      rate: 100 # [Hz]
+
+      during_activation:
+        controller: "MidairActivationController"
+        tracker: "MidairActivationTracker"

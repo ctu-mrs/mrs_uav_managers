@@ -32,7 +32,7 @@ mrs_uav_managers:
       parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "fcu_untilted"
 
-    # the list of additional source topics from which the tfs will be constructed 
+    # the list of additional source topics from which the tfs will be constructed
     # tf_sources: ["hw_api_raw", "aloam_mapping"]
     tf_sources: []
 
