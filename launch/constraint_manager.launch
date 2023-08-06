@@ -40,10 +40,6 @@
       <rosparam file="$(find mrs_uav_managers)/config/public/constraint_manager/constraint_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/public/constraint_manager/constraints.yaml" />
 
-        <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
-
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />

@@ -38,10 +38,6 @@
       <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gain_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gains.yaml" />
 
-        <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/gain_manager/gains.yaml" />
-
       <!-- Load a user param file -->
       <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
