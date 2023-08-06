@@ -97,7 +97,8 @@ public:
   virtual bool resetStatic(void) = 0;
 
   /**
-   * @brief The most important routine. It is called with every odometry update and it should produce a new reference for the controllers.
+   * @brief The most important routine. It is called with every state estimator update and it should produce a new reference for the controllers.
+   *        The run time should be as short as possible (<= 1 ms).
    *
    * @param uav_state the latest UAV state estimate
    * @param last_attitude_cmd the last controller's output command (may be useful)
