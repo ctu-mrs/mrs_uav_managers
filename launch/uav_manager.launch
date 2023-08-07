@@ -7,6 +7,7 @@
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
+  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
 
   <!-- other args -->
   <arg name="standalone" default="true" />
