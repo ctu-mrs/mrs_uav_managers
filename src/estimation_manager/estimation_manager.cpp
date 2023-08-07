@@ -802,9 +802,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
         std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
-    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, estimator->getPrintName());
-    ph->name_space     = estimator->getPrintName();
-    ph->runtime_name   = estimator->getName().c_str();
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, _2);
+    ph->name_space     = estimator->getName();
+    ph->runtime_name   = estimator->getName();
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
@@ -827,9 +827,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
         std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
-    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, est_alt_agl_->getPrintName());
-    ph->name_space     = est_alt_agl_->getPrintName();
-    ph->runtime_name   = est_alt_agl_->getName().c_str();
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, _2);
+    ph->name_space     = est_alt_agl_->getName();
+    ph->runtime_name   = est_alt_agl_->getName();
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());

@@ -107,7 +107,7 @@ std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeadi
 /*//{ isCompatibleWithHwApi() */
 bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  Support::loadParamFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml", nh_.getNamespace());
+  Support::loadParamFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml", "");
 
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
   param_loader.setPrefix(getName() + "/");
