@@ -2,7 +2,6 @@
 
   <!-- args corresponding to environment variables -->
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
