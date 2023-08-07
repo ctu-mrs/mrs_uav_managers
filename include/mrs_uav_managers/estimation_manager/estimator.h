@@ -24,6 +24,7 @@
 #include <mrs_uav_managers/estimation_manager/types.h>
 #include <mrs_uav_managers/estimation_manager/support.h>
 #include <mrs_uav_managers/estimation_manager/common_handlers.h>
+#include <mrs_uav_managers/estimation_manager/private_handlers.h>
 
 //}
 
@@ -47,6 +48,7 @@ protected:
   std::string ns_frame_id_;
 
   std::shared_ptr<CommonHandlers_t> ch_;
+  std::shared_ptr<PrivateHandlers_t> ph_;
 
   double max_flight_z_ = -1.0;
 
@@ -65,7 +67,7 @@ protected:
 
 public:
   // virtual methods
-  virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<CommonHandlers_t> &ch) = 0;
+  virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<CommonHandlers_t> &ch, const std::shared_ptr<PrivateHandlers_t> &ph) = 0;
   virtual bool start(void)                                                                  = 0;
   virtual bool pause(void)                                                                  = 0;
   virtual bool reset(void)                                                                  = 0;

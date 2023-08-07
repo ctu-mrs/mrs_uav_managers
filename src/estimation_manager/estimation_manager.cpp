@@ -33,6 +33,7 @@
 #include <mrs_uav_managers/agl_estimator.h>
 #include <mrs_uav_managers/estimation_manager/support.h>
 #include <mrs_uav_managers/estimation_manager/common_handlers.h>
+#include <mrs_uav_managers/estimation_manager/private_handlers.h>
 /*//}*/
 
 namespace mrs_uav_managers
@@ -293,6 +294,9 @@ private:
 
   ros::NodeHandle nh_;
 
+  std::string _custom_config_;
+  std::string _platform_config_;
+
   std::shared_ptr<CommonHandlers_t> ch_;
 
   std::shared_ptr<StateMachine> sm_;
@@ -362,6 +366,8 @@ private:
 
   bool switchToHealthyEstimator();
   void switchToEstimator(const boost::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator);
+
+  bool loadConfigFile(const std::string& file_path, const std::string ns);
 
 public:
   EstimationManager() {
@@ -657,7 +663,10 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   }
   /*//}*/
 
-  // load common parameters into the common handlers structure
+  param_loader.loadParam("custom_config", _custom_config_);
+  param_loader.loadParam("platform_config", _platform_config_);
+
+  /*//{ load parameters into common handlers */
   param_loader.loadParam("uav_name", ch_->uav_name);
   param_loader.loadParam(yaml_prefix + "frame_id/fcu", ch_->frames.fcu);
   ch_->frames.ns_fcu = ch_->uav_name + "/" + ch_->frames.fcu;
@@ -670,8 +679,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh_, getName());
   ch_->transformer->retryLookupNewest(true);
+/*//}*/
   /*//}*/
-
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
@@ -789,9 +798,17 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//{ initialize estimators */
   for (auto estimator : estimator_list_) {
 
+    // create private handlers
+    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
+        std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
+
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, estimator->getPrintName());
+    ph->name_space     = estimator->getPrintName();
+    ph->runtime_name   = estimator->getName().c_str();
+
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
-      estimator->initialize(nh_, ch_);
+      estimator->initialize(nh_, ch_, ph);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
@@ -806,9 +823,17 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   // | ----------- agl height estimator initialization ---------- |
   if (is_using_agl_estimator_) {
+
+    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
+        std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
+
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, est_alt_agl_->getPrintName());
+    ph->name_space     = est_alt_agl_->getPrintName();
+    ph->runtime_name   = est_alt_agl_->getName().c_str();
+
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
-      est_alt_agl_->initialize(nh_, ch_);
+      est_alt_agl_->initialize(nh_, ch_, ph);
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
@@ -1006,6 +1031,52 @@ std::string EstimationManager::getName() const {
   return nodelet_name_;
 }
 /*//}*/
+
+/* loadConfigFile() //{ */
+
+bool EstimationManager::loadConfigFile(const std::string& file_path, const std::string ns) {
+
+  const std::string name_space = nh_.getNamespace() + "/" + ns;
+
+  ROS_INFO("[%s]: loading '%s' under the namespace '%s'", getName().c_str(), file_path.c_str(), name_space.c_str());
+
+  // load the user-requested file
+  {
+    std::string command = "rosparam load " + file_path + " " + name_space;
+    int         result  = std::system(command.c_str());
+
+    if (result != 0) {
+      ROS_ERROR("[%s]: failed to load '%s'", getName().c_str(), file_path.c_str());
+      return false;
+    }
+  }
+
+  // load the platform config
+  if (_platform_config_ != "") {
+    std::string command = "rosparam load " + _platform_config_ + " " + name_space;
+    int         result  = std::system(command.c_str());
+
+    if (result != 0) {
+      ROS_ERROR("[%s]: failed to load the platform config file '%s'", getName().c_str(), _platform_config_.c_str());
+      return false;
+    }
+  }
+
+  // load the custom config
+  if (_custom_config_ != "") {
+    std::string command = "rosparam load " + _custom_config_ + " " + name_space;
+    int         result  = std::system(command.c_str());
+
+    if (result != 0) {
+      ROS_ERROR("[%s]: failed to load the custom config file '%s'", getName().c_str(), _custom_config_.c_str());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+//}
 
 }  // namespace estimation_manager
 
