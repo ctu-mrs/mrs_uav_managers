@@ -4,7 +4,6 @@
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
   <arg name="BODY_DISTURBANCE_X" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
@@ -27,7 +26,7 @@
   <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
+  <arg if="$(eval arg('RUN_TYPE') == 'realworld')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
   <arg name="g" default="9.81" />
 
@@ -50,7 +49,8 @@
       <!-- Load the default param files -->
       <rosparam file="$(find mrs_uav_managers)/config/private/control_manager.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/public/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/trackers.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/controllers.yaml" />
       <rosparam file="$(find mrs_uav_managers)/config/public/controllers.yaml" />
 
       <rosparam file="$(arg world_file)" />
@@ -62,7 +62,7 @@
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="body_frame" type="string" value="$(arg body_frame)" />
       <param name="g" value="$(arg g)" />
-      <param if="$(eval arg('RUN_TYPE') == 'uav')" name="uav_mass" value="$(arg UAV_MASS)" />
+      <param if="$(eval arg('RUN_TYPE') == 'realworld')" name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="body_disturbance_x" value="$(arg BODY_DISTURBANCE_X)" />
       <param name="body_disturbance_y" value="$(arg BODY_DISTURBANCE_Y)" />
 

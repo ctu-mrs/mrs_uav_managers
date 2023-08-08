@@ -7,7 +7,6 @@
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
 
   <!-- other args -->
   <arg name="standalone" default="true" />
@@ -20,7 +19,7 @@
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
-  <arg if="$(eval arg('RUN_TYPE') == 'uav')" name="UAV_MASS" default="$(env UAV_MASS)" />
+  <arg if="$(eval arg('RUN_TYPE') == 'realworld')" name="UAV_MASS" default="$(env UAV_MASS)" />
 
   <arg name="g" default="9.81" />
 
@@ -54,7 +53,7 @@
       <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
-      <param if="$(eval arg('RUN_TYPE') == 'uav')" name="uav_mass" value="$(arg UAV_MASS)" />
+      <param if="$(eval arg('RUN_TYPE') == 'realworld')" name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="g" value="$(arg g)" />

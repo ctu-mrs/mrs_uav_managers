@@ -1274,7 +1274,15 @@ void ControlManager::initialize(void) {
   // |                        load trackers                       |
   // --------------------------------------------------------------
 
-  param_loader.loadParam(yaml_prefix + "trackers", _tracker_names_);
+  std::vector<std::string> custom_trackers;
+
+  param_loader.loadParam(yaml_prefix + "mrs_trackers", _tracker_names_);
+  param_loader.loadParam(yaml_prefix + "trackers", custom_trackers);
+
+  if (!custom_trackers.empty()) {
+    _tracker_names_.insert(_tracker_names_.end(), custom_trackers.begin(), custom_trackers.end());
+  }
+
   param_loader.loadParam(yaml_prefix + "null_tracker", _null_tracker_name_);
   param_loader.loadParam(yaml_prefix + "landing_takeoff_tracker", _landoff_tracker_name_);
 
@@ -1427,10 +1435,17 @@ void ControlManager::initialize(void) {
   }
 
   // --------------------------------------------------------------
-  // |                      load controllers                      |
+  // |                    load the controllers                    |
   // --------------------------------------------------------------
 
-  param_loader.loadParam(yaml_prefix + "controllers", _controller_names_);
+  std::vector<std::string> custom_controllers;
+
+  param_loader.loadParam(yaml_prefix + "mrs_controllers", _controller_names_);
+  param_loader.loadParam(yaml_prefix + "controllers", custom_controllers);
+
+  if (!custom_controllers.empty()) {
+    _controller_names_.insert(_controller_names_.end(), custom_controllers.begin(), custom_controllers.end());
+  }
 
   controller_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::Controller>>("mrs_uav_managers", "mrs_uav_managers::Controller");
 

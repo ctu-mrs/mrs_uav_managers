@@ -6,7 +6,6 @@
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="true" />
   <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="false" />

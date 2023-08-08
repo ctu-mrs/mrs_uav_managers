@@ -1,0 +1,87 @@
+mrs_uav_managers:
+
+  control_manager:
+
+    Se3Controller:
+
+      address: "mrs_uav_controllers/Se3Controller"
+      namespace: "se3_controller"
+      human_switchable: true
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    MpcController:
+      address: "mrs_uav_controllers/MpcController"
+      namespace: "mpc_controller"
+      human_switchable: true
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    FailsafeController:
+      address: "mrs_uav_controllers/FailsafeController"
+      namespace: "failsafe_controller"
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+    EmergencyController:
+      address: "mrs_uav_controllers/MpcController"
+      namespace: "emergency_controller"
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true
+
+
+    MidairActivationController:
+      address: "mrs_uav_controllers/MidairActivationController"
+      namespace: "midair_activation_controller"
+
+      # which outputs the controller can provide
+      outputs:
+        actuators:             true
+        control_group:         true
+        attitude_rate:         true
+        attitude:              true
+        acceleration_hdg_rate: true
+        acceleration_hdg:      true
+        velocity_hdg_rate:     true
+        velocity_hdg:          true
+        position:              true

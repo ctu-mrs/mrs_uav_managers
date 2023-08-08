@@ -2,21 +2,12 @@ mrs_uav_managers:
 
   control_manager:
 
-    #- list of names of dynamically loaded trackers
+    # list of names of dynamically loaded trackers
     trackers : [
-      "MpcTracker",
-      "LandoffTracker",
-      "JoyTracker",
-      "NullTracker",
-      "SpeedTracker",
     ]
 
-    #- list of names of dynamically loaded controllers
+    # list of names of dynamically loaded controllers
     controllers : [
-      "Se3Controller",
-      "MpcController",
-      "FailsafeController",
-      "EmergencyController",
     ]
 
     state_input: 0 # {0 = mrs_msgs::UavState, 1 = nav_msgs::Odometry}
