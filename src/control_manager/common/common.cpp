@@ -531,7 +531,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   model_params.body_height = body_height;
   model_params.prop_radius = prop_radius;
 
-  Eigen::MatrixXd inertia_matrix = param_loader.loadMatrixDynamic2("model_params/inertial_matrix", 3, 3);
+  Eigen::MatrixXd inertia_matrix = param_loader.loadMatrixDynamic2("model_params/inertia_matrix", 3, 3);
 
   if (param_loader.loadedSuccessfully()) {
 
