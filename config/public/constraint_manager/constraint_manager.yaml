@@ -37,12 +37,12 @@ mrs_uav_managers:
       # those gains will be used automatically when a localization mode switches
       # and the current gains are not in the allowed list (next paragraphs)
       fallback_constraints:
-        gps_garmin: "medium"
-        gps_baro: "medium"
-        rtk: "medium"
+        gps_garmin: "slow"
+        gps_baro: "slow"
+        rtk: "slow"
         aloam: "slow"
         hector_garmin: "slow"
         vio: "slow"
         optflow: "slow"
         other: "slow"
-        ground_truth: "medium"
+        ground_truth: "slow"
