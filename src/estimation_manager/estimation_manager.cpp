@@ -367,7 +367,7 @@ private:
   bool switchToHealthyEstimator();
   void switchToEstimator(const boost::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator);
 
-  bool loadConfigFile(const std::string& file_path, const std::string ns);
+  bool loadConfigFile(const std::string& file_path);
 
 public:
   EstimationManager() {
@@ -600,20 +600,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   mrs_lib::ParamLoader param_loader(nh_, getName());
 
-  const std::string yaml_prefix = "mrs_uav_managers/estimation_manager/";
-
-  /*//{ load parameters */
-
-  /*//{ publish debug topics parameters */
-  param_loader.loadParam(yaml_prefix + "debug_topics/input", ch_->debug_topics.input);
-  param_loader.loadParam(yaml_prefix + "debug_topics/output", ch_->debug_topics.output);
-  param_loader.loadParam(yaml_prefix + "debug_topics/state", ch_->debug_topics.state);
-  param_loader.loadParam(yaml_prefix + "debug_topics/covariance", ch_->debug_topics.covariance);
-  param_loader.loadParam(yaml_prefix + "debug_topics/innovation", ch_->debug_topics.innovation);
-  param_loader.loadParam(yaml_prefix + "debug_topics/diagnostics", ch_->debug_topics.diag);
-  param_loader.loadParam(yaml_prefix + "debug_topics/correction", ch_->debug_topics.correction);
-  param_loader.loadParam(yaml_prefix + "debug_topics/correction_delay", ch_->debug_topics.corr_delay);
-  /*//}*/
+  param_loader.loadParam("uav_name", ch_->uav_name);
 
   // load maximum flight z from safety area
   bool use_safety_area;
@@ -666,21 +653,37 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);
 
+  param_loader.setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
+
   /*//{ load parameters into common handlers */
-  param_loader.loadParam("uav_name", ch_->uav_name);
-  param_loader.loadParam(yaml_prefix + "frame_id/fcu", ch_->frames.fcu);
+  param_loader.loadParam("frame_id/fcu", ch_->frames.fcu);
   ch_->frames.ns_fcu = ch_->uav_name + "/" + ch_->frames.fcu;
 
-  param_loader.loadParam(yaml_prefix + "frame_id/fcu_untilted", ch_->frames.fcu_untilted);
+  param_loader.loadParam("frame_id/fcu_untilted", ch_->frames.fcu_untilted);
   ch_->frames.ns_fcu_untilted = ch_->uav_name + "/" + ch_->frames.fcu_untilted;
 
-  param_loader.loadParam(yaml_prefix + "frame_id/rtk_antenna", ch_->frames.rtk_antenna);
+  param_loader.loadParam("frame_id/rtk_antenna", ch_->frames.rtk_antenna);
   ch_->frames.ns_rtk_antenna = ch_->uav_name + "/" + ch_->frames.rtk_antenna;
 
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh_, getName());
   ch_->transformer->retryLookupNewest(true);
-/*//}*/
+
   /*//}*/
+
+  /*//{ load parameters */
+
+  /*//{ publish debug topics parameters */
+  param_loader.loadParam("debug_topics/input", ch_->debug_topics.input);
+  param_loader.loadParam("debug_topics/output", ch_->debug_topics.output);
+  param_loader.loadParam("debug_topics/state", ch_->debug_topics.state);
+  param_loader.loadParam("debug_topics/covariance", ch_->debug_topics.covariance);
+  param_loader.loadParam("debug_topics/innovation", ch_->debug_topics.innovation);
+  param_loader.loadParam("debug_topics/diagnostics", ch_->debug_topics.diag);
+  param_loader.loadParam("debug_topics/correction", ch_->debug_topics.correction);
+  param_loader.loadParam("debug_topics/correction_delay", ch_->debug_topics.corr_delay);
+  /*//}*/
+
+/*//}*/
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
@@ -716,7 +719,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ load state estimator plugins */
-  param_loader.loadParam(yaml_prefix + "state_estimators", estimator_names_);
+  param_loader.loadParam("state_estimators", estimator_names_);
 
   state_estimator_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>>("mrs_uav_managers", "mrs_uav_managers::StateEstimator");
 
@@ -726,7 +729,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
     // load the estimator parameters
     std::string address;
-    param_loader.loadParam(yaml_prefix + estimator_name + "/address", address);
+    param_loader.loadParam(estimator_name + "/address", address);
 
     try {
       ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
@@ -745,7 +748,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   }
 
   /*//{ load agl estimator plugins */
-  param_loader.loadParam(yaml_prefix + "agl_height_estimator", est_alt_agl_name_);
+  param_loader.loadParam("agl_height_estimator", est_alt_agl_name_);
   is_using_agl_estimator_ = est_alt_agl_name_ != "";
   ROS_WARN_COND(!is_using_agl_estimator_, "[%s]: not using AGL estimator for min height safe checking", getName().c_str());
 
@@ -756,7 +759,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
     // load the estimator parameters
     std::string address;
-    param_loader.loadParam(yaml_prefix + est_alt_agl_name_ + "/address", address);
+    param_loader.loadParam(est_alt_agl_name_ + "/address", address);
 
     try {
       ROS_INFO("[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
@@ -779,7 +782,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ check whether initial estimator was loaded */
-  param_loader.loadParam(yaml_prefix + "initial_state_estimator", initial_estimator_name_);
+  param_loader.loadParam("initial_state_estimator", initial_estimator_name_);
   bool initial_estimator_found = false;
   for (auto estimator : estimator_list_) {
     if (estimator->getName() == initial_estimator_name_) {
@@ -802,9 +805,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
         std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
-    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, _2);
-    ph->name_space     = estimator->getName();
-    ph->runtime_name   = estimator->getName();
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
@@ -827,9 +828,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
         std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
-    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1, _2);
-    ph->name_space     = est_alt_agl_->getName();
-    ph->runtime_name   = est_alt_agl_->getName();
+    ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
@@ -878,7 +877,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//}*/
 
   /*//{ initialize scope timer */
-  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", ch_->scope_timer.enabled);
+  param_loader.loadParam("scope_timer/enabled", ch_->scope_timer.enabled);
   std::string       filepath;
   const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/scope_timer.txt";
   ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
@@ -1034,9 +1033,9 @@ std::string EstimationManager::getName() const {
 
 /* loadConfigFile() //{ */
 
-bool EstimationManager::loadConfigFile(const std::string& file_path, const std::string ns) {
+bool EstimationManager::loadConfigFile(const std::string& file_path) {
 
-  const std::string name_space = nh_.getNamespace() + "/" + ns;
+  const std::string name_space = nh_.getNamespace() + "/";
 
   ROS_INFO("[%s]: loading '%s' under the namespace '%s'", getName().c_str(), file_path.c_str(), name_space.c_str());
 

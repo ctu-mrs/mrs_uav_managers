@@ -107,10 +107,17 @@ std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeadi
 /*//{ isCompatibleWithHwApi() */
 bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  Support::loadParamFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml", "");
+  bool success = true;
+
+  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml");
+
+  if (!success) {
+    ROS_ERROR("[%s]: could not load config file", getPrintName().c_str());
+    ros::shutdown();
+  }
 
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
-  param_loader.setPrefix(getName() + "/");
+  param_loader.setPrefix(Support::toSnakeCase(ch_->nodelet_name) + "/" + ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
   bool requires_gnss, requires_imu, requires_distance_sensor, requires_altitude, requires_magnetometer_heading, requires_position, requires_orientation,
       requires_velocity, requires_angular_velocity;
@@ -125,7 +132,7 @@ bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesCons
   param_loader.loadParam("requires/angular_velocity", requires_angular_velocity);
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
+    ROS_ERROR("[%s]: Could not load all non-optional hw_api compatibility parameters. Shutting down.", getPrintName().c_str());
     ros::shutdown();
   }
 

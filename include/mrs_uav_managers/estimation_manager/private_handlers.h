@@ -9,13 +9,11 @@ namespace mrs_uav_managers
 namespace estimation_manager
 {
 
-typedef boost::function<bool(const std::string, const std::string)> loadConfigFile_t;
+typedef boost::function<bool(const std::string)> loadConfigFile_t;
 
 struct PrivateHandlers_t
 {
   loadConfigFile_t loadConfigFile;
-  std::string      name_space;
-  std::string      runtime_name;
 };
 
 }  // namespace estimation_manager

@@ -23,10 +23,17 @@ void AglEstimator::publishCovariance() const {
 /*//{ isCompatibleWithHwApi() */
 bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  Support::loadParamFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml", nh_.getNamespace());
+  bool success = true;
+
+  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/estimators/" + getName() + "/" + getName() + ".yaml");
+
+  if (!success) {
+    ROS_ERROR("[%s]: could not load config file", getPrintName().c_str());
+    ros::shutdown();
+  }
 
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
-  param_loader.setPrefix(getName() + "/");
+  param_loader.setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
   bool requires_gnss, requires_imu, requires_distance_sensor, requires_altitude, requires_magnetometer_heading, requires_position, requires_orientation,
       requires_velocity, requires_angular_velocity;
