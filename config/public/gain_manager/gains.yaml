@@ -5,8 +5,8 @@ mrs_uav_managers:
     supersoft:
 
       horizontal:
-        kp: 2.3
-        kv: 1.5
+        kp: 3.0
+        kv: 2.0
         ka: 1.0
 
         kib: 0.1
@@ -16,8 +16,8 @@ mrs_uav_managers:
         kiw_lim: 10.0
 
       vertical:
-        kp: 8.0
-        kv: 5.0
+        kp: 15.0
+        kv: 8.0
         ka: 1.0
 
       attitude:
