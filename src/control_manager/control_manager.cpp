@@ -1557,7 +1557,7 @@ void ControlManager::initialize(void) {
     } else if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
       _safety_timer_rate_          = 30.0;
       _status_timer_rate_          = 1.0;
-      desired_uav_state_rate_      = 30.0;
+      desired_uav_state_rate_      = 40.0;
       _uav_state_max_missing_time_ = 0.2;
     } else if (lowest_output >= VELOCITY_HDG_RATE) {
       _safety_timer_rate_          = 20.0;
