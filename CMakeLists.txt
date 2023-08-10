@@ -10,6 +10,7 @@ set(CATKIN_DEPENDENCIES
   std_msgs
   nav_msgs
   mrs_msgs
+  visualization_msgs
   mrs_lib
   tf2
   tf2_ros
