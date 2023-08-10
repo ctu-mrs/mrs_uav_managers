@@ -350,6 +350,7 @@ private:
   std::vector<boost::shared_ptr<mrs_uav_managers::StateEstimator>>          estimator_list_;          // list of estimators
   std::mutex                                                                mutex_estimator_list_;
   std::vector<std::string>                                                  switchable_estimator_names_;
+  std::mutex                                                                mutex_switchable_estimator_names_;
   std::string                                                               initial_estimator_name_ = "UNDEFINED_INITIAL_ESTIMATOR";
   boost::shared_ptr<mrs_uav_managers::StateEstimator>                       initial_estimator_;
   boost::shared_ptr<mrs_uav_managers::StateEstimator>                       active_estimator_;
@@ -429,11 +430,14 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
     // publish diagnostics
     mrs_msgs::EstimationDiagnostics diagnostics;
-    diagnostics.header.stamp                = ros::Time::now();
-    diagnostics.current_sm_state            = sm_->getCurrentStateString();
-    diagnostics.running_state_estimators    = estimator_names_;
-    diagnostics.switchable_state_estimators = switchable_estimator_names_;
-    diagnostics.max_flight_z                = max_flight_z_msg.value;
+    diagnostics.header.stamp             = ros::Time::now();
+    diagnostics.current_sm_state         = sm_->getCurrentStateString();
+    diagnostics.running_state_estimators = estimator_names_;
+    {
+      std::scoped_lock lock(mutex_switchable_estimator_names_);
+      diagnostics.switchable_state_estimators = switchable_estimator_names_;
+    }
+    diagnostics.max_flight_z = max_flight_z_msg.value;
     if (active_estimator_ && active_estimator_->isInitialized()) {
       diagnostics.header.frame_id         = active_estimator_->getFrameId();
       diagnostics.current_state_estimator = active_estimator_->getName();
@@ -519,7 +523,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerCheckHealth", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   /*//{ start ready estimators, check switchable estimators */
-  switchable_estimator_names_.clear();
+  std::vector<std::string> switchable_estimator_names;
   for (auto estimator : estimator_list_) {
 
     if (estimator->isReady()) {
@@ -534,8 +538,13 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     }
 
     if (estimator->isRunning() && estimator->getName() != "dummy" && estimator->getName() != "ground_truth") {
-      switchable_estimator_names_.push_back(estimator->getName());
+      switchable_estimator_names.push_back(estimator->getName());
     }
+  }
+
+  {
+    std::scoped_lock lock(mutex_switchable_estimator_names_);
+    switchable_estimator_names_ = switchable_estimator_names;
   }
 
   if (is_using_agl_estimator_ && est_alt_agl_->isReady()) {
@@ -559,7 +568,11 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     if (active_estimator_->getName() == "dummy") {
       sm_->changeState(StateMachine::DUMMY_STATE);
     } else {
-      sm_->changeState(StateMachine::READY_FOR_TAKEOFF_STATE);
+      if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
+        sm_->changeState(StateMachine::READY_FOR_TAKEOFF_STATE);
+      } else {
+        ROS_WARN_THROTTLE(1.0, "[%s]: waiting for agl estimator: %s to be running", getName().c_str(), est_alt_agl_->getName().c_str());
+      }
     }
   }
 
@@ -683,7 +696,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   param_loader.loadParam("debug_topics/correction_delay", ch_->debug_topics.corr_delay);
   /*//}*/
 
-/*//}*/
+  /*//}*/
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
@@ -802,8 +815,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   for (auto estimator : estimator_list_) {
 
     // create private handlers
-    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
-        std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
+    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
 
@@ -825,8 +837,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   // | ----------- agl height estimator initialization ---------- |
   if (is_using_agl_estimator_) {
 
-    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph =
-        std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
+    std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
 
