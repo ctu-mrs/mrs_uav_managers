@@ -10,8 +10,8 @@
   <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="true" />
   <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="false" />
 
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(env WORLD_NAME).yaml" />
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('simulation'))" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_deployment)/config/worlds/world_$(env WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('simulation'))" name="world_file" value="$(find mrs_uav_core)/config/worlds/world_simulation.yaml" />
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg name="custom_config" default="" />
