@@ -20,14 +20,15 @@
   <depend>std_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>mrs_msgs</depend>
+  <depend>visualization_msgs</depend>
   <depend>mrs_lib</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
 
   <export>
-    <nodelet plugin="${prefix}/plugins.xml" />
-    <mrs_uav_managers plugin="${prefix}/null_tracker.xml" />
+    <nodelet plugin="${prefix}/nodelets.xml" />
+    <mrs_uav_managers plugin="${prefix}/plugins.xml" />
   </export>
 
 </package>

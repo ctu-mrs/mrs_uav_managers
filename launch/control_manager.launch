@@ -22,8 +22,8 @@
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
 
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_$(optenv WORLD_NAME).yaml" />
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_general)/config/worlds/world_simulation.yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_deployment)/config/worlds/world_$(optenv WORLD_NAME).yaml" />
+  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('RUN_TYPE') == 'simulation')" name="world_file" value="$(find mrs_uav_core)/config/worlds/world_simulation.yaml" />
   <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'realworld')" name="UAV_MASS" default="$(env UAV_MASS)" />
