@@ -27,8 +27,8 @@
   <depend>tf2_geometry_msgs</depend>
 
   <export>
-    <nodelet plugin="${prefix}/plugins.xml" />
-    <mrs_uav_managers plugin="${prefix}/null_tracker.xml" />
+    <nodelet plugin="${prefix}/nodelets.xml" />
+    <mrs_uav_managers plugin="${prefix}/plugins.xml" />
   </export>
 
 </package>
