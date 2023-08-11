@@ -47,7 +47,7 @@ protected:
   std::string frame_id_;  // cannot be constant - must remain overridable by loaded parameter
   std::string ns_frame_id_;
 
-  std::shared_ptr<CommonHandlers_t> ch_;
+  std::shared_ptr<CommonHandlers_t>  ch_;
   std::shared_ptr<PrivateHandlers_t> ph_;
 
   double max_flight_z_ = -1.0;
@@ -55,8 +55,9 @@ protected:
   std::atomic_bool is_mitigating_jump_ = false;
 
 private:
-  SMStates_t previous_sm_state_ = UNINITIALIZED_STATE;
-  SMStates_t current_sm_state_  = UNINITIALIZED_STATE;
+  SMStates_t         previous_sm_state_ = SMStates_t::UNINITIALIZED_STATE;
+  SMStates_t         current_sm_state_  = SMStates_t::UNINITIALIZED_STATE;
+  mutable std::mutex mutex_current_state_;
 
 protected:
   Estimator(const std::string &type, const std::string &name, const std::string &frame_id) : type_(type), name_(name), frame_id_(frame_id) {
@@ -68,9 +69,9 @@ protected:
 public:
   // virtual methods
   virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<CommonHandlers_t> &ch, const std::shared_ptr<PrivateHandlers_t> &ph) = 0;
-  virtual bool start(void)                                                                  = 0;
-  virtual bool pause(void)                                                                  = 0;
-  virtual bool reset(void)                                                                  = 0;
+  virtual bool start(void)                                                                                                                = 0;
+  virtual bool pause(void)                                                                                                                = 0;
+  virtual bool reset(void)                                                                                                                = 0;
 
   // implemented methods
   // access methods
@@ -82,6 +83,8 @@ public:
   std::string getSmStateString(const SMStates_t &state) const;
   std::string getCurrentSmStateString(void) const;
   SMStates_t  getCurrentSmState() const;
+
+  void setCurrentSmState(const SMStates_t &new_state);
 
   bool isMitigatingJump() const;
 

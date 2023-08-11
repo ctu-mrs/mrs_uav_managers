@@ -7,22 +7,21 @@ namespace mrs_uav_managers
 /*//{ changeState() */
 bool Estimator::changeState(SMStates_t new_state) {
 
-  if (new_state == current_sm_state_) {
+  if (new_state == getCurrentSmState()) {
     return true;
   }
 
-  previous_sm_state_ = current_sm_state_;
-  current_sm_state_  = new_state;
+  previous_sm_state_ = getCurrentSmState();
+  setCurrentSmState(new_state);
 
-  ROS_INFO("[%s]: Switching sm state %s -> %s", getPrintName().c_str(), getSmStateString(previous_sm_state_).c_str(),
-           getSmStateString(current_sm_state_).c_str());
+  ROS_INFO("[%s]: Switching sm state %s -> %s", getPrintName().c_str(), getSmStateString(previous_sm_state_).c_str(), getCurrentSmStateString().c_str());
   return true;
 }
 /*//}*/
 
 /*//{ isInState() */
 bool Estimator::isInState(const SMStates_t& state_in) const {
-  return state_in == current_sm_state_;
+  return state_in == getCurrentSmState();
 }
 /*//}*/
 
@@ -46,7 +45,7 @@ bool Estimator::isStarted() const {
 
 /*//{ isRunning() */
 bool Estimator::isRunning() const {
-  return isInState(RUNNING_STATE);
+  return isInState(SMStates_t::RUNNING_STATE);
 }
 /*//}*/
 
@@ -68,6 +67,13 @@ SMStates_t Estimator::getCurrentSmState() const {
 }
 /*//}*/
 
+/*//{ setCurrentSmState() */
+void Estimator::setCurrentSmState(const SMStates_t& new_state) {
+  std::scoped_lock lock(mutex_current_state_);
+  current_sm_state_ = new_state;
+}
+/*//}*/
+
 /*//{ getSmStateString() */
 std::string Estimator::getSmStateString(const SMStates_t& state) const {
   return sm::state_names[state];
@@ -76,7 +82,7 @@ std::string Estimator::getSmStateString(const SMStates_t& state) const {
 
 /*//{ getCurrentSmStateName() */
 std::string Estimator::getCurrentSmStateString(void) const {
-  return getSmStateString(current_sm_state_);
+  return getSmStateString(getCurrentSmState());
 }
 /*//}*/
 
@@ -155,10 +161,10 @@ tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::Vector3Stamped& acc_st
 
   // untilt the desired acceleration vector
   geometry_msgs::Vector3Stamped des_acc;
-  geometry_msgs::Vector3      des_acc_untilted;
-  des_acc.vector.x         = acc_stamped.vector.x;
-  des_acc.vector.y         = acc_stamped.vector.y;
-  des_acc.vector.z         = acc_stamped.vector.z;
+  geometry_msgs::Vector3        des_acc_untilted;
+  des_acc.vector.x        = acc_stamped.vector.x;
+  des_acc.vector.y        = acc_stamped.vector.y;
+  des_acc.vector.z        = acc_stamped.vector.z;
   des_acc.header.frame_id = ch_->frames.ns_fcu;
   des_acc.header.stamp    = acc_stamped.header.stamp;
   auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);

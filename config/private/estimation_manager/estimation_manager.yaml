@@ -10,3 +10,6 @@ mrs_uav_managers:
       fcu: "fcu" # the body frame of the UAV where the flight control unit resides (default: "fcu")
       fcu_untilted: "fcu_untilted" # the body frame with zero tilt angles default: ("fcu_untilted")
       rtk_antenna: "rtk_antenna" # the body frame with zero tilt angles default: ("fcu_untilted")
+
+    rate:
+      diagnostics: 10 # [Hz]
