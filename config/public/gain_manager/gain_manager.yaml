@@ -12,6 +12,7 @@ mrs_uav_managers:
       "optflow",
       "other",
       "ground_truth",
+      "passthrough",
     ]
 
     gains: [
@@ -31,6 +32,7 @@ mrs_uav_managers:
         optflow: ["supersoft"]
         other: ["supersoft"]
         ground_truth: ["supersoft"]
+        passthrough: ["supersoft"]
 
       # those gains will be used automatically when a localization mode switches
       # and the current gains are not in the allowed list (next paragraphs)
@@ -44,3 +46,4 @@ mrs_uav_managers:
         optflow: "supersoft"
         other: "supersoft"
         ground_truth: "supersoft"
+        passthrough: "supersoft"
