@@ -55,6 +55,7 @@ struct CommonHandlers_t
   CommonFrames_t                        frames;
   std::shared_ptr<mrs_lib::Transformer> transformer;
   double                                desired_uav_state_rate;
+  double                                desired_diagnostics_rate;
   WorldOrigin_t                         world_origin;
   ScopeTimer_t                          scope_timer;
   DebugTopics_t                         debug_topics;

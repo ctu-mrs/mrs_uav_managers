@@ -318,6 +318,9 @@ private:
   ros::Timer timer_publish_;
   void       timerPublish(const ros::TimerEvent& event);
 
+  ros::Timer timer_publish_diagnostics_;
+  void       timerPublishDiagnostics(const ros::TimerEvent& event);
+
   ros::Timer timer_check_health_;
   void       timerCheckHealth(const ros::TimerEvent& event);
 
@@ -414,102 +417,174 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     return;
   }
 
-  if (!sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-    mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-    mrs_msgs::Float64Stamped max_flight_z_msg;
-    max_flight_z_msg.header.stamp = ros::Time::now();
-    if (active_estimator_ && active_estimator_->isInitialized()) {
-      max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
-      max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
-    }
-    max_flight_z_ = max_flight_z_msg.value;
-
-    scope_timer.checkpoint("get max flight z");
-
-    // publish diagnostics
-    mrs_msgs::EstimationDiagnostics diagnostics;
-    diagnostics.header.stamp             = ros::Time::now();
-    diagnostics.current_sm_state         = sm_->getCurrentStateString();
-    diagnostics.running_state_estimators = estimator_names_;
-    {
-      std::scoped_lock lock(mutex_switchable_estimator_names_);
-      diagnostics.switchable_state_estimators = switchable_estimator_names_;
-    }
-    diagnostics.max_flight_z = max_flight_z_msg.value;
-    if (active_estimator_ && active_estimator_->isInitialized()) {
-      diagnostics.header.frame_id         = active_estimator_->getFrameId();
-      diagnostics.current_state_estimator = active_estimator_->getName();
-    } else {
-      diagnostics.header.frame_id         = "";
-      diagnostics.current_state_estimator = "";
-    }
-    scope_timer.checkpoint("diag fill");
-    ph_max_flight_z_.publish(max_flight_z_msg);
-
-    scope_timer.checkpoint("max flight pub");
-    ph_diagnostics_.publish(diagnostics);
-    scope_timer.checkpoint("diag pub");
-
-    if (sm_->isInPublishableState()) {
-
-      mrs_msgs::UavState uav_state;
-      auto               ret = active_estimator_->getUavState();
-      if (ret) {
-        uav_state = ret.value();
-      } else {
-        ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
-        return;
-      }
-
-      if (!Support::noNans(uav_state.pose.orientation)) {
-        ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
-        return;
-      }
-
-      if (active_estimator_->isMitigatingJump()) {
-        estimator_switch_count_++;
-      }
-      uav_state.estimator_iteration = estimator_switch_count_;
-
-      scope_timer.checkpoint("get uav state");
-      // TODO state health checks
-
-      ph_uav_state_.publish(uav_state);
-
-      scope_timer.checkpoint("pub uav state");
-      nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state);
-
-      scope_timer.checkpoint("uav state to odom");
-      const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
-      for (size_t i = 0; i < pose_covariance.size(); i++) {
-        odom_main.pose.covariance[i] = pose_covariance[i];
-      }
-
-      const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
-      for (size_t i = 0; i < twist_covariance.size(); i++) {
-        odom_main.twist.covariance[i] = twist_covariance[i];
-      }
-
-      scope_timer.checkpoint("get covariance");
-      ph_odom_main_.publish(odom_main);
-
-      nav_msgs::Odometry innovation = active_estimator_->getInnovation();
-      ph_innovation_.publish(innovation);
-
-      if (is_using_agl_estimator_) {
-        ph_altitude_agl_.publish(est_alt_agl_->getUavAglHeight());
-      }
-
-      ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
-                        sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
-                        active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
-
-    } else {
-      ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
-    }
+  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+    ROS_WARN("[%s]: Not publishing during estimator switching.", getName().c_str());
+    return;
   }
+
+  if (!sm_->isInPublishableState()) {
+    ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
+    return;
+  }
+
+  mrs_msgs::UavState uav_state;
+  auto               ret = active_estimator_->getUavState();
+  if (ret) {
+    uav_state = ret.value();
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
+    return;
+  }
+
+  if (!Support::noNans(uav_state.pose.orientation)) {
+    ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
+    return;
+  }
+
+
+  if (active_estimator_->isMitigatingJump()) {
+    estimator_switch_count_++;
+  }
+  uav_state.estimator_iteration = estimator_switch_count_;
+
+  scope_timer.checkpoint("get uav state");
+  // TODO state health checks
+
+  ph_uav_state_.publish(uav_state);
+
+  scope_timer.checkpoint("pub uav state");
+  nav_msgs::Odometry odom_main = Support::uavStateToOdom(uav_state);
+
+  scope_timer.checkpoint("uav state to odom");
+  const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
+  for (size_t i = 0; i < pose_covariance.size(); i++) {
+    odom_main.pose.covariance[i] = pose_covariance[i];
+  }
+
+  const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
+  for (size_t i = 0; i < twist_covariance.size(); i++) {
+    odom_main.twist.covariance[i] = twist_covariance[i];
+  }
+
+  scope_timer.checkpoint("get covariance");
+  ph_odom_main_.publish(odom_main);
+
+  nav_msgs::Odometry innovation = active_estimator_->getInnovation();
+  ph_innovation_.publish(innovation);
+
+
+  mrs_msgs::Float64Stamped agl_height;
+
+  if (is_using_agl_estimator_) {
+    agl_height = est_alt_agl_->getUavAglHeight();
+    ph_altitude_agl_.publish(agl_height);
+  }
+
+  ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
+                    sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
+                    active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
+
+
+}
+/*//}*/
+
+/*//{ timerPublishDiagnostics() */
+void EstimationManager::timerPublishDiagnostics([[maybe_unused]] const ros::TimerEvent& event) {
+
+  if (!sm_->isInitialized()) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("EstimationManager::timerPublishDiagnostics", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+    ROS_WARN("[%s]: Not publishing diagnostics during estimator switching.", getName().c_str());
+    return;
+  }
+
+  if (!sm_->isInPublishableState()) {
+    ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
+    return;
+  }
+
+  mrs_msgs::UavState uav_state;
+  auto               ret = active_estimator_->getUavState();
+  if (ret) {
+    uav_state = ret.value();
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
+    return;
+  }
+
+  if (!Support::noNans(uav_state.pose.orientation)) {
+    ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
+    return;
+  }
+
+  mrs_msgs::Float64Stamped agl_height;
+
+  if (is_using_agl_estimator_) {
+    agl_height = est_alt_agl_->getUavAglHeight();
+    ph_altitude_agl_.publish(agl_height);
+  }
+
+  mrs_msgs::Float64Stamped max_flight_z_msg;
+  max_flight_z_msg.header.stamp = ros::Time::now();
+  if (active_estimator_ && active_estimator_->isInitialized()) {
+    max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
+    max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
+  }
+  max_flight_z_ = max_flight_z_msg.value;
+  ph_max_flight_z_.publish(max_flight_z_msg);
+
+  // publish diagnostics
+  mrs_msgs::EstimationDiagnostics diagnostics;
+
+  diagnostics.header.stamp   = uav_state.header.stamp;
+  diagnostics.child_frame_id = uav_state.child_frame_id;
+
+  diagnostics.pose         = uav_state.pose;
+  diagnostics.velocity     = uav_state.velocity;
+  diagnostics.acceleration = uav_state.acceleration;
+
+  diagnostics.sm_state                 = sm_->getCurrentStateString();
+  diagnostics.max_flight_z             = max_flight_z_msg.value;
+  diagnostics.estimator_iteration      = estimator_switch_count_;
+  diagnostics.estimation_rate          = ch_->desired_uav_state_rate;
+  diagnostics.running_state_estimators = estimator_names_;
+
+  {
+    std::scoped_lock lock(mutex_switchable_estimator_names_);
+    diagnostics.switchable_state_estimators = switchable_estimator_names_;
+  }
+
+
+  if (active_estimator_ && active_estimator_->isInitialized()) {
+    diagnostics.header.frame_id         = active_estimator_->getFrameId();
+    diagnostics.current_state_estimator = active_estimator_->getName();
+  } else {
+    diagnostics.header.frame_id         = "";
+    diagnostics.current_state_estimator = "";
+  }
+
+  diagnostics.estimator_horizontal = uav_state.estimator_horizontal;
+  diagnostics.estimator_vertical   = uav_state.estimator_vertical;
+  diagnostics.estimator_heading    = uav_state.estimator_heading;
+
+  if (is_using_agl_estimator_) {
+    diagnostics.estimator_agl_height = est_alt_agl_name_;
+    diagnostics.agl_height           = agl_height.value;
+  } else {
+    diagnostics.estimator_agl_height = "NOT_USED";
+    diagnostics.agl_height           = std::nanf("");
+  }
+
+  diagnostics.platform_config = _platform_config_;
+  diagnostics.custom_config   = _custom_config_;
+
+  ph_diagnostics_.publish(diagnostics);
 }
 /*//}*/
 
@@ -681,6 +756,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh_, getName());
   ch_->transformer->retryLookupNewest(true);
 
+  param_loader.loadParam("rate/diagnostics", ch_->desired_diagnostics_rate);
+
   /*//}*/
 
   /*//{ load parameters */
@@ -719,7 +796,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   mrs_msgs::HwApiCapabilitiesConstPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
   /*//}*/
 
-  /*//{ wait for desired uav_state rate*/
+  /*//{ wait for desired uav_state rate */
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   while (!sh_control_manager_diag_.hasMsg()) {
     ROS_INFO("[%s]: waiting for control_manager_diagnostics message at topic: %s", getName().c_str(), sh_control_manager_diag_.topicName().c_str());
@@ -872,6 +949,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   /*//{ initialize timers */
   timer_publish_ = nh_.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerPublish, this);
+
+  timer_publish_diagnostics_ = nh_.createTimer(ros::Rate(ch_->desired_diagnostics_rate), &EstimationManager::timerPublishDiagnostics, this);
 
   timer_check_health_ = nh_.createTimer(ros::Rate(ch_->desired_uav_state_rate), &EstimationManager::timerCheckHealth, this);
   /*//}*/
