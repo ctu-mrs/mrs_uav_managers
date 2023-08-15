@@ -9,6 +9,7 @@
   <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
   <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
+	<arg name="OLD_PX4_FW" default="$(optenv OLD_PX4_FW false)" />
 
     <!-- other args -->
   <arg name="debug" default="false" />
