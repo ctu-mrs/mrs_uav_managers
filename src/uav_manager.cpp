@@ -213,6 +213,10 @@ public:
   bool      throttle_under_threshold_ = false;
   ros::Time throttle_mass_estimate_first_time_;
 
+  // velocity during landing
+  bool      velocity_under_threshold_ = false;
+  ros::Time velocity_under_threshold_first_time_;
+
   bool _gain_manager_required_       = false;
   bool _constraint_manager_required_ = false;
 
@@ -710,6 +714,50 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
         }
 
         if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _landing_cutoff_mass_timeout_)) {
+
+          switchTrackerSrv(_null_tracker_name_);
+
+          setControlCallbacksSrv(true);
+
+          if (_landing_disarm_) {
+
+            ROS_INFO("[UavManager]: disarming after landing");
+
+            disarmSrv();
+          }
+
+          changeLandingState(IDLE_STATE);
+
+          ROS_INFO("[UavManager]: landing finished");
+
+          timer_landing_.stop();
+        }
+
+      } else {
+
+        auto odometry = sh_odometry_.getMsg();
+
+        double z_vel = odometry->twist.twist.linear.z;
+
+        ROS_INFO_THROTTLE(1.0, "[UavManager]: landing: z-velocity: %.2f", z_vel);
+
+        // condition for automatic motor turn off
+        if (z_vel > -0.1) {
+
+          if (!velocity_under_threshold_) {
+
+            velocity_under_threshold_first_time_ = ros::Time::now();
+            velocity_under_threshold_            = true;
+          }
+
+          ROS_INFO_THROTTLE(0.5, "[UavManager]: velocity over threshold for %.2f s", (ros::Time::now() - velocity_under_threshold_first_time_).toSec());
+
+        } else {
+
+          velocity_under_threshold_ = false;
+        }
+
+        if (velocity_under_threshold_ && ((ros::Time::now() - velocity_under_threshold_first_time_).toSec() > 3.0)) {
 
           switchTrackerSrv(_null_tracker_name_);
 
