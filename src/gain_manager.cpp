@@ -456,14 +456,12 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::gainManagementTimer", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing estimation diagnostics!");
     return;
   }
 
   auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
 
   if (!sh_control_manager_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing control manager diagnostics!");
     return;
   }
 
@@ -530,7 +528,12 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: can not do constraint management, missing estimator diagnostics!");
+    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do constraint management, missing estimator diagnostics!");
+    return;
+  }
+
+  if (!sh_control_manager_diag_.hasMsg()) {
+    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do constraint management, missing control manager diagnostics!");
     return;
   }
 

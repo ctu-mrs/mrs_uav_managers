@@ -456,20 +456,20 @@ private:
   ros::ServiceServer service_server_set_heading_relative_;
 
   // the reference service and subscriber
-  ros::ServiceServer service_server_reference_;
-  ros::Subscriber    subscriber_reference_;
+  ros::ServiceServer                                    service_server_reference_;
+  mrs_lib::SubscribeHandler<mrs_msgs::ReferenceStamped> sh_reference_;
 
   // the velocity reference service and subscriber
-  ros::ServiceServer service_server_velocity_reference_;
-  ros::Subscriber    subscriber_velocity_reference_;
+  ros::ServiceServer                                            service_server_velocity_reference_;
+  mrs_lib::SubscribeHandler<mrs_msgs::VelocityReferenceStamped> sh_velocity_reference_;
 
   // trajectory tracking
-  ros::ServiceServer service_server_trajectory_reference_;
-  ros::Subscriber    subscriber_trajectory_reference_;
-  ros::ServiceServer service_server_start_trajectory_tracking_;
-  ros::ServiceServer service_server_stop_trajectory_tracking_;
-  ros::ServiceServer service_server_resume_trajectory_tracking_;
-  ros::ServiceServer service_server_goto_trajectory_start_;
+  ros::ServiceServer                                       service_server_trajectory_reference_;
+  mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference> sh_trajectory_reference_;
+  ros::ServiceServer                                       service_server_start_trajectory_tracking_;
+  ros::ServiceServer                                       service_server_stop_trajectory_tracking_;
+  ros::ServiceServer                                       service_server_resume_trajectory_tracking_;
+  ros::ServiceServer                                       service_server_goto_trajectory_start_;
 
   // transform service servers
   ros::ServiceServer service_server_transform_reference_;
@@ -592,11 +592,11 @@ private:
   // | ------------------------ callbacks ----------------------- |
 
   // topic callbacks
-  void callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp);
-  void callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
-  void callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>& wrp);
-  void callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
-  void callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp);
+  void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
+  void callbackUavState(const mrs_msgs::UavState::ConstPtr msg);
+  void callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr msg);
+  void callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg);
+  void callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg);
 
   // topic timeouts
   void timeoutUavState(const double& missing_for);
@@ -607,9 +607,9 @@ private:
   bool callbackTrackerResetStatic(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // reference callbacks
-  void callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg);
-  void callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg);
-  void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg);
+  void callbackReferenceTopic(const mrs_msgs::ReferenceStamped::ConstPtr msg);
+  void callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStamped::ConstPtr msg);
+  void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReference::ConstPtr msg);
   bool callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
   bool callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
@@ -795,7 +795,7 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::Joy> sh_joystick_;
 
-  void callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy>& msg);
+  void callbackJoystick(const sensor_msgs::Joy::ConstPtr msg);
   bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
 
   // joystick buttons mappings
@@ -1826,15 +1826,15 @@ void ControlManager::initialize(void) {
   service_server_set_heading_relative_ = nh_.advertiseService("set_heading_relative_in", &ControlManager::callbackSetHeadingRelative, this);
 
   service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
-  subscriber_reference_     = nh_.subscribe("reference_in", 1, &ControlManager::callbackReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  sh_reference_             = mrs_lib::SubscribeHandler<mrs_msgs::ReferenceStamped>(shopts, "reference_in", &ControlManager::callbackReferenceTopic, this);
 
   service_server_velocity_reference_ = nh_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
-  subscriber_velocity_reference_ =
-      nh_.subscribe("velocity_reference_in", 1, &ControlManager::callbackVelocityReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  sh_velocity_reference_ =
+      mrs_lib::SubscribeHandler<mrs_msgs::VelocityReferenceStamped>(shopts, "velocity_reference_in", &ControlManager::callbackVelocityReferenceTopic, this);
 
   service_server_trajectory_reference_ = nh_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
-  subscriber_trajectory_reference_ =
-      nh_.subscribe("trajectory_reference_in", 1, &ControlManager::callbackTrajectoryReferenceTopic, this, ros::TransportHints().tcpNoDelay());
+  sh_trajectory_reference_ =
+      mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>(shopts, "trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceTopic, this);
 
   // | --------------------- other services --------------------- |
 
@@ -3538,7 +3538,7 @@ void ControlManager::asyncControl(void) {
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
+void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -3546,7 +3546,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
 
-  nav_msgs::OdometryConstPtr odom = wrp.getMsg();
+  nav_msgs::OdometryConstPtr odom = msg;
 
   // | ------------------ check for time stamp ------------------ |
 
@@ -3700,7 +3700,7 @@ void ControlManager::callbackOdometry(mrs_lib::SubscribeHandler<nav_msgs::Odomet
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
+void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -3708,7 +3708,7 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::UavStateConstPtr uav_state = wrp.getMsg();
+  mrs_msgs::UavStateConstPtr uav_state = msg;
 
   // | ------------------ check for time stamp ------------------ |
 
@@ -3880,7 +3880,7 @@ void ControlManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavSta
 
 /* //{ callbackGNSS() */
 
-void ControlManager::callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+void ControlManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -3888,16 +3888,14 @@ void ControlManager::callbackGNSS(mrs_lib::SubscribeHandler<sensor_msgs::NavSatF
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGNSS");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
 
-  sensor_msgs::NavSatFixConstPtr data = wrp.getMsg();
-
-  transformer_->setLatLon(data->latitude, data->longitude);
+  transformer_->setLatLon(msg->latitude, msg->longitude);
 }
 
 //}
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy>& wrp) {
+void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -3909,7 +3907,7 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  sensor_msgs::JoyConstPtr joystick_data = wrp.getMsg();
+  sensor_msgs::JoyConstPtr joystick_data = msg;
 
   // TODO check if the array is smaller than the largest idx
   if (joystick_data->buttons.size() == 0 || joystick_data->axes.size() == 0) {
@@ -4018,7 +4016,7 @@ void ControlManager::callbackJoystick(mrs_lib::SubscribeHandler<sensor_msgs::Joy
 
 /* //{ callbackHwApiStatus() */
 
-void ControlManager::callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>& wrp) {
+void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -4026,7 +4024,7 @@ void ControlManager::callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwA
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiStatus");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::HwApiStatusConstPtr state = wrp.getMsg();
+  mrs_msgs::HwApiStatusConstPtr state = msg;
 
   // | ------ detect and print the changes in offboard mode ----- |
   if (state->offboard) {
@@ -4066,7 +4064,7 @@ void ControlManager::callbackHwApiStatus(mrs_lib::SubscribeHandler<mrs_msgs::HwA
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>& wrp) {
+void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -4074,7 +4072,7 @@ void ControlManager::callbackRC(mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChann
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::HwApiRcChannelsConstPtr rc = wrp.getMsg();
+  mrs_msgs::HwApiRcChannelsConstPtr rc = msg;
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
@@ -5409,7 +5407,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
 /* //{ callbackReferenceTopic() */
 
-void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStampedConstPtr& msg) {
+void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStamped::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -5451,7 +5449,7 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenc
 
 /* //{ callbackVelocityReferenceTopic() */
 
-void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStampedConstPtr& msg) {
+void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStamped::ConstPtr msg) {
 
   if (!is_initialized_)
     return;
@@ -5496,7 +5494,7 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
 /* //{ callbackTrajectoryReferenceTopic() */
 
-void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReferenceConstPtr& msg) {
+void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReference::ConstPtr msg) {
 
   if (!is_initialized_)
     return;

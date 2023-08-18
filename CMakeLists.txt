@@ -31,7 +31,6 @@ set(LIBRARIES
   MrsUavManagers_ConstraintManager
   MrsUavManagers_ControlManager
   MrsUavManagers_UavManager
-  MrsUavManagers_TfManager
   MrsUavManagers_EstimationManager
   MrsUavManagers_TransformManager
   MrsUavManagers_NullTracker
@@ -123,21 +122,6 @@ add_dependencies(MrsUavManagers_ConstraintManager
 
 target_link_libraries(MrsUavManagers_ConstraintManager
   ${catkin_LIBRARIES}
-  )
-
-# MrsUavManagers_TfManager
-add_library(MrsUavManagers_TfManager
-  src/tf_manager.cpp
-  )
-
-add_dependencies(MrsUavManagers_TfManager
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  )
-
-target_link_libraries(MrsUavManagers_TfManager
-  ${catkin_LIBRARIES}
-  ${Eigen_LIBRARIES}
   )
 
 # MrsUavManagers_EstimationManager

@@ -458,7 +458,6 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing estimation diagnostics!");
     return;
   }
 
@@ -535,7 +534,7 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: can not do constraint management, missing estimation diagnostics!");
+    ROS_WARN_THROTTLE(10.0, "[ConstraintManager]: can not do constraint management, missing estimation diagnostics!");
     return;
   }
 

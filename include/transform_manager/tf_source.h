@@ -47,7 +47,7 @@ public:
 
       const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
-      std::string          odom_topic, attitude_topic, ns;
+      std::string odom_topic, attitude_topic, ns;
 
       param_loader.loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
       param_loader.loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
@@ -182,7 +182,6 @@ private:
   bool             publish_local_tf_ = true;
   bool             publish_utm_tf_   = false;
   bool             publish_world_tf_ = false;
-  bool             is_in_utm_        = false;
   std::atomic_bool is_utm_source_    = false;
   std::string      ns_utm_origin_parent_frame_id_;
   std::string      ns_utm_origin_child_frame_id_;
@@ -190,7 +189,6 @@ private:
   bool                 is_utm_origin_set_ = false;
   geometry_msgs::Point utm_origin_;
 
-  bool        is_world_source_ = false;
   std::string ns_world_origin_parent_frame_id_;
   std::string ns_world_origin_child_frame_id_;
 
@@ -219,7 +217,7 @@ private:
   bool                                                        got_first_msg_ = false;
 
   /*//{ callbackTfSourceOdom()*/
-  void callbackTfSourceOdom(mrs_lib::SubscribeHandler<nav_msgs::Odometry>& wrp) {
+  void callbackTfSourceOdom(const nav_msgs::Odometry::ConstPtr msg) {
 
     if (!is_initialized_) {
       return;
@@ -227,7 +225,6 @@ private:
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::callbackTfSourceOdom", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-    nav_msgs::OdometryConstPtr msg = wrp.getMsg();
     scope_timer.checkpoint("get msg");
 
     if (!got_first_msg_) {
@@ -260,7 +257,7 @@ private:
   /*//}*/
 
   /*//{ callbackTfSourceAtt()*/
-  void callbackTfSourceAtt(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
+  void callbackTfSourceAtt(const geometry_msgs::QuaternionStamped::ConstPtr msg) {
 
     if (!is_initialized_) {
       return;
@@ -268,7 +265,6 @@ private:
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::callbackTfSourceAtt", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-    geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
     scope_timer.checkpoint("get msg");
     publishTfFromAtt(msg);
   }

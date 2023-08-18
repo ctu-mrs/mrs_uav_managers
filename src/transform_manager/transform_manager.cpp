@@ -93,22 +93,22 @@ private:
 
   std::shared_ptr<mrs_lib::TransformBroadcaster> broadcaster_;
 
-  void timeoutCallback(const std::string& topic, const ros::Time& last_msg, const int n_pubs);
+  void timeoutCallback(const std::string& topic, const ros::Time& last_msg);
 
   mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
-  void                                          callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp);
+  void                                          callbackUavState(const mrs_msgs::UavState::ConstPtr msg);
   std::string                                   first_frame_id_;
   std::string                                   last_frame_id_;
   bool                                          is_first_frame_id_set_ = false;
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_height_agl_;
-  void                                                callbackHeightAgl(mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>& wrp);
+  void                                                callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg);
 
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
-  void                                                        callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp);
+  void                                                        callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg);
 
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
-  void                                              callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp);
+  void                                              callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg);
   std::atomic<bool>                                 got_utm_offset_ = false;
 
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
@@ -289,7 +289,7 @@ void TransformManager::onInit() {
 
 /*//{ callbackUavState() */
 
-void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavState>& wrp) {
+void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -298,7 +298,6 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   // obtain first frame_id
-  mrs_msgs::UavStateConstPtr msg = wrp.getMsg();
   if (!is_first_frame_id_set_) {
     first_frame_id_                = msg->header.frame_id;
     last_frame_id_                 = msg->header.frame_id;
@@ -464,16 +463,13 @@ void TransformManager::callbackUavState(mrs_lib::SubscribeHandler<mrs_msgs::UavS
 
 /*//{ callbackHeightAgl() */
 
-void TransformManager::callbackHeightAgl(mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>& wrp) {
+void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publish>HeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  // obtain first frame_id
-  mrs_msgs::Float64StampedConstPtr msg = wrp.getMsg();
 
   geometry_msgs::TransformStamped tf_msg;
   tf_msg.header.stamp    = msg->header.stamp;
@@ -505,15 +501,13 @@ void TransformManager::callbackHeightAgl(mrs_lib::SubscribeHandler<mrs_msgs::Flo
 /*//}*/
 
 /*//{ callbackHwApiOrientation() */
-void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>& wrp) {
+void TransformManager::callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  geometry_msgs::QuaternionStampedConstPtr msg = wrp.getMsg();
 
   if (publish_fcu_untilted_tf_) {
     publishFcuUntiltedTf(msg);
@@ -522,7 +516,7 @@ void TransformManager::callbackHwApiOrientation(mrs_lib::SubscribeHandler<geomet
 /*//}*/
 
 /*//{ callbackGnss() */
-void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>& wrp) {
+void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -531,8 +525,6 @@ void TransformManager::callbackGnss(mrs_lib::SubscribeHandler<sensor_msgs::NavSa
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   if (!got_utm_offset_) {
-
-    sensor_msgs::NavSatFixConstPtr msg = wrp.getMsg();
 
     double out_x;
     double out_y;
