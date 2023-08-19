@@ -3,19 +3,14 @@
   <!-- args corresponding to environment variables -->
   <arg name="UAV_NAME" default="$(env UAV_NAME)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
-  <arg name="WORLD_FILE" default="$(optenv WORLD_FILE)" />
-  <arg name="WORLD_NAME" default="$(optenv WORLD_NAME)" />
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
 
   <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="true" />
   <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" value="false" />
 
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') != '')" name="world_file" value="$(find mrs_uav_deployment)/config/worlds/world_$(env WORLD_NAME).yaml" />
-  <arg if="$(eval arg('WORLD_FILE') == '' and arg('WORLD_NAME') == '' and arg('simulation'))" name="world_file" value="$(find mrs_uav_core)/config/worlds/world_simulation.yaml" />
-  <arg if="$(eval arg('WORLD_FILE') != '')" name="world_file" value="$(arg WORLD_FILE)" />
-
   <arg name="custom_config" default="" />
   <arg name="platform_config" default="" />
+  <arg name="world_config" default="" />
   <arg name="custom_config_active_estimators" default="" />
 
     <!-- other args -->
@@ -44,12 +39,12 @@
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
 
-      <rosparam file="$(arg world_file)" command="load" />
       <rosparam file="$(find mrs_uav_managers)/config/private/transform_manager/transform_manager.yaml" command="load" />
       <rosparam file="$(find mrs_uav_managers)/config/public/transform_manager/transform_manager.yaml" command="load" />
       <rosparam file="$(find mrs_uav_managers)/config/public/active_estimators.yaml" command="load" />
 
       <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('world_config') == '')" file="$(arg world_config)" />
       <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 

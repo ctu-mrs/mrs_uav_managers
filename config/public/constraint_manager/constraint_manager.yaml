@@ -21,31 +21,29 @@ mrs_uav_managers:
       "fast",
     ]
 
-    constraint_management:
+    # list of allowed gains per odometry mode
+    allowed_constraints:
+      gps_garmin: ["slow", "medium", "fast"]
+      gps_baro: ["slow", "medium", "fast"]
+      rtk: ["slow", "medium", "fast"]
+      aloam: ["slow"]
+      hector_garmin: ["slow"]
+      vio: ["slow"]
+      optflow: ["slow"]
+      other: ["slow"]
+      ground_truth: ["slow", "medium", "fast"]
+      passthrough: ["slow", "medium", "fast"]
 
-      # list of allowed gains per odometry mode
-      allowed_constraints:
-        gps_garmin: ["slow", "medium", "fast"]
-        gps_baro: ["slow", "medium", "fast"]
-        rtk: ["slow", "medium", "fast"]
-        aloam: ["slow"]
-        hector_garmin: ["slow"]
-        vio: ["slow"]
-        optflow: ["slow"]
-        other: ["slow"]
-        ground_truth: ["slow", "medium", "fast"]
-        passthrough: ["slow", "medium", "fast"]
-
-      # those gains will be used automatically when a localization mode switches
-      # and the current gains are not in the allowed list (next paragraphs)
-      fallback_constraints:
-        gps_garmin: "slow"
-        gps_baro: "slow"
-        rtk: "slow"
-        aloam: "slow"
-        hector_garmin: "slow"
-        vio: "slow"
-        optflow: "slow"
-        other: "slow"
-        ground_truth: "slow"
-        passthrough: "slow"
+    # those gains will be used automatically when a localization mode switches
+    # and the current gains are not in the allowed list (next paragraphs)
+    default_constraints:
+      gps_garmin: "slow"
+      gps_baro: "slow"
+      rtk: "slow"
+      aloam: "slow"
+      hector_garmin: "slow"
+      vio: "slow"
+      optflow: "slow"
+      other: "slow"
+      ground_truth: "slow"
+      passthrough: "slow"

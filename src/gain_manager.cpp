@@ -62,7 +62,8 @@ private:
   std::map<std::string, Gains_t> _gains_;
 
   std::map<std::string, std::vector<std::string>> _map_type_allowed_gains_;
-  std::map<std::string, std::string>              _map_type_fallback_gains_;
+  std::map<std::string, std::string>              _map_type_default_gains_;
+  ;
 
   // | --------------------- service clients -------------------- |
 
@@ -181,7 +182,7 @@ void GainManager::onInit() {
   for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.loadParam(yaml_prefix + "gain_management/allowed_gains/" + *it, temp_vector);
+    param_loader.loadParam(yaml_prefix + "allowed_gains/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -194,18 +195,18 @@ void GainManager::onInit() {
     _map_type_allowed_gains_.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
   }
 
-  // loading the fallback gains
+  // loading the default gains
   for (it = _current_state_estimators_.begin(); it != _current_state_estimators_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.loadParam(yaml_prefix + "gain_management/fallback_gains/" + *it, temp_str);
+    param_loader.loadParam(yaml_prefix + "default_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
       ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
-    _map_type_fallback_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
+    _map_type_default_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
   ROS_INFO("[GainManager]: done loading dynamical params");
@@ -477,9 +478,9 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
                       estimation_diagnostics.current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_fallback_gains_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_default_gains_.find(estimation_diagnostics.current_state_estimator);
 
-    if (it == _map_type_fallback_gains_.end()) {
+    if (it == _map_type_default_gains_.end()) {
 
       ROS_WARN_THROTTLE(1.0, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
                         estimation_diagnostics.current_state_estimator.c_str());
@@ -491,7 +492,7 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
 
         last_estimator_name = estimation_diagnostics.current_state_estimator;
 
-        // else, try to set the fallback gains
+        // else, try to set the default gains
       } else {
 
         ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
@@ -501,7 +502,7 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
 
           last_estimator_name = estimation_diagnostics.current_state_estimator;
 
-          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to fallback: '%s'", it->second.c_str());
+          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to default: '%s'", it->second.c_str());
 
         } else {
 

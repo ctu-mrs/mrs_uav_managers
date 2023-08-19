@@ -51,7 +51,7 @@ private:
   std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest> _constraints_;
 
   std::map<std::string, std::vector<std::string>> _map_type_allowed_constraints_;
-  std::map<std::string, std::string>              _map_type_fallback_constraints_;
+  std::map<std::string, std::string>              _map_type_default_constraints_;
 
   // | --------------------- service clients -------------------- |
 
@@ -68,8 +68,8 @@ private:
   ros::ServiceServer service_server_set_constraints_;
   bool               callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
-  std::string                         last_estimator_name_;
-  std::mutex                          mutex_last_estimator_name_;
+  std::string last_estimator_name_;
+  std::mutex  mutex_last_estimator_name_;
 
   void       timerConstraintManagement(const ros::TimerEvent& event);
   ros::Timer timer_constraint_management_;
@@ -181,7 +181,7 @@ void ConstraintManager::onInit() {
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::vector<std::string> temp_vector;
-    param_loader.loadParam(yaml_prefix + "constraint_management/allowed_constraints/" + *it, temp_vector);
+    param_loader.loadParam(yaml_prefix + "allowed_constraints/" + *it, temp_vector);
 
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
@@ -194,18 +194,18 @@ void ConstraintManager::onInit() {
     _map_type_allowed_constraints_.insert(std::pair<std::string, std::vector<std::string>>(*it, temp_vector));
   }
 
-  // loading the fallback constraints
+  // loading the default constraints
   for (it = _estimator_type_names_.begin(); it != _estimator_type_names_.end(); ++it) {
 
     std::string temp_str;
-    param_loader.loadParam(yaml_prefix + "constraint_management/fallback_constraints/" + *it, temp_str);
+    param_loader.loadParam(yaml_prefix + "default_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
       ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       ros::shutdown();
     }
 
-    _map_type_fallback_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
+    _map_type_default_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
   ROS_INFO("[ConstraintManager]: done loading dynamical params");
@@ -466,12 +466,13 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
   // | --- automatically set constraints when the state estimator changes -- |
   if (estimation_diagnostics.current_state_estimator != last_estimator_name_) {
 
-    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics.current_state_estimator.c_str());
+    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
+                      estimation_diagnostics.current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_fallback_constraints_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_default_constraints_.find(estimation_diagnostics.current_state_estimator);
 
-    if (it == _map_type_fallback_constraints_.end()) {
+    if (it == _map_type_default_constraints_.end()) {
 
       ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the state estimator type '%s' was not specified in the constraint_manager's config!",
                         estimation_diagnostics.current_state_estimator.c_str());
@@ -483,7 +484,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
 
         last_estimator_name = estimation_diagnostics.current_state_estimator;
 
-        // else, try to set the fallback constraints
+        // else, try to set the initial constraints
       } else {
 
         ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(),
@@ -493,7 +494,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
 
           last_estimator_name = estimation_diagnostics.current_state_estimator;
 
-          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to fallback: '%s'", it->second.c_str());
+          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to initial: '%s'", it->second.c_str());
 
         } else {
 
@@ -506,7 +507,7 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
   if (constraints_override_updated_) {
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_fallback_constraints_.find(last_estimator_name_);
+    it = _map_type_default_constraints_.find(last_estimator_name_);
 
     ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: re-setting constraints with user value override");
 
