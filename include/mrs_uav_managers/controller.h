@@ -97,14 +97,24 @@ public:
    */
   virtual void resetDisturbanceEstimators(void) = 0;
 
-  virtual void update(const mrs_msgs::UavState &uav_state) = 0;
+  /**
+   * @brief This method is called in the main feedback control loop when your controller is NOT active. You can use this to validate your results without endangering the drone.
+   *        The method is called even before the flight with just the uav_state being supplied.
+   *
+   * @param uav_state current estimated state of the UAV dynamics
+   * @param tracker_command current required control reference (is optional)
+   */
+  virtual void updateInactive(const mrs_msgs::UavState &uav_state, const std::optional<mrs_msgs::TrackerCommand> &tracker_command) = 0;
 
   /**
-   * @brief The most important routine. It is called with every odometry update and it should produce a new control command.
+   * @brief This method is called in the main feedback control loop when your controller IS active and when it is supposed to produce a control output.
    *
-   * TODO
+   * @param uav_state current estimated state of the UAV dynamics
+   * @param tracker_command current required control reference
+   *
+   * @return produced control output
    */
-  virtual ControlOutput update(const mrs_msgs::UavState &uav_state, const mrs_msgs::TrackerCommand &tracker_command) = 0;
+  virtual ControlOutput updateActive(const mrs_msgs::UavState &uav_state, const mrs_msgs::TrackerCommand &tracker_command) = 0;
 
   /**
    * @brief A request for the controller's status.

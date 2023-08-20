@@ -8735,7 +8735,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
       // nonactive controller => just update without retrieving the command
       for (int i = 0; i < int(controller_list_.size()); i++) {
-        controller_list_[i]->update(uav_state);
+        controller_list_[i]->updateInactive(uav_state, last_tracker_cmd);
       }
     }
 
@@ -8753,7 +8753,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
         std::scoped_lock lock(mutex_controller_list_);
 
         // active controller => update and retrieve the command
-        control_output = controller_list_[active_controller_idx]->update(uav_state, last_tracker_cmd.value());
+        control_output = controller_list_[active_controller_idx]->updateActive(uav_state, last_tracker_cmd.value());
       }
       catch (std::runtime_error& exrun) {
 
@@ -8778,7 +8778,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
         std::scoped_lock lock(mutex_controller_list_);
 
         // nonactive controller => just update without retrieving the command
-        controller_list_[i]->update(uav_state);
+        controller_list_[i]->updateInactive(uav_state, last_tracker_cmd);
       }
       catch (std::runtime_error& exrun) {
 
