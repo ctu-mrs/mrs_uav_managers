@@ -8,8 +8,8 @@ mrs_uav_managers:
       odometry_innovation_threshold: 1.5 # [m], position odometry innovation threshold
 
     MpcController:
-      eland_threshold: 2.5 # [m], position error triggering eland
-      failsafe_threshold: 3.5 # [m], position error triggering failsafe land
+      eland_threshold: 3.5 # [m], position error triggering eland
+      failsafe_threshold: 4.5 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 2.5 # [m], position odometry innovation threshold
 
     FailsafeController:

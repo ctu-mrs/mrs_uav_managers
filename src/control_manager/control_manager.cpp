@@ -658,10 +658,14 @@ private:
   bool callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Request& req, mrs_msgs::DynamicsConstraintsSrv::Response& res);
 
   // constraints management
-  bool       got_constraints_ = false;
-  std::mutex mutex_constraints_;
-  void       setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest constraints);
-  bool       enforceControllersConstraints(mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  bool              got_constraints_ = false;
+  std::mutex        mutex_constraints_;
+  void              setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  void              setConstraintsToTrackers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  void              setConstraintsToControllers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  std::atomic<bool> constraints_being_enforced_ = false;
+
+  std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> enforceControllersConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
 
   mrs_msgs::DynamicsConstraintsSrvRequest current_constraints_;
   mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints_;
@@ -3468,8 +3472,8 @@ void ControlManager::asyncControl(void) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::asyncControl", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
+  auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
 
   if (!failsafe_triggered_) {  // when failsafe is triggered, updateControllers() and publish() is called in timerFailsafe()
 
@@ -3497,14 +3501,20 @@ void ControlManager::asyncControl(void) {
     if (got_constraints_) {
 
       // update the constraints to trackers, if need to
-      if (enforceControllersConstraints(sanitized_constraints)) {
-        setConstraints(sanitized_constraints);
+      auto enforce = enforceControllersConstraints(current_constraints);
 
-        {
-          std::scoped_lock lock(mutex_constraints_);
+      if (enforce && !constraints_being_enforced_) {
 
-          sanitized_constraints_ = sanitized_constraints;
-        }
+        setConstraintsToTrackers(enforce.value());
+        mrs_lib::set_mutexed(mutex_constraints_, enforce.value(), sanitized_constraints_);
+
+        constraints_being_enforced_ = true;
+
+      } else if (!enforce && constraints_being_enforced_) {
+
+        constraints_being_enforced_ = false;
+
+        setConstraintsToTrackers(current_constraints);
       }
     }
 
@@ -4620,22 +4630,26 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Re
     return true;
   }
 
-  // copy member variables
-  auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
-
   {
     std::scoped_lock lock(mutex_constraints_);
 
-    current_constraints_   = req;
-    sanitized_constraints_ = req;
-    got_constraints_       = true;
+    current_constraints_ = req;
 
-    enforceControllersConstraints(sanitized_constraints_);
+    auto enforced = enforceControllersConstraints(current_constraints_);
 
-    sanitized_constraints = sanitized_constraints_;
+    if (enforced) {
+      sanitized_constraints_      = enforced.value();
+      constraints_being_enforced_ = true;
+    } else {
+      sanitized_constraints_      = req;
+      constraints_being_enforced_ = false;
+    }
+
+    got_constraints_ = true;
+
+    setConstraintsToControllers(current_constraints_);
+    setConstraintsToTrackers(sanitized_constraints_);
   }
-
-  setConstraints(sanitized_constraints);
 
   res.message = "setting constraints";
   res.success = true;
@@ -6561,12 +6575,12 @@ void ControlManager::publishDiagnostics(void) {
 
 //}
 
-/* setConstraints() //{ */
+/* setConstraintsToTrackers() //{ */
 
-void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest constraints) {
+void ControlManager::setConstraintsToTrackers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToTrackers");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
 
@@ -6581,6 +6595,18 @@ void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest cons
           mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
+}
+
+//}
+
+/* setConstraintsToControllers() //{ */
+
+void ControlManager::setConstraintsToControllers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToControllers");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToControllers", scope_timer_logger_, scope_timer_enabled_);
+
+  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
 
   {
     std::scoped_lock lock(mutex_controller_list_);
@@ -6597,72 +6623,92 @@ void ControlManager::setConstraints(mrs_msgs::DynamicsConstraintsSrvRequest cons
 
 //}
 
+/* setConstraints() //{ */
+
+void ControlManager::setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
+
+  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
+
+  setConstraintsToTrackers(constraints);
+
+  setConstraintsToControllers(constraints);
+}
+
+//}
+
+
 /* enforceControllerConstraints() //{ */
 
-bool ControlManager::enforceControllersConstraints(mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceControllersConstraints(
+    const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
+  if (!last_control_output.control_output || !last_control_output.diagnostics.controller_enforcing_constraints) {
+    return {};
+  }
+
   bool enforcing = false;
 
-  if (last_control_output.control_output) {
+  auto constraints_out = constraints;
 
-    if (last_control_output.diagnostics.controller_enforcing_constraints) {
+  std::scoped_lock lock(mutex_tracker_list_);
 
-      std::scoped_lock lock(mutex_tracker_list_);
+  // enforce horizontal speed
+  if (last_control_output.diagnostics.horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
+    constraints_out.constraints.horizontal_speed = last_control_output.diagnostics.horizontal_speed_constraint;
 
-      // enforce horizontal speed
-      if (last_control_output.diagnostics.horizontal_speed_constraint < constraints.constraints.horizontal_speed) {
-        constraints.constraints.horizontal_speed = last_control_output.diagnostics.horizontal_speed_constraint;
+    enforcing = true;
+  }
 
-        enforcing = true;
-      }
+  // enforce horizontal acceleration
+  if (last_control_output.diagnostics.horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
+    constraints_out.constraints.horizontal_acceleration = last_control_output.diagnostics.horizontal_acc_constraint;
 
-      // enforce horizontal acceleration
-      if (last_control_output.diagnostics.horizontal_acc_constraint < constraints.constraints.horizontal_acceleration) {
-        constraints.constraints.horizontal_acceleration = last_control_output.diagnostics.horizontal_acc_constraint;
+    enforcing = true;
+  }
 
-        enforcing = true;
-      }
+  // enforce vertical ascending speed
+  if (last_control_output.diagnostics.vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
+    constraints_out.constraints.vertical_ascending_speed = last_control_output.diagnostics.vertical_asc_speed_constraint;
 
-      // enforce vertical ascending speed
-      if (last_control_output.diagnostics.vertical_asc_speed_constraint < constraints.constraints.vertical_ascending_speed) {
-        constraints.constraints.vertical_ascending_speed = last_control_output.diagnostics.vertical_asc_speed_constraint;
+    enforcing = true;
+  }
 
-        enforcing = true;
-      }
+  // enforce vertical ascending acceleration
+  if (last_control_output.diagnostics.vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
+    constraints_out.constraints.vertical_ascending_acceleration = last_control_output.diagnostics.vertical_asc_acc_constraint;
 
-      // enforce vertical ascending acceleration
-      if (last_control_output.diagnostics.vertical_asc_acc_constraint < constraints.constraints.vertical_ascending_acceleration) {
-        constraints.constraints.vertical_ascending_acceleration = last_control_output.diagnostics.vertical_asc_acc_constraint;
+    enforcing = true;
+  }
 
-        enforcing = true;
-      }
+  // enforce vertical descending speed
+  if (last_control_output.diagnostics.vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
+    constraints_out.constraints.vertical_descending_speed = last_control_output.diagnostics.vertical_desc_speed_constraint;
 
-      // enforce vertical descending speed
-      if (last_control_output.diagnostics.vertical_desc_speed_constraint < constraints.constraints.vertical_descending_speed) {
-        constraints.constraints.vertical_descending_speed = last_control_output.diagnostics.vertical_desc_speed_constraint;
+    enforcing = true;
+  }
 
-        enforcing = true;
-      }
+  // enforce vertical descending acceleration
+  if (last_control_output.diagnostics.vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
+    constraints_out.constraints.vertical_descending_acceleration = last_control_output.diagnostics.vertical_desc_acc_constraint;
 
-      // enforce vertical descending acceleration
-      if (last_control_output.diagnostics.vertical_desc_acc_constraint < constraints.constraints.vertical_descending_acceleration) {
-        constraints.constraints.vertical_descending_acceleration = last_control_output.diagnostics.vertical_desc_acc_constraint;
-
-        enforcing = true;
-      }
-    }
+    enforcing = true;
   }
 
   if (enforcing) {
     ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' is enforcing constraints over the ConstraintManager",
                       _controller_names_[active_controller_idx].c_str());
-  }
 
-  return enforcing;
+    return {constraints_out};
+  } else {
+    return {};
+  }
 }
 
 //}
@@ -8586,6 +8632,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   }
 
   mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints;
+
   {
     std::scoped_lock lock(mutex_constraints_);
 
@@ -8593,7 +8640,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     sanitized_constraints  = sanitized_constraints_;
   }
 
-  setConstraints(sanitized_constraints);
+  setConstraintsToControllers(sanitized_constraints);
 
   return std::tuple(true, ss.str());
 }
