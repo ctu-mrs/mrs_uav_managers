@@ -2819,8 +2819,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", error_size,
-                             _eland_threshold_ / 2.0, position_error.value()[0], position_error.value()[1], position_error.value()[2]);
+          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload due to large position error");
 
           ungripSrv();
         }
@@ -3509,6 +3508,11 @@ void ControlManager::asyncControl(void) {
         mrs_lib::set_mutexed(mutex_constraints_, enforce.value(), sanitized_constraints_);
 
         constraints_being_enforced_ = true;
+
+        auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' is enforcing constraints over the ConstraintManager",
+                          _controller_names_[active_controller_idx].c_str());
 
       } else if (!enforce && constraints_being_enforced_) {
 
@@ -6646,8 +6650,7 @@ std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceCo
     const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
-  auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
   if (!last_control_output.control_output || !last_control_output.diagnostics.controller_enforcing_constraints) {
     return {};
@@ -6702,9 +6705,6 @@ std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceCo
   }
 
   if (enforcing) {
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' is enforcing constraints over the ConstraintManager",
-                      _controller_names_[active_controller_idx].c_str());
-
     return {constraints_out};
   } else {
     return {};
@@ -8312,8 +8312,6 @@ bool ControlManager::parachuteSrv(void) {
 /* ungripSrv() //{ */
 
 void ControlManager::ungripSrv(void) {
-
-  ROS_INFO_THROTTLE(1.0, "[ControlManager]: ungripping payload");
 
   std_srvs::Trigger srv;
 
