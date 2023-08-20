@@ -3516,7 +3516,11 @@ void ControlManager::asyncControl(void) {
 
       } else if (!enforce && constraints_being_enforced_) {
 
+        ROS_INFO_THROTTLE(1.0, "[ControlManager]: constraint values returned to original values");
+
         constraints_being_enforced_ = false;
+
+        mrs_lib::set_mutexed(mutex_constraints_, current_constraints, sanitized_constraints_);
 
         setConstraintsToTrackers(current_constraints);
       }

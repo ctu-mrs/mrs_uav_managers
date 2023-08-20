@@ -846,7 +846,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMaxHeight", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[UavManager]: maxHeightTimer() not spinning, missing data");
+    ROS_WARN_THROTTLE(10.0, "[UavManager]: maxHeightTimer() not spinning, missing data");
     return;
   }
 
@@ -943,7 +943,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerMinHeight", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_odometry_.hasMsg() || !sh_height_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(1.0, "[UavManager]: minHeightTimer() not spinning, missing data");
+    ROS_WARN_THROTTLE(10.0, "[UavManager]: minHeightTimer() not spinning, missing data");
     return;
   }
 
