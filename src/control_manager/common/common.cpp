@@ -16,7 +16,7 @@ std::optional<unsigned int> idxInVector(const std::string& str, const std::vecto
     }
   }
 
-  return false;
+  return {};
 }
 
 //}
