@@ -4,11 +4,12 @@ mrs_uav_managers:
 
     # list of names of dynamically loaded trackers
     mrs_trackers : [
+      "NullTracker",
       "MpcTracker",
       "LandoffTracker",
       "JoyTracker",
-      "NullTracker",
       "SpeedTracker",
+      "MidairActivationTracker",
     ]
 
     # list of names of dynamically loaded controllers
@@ -17,6 +18,7 @@ mrs_uav_managers:
       "MpcController",
       "FailsafeController",
       "EmergencyController",
+      "MidairActivationController",
     ]
 
     #- this is the "do nothing tracker", which is active when no other is
