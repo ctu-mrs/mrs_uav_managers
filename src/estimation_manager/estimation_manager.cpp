@@ -302,6 +302,7 @@ private:
   std::shared_ptr<StateMachine> sm_;
 
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>            sh_control_input_;
 
   mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_z_;
@@ -485,8 +486,6 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
   ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
                     sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
                     active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
-
-
 }
 /*//}*/
 
@@ -674,11 +673,22 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   }
 
   if (sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE)) {
-    sm_->changeState(StateMachine::TAKING_OFF_STATE);
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == "LandoffTracker") {
+      sm_->changeState(StateMachine::TAKING_OFF_STATE);
+    }
   }
 
   if (sm_->isInState(StateMachine::TAKING_OFF_STATE)) {
-    sm_->changeState(StateMachine::FLYING_STATE);
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker != "LandoffTracker") {
+      sm_->changeState(StateMachine::FLYING_STATE);
+    }
+  }
+
+  if (sm_->isInState(StateMachine::FLYING_STATE)) {
+    if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
+      ROS_WARN_THROTTLE(1.0, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable", getName().c_str(),
+                        (ros::Time::now() - sh_control_input_.lastMsgTime()).toSec());
+    }
   }
 }
 /*//}*/
@@ -806,6 +816,12 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   mrs_msgs::ControlManagerDiagnosticsConstPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
   ch_->desired_uav_state_rate                                          = control_manager_diag_msg->desired_uav_state_rate;
   ROS_INFO("[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
+  /*//}*/
+
+  /*//{ initialize subscribers */
+
+  sh_control_input_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>(shopts, "control_input_in");
+
   /*//}*/
 
   /*//{ load state estimator plugins */
