@@ -8171,6 +8171,13 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
     return std::tuple(false, ss.str());
   }
 
+  if (!input && _rc_emergency_handoff_) {
+
+    toggleOutput(false);
+
+    return std::tuple(true, "RC emergency handoff is ON, disabling output");
+  }
+
   std_srvs::SetBool srv_out;
 
   srv_out.request.data = input ? 1 : 0;  // arm or disarm?
