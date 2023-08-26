@@ -31,6 +31,9 @@ namespace estimation_manager
 class Support {
 
 public:
+
+  const static inline std::string waiting_for_string = "\033[0;36mWAITING FOR:\033[0m";
+
   /*//{ toSnakeCase() */
   static std::string toSnakeCase(const std::string& str_in) {
 
