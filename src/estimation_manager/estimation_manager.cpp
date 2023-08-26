@@ -483,9 +483,6 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     ph_altitude_agl_.publish(agl_height);
   }
 
-  ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
-                    sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
-                    active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
 }
 /*//}*/
 
@@ -584,6 +581,10 @@ void EstimationManager::timerPublishDiagnostics([[maybe_unused]] const ros::Time
   diagnostics.custom_config   = _custom_config_;
 
   ph_diagnostics_.publish(diagnostics);
+
+  ROS_INFO_THROTTLE(5.0, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(),
+                    sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
+                    active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
 }
 /*//}*/
 
@@ -645,7 +646,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
         sm_->changeState(StateMachine::READY_FOR_TAKEOFF_STATE);
       } else {
-        ROS_WARN_THROTTLE(1.0, "[%s]: waiting for agl estimator: %s to be running", getName().c_str(), est_alt_agl_->getName().c_str());
+        ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(), est_alt_agl_->getName().c_str());
       }
     }
   }
@@ -799,7 +800,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
   while (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO("[%s]: waiting for hw_api_capabilities message at topic: %s", getName().c_str(), sh_hw_api_capabilities_.topicName().c_str());
+    ROS_INFO("[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_hw_api_capabilities_.topicName().c_str());
     ros::Duration(1.0).sleep();
   }
 
@@ -809,7 +810,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//{ wait for desired uav_state rate */
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   while (!sh_control_manager_diag_.hasMsg()) {
-    ROS_INFO("[%s]: waiting for control_manager_diagnostics message at topic: %s", getName().c_str(), sh_control_manager_diag_.topicName().c_str());
+    ROS_INFO("[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_control_manager_diag_.topicName().c_str());
     ros::Duration(1.0).sleep();
   }
 
