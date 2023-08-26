@@ -8623,7 +8623,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           controller_tracker_switch_time_ = ros::Time::now();
         }
 
-        // super important, switch which the active controller idx
+        // super important, switch the active controller idx
         try {
 
           controller_list_[active_controller_idx_]->deactivate();

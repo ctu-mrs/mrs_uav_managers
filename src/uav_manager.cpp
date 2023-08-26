@@ -498,13 +498,18 @@ void UavManager::initialize() {
   timer_landing_           = nh_.createTimer(ros::Rate(_landing_timer_rate_), &UavManager::timerLanding, this, false, false);
   timer_takeoff_           = nh_.createTimer(ros::Rate(_takeoff_timer_rate_), &UavManager::timerTakeoff, this, false, false);
   timer_flighttime_        = nh_.createTimer(ros::Rate(_flighttime_timer_rate_), &UavManager::timerFlightTime, this, false, false);
-  timer_maxthrottle_       = nh_.createTimer(ros::Rate(_maxthrottle_timer_rate_), &UavManager::timerMaxthrottle, this);
   timer_diagnostics_       = nh_.createTimer(ros::Rate(_diagnostics_timer_rate_), &UavManager::timerDiagnostics, this);
   timer_midair_activation_ = nh_.createTimer(ros::Rate(_midair_activation_timer_rate_), &UavManager::timerMidairActivation, this, false, false);
   timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false,
                                       _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
   timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false,
                                       _min_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
+
+  bool should_check_throttle = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
+                               hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
+
+  timer_maxthrottle_ =
+      nh_.createTimer(ros::Rate(_maxthrottle_timer_rate_), &UavManager::timerMaxthrottle, this, false, _maxthrottle_timer_enabled_ && should_check_throttle);
 
   // | ----------------------- finish init ---------------------- |
 
