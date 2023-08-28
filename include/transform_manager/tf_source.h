@@ -139,6 +139,12 @@ public:
   }
   /*//}*/
 
+  /*//{ getIsUtmBased() */
+  bool getIsUtmBased() {
+    return is_utm_based_;
+  }
+  /*//}*/
+
   /*//{ setIsUtmSource() */
   void setIsUtmSource(const bool is_utm_source) {
     is_utm_source_ = is_utm_source;
@@ -240,15 +246,15 @@ private:
       scope_timer.checkpoint("pub local tf");
     }
 
-    if (publish_utm_tf_ && is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) {
-      publishUtmTf(msg->header.frame_id);
-      scope_timer.checkpoint("pub utm tf");
-    }
+    /* if (publish_utm_tf_ && is_utm_based_ && is_utm_origin_set_ && !is_utm_static_tf_published_) { */
+    /*   publishUtmTf(msg->header.frame_id); */
+    /*   scope_timer.checkpoint("pub utm tf"); */
+    /* } */
 
-    if (publish_world_tf_ && is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) {
-      publishWorldTf(msg->header.frame_id);
-      scope_timer.checkpoint("pub world tf");
-    }
+    /* if (publish_world_tf_ && is_utm_based_ && is_world_origin_set_ && !is_world_static_tf_published_) { */
+    /*   publishWorldTf(msg->header.frame_id); */
+    /*   scope_timer.checkpoint("pub world tf"); */
+    /* } */
 
     for (auto republisher : republishers_) {
       republishInFrame(msg, ch_->uav_name + "/" + republisher.first, republisher.second);

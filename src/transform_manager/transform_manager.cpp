@@ -87,6 +87,9 @@ private:
   std::vector<std::string> utm_source_priority_list_;
   std::string              utm_source_name;
 
+  std::mutex mtx_broadcast_utm_origin_;
+  std::mutex mtx_broadcast_world_origin_;
+
   ros::NodeHandle nh_;
 
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
@@ -438,25 +441,51 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     /*//}*/
   }
 
-/*//{ choose another source of utm and world tfs after estimator switch */
+  /*//{ choose another source of utm and world tfs after estimator switch */
   if (msg->header.frame_id != last_frame_id_) {
     const std::string last_estimator_name    = Support::frameIdToEstimatorName(last_frame_id_);
     const std::string current_estimator_name = Support::frameIdToEstimatorName(msg->header.frame_id);
 
     ROS_INFO("[%s]: Detected estimator switch: %s -> %s", getPrintName().c_str(), last_estimator_name.c_str(), current_estimator_name.c_str());
 
-    for (size_t i = 0; i < tf_sources_.size(); i++) {
-      if (tf_sources_.at(i)->getName() == last_estimator_name) {
-        tf_sources_.at(i)->setIsUtmSource(false);
-    ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
+      bool             valid_utm_source_found = false;
+      size_t           potential_utm_source_index;
+
+      for (size_t i = 0; i < tf_sources_.size(); i++) {
+
+        // first check if tf source can publish utm origin and is not the switched from estimator
+        if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() != last_estimator_name) {
+
+          valid_utm_source_found     = true;
+          potential_utm_source_index = i;
+
+          // check if switched to estimator is utm_based, if so, use it
+          if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() == current_estimator_name) {
+            potential_utm_source_index = i;
+            break;
+          }
+        }
       }
-      if (tf_sources_.at(i)->getName() == current_estimator_name) {
-        tf_sources_.at(i)->setIsUtmSource(true);
-    ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+
+
+      // if we found a valid utm source, use it, otherwise stay with the switched from estimator
+      if (valid_utm_source_found) {
+
+        tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
+        ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+
+        // stop previous estimator from publishing utm source
+        for (size_t i = 0; i < tf_sources_.size(); i++) {
+          if (tf_sources_.at(i)->getName() == last_estimator_name) {
+            tf_sources_.at(i)->setIsUtmSource(false);
+            ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
+          }
+        }
       }
-    }
+
   }
-/*//}*/
+  /*//}*/
+
   last_frame_id_ = msg->header.frame_id;
 }
 /*//}*/
