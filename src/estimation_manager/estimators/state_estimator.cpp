@@ -107,16 +107,6 @@ std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeadi
 /*//{ isCompatibleWithHwApi() */
 bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  bool success = true;
-
-  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
-  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
-
-  if (!success) {
-    ROS_ERROR("[%s]: could not load config file", getPrintName().c_str());
-    ros::shutdown();
-  }
-
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
   param_loader.setPrefix(Support::toSnakeCase(ch_->nodelet_name) + "/" + ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
