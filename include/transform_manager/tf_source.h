@@ -288,7 +288,7 @@ private:
     /*//{ tf source origin */
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp         = odom->header.stamp;
-    std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + custom_frame_id_ : odom->header.frame_id;
+    std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + "/" + custom_frame_id_ : odom->header.frame_id;
     if (is_inverted_) {
 
       tf_msg.header.frame_id       = ch_->frames.ns_fcu;
