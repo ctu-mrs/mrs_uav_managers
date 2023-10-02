@@ -46,7 +46,7 @@ mrs_uav_managers:
         enabled: false
       namespace: "hw_api" # the namespace of the topic (usually the node that publishes the topic)
       utm_based: false # if true, will publish tf to utm_origin
-      inverted: false # publish as inverted tf (the default for inverted mrs tf tree convention)
+      inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
 
     aloam_mapping:
@@ -55,7 +55,7 @@ mrs_uav_managers:
         enabled: false
       namespace: "slam" # the namespace of the topic (usually the node that publishes the topic)
       utm_based: false # if true, will publish tf to utm_origin
-      inverted: false # publish as inverted tf (the default for inverted mrs tf tree convention)
+      inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       custom_frame_id:
         enabled: true
         frame_id: "slam_mapping_origin"
