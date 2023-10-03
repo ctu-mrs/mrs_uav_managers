@@ -32,7 +32,7 @@ mrs_uav_managers:
       parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "fcu_untilted"
 
-    slam_mapping_origin_tf:
+    mapping_origin_tf:
       enabled: true
       lateral_topic: "slam/odom" # name of the topic used for x, y components of the tf (expects nav_msgs/Odometry topic type)
       altitude_topic: "slam/odom" # name of the topic  used for z components of the tf (expects nav_msgs/Odometry topic type)
@@ -40,7 +40,7 @@ mrs_uav_managers:
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       custom_frame_id:
         enabled: true
-        frame_id: "slam_mapping_origin"
+        frame_id: "mapping_origin"
 
 
     # the list of additional source topics from which the tfs will be constructed
