@@ -90,6 +90,7 @@ private:
   std::mutex mtx_broadcast_utm_origin_;
   std::mutex mtx_broadcast_world_origin_;
 
+
   ros::NodeHandle nh_;
 
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
@@ -114,9 +115,36 @@ private:
   void                                              callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg);
   std::atomic<bool>                                 got_utm_offset_ = false;
 
+
+  bool        slam_mapping_origin_tf_enabled_;
+  bool        slam_mapping_origin_tf_inverted_;
+  bool        slam_mapping_origin_tf_custom_frame_id_enabled_;
+  std::string slam_mapping_origin_tf_custom_frame_id_;
+  double      slam_mapping_origin_tf_cache_duration_;
+
+  std::string                                   slam_mapping_origin_tf_lateral_topic_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_mapping_odom_lat_;
+  void                                          callbackMappingOdomLat(const nav_msgs::Odometry::ConstPtr msg);
+  std::vector<nav_msgs::Odometry>               vec_mapping_odom_lat_;
+
+  std::string                                                 slam_mapping_origin_tf_orientation_topic_;
+  mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_mapping_odom_rot_;
+  void                                                        callbackMappingOdomRot(const geometry_msgs::QuaternionStamped::ConstPtr msg);
+  std::vector<geometry_msgs::QuaternionStamped>               vec_mapping_odom_rot_;
+  std::mutex                                                  mtx_mapping_odom_rot_;
+  bool                                                        got_mapping_odom_rot_ = false;
+
+  std::string                                   slam_mapping_origin_tf_altitude_topic_;
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_mapping_odom_alt_;
+  void                                          callbackMappingOdomAlt(const nav_msgs::Odometry::ConstPtr msg);
+  std::vector<nav_msgs::Odometry>               vec_mapping_odom_alt_;
+  std::mutex                                    mtx_mapping_odom_alt_;
+  bool                                          got_mapping_odom_alt_ = false;
+
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
 };
 /*//}*/
+
 
 /*//{ onInit() */
 void TransformManager::onInit() {
@@ -231,6 +259,20 @@ void TransformManager::onInit() {
   param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
+  /*//{ load slam mapping origin parameters */
+  param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/enabled", slam_mapping_origin_tf_enabled_);
+  if (slam_mapping_origin_tf_enabled_) {
+    param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/lateral_topic", slam_mapping_origin_tf_lateral_topic_);
+    param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/altitude_topic", slam_mapping_origin_tf_altitude_topic_);
+    param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/orientation_topic", slam_mapping_origin_tf_orientation_topic_);
+    param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/inverted", slam_mapping_origin_tf_inverted_);
+    param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/custom_frame_id/enabled", slam_mapping_origin_tf_custom_frame_id_enabled_);
+    if (slam_mapping_origin_tf_custom_frame_id_enabled_) {
+      param_loader.loadParam(yaml_prefix + "/slam_mapping_origin_tf/custom_frame_id/frame_id", slam_mapping_origin_tf_custom_frame_id_);
+    }
+  }
+  /*//}*/
+
   param_loader.loadParam("mrs_uav_managers/estimation_manager/state_estimators", estimator_names_);
   param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
 
@@ -278,6 +320,21 @@ void TransformManager::onInit() {
       mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
   sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+
+  if (slam_mapping_origin_tf_enabled_) {
+    sh_mapping_odom_lat_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + slam_mapping_origin_tf_lateral_topic_,
+                                                                         &TransformManager::callbackMappingOdomLat, this);
+
+    if (slam_mapping_origin_tf_orientation_topic_ != slam_mapping_origin_tf_lateral_topic_) {
+      sh_mapping_odom_rot_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(
+          shopts, "/" + ch_->uav_name + "/" + slam_mapping_origin_tf_orientation_topic_.c_str(), &TransformManager::callbackMappingOdomRot, this);
+    }
+
+    if (slam_mapping_origin_tf_altitude_topic_ != slam_mapping_origin_tf_lateral_topic_) {
+      sh_mapping_odom_alt_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + slam_mapping_origin_tf_altitude_topic_.c_str(),
+                                                                           &TransformManager::callbackMappingOdomAlt, this);
+    }
+  }
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -448,41 +505,40 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
     ROS_INFO("[%s]: Detected estimator switch: %s -> %s", getPrintName().c_str(), last_estimator_name.c_str(), current_estimator_name.c_str());
 
-      bool             valid_utm_source_found = false;
-      size_t           potential_utm_source_index;
+    bool   valid_utm_source_found = false;
+    size_t potential_utm_source_index;
 
-      for (size_t i = 0; i < tf_sources_.size(); i++) {
+    for (size_t i = 0; i < tf_sources_.size(); i++) {
 
-        // first check if tf source can publish utm origin and is not the switched from estimator
-        if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() != last_estimator_name) {
+      // first check if tf source can publish utm origin and is not the switched from estimator
+      if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() != last_estimator_name) {
 
-          valid_utm_source_found     = true;
+        valid_utm_source_found     = true;
+        potential_utm_source_index = i;
+
+        // check if switched to estimator is utm_based, if so, use it
+        if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() == current_estimator_name) {
           potential_utm_source_index = i;
-
-          // check if switched to estimator is utm_based, if so, use it
-          if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() == current_estimator_name) {
-            potential_utm_source_index = i;
-            break;
-          }
+          break;
         }
       }
+    }
 
 
-      // if we found a valid utm source, use it, otherwise stay with the switched from estimator
-      if (valid_utm_source_found) {
+    // if we found a valid utm source, use it, otherwise stay with the switched from estimator
+    if (valid_utm_source_found) {
 
-        tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
-        ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+      tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
+      ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
 
-        // stop previous estimator from publishing utm source
-        for (size_t i = 0; i < tf_sources_.size(); i++) {
-          if (tf_sources_.at(i)->getName() == last_estimator_name) {
-            tf_sources_.at(i)->setIsUtmSource(false);
-            ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
-          }
+      // stop previous estimator from publishing utm source
+      for (size_t i = 0; i < tf_sources_.size(); i++) {
+        if (tf_sources_.at(i)->getName() == last_estimator_name) {
+          tf_sources_.at(i)->setIsUtmSource(false);
+          ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
         }
       }
-
+    }
   }
   /*//}*/
 
@@ -582,6 +638,218 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
       tf_sources_[i]->setWorldOrigin(world_origin_);
     }
     got_utm_offset_ = true;
+  }
+}
+/*//}*/
+
+/*//{ callbackMappingOdomLat() */
+
+void TransformManager::callbackMappingOdomLat(const nav_msgs::Odometry::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (!got_mapping_odom_rot_ && slam_mapping_origin_tf_orientation_topic_ == slam_mapping_origin_tf_lateral_topic_) {
+    got_mapping_odom_rot_ = true;
+  }
+
+  if (!got_mapping_odom_alt_ && slam_mapping_origin_tf_altitude_topic_ == slam_mapping_origin_tf_lateral_topic_) {
+    got_mapping_odom_alt_ = true;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackMappingOdomLat", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  const double hdg_mapping_old = mrs_lib::AttitudeConverter(msg->pose.pose.orientation).getHeading();
+
+  /* publish aloam mapping origin tf //{ */
+
+  bool clear_needed = false;
+
+  if (got_mapping_odom_rot_ && got_mapping_odom_alt_) {
+    std::scoped_lock lock(mtx_mapping_odom_rot_);
+
+    // Copy mapping odometry
+    nav_msgs::Odometry mapping_odom;
+    mapping_odom = *msg;
+
+    // Find corresponding orientation
+    tf2::Quaternion                  tf2_rot;
+    geometry_msgs::QuaternionStamped rot_tmp = *sh_mapping_odom_rot_.getMsg();  // start with newest msg
+
+    for (size_t i = 0; i < vec_mapping_odom_rot_.size(); i++) {
+      if (mapping_odom.header.stamp < vec_mapping_odom_rot_.at(i).header.stamp) {
+
+        // Choose an orientation with closest timestamp
+        double time_diff      = std::fabs(vec_mapping_odom_rot_.at(i).header.stamp.toSec() - mapping_odom.header.stamp.toSec());
+        double time_diff_prev = std::numeric_limits<double>::max();
+        if (i > 0) {
+          time_diff_prev = std::fabs(vec_mapping_odom_rot_.at(i - 1).header.stamp.toSec() - mapping_odom.header.stamp.toSec());
+        }
+        if (time_diff_prev < time_diff && i > 0) {
+          i = i - 1;
+        }
+
+        // Cache is too small if it is full and its oldest element is used
+        if (clear_needed && i == 0) {
+          ROS_WARN_THROTTLE(1.0, "[%s] Mapping orientation cache is too small.", getPrintName().c_str());
+        }
+        rot_tmp = vec_mapping_odom_rot_.at(i);
+        break;
+      }
+    }
+
+    tf2_rot = mrs_lib::AttitudeConverter(rot_tmp.quaternion);
+
+    // Obtain heading from orientation
+    double hdg = 0;
+    try {
+      hdg = mrs_lib::AttitudeConverter(rot_tmp.quaternion).getHeading();
+    }
+    catch (...) {
+      ROS_WARN("[%s]: failed to getHeading() from rot_tmp", getPrintName().c_str());
+    }
+
+    // Build rotation matrix from difference between new heading and old heading
+    tf2::Matrix3x3 rot_mat = mrs_lib::AttitudeConverter(Eigen::AngleAxisd(hdg_mapping_old - hdg, Eigen::Vector3d::UnitZ()));
+
+    // Transform the mavros orientation by the rotation matrix
+    geometry_msgs::Quaternion new_orientation = mrs_lib::AttitudeConverter(tf2::Transform(rot_mat) * tf2_rot);
+
+    // Set new orientation
+    mapping_odom.pose.pose.orientation = new_orientation;
+
+
+    // Find corresponding local odom
+    double odom_alt = msg->pose.pose.position.z;
+    for (size_t i = 0; i < vec_mapping_odom_alt_.size(); i++) {
+      if (mapping_odom.header.stamp < vec_mapping_odom_alt_.at(i).header.stamp) {
+
+        // Choose orientation with closest timestamp
+        double time_diff      = std::fabs(vec_mapping_odom_alt_.at(i).header.stamp.toSec() - mapping_odom.header.stamp.toSec());
+        double time_diff_prev = std::numeric_limits<double>::max();
+        if (i > 0) {
+          time_diff_prev = std::fabs(vec_mapping_odom_alt_.at(i - 1).header.stamp.toSec() - mapping_odom.header.stamp.toSec());
+        }
+        if (time_diff_prev < time_diff && i > 0) {
+          i = i - 1;
+        }
+        // Cache is too small if it is full and its oldest element is used
+        if (clear_needed && i == 0) {
+          ROS_WARN_THROTTLE(1.0, "[%s] mapping orientation cache (for slam mapping tf) is too small.", getPrintName().c_str());
+        }
+        odom_alt = vec_mapping_odom_alt_.at(i).pose.pose.position.z;
+        break;
+      }
+    }
+
+    // Set altitude
+    mapping_odom.pose.pose.position.z = odom_alt;
+
+    // Get inverse transform
+    tf2::Transform      tf_mapping_inv   = Support::tf2FromPose(mapping_odom.pose.pose).inverse();
+    geometry_msgs::Pose pose_mapping_inv = Support::poseFromTf2(tf_mapping_inv);
+
+    geometry_msgs::TransformStamped tf_mapping;
+    tf_mapping.header.stamp    = mapping_odom.header.stamp;
+    tf_mapping.header.frame_id = ch_->frames.ns_fcu;
+    if (slam_mapping_origin_tf_custom_frame_id_enabled_) {
+      tf_mapping.child_frame_id = ch_->uav_name + "/" + slam_mapping_origin_tf_custom_frame_id_;
+    } else {
+      tf_mapping.child_frame_id = mapping_odom.header.frame_id;
+    }
+    tf_mapping.transform.translation = Support::pointToVector3(pose_mapping_inv.position);
+    tf_mapping.transform.rotation    = pose_mapping_inv.orientation;
+
+    if (Support::noNans(tf_mapping)) {
+      try {
+        broadcaster_->sendTransform(tf_mapping);
+      }
+      catch (...) {
+        ROS_ERROR("[%s]: Exception caught during publishing TF: %s - %s.", getPrintName().c_str(), tf_mapping.child_frame_id.c_str(),
+                  tf_mapping.header.frame_id.c_str());
+      }
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_mapping.header.frame_id.c_str(),
+                        tf_mapping.child_frame_id.c_str());
+    }
+  }
+
+  //}
+}
+/*//}*/
+
+/*//{ callbackMappingOdomRot() */
+void TransformManager::callbackMappingOdomRot(const geometry_msgs::QuaternionStamped::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+  std::scoped_lock lock(mtx_mapping_odom_rot_);
+
+  const ros::Time time_now = ros::Time::now();
+
+  // Add new data
+  vec_mapping_odom_rot_.push_back(*msg);
+
+  // Delete old data
+  size_t index_delete = 0;
+  bool   clear_needed = false;
+  for (size_t i = 0; i < vec_mapping_odom_rot_.size(); i++) {
+    if (time_now - vec_mapping_odom_rot_.at(i).header.stamp > ros::Duration(slam_mapping_origin_tf_cache_duration_)) {
+      index_delete = i;
+      clear_needed = true;
+    } else {
+      break;
+    }
+  }
+  if (clear_needed) {
+    for (int i = (int)index_delete; i >= 0; i--) {
+      vec_mapping_odom_rot_.erase(vec_mapping_odom_rot_.begin() + i);
+    }
+    clear_needed = false;
+  }
+
+  if (!got_mapping_odom_rot_) {
+    got_mapping_odom_rot_ = true;
+  }
+}
+/*//}*/
+
+/*//{ callbackMappingOdomAlt() */
+void TransformManager::callbackMappingOdomAlt(const nav_msgs::Odometry::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+  
+  std::scoped_lock lock(mtx_mapping_odom_alt_);
+
+  const ros::Time time_now = ros::Time::now();
+
+  // Add new data
+  vec_mapping_odom_alt_.push_back(*msg);
+
+  // Delete old data
+  size_t index_delete = 0;
+  bool   clear_needed = false;
+  for (size_t i = 0; i < vec_mapping_odom_alt_.size(); i++) {
+    if (time_now - vec_mapping_odom_alt_.at(i).header.stamp > ros::Duration(slam_mapping_origin_tf_cache_duration_)) {
+      index_delete = i;
+      clear_needed = true;
+    } else {
+      break;
+    }
+  }
+  if (clear_needed) {
+    for (int i = (int)index_delete; i >= 0; i--) {
+      vec_mapping_odom_alt_.erase(vec_mapping_odom_alt_.begin() + i);
+    }
+    clear_needed = false;
+  }
+
+  if (!got_mapping_odom_alt_) {
+    got_mapping_odom_alt_ = true;
   }
 }
 /*//}*/
