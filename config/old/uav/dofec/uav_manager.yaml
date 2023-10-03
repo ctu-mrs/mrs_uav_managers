@@ -1,7 +1,0 @@
-takeoff:
-
-  takeoff_height: 2.0
-
-  after_takeoff:
-
-    controller: "Se3Controller"
