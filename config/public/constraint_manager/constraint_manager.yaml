@@ -21,7 +21,7 @@ mrs_uav_managers:
       "fast",
     ]
 
-    # list of allowed gains per odometry mode
+    # list of allowed constraints per odometry mode
     allowed_constraints:
       gps_garmin: ["slow", "medium", "fast"]
       gps_baro: ["slow", "medium", "fast"]
@@ -34,8 +34,8 @@ mrs_uav_managers:
       ground_truth: ["slow", "medium", "fast"]
       passthrough: ["slow", "medium", "fast"]
 
-    # those gains will be used automatically when a localization mode switches
-    # and the current gains are not in the allowed list (next paragraphs)
+    # those constraints will be used automatically when a localization mode switches
+    # and the current constraints are not in the allowed list (next paragraphs)
     default_constraints:
       gps_garmin: "slow"
       gps_baro: "slow"
