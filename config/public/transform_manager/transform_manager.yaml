@@ -34,7 +34,7 @@ mrs_uav_managers:
 
     mapping_origin_tf:
       enabled: true
-      debug_prints: true
+      debug_prints: false
       lateral_topic: "slam/odom" # name of the topic used for x, y components of the tf (expects nav_msgs/Odometry topic type)
       altitude_topic: "slam/odom" # name of the topic  used for z components of the tf (expects nav_msgs/Odometry topic type)
       orientation_topic: "hw_api/orientation" # name of the topic  used for orientation components of the tf (expects geometry_msgs/Quaternion topic type)
