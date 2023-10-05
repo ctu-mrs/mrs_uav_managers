@@ -38,13 +38,14 @@ public:
     const std::string yaml_prefix = "mrs_uav_managers/transform_manager/mapping_origin_tf/";
 
     /*//{ load mapping origin parameters */
-    param_loader.loadParam(yaml_prefix + "lateral_topic", mapping_origin_tf_lateral_topic_);
-    param_loader.loadParam(yaml_prefix + "altitude_topic", mapping_origin_tf_altitude_topic_);
-    param_loader.loadParam(yaml_prefix + "orientation_topic", mapping_origin_tf_orientation_topic_);
-    param_loader.loadParam(yaml_prefix + "inverted", mapping_origin_tf_inverted_);
-    param_loader.loadParam(yaml_prefix + "custom_frame_id/enabled", mapping_origin_tf_custom_frame_id_enabled_);
-    if (mapping_origin_tf_custom_frame_id_enabled_) {
-      param_loader.loadParam(yaml_prefix + "custom_frame_id/frame_id", mapping_origin_tf_custom_frame_id_);
+    param_loader.loadParam(yaml_prefix + "debug_prints", debug_prints_);
+    param_loader.loadParam(yaml_prefix + "lateral_topic", lateral_topic_);
+    param_loader.loadParam(yaml_prefix + "altitude_topic", altitude_topic_);
+    param_loader.loadParam(yaml_prefix + "orientation_topic", orientation_topic_);
+    param_loader.loadParam(yaml_prefix + "inverted", tf_inverted_);
+    param_loader.loadParam(yaml_prefix + "custom_frame_id/enabled", custom_frame_id_enabled_);
+    if (custom_frame_id_enabled_) {
+      param_loader.loadParam(yaml_prefix + "custom_frame_id/frame_id", custom_frame_id_);
     }
 
     if (!param_loader.loadedSuccessfully()) {
@@ -64,16 +65,16 @@ public:
     shopts.queue_size         = 10;
     shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-    sh_mapping_odom_lat_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + mapping_origin_tf_lateral_topic_,
+    sh_mapping_odom_lat_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + lateral_topic_,
                                                                          &TfMappingOrigin::callbackMappingOdomLat, this);
 
-    if (mapping_origin_tf_orientation_topic_ != mapping_origin_tf_lateral_topic_) {
+    if (orientation_topic_ != lateral_topic_) {
       sh_mapping_odom_rot_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(
-          shopts, "/" + ch_->uav_name + "/" + mapping_origin_tf_orientation_topic_.c_str(), &TfMappingOrigin::callbackMappingOdomRot, this);
+          shopts, "/" + ch_->uav_name + "/" + orientation_topic_.c_str(), &TfMappingOrigin::callbackMappingOdomRot, this);
     }
 
-    if (mapping_origin_tf_altitude_topic_ != mapping_origin_tf_lateral_topic_) {
-      sh_mapping_odom_alt_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + mapping_origin_tf_altitude_topic_.c_str(),
+    if (altitude_topic_ != lateral_topic_) {
+      sh_mapping_odom_alt_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + altitude_topic_.c_str(),
                                                                            &TfMappingOrigin::callbackMappingOdomAlt, this);
     }
     /*//}*/
@@ -106,14 +107,17 @@ private:
 
   std::atomic_bool is_initialized_ = false;
 
-  bool        mapping_origin_tf_inverted_;
-  bool        mapping_origin_tf_custom_frame_id_enabled_;
-  std::string mapping_origin_tf_custom_frame_id_;
-  double      mapping_origin_tf_cache_duration_;
+  bool debug_prints_;
+  bool        tf_inverted_;
+  bool        custom_frame_id_enabled_;
+  std::string custom_frame_id_;
+  double      cache_duration_;
 
-  std::string                                   mapping_origin_tf_lateral_topic_;
+  std::string                                   lateral_topic_;
   mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_mapping_odom_lat_;
   std::vector<nav_msgs::Odometry>               vec_mapping_odom_lat_;
+  std::atomic_bool                              got_mapping_odom_lat_ = false;
+  std::atomic<double>                           timestamp_lat_;
 
   /*//{ callbackMappingOdomLat() */
 
@@ -123,11 +127,17 @@ private:
       return;
     }
 
-    if (!got_mapping_odom_rot_ && mapping_origin_tf_orientation_topic_ == mapping_origin_tf_lateral_topic_) {
+    timestamp_lat_ = msg->header.stamp.toSec();
+
+    if (!got_mapping_odom_lat_) {
+      got_mapping_odom_lat_ = true;
+    }
+
+    if (!got_mapping_odom_rot_ && orientation_topic_ == lateral_topic_) {
       got_mapping_odom_rot_ = true;
     }
 
-    if (!got_mapping_odom_alt_ && mapping_origin_tf_altitude_topic_ == mapping_origin_tf_lateral_topic_) {
+    if (!got_mapping_odom_alt_ && altitude_topic_ == lateral_topic_) {
       got_mapping_odom_alt_ = true;
     }
 
@@ -147,8 +157,9 @@ private:
       mapping_odom = *msg;
 
       // Find corresponding orientation
+      geometry_msgs::QuaternionStamped rot_tmp           = *sh_mapping_odom_rot_.getMsg();  // start with newest msg
+      ros::Time                        dbg_timestamp_rot = rot_tmp.header.stamp;
       tf2::Quaternion                  tf2_rot;
-      geometry_msgs::QuaternionStamped rot_tmp = *sh_mapping_odom_rot_.getMsg();  // start with newest msg
 
       for (size_t i = 0; i < vec_mapping_odom_rot_.size(); i++) {
         if (mapping_odom.header.stamp < vec_mapping_odom_rot_.at(i).header.stamp) {
@@ -167,7 +178,8 @@ private:
           if (clear_needed && i == 0) {
             ROS_WARN_THROTTLE(1.0, "[%s] Mapping orientation cache is too small.", getPrintName().c_str());
           }
-          rot_tmp = vec_mapping_odom_rot_.at(i);
+          rot_tmp           = vec_mapping_odom_rot_.at(i);
+          dbg_timestamp_rot = vec_mapping_odom_rot_.at(i).header.stamp;
           break;
         }
       }
@@ -194,7 +206,8 @@ private:
 
 
       // Find corresponding local odom
-      double odom_alt = msg->pose.pose.position.z;
+      double    odom_alt          = msg->pose.pose.position.z;  // start with newest msg
+      ros::Time dbg_timestamp_alt = msg->header.stamp;
       for (size_t i = 0; i < vec_mapping_odom_alt_.size(); i++) {
         if (mapping_odom.header.stamp < vec_mapping_odom_alt_.at(i).header.stamp) {
 
@@ -209,9 +222,10 @@ private:
           }
           // Cache is too small if it is full and its oldest element is used
           if (clear_needed && i == 0) {
-            ROS_WARN_THROTTLE(1.0, "[%s] mapping orientation cache (for slam mapping tf) is too small.", getPrintName().c_str());
+            ROS_WARN_THROTTLE(1.0, "[%s] mapping orientation cache (for mapping tf) is too small.", getPrintName().c_str());
           }
-          odom_alt = vec_mapping_odom_alt_.at(i).pose.pose.position.z;
+          odom_alt          = vec_mapping_odom_alt_.at(i).pose.pose.position.z;
+          dbg_timestamp_alt = vec_mapping_odom_alt_.at(i).header.stamp;
           break;
         }
       }
@@ -226,8 +240,8 @@ private:
       geometry_msgs::TransformStamped tf_mapping;
       tf_mapping.header.stamp    = mapping_odom.header.stamp;
       tf_mapping.header.frame_id = ch_->frames.ns_fcu;
-      if (mapping_origin_tf_custom_frame_id_enabled_) {
-        tf_mapping.child_frame_id = ch_->uav_name + "/" + mapping_origin_tf_custom_frame_id_;
+      if (custom_frame_id_enabled_) {
+        tf_mapping.child_frame_id = ch_->uav_name + "/" + custom_frame_id_;
       } else {
         tf_mapping.child_frame_id = mapping_odom.header.frame_id;
       }
@@ -246,17 +260,26 @@ private:
         ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_mapping.header.frame_id.c_str(),
                           tf_mapping.child_frame_id.c_str());
       }
+
+      // debug timestamps: rot and alt timestamps should be as close as possible to lat_timestamp, the delay is the difference between current time and the time
+      // of acquisition of scan that was used to calculate the pose estimate
+      if (debug_prints_) {
+        ROS_INFO("[%s] lat timestamp: %.6f, rot stamp: %.6f (diff: %.6f),  alt stamp: %.6f (diff: %.6f), delay: %.6f", getPrintName().c_str(),
+                 mapping_odom.header.stamp.toSec(), dbg_timestamp_rot.toSec(), dbg_timestamp_rot.toSec() - mapping_odom.header.stamp.toSec(),
+                 dbg_timestamp_alt.toSec(), dbg_timestamp_alt.toSec() - mapping_odom.header.stamp.toSec(),
+                 ros::Time::now().toSec() - mapping_odom.header.stamp.toSec());
+      }
     }
 
     //}
   }
   /*//}*/
 
-  std::string                                                 mapping_origin_tf_orientation_topic_;
+  std::string                                                 orientation_topic_;
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_mapping_odom_rot_;
   std::vector<geometry_msgs::QuaternionStamped>               vec_mapping_odom_rot_;
   std::mutex                                                  mtx_mapping_odom_rot_;
-  bool                                                        got_mapping_odom_rot_ = false;
+  std::atomic_bool                                            got_mapping_odom_rot_ = false;
 
   /*//{ callbackMappingOdomRot() */
   void callbackMappingOdomRot(const geometry_msgs::QuaternionStamped::ConstPtr msg) {
@@ -264,9 +287,12 @@ private:
     if (!is_initialized_) {
       return;
     }
-    std::scoped_lock lock(mtx_mapping_odom_rot_);
 
-    const ros::Time time_now = ros::Time::now();
+    if (!got_mapping_odom_lat_) {
+      return;
+    }
+
+    std::scoped_lock lock(mtx_mapping_odom_rot_);
 
     // Add new data
     vec_mapping_odom_rot_.push_back(*msg);
@@ -275,7 +301,7 @@ private:
     size_t index_delete = 0;
     bool   clear_needed = false;
     for (size_t i = 0; i < vec_mapping_odom_rot_.size(); i++) {
-      if (time_now - vec_mapping_odom_rot_.at(i).header.stamp > ros::Duration(mapping_origin_tf_cache_duration_)) {
+      if (timestamp_lat_ - vec_mapping_odom_rot_.at(i).header.stamp.toSec() > cache_duration_) {
         index_delete = i;
         clear_needed = true;
       } else {
@@ -292,14 +318,18 @@ private:
     if (!got_mapping_odom_rot_) {
       got_mapping_odom_rot_ = true;
     }
+
+    if (debug_prints_) {
+      ROS_INFO_THROTTLE(1.0, "[%s]: mapping odom rot cache size: %lu", getPrintName().c_str(), vec_mapping_odom_rot_.size());
+    }
   }
   /*//}*/
 
-  std::string                                   mapping_origin_tf_altitude_topic_;
+  std::string                                   altitude_topic_;
   mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_mapping_odom_alt_;
   std::vector<nav_msgs::Odometry>               vec_mapping_odom_alt_;
   std::mutex                                    mtx_mapping_odom_alt_;
-  bool                                          got_mapping_odom_alt_ = false;
+  std::atomic_bool                              got_mapping_odom_alt_ = false;
 
   /*//{ callbackMappingOdomAlt() */
   void callbackMappingOdomAlt(const nav_msgs::Odometry::ConstPtr msg) {
@@ -308,9 +338,11 @@ private:
       return;
     }
 
-    std::scoped_lock lock(mtx_mapping_odom_alt_);
+    if (!got_mapping_odom_lat_) {
+      return;
+    }
 
-    const ros::Time time_now = ros::Time::now();
+    std::scoped_lock lock(mtx_mapping_odom_alt_);
 
     // Add new data
     vec_mapping_odom_alt_.push_back(*msg);
@@ -319,7 +351,7 @@ private:
     size_t index_delete = 0;
     bool   clear_needed = false;
     for (size_t i = 0; i < vec_mapping_odom_alt_.size(); i++) {
-      if (time_now - vec_mapping_odom_alt_.at(i).header.stamp > ros::Duration(mapping_origin_tf_cache_duration_)) {
+      if (timestamp_lat_ - vec_mapping_odom_alt_.at(i).header.stamp.toSec() > cache_duration_) {
         index_delete = i;
         clear_needed = true;
       } else {
@@ -335,6 +367,10 @@ private:
 
     if (!got_mapping_odom_alt_) {
       got_mapping_odom_alt_ = true;
+    }
+
+    if (debug_prints_) {
+      ROS_INFO_THROTTLE(1.0, "[%s]: mapping odom alt cache size: %lu", getPrintName().c_str(), vec_mapping_odom_alt_.size());
     }
   }
   /*//}*/
