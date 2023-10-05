@@ -120,14 +120,14 @@ public:
     switch (target_state) {
 
       case UNINITIALIZED_STATE: {
-        ROS_ERROR("[%s]: transition to %s is not possible from any state", getPrintName().c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
+        ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is not possible from any state", getPrintName().c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
         return false;
         break;
       }
 
       case INITIALIZED_STATE: {
         if (current_state_ != UNINITIALIZED_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
                     getStateAsString(UNINITIALIZED_STATE).c_str());
           return false;
         }
@@ -136,7 +136,7 @@ public:
 
       case READY_FOR_TAKEOFF_STATE: {
         if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(READY_FOR_TAKEOFF_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(READY_FOR_TAKEOFF_STATE).c_str(),
                     getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(LANDED_STATE).c_str());
           return false;
         }
@@ -145,7 +145,7 @@ public:
 
       case TAKING_OFF_STATE: {
         if (current_state_ != READY_FOR_TAKEOFF_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
                     getStateAsString(READY_FOR_TAKEOFF_STATE).c_str());
           return false;
         }
@@ -154,7 +154,7 @@ public:
 
       case FLYING_STATE: {
         if (current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(),
                     getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
@@ -163,7 +163,7 @@ public:
 
       case HOVER_STATE: {
         if (current_state_ != FLYING_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
                     getStateAsString(FLYING_STATE).c_str());
           return false;
         }
@@ -172,7 +172,7 @@ public:
 
       case ESTIMATOR_SWITCHING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(),
                     getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
           return false;
         }
@@ -182,7 +182,7 @@ public:
 
       case LANDING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
                     getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
           return false;
         }
@@ -191,7 +191,7 @@ public:
 
       case LANDED_STATE: {
         if (current_state_ != LANDING_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(LANDED_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(LANDED_STATE).c_str(),
                     getStateAsString(LANDING_STATE).c_str());
           return false;
         }
@@ -200,7 +200,7 @@ public:
 
       case DUMMY_STATE: {
         if (current_state_ != INITIALIZED_STATE) {
-          ROS_ERROR("[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(DUMMY_STATE).c_str(),
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(DUMMY_STATE).c_str(),
                     getStateAsString(INITIALIZED_STATE).c_str());
           return false;
         }
@@ -222,7 +222,7 @@ public:
       }
 
       default: {
-        ROS_ERROR("[%s]: rejected transition to unknown state id %d", getPrintName().c_str(), target_state);
+        ROS_ERROR_THROTTLE(1.0, "[%s]: rejected transition to unknown state id %d", getPrintName().c_str(), target_state);
         return false;
         break;
       }
