@@ -586,8 +586,8 @@ private:
   bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
   bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
   bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
-  double getMinZ(void);
-  double getMaxZ(void);
+  double getMinZ(const std::string& frame_id);
+  double getMaxZ(const std::string& frame_id);
 
   // | ------------------------ callbacks ----------------------- |
 
@@ -1257,8 +1257,8 @@ void ControlManager::initialize(void) {
   common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this);
-  common_handlers_->safety_area.getMaxZ               = boost::bind(&ControlManager::getMaxZ, this);
+  common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this, _1);
+  common_handlers_->safety_area.getMaxZ               = boost::bind(&ControlManager::getMaxZ, this, _1);
 
   common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
 
@@ -2118,8 +2118,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       mrs_lib::Polygon border = safety_zone_->getBorder();
 
-      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ());
-      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ());
+      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_frame_));
+      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_frame_));
 
       std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
       std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
@@ -2275,8 +2275,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto polygon : polygon_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinZ());
-        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxZ());
+        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinZ(_safety_area_frame_));
+        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxZ(_safety_area_frame_));
 
         // transform border bottom points to local origin
         for (size_t i = 0; i < points_bot.size(); i++) {
@@ -2348,7 +2348,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       for (auto point : point_obstacles) {
 
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinZ());
+        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinZ(_safety_area_frame_));
         std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
 
         // transform bottom points to local origin
@@ -5134,11 +5134,14 @@ bool ControlManager::callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request&
 
 bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
+
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   res.success = true;
-  res.value   = getMinZ();
+  res.value   = getMinZ(uav_state.header.frame_id);
 
   return true;
 }
@@ -6188,8 +6191,8 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     int last_valid_idx    = 0;
     int first_invalid_idx = -1;
 
-    double min_z = getMinZ();
-    double max_z = getMaxZ();
+    double min_z = getMinZ(processed_trajectory.header.frame_id);
+    double max_z = getMaxZ(processed_trajectory.header.frame_id);
 
     for (int i = 0; i < trajectory_size; i++) {
 
@@ -6787,7 +6790,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   if (safety_zone_->isPointValid3d(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
-      point_transformed.reference.position.z >= min_z && point_transformed.reference.position.z <= getMaxZ()) {
+      point_transformed.reference.position.z >= min_z && point_transformed.reference.position.z <= getMaxZ(_safety_area_frame_)) {
     return true;
   }
 
@@ -6906,9 +6909,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 /* //{ getMaxZ() */
 
-double ControlManager::getMaxZ(void) {
-
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+double ControlManager::getMaxZ(const std::string& frame_id) {
 
   // | ------- first, calculate max_z from the safety area ------ |
 
@@ -6923,7 +6924,7 @@ double ControlManager::getMaxZ(void) {
     point.point.y         = 0;
     point.point.z         = _safety_area_max_z_;
 
-    auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
+    auto ret = transformer_->transformSingle(point, frame_id);
 
     if (!ret) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to the current control frame");
@@ -6949,7 +6950,7 @@ double ControlManager::getMaxZ(void) {
       point.point.y = 0;
       point.point.z = msg->value;
 
-      auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
+      auto ret = transformer_->transformSingle(point, frame_id);
 
       if (!ret) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
@@ -6970,7 +6971,7 @@ double ControlManager::getMaxZ(void) {
 
 /* //{ getMinZ() */
 
-double ControlManager::getMinZ(void) {
+double ControlManager::getMinZ(const std::string& frame_id) {
 
   if (!use_safety_area_) {
     return std::numeric_limits<double>::lowest();
@@ -6985,7 +6986,7 @@ double ControlManager::getMinZ(void) {
   point.point.y         = 0;
   point.point.z         = safety_area_min_z_;
 
-  auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
+  auto ret = transformer_->transformSingle(point, frame_id);
 
   if (!ret) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform min_z to the current control frame");
