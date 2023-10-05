@@ -8,7 +8,7 @@
   <arg name="BODY_DISTURBANCE_X" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
   <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
-	<arg name="OLD_PX4_FW" default="$(optenv OLD_PX4_FW false)" />
+  <arg name="OLD_PX4_FW" default="$(optenv OLD_PX4_FW false)" />
 
     <!-- other args -->
   <arg name="debug" default="false" />
@@ -164,7 +164,6 @@
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />
       <remap from="~bumper_set_params_in" to="~bumper_set_params" />
-      <remap from="~set_min_z_in" to="~set_min_z" />
       <remap from="~get_min_z_in" to="~get_min_z" />
       <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_service_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />

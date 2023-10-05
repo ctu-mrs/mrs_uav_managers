@@ -640,7 +640,6 @@ private:
   bool callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
-  bool callbackSetMinZ(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res);
   bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
   bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
@@ -1802,7 +1801,6 @@ void ControlManager::initialize(void) {
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_bumper_set_params_          = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
   service_server_bumper_repulsion_enabler_   = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsion, this);
-  service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
@@ -5132,31 +5130,6 @@ bool ControlManager::callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request&
 
 //}
 
-/* //{ callbackSetMinZ() */
-
-bool ControlManager::callbackSetMinZ(mrs_msgs::Float64Srv::Request& req, mrs_msgs::Float64Srv::Response& res) {
-
-  if (!is_initialized_) {
-    return false;
-  }
-
-  double min_z = req.value;
-
-  std::stringstream message;
-
-  mrs_lib::set_mutexed(mutex_safety_area_min_z_, min_z, safety_area_min_z_);
-
-  message << "Setting safety area min Z to " << min_z;
-  ROS_INFO_STREAM("[ControlManager]: " << message.str());
-
-  res.success = true;
-  res.message = message.str();
-
-  return true;
-}
-
-//}
-
 /* //{ callbackGetMinZ() */
 
 bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
@@ -5165,7 +5138,7 @@ bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Requ
     return false;
 
   res.success = true;
-  res.value   = mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
+  res.value   = getMinZ();
 
   return true;
 }
@@ -6807,9 +6780,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   auto ret = transformer_->transformSingle(point, _safety_area_frame_);
 
   if (!ret) {
-
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
-
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area frame");
     return false;
   }
 
@@ -6837,7 +6808,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
 
   if (!ret) {
 
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the safety area frame");
 
     return false;
   }
@@ -6937,30 +6908,62 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
 double ControlManager::getMaxZ(void) {
 
-  // set the default max z from the safety area
-  double max_z = _safety_area_max_z_;
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  // if possible, override it with max z from the estimation manager
-  if (sh_max_z_.hasMsg()) {
+  // | ------- first, calculate max_z from the safety area ------ |
 
-    auto msg = sh_max_z_.getMsg();
+  double safety_area_max_z = std::numeric_limits<float>::max();
 
-    // transform it into the safety area frame
+  {
+
     geometry_msgs::PointStamped point;
-    point.header  = msg->header;
-    point.point.x = 0;
-    point.point.y = 0;
-    point.point.z = msg->value;
 
-    auto ret = transformer_->transformSingle(point, _safety_area_frame_);
+    point.header.frame_id = _safety_area_frame_;
+    point.point.x         = 0;
+    point.point.y         = 0;
+    point.point.z         = _safety_area_max_z_;
 
-    if (ret) {
+    auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
 
-      max_z = _safety_area_max_z_ > ret->point.z ? ret->point.z : _safety_area_max_z_;
+    if (!ret) {
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to the current control frame");
+    }
+
+    safety_area_max_z = ret->point.z;
+  }
+
+  // | ------------ overwrite from estimation manager ----------- |
+
+  double estimation_manager_max_z = std::numeric_limits<float>::max();
+
+  {
+    // if possible, override it with max z from the estimation manager
+    if (sh_max_z_.hasMsg()) {
+
+      auto msg = sh_max_z_.getMsg();
+
+      // transform it into the safety area frame
+      geometry_msgs::PointStamped point;
+      point.header  = msg->header;
+      point.point.x = 0;
+      point.point.y = 0;
+      point.point.z = msg->value;
+
+      auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
+
+      if (!ret) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
+      }
+
+      estimation_manager_max_z = ret->point.z;
     }
   }
 
-  return max_z;
+  if (estimation_manager_max_z < safety_area_max_z) {
+    return estimation_manager_max_z;
+  } else {
+    return safety_area_max_z;
+  }
 }
 
 //}
@@ -6969,11 +6972,29 @@ double ControlManager::getMaxZ(void) {
 
 double ControlManager::getMinZ(void) {
 
-  if (use_safety_area_) {
-    return mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
-  } else {
+  if (!use_safety_area_) {
     return std::numeric_limits<double>::lowest();
   }
+
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+
+  geometry_msgs::PointStamped point;
+
+  point.header.frame_id = _safety_area_frame_;
+  point.point.x         = 0;
+  point.point.y         = 0;
+  point.point.z         = safety_area_min_z_;
+
+  auto ret = transformer_->transformSingle(point, uav_state.header.frame_id);
+
+  if (!ret) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform min_z to the current control frame");
+    return std::numeric_limits<double>::lowest();
+  }
+
+  geometry_msgs::PointStamped point_transformed = ret.value();
+
+  return mrs_lib::get_mutexed(mutex_safety_area_min_z_, point_transformed.point.z);
 }
 
 //}
