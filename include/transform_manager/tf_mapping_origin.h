@@ -65,12 +65,12 @@ public:
     shopts.queue_size         = 10;
     shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-    sh_mapping_odom_lat_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + lateral_topic_,
-                                                                         &TfMappingOrigin::callbackMappingOdomLat, this);
+    sh_mapping_odom_lat_ =
+        mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "/" + ch_->uav_name + "/" + lateral_topic_, &TfMappingOrigin::callbackMappingOdomLat, this);
 
     if (orientation_topic_ != lateral_topic_) {
-      sh_mapping_odom_rot_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(
-          shopts, "/" + ch_->uav_name + "/" + orientation_topic_.c_str(), &TfMappingOrigin::callbackMappingOdomRot, this);
+      sh_mapping_odom_rot_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "/" + ch_->uav_name + "/" + orientation_topic_.c_str(),
+                                                                                         &TfMappingOrigin::callbackMappingOdomRot, this);
     }
 
     if (altitude_topic_ != lateral_topic_) {
@@ -78,6 +78,8 @@ public:
                                                                            &TfMappingOrigin::callbackMappingOdomAlt, this);
     }
     /*//}*/
+
+    ph_map_delay_ = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "map_delay_out", 10);
 
     is_initialized_ = true;
     ROS_INFO("[%s]: initialized", getPrintName().c_str());
@@ -107,7 +109,9 @@ private:
 
   std::atomic_bool is_initialized_ = false;
 
-  bool debug_prints_;
+  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped> ph_map_delay_;
+
+  bool        debug_prints_;
   bool        tf_inverted_;
   bool        custom_frame_id_enabled_;
   std::string custom_frame_id_;
@@ -269,6 +273,11 @@ private:
                  dbg_timestamp_alt.toSec(), dbg_timestamp_alt.toSec() - mapping_odom.header.stamp.toSec(),
                  ros::Time::now().toSec() - mapping_odom.header.stamp.toSec());
       }
+
+      mrs_msgs::Float64Stamped map_delay_msg;
+      map_delay_msg.header.stamp = ros::Time::now();
+      map_delay_msg.value        = ros::Time::now().toSec() - mapping_odom.header.stamp.toSec();
+      ph_map_delay_.publish(map_delay_msg);
     }
 
     //}
