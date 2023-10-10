@@ -1,29 +1,5 @@
-<library path="lib/libUavManager">
-  <class name="mrs_uav_managers/UavManager" type="mrs_uav_managers::uav_manager::UavManager" base_class_type="nodelet::Nodelet">
-    <description>UavManager nodelet</description>
-  </class>
-</library>
-
-<library path="lib/libControlManager">
-  <class name="mrs_uav_managers/ControlManager" type="mrs_uav_managers::control_manager::ControlManager" base_class_type="nodelet::Nodelet">
-    <description>ControlManager nodelet</description>
-  </class>
-</library>
-
-<library path="lib/libConstraintManager">
-  <class name="mrs_uav_managers/ConstraintManager" type="mrs_uav_managers::constraint_manager::ConstraintManager" base_class_type="nodelet::Nodelet">
-    <description>ConstraintManager nodelet</description>
-  </class>
-</library>
-
-<library path="lib/libGainManager">
-  <class name="mrs_uav_managers/GainManager" type="mrs_uav_managers::gain_manager::GainManager" base_class_type="nodelet::Nodelet">
-    <description>GainManager nodelet</description>
-  </class>
-</library>
-
-<library path="lib/libTfManager">
-  <class name="mrs_uav_managers/TfManager" type="mrs_uav_managers::tf_manager::TfManager" base_class_type="nodelet::Nodelet">
-    <description>TfManager nodelet</description>
+<library path="lib/libMrsUavManagers_NullTracker">
+  <class name="mrs_uav_managers/NullTracker" type="mrs_uav_managers::NullTracker" base_class_type="mrs_uav_managers::Tracker">
+    <description>This is Null tracker.</description>
   </class>
 </library>

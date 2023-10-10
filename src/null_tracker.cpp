@@ -12,15 +12,17 @@ class NullTracker : public mrs_uav_managers::Tracker {
 public:
   ~NullTracker(){};
 
-  void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name, std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers);
-  std::tuple<bool, std::string> activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd);
+  bool initialize(const ros::NodeHandle &parent_nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+                  std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers);
+
+  std::tuple<bool, std::string> activate([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand> &last_tracker_cmd);
   void                          deactivate(void);
   bool                          resetStatic(void);
 
-  const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &uav_state, const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd);
+  std::optional<mrs_msgs::TrackerCommand>   update(const mrs_msgs::UavState &uav_state, const Controller::ControlOutput &last_control_output);
   const mrs_msgs::TrackerStatus             getStatus();
   const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd);
-  const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state);
+  const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState &new_uav_state);
 
   const mrs_msgs::ReferenceSrvResponse::ConstPtr           setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd);
   const mrs_msgs::VelocityReferenceSrvResponse::ConstPtr   setVelocityReference(const mrs_msgs::VelocityReferenceSrvRequest::ConstPtr &cmd);
@@ -40,7 +42,7 @@ private:
   bool            is_initialized    = false;
   bool            callbacks_enabled = false;
 
-  std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers;
+  std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers;
 };
 
 //}
@@ -49,8 +51,9 @@ private:
 
 /* //{ initialize() */
 
-void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] const std::string uav_name,
-                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) {
+bool NullTracker::initialize(const ros::NodeHandle &                                                                parent_nh,
+                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t>  common_handlers,
+                             [[maybe_unused]] std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) {
 
   ros::NodeHandle nh_(parent_nh, "null_tracker");
 
@@ -61,13 +64,15 @@ void NullTracker::initialize(const ros::NodeHandle &parent_nh, [[maybe_unused]] 
   this->common_handlers = common_handlers;
 
   ROS_INFO("[NullTracker]: initialized");
+
+  return true;
 }
 
 //}
 
 /* //{ activate() */
 
-std::tuple<bool, std::string> NullTracker::activate([[maybe_unused]] const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) {
+std::tuple<bool, std::string> NullTracker::activate([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand> &last_tracker_cmd) {
 
   std::stringstream ss;
   ss << "activated";
@@ -100,7 +105,7 @@ bool NullTracker::resetStatic(void) {
 
 /* switchOdometrySource() //{ */
 
-const std_srvs::TriggerResponse::ConstPtr NullTracker::switchOdometrySource([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &new_uav_state) {
+const std_srvs::TriggerResponse::ConstPtr NullTracker::switchOdometrySource([[maybe_unused]] const mrs_msgs::UavState &new_uav_state) {
   return std_srvs::TriggerResponse::Ptr();
 }
 
@@ -108,10 +113,10 @@ const std_srvs::TriggerResponse::ConstPtr NullTracker::switchOdometrySource([[ma
 
 /* //{ update() */
 
-const mrs_msgs::PositionCommand::ConstPtr NullTracker::update([[maybe_unused]] const mrs_msgs::UavState::ConstPtr &       uav_state,
-                                                              [[maybe_unused]] const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) {
+std::optional<mrs_msgs::TrackerCommand> NullTracker::update([[maybe_unused]] const mrs_msgs::UavState &       uav_state,
+                                                            [[maybe_unused]] const Controller::ControlOutput &last_control_output) {
 
-  return mrs_msgs::PositionCommand::Ptr();
+  return {};
 }
 
 //}

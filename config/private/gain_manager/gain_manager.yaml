@@ -1,0 +1,11 @@
+mrs_uav_managers:
+
+  gain_manager:
+
+    rate: 10.0 # [Hz]
+    diagnostics_rate: 1.0 # [Hz]
+
+    scope_timer:
+
+      enabled: false
+      log_filename: "" # if empty, scope timers output to terminal; otherwise log to file

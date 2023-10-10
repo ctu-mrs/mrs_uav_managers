@@ -1,0 +1,47 @@
+mrs_uav_managers:
+
+  gain_manager:
+
+    estimator_types: [
+      "gps_garmin",
+      "gps_baro",
+      "rtk",
+      "aloam",
+      "hector_garmin",
+      "vio",
+      "optflow",
+      "other",
+      "ground_truth",
+      "passthrough",
+    ]
+
+    gains: [
+      "supersoft",
+    ]
+
+    # list of allowed gains per odometry mode
+    allowed_gains:
+      gps_garmin: ["supersoft"]
+      gps_baro: ["supersoft"]
+      rtk: ["supersoft"]
+      aloam: ["supersoft"]
+      hector_garmin: ["supersoft"]
+      vio: ["supersoft"]
+      optflow: ["supersoft"]
+      other: ["supersoft"]
+      ground_truth: ["supersoft"]
+      passthrough: ["supersoft"]
+
+    # those gains will be used automatically when a localization mode switches
+    # and the current gains are not in the allowed list (next paragraphs)
+    default_gains:
+      gps_garmin: "supersoft"
+      gps_baro: "supersoft"
+      rtk: "supersoft"
+      aloam: "supersoft"
+      hector_garmin: "supersoft"
+      vio: "supersoft"
+      optflow: "supersoft"
+      other: "supersoft"
+      ground_truth: "supersoft"
+      passthrough: "supersoft"

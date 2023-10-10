@@ -4,20 +4,27 @@
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
   <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
-  <arg name="UAV_TYPE" default="$(optenv UAV_TYPE)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
-    <!-- other args -->
+  <!-- other args -->
   <arg name="debug" default="false" />
-  <arg name="custom_config" default="" />
   <arg name="standalone" default="true" />
+  <arg name="bond" default="$(optenv BOND true)" />
+  <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
+
+  <!-- config files -->
+  <arg name="custom_config" default="" />
+  <arg name="platform_config" default="" />
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
+
+  <arg     if="$(arg bond)" name="bond_suffix" value="" />
+  <arg unless="$(arg bond)" name="bond_suffix" value="--no-bond" />
 
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
   <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
   <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
-  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
@@ -25,23 +32,21 @@
   <group ns="$(arg UAV_NAME)">
 
     <!-- Constraint Manager -->
-    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_managers/ConstraintManager $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node pkg="nodelet" type="nodelet" name="constraint_manager" args="$(arg nodelet) mrs_uav_managers/ConstraintManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/default/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/default/constraint_manager/constraints.yaml" />
-
-        <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraint_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/$(arg RUN_TYPE)/$(arg UAV_TYPE)/constraint_manager/constraints.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/private/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/constraint_manager/constraint_manager.yaml" />
+      <rosparam file="$(find mrs_uav_managers)/config/public/constraint_manager/constraints.yaml" />
 
       <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
 
       <!-- Subscribers -->
-      <remap from="~odometry_diagnostics_in" to="odometry/diagnostics" />
+      <remap from="~estimation_diagnostics_in" to="estimation_manager/diagnostics" />
 
       <!-- Services -->
       <remap from="~set_constraints_in" to="~set_constraints" />

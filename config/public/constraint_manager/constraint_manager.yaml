@@ -1,0 +1,49 @@
+mrs_uav_managers:
+
+  constraint_manager:
+
+    estimator_types: [
+      "gps_garmin",
+      "gps_baro",
+      "rtk",
+      "aloam",
+      "hector_garmin",
+      "vio",
+      "optflow",
+      "other",
+      "ground_truth",
+      "passthrough",
+    ]
+
+    constraints: [
+      "slow",
+      "medium",
+      "fast",
+    ]
+
+    # list of allowed constraints per odometry mode
+    allowed_constraints:
+      gps_garmin: ["slow", "medium", "fast"]
+      gps_baro: ["slow", "medium", "fast"]
+      rtk: ["slow", "medium", "fast"]
+      aloam: ["slow"]
+      hector_garmin: ["slow"]
+      vio: ["slow"]
+      optflow: ["slow"]
+      other: ["slow"]
+      ground_truth: ["slow", "medium", "fast"]
+      passthrough: ["slow", "medium", "fast"]
+
+    # those constraints will be used automatically when a localization mode switches
+    # and the current constraints are not in the allowed list (next paragraphs)
+    default_constraints:
+      gps_garmin: "slow"
+      gps_baro: "slow"
+      rtk: "slow"
+      aloam: "slow"
+      hector_garmin: "slow"
+      vio: "slow"
+      optflow: "slow"
+      other: "slow"
+      ground_truth: "slow"
+      passthrough: "slow"

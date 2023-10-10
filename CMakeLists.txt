@@ -1,23 +1,25 @@
-cmake_minimum_required(VERSION 3.1.2)
+cmake_minimum_required(VERSION 3.5)
 project(mrs_uav_managers)
 
-find_package(catkin REQUIRED COMPONENTS
+set(CATKIN_DEPENDENCIES
+  cmake_modules
   roscpp
+  rospy
+  nodelet
   geometry_msgs
   std_msgs
-  geometry_msgs
   nav_msgs
   mrs_msgs
+  visualization_msgs
   mrs_lib
-  cmake_modules
-  nodelet
-  tf2_geometry_msgs
   tf2
   tf2_ros
+  tf2_geometry_msgs
   )
 
-# find_package(mavros_msgs 1.4.0 EXACT REQUIRED)
-find_package(mavros_msgs REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+  ${CATKIN_DEPENDENCIES}
+  )
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,113 +27,132 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 set(LIBRARIES
-  GainManager ConstraintManager ControlManager UavManager TfManager NullTracker
+  MrsUavManagers_GainManager
+  MrsUavManagers_ConstraintManager
+  MrsUavManagers_ControlManager
+  MrsUavManagers_UavManager
+  MrsUavManagers_EstimationManager
+  MrsUavManagers_TransformManager
+  MrsUavManagers_NullTracker
   )
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${LIBRARIES}
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs mrs_msgs mrs_lib tf2 tf2_ros tf2_geometry_msgs
-  DEPENDS mavros_msgs
+  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${mavros_msgs_INCLUDE_DIRS}
   )
 
-# ControlManager
+# MrsUavManagers_ControlManager
 
-add_library(ControlManager
-  src/control_manager.cpp
+add_library(MrsUavManagers_ControlManager
+  src/control_manager/control_manager.cpp
+  src/control_manager/output_publisher.cpp
+  src/control_manager/common/common.cpp
   )
 
-add_dependencies(ControlManager
+add_dependencies(MrsUavManagers_ControlManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(ControlManager
+target_link_libraries(MrsUavManagers_ControlManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
-# NullTracker
+# MrsUavManagers_NullTracker
 
-add_library(NullTracker
+add_library(MrsUavManagers_NullTracker
   src/null_tracker.cpp
   )
 
-add_dependencies(NullTracker
+add_dependencies(MrsUavManagers_NullTracker
   ${catkin_EXPORTED_TARGETS}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
 
-target_link_libraries(NullTracker
+target_link_libraries(MrsUavManagers_NullTracker
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
-# UavManager
+# MrsUavManagers_UavManager
 
-add_library(UavManager
+add_library(MrsUavManagers_UavManager
   src/uav_manager.cpp
   )
 
-add_dependencies(UavManager
+add_dependencies(MrsUavManagers_UavManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(UavManager
+target_link_libraries(MrsUavManagers_UavManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
-# GainManager
+# MrsUavManagers_GainManager
 
-add_library(GainManager
+add_library(MrsUavManagers_GainManager
   src/gain_manager.cpp
   )
 
-add_dependencies(GainManager
+add_dependencies(MrsUavManagers_GainManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(GainManager
+target_link_libraries(MrsUavManagers_GainManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
-# ConstraintManager
+# MrsUavManagers_ConstraintManager
 
-add_library(ConstraintManager
+add_library(MrsUavManagers_ConstraintManager
   src/constraint_manager.cpp
   )
 
-add_dependencies(ConstraintManager
+add_dependencies(MrsUavManagers_ConstraintManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(ConstraintManager
+target_link_libraries(MrsUavManagers_ConstraintManager
   ${catkin_LIBRARIES}
-  ${mavros_msgs_LIBRARIES}
   )
 
-# TfManager
-add_library(TfManager
-  src/tf_manager.cpp
+# MrsUavManagers_EstimationManager
+add_library(MrsUavManagers_EstimationManager
+  src/estimation_manager/estimation_manager.cpp
+  src/estimation_manager/estimator.cpp
+  src/estimation_manager/estimators/state_estimator.cpp
+  src/estimation_manager/estimators/agl_estimator.cpp
   )
 
-add_dependencies(TfManager
+add_dependencies(MrsUavManagers_EstimationManager
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(TfManager
+target_link_libraries(MrsUavManagers_EstimationManager
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+  )
+
+# MrsUavManagers_TransformManager
+add_library(MrsUavManagers_TransformManager
+  src/transform_manager/transform_manager.cpp
+  )
+
+add_dependencies(MrsUavManagers_TransformManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(MrsUavManagers_TransformManager
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )
@@ -150,11 +171,20 @@ install(DIRECTORY launch config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
-install(DIRECTORY include/
-  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
+install(DIRECTORY scripts/
+  USE_SOURCE_PERMISSIONS
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
   )
 
-install(DIRECTORY ./
+install(DIRECTORY scripts
+  USE_SOURCE_PERMISSIONS
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  FILES_MATCHING PATTERN "*.xml"
+  )
+
+install(DIRECTORY include/mrs_uav_managers/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  )
+
+install(FILES nodelets.xml plugins.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )

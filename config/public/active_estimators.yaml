@@ -1,0 +1,17 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # loaded state estimator plugins
+    # available in mrs_uav_state_estimators: gps_garmin, gps_baro, rtk, aloam, ground_truth, dummy
+    state_estimators: [
+    "gps_garmin",
+    "gps_baro",
+    # "rtk",
+    # "aloam",
+    # "ground_truth",
+    # "dummy"
+    ]
+
+    initial_state_estimator: "gps_garmin" # will be used as the first state estimator
+    agl_height_estimator: "garmin_agl" # only slightly filtered height for checking min height (not used in control feedback)

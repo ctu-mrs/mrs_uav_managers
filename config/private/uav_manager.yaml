@@ -1,0 +1,22 @@
+mrs_uav_managers:
+
+  uav_manager:
+
+    null_tracker: "NullTracker"
+
+    diagnostics:
+
+      rate: 1.0 # [Hz]
+
+    scope_timer:
+
+      enabled: false
+      log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+
+    midair_activation:
+
+      rate: 100 # [Hz]
+
+      during_activation:
+        controller: "MidairActivationController"
+        tracker: "MidairActivationTracker"

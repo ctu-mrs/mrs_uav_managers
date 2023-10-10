@@ -5,9 +5,10 @@
 
 #include <ros/ros.h>
 
-#include <mrs_uav_managers/common_handlers.h>
+#include <mrs_uav_managers/control_manager/common_handlers.h>
+#include <mrs_uav_managers/control_manager/private_handlers.h>
 
-#include <mrs_msgs/PositionCommand.h>
+#include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/TrackerStatus.h>
 #include <mrs_msgs/UavState.h>
 
@@ -41,7 +42,7 @@
 #include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
 #include <mrs_msgs/DynamicsConstraintsSrvResponse.h>
 
-#include <mrs_msgs/AttitudeCommand.h>
+#include <mrs_uav_managers/controller.h>
 
 //}
 
@@ -51,26 +52,27 @@ namespace mrs_uav_managers
 class Tracker {
 
 public:
-  virtual ~Tracker() = 0;
-
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
    *
-   * @param parent_nh the node handle of the ControlManager
+   * @param nh the node handle of the ControlManager
    * @param uav_name the UAV name (e.g., "uav1")
    * @param common_handlers handlers shared between trackers and controllers
+   * @param private_handlers handlers provided individually to each tracker
+   *
+   * @return true if success
    */
-  virtual void initialize(const ros::NodeHandle &parent_nh, const std::string uav_name,
-                          std::shared_ptr<mrs_uav_managers::CommonHandlers_t> common_handlers) = 0;
+  virtual bool initialize(const ros::NodeHandle &nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+                          std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) = 0;
 
   /**
    * @brief It is called before the trackers output will be required and used. Should not take much time (within miliseconds).
    *
-   * @param last_position_cmd the last command produced by the last active tracker. Should be used as an initial condition to maintain a smooth reference.
+   * @param last_tracker_cmd the last command produced by the last active tracker. Should be used as an initial condition to maintain a smooth reference.
    *
    * @return true if success and message
    */
-  virtual std::tuple<bool, std::string> activate(const mrs_msgs::PositionCommand::ConstPtr &last_position_cmd) = 0;
+  virtual std::tuple<bool, std::string> activate(const std::optional<mrs_msgs::TrackerCommand> &last_tracker_cmd) = 0;
 
   /**
    * @brief is called when this trackers output is no longer needed. However, it can be activated later.
@@ -85,7 +87,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState::ConstPtr &new_uav_state) = 0;
+  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState &new_uav_state) = 0;
 
   /**
    * @brief Request for reseting the tracker's states given the UAV is static.
@@ -95,15 +97,15 @@ public:
   virtual bool resetStatic(void) = 0;
 
   /**
-   * @brief The most important routine. It is called with every odometry update and it should produce a new reference for the controllers.
+   * @brief The most important routine. It is called with every state estimator update and it should produce a new reference for the controllers.
+   *        The run time should be as short as possible (<= 1 ms).
    *
    * @param uav_state the latest UAV state estimate
    * @param last_attitude_cmd the last controller's output command (may be useful)
    *
    * @return the new reference for the controllers
    */
-  virtual const mrs_msgs::PositionCommand::ConstPtr update(const mrs_msgs::UavState::ConstPtr &       uav_state,
-                                                           const mrs_msgs::AttitudeCommand::ConstPtr &last_attitude_cmd) = 0;
+  virtual std::optional<mrs_msgs::TrackerCommand> update(const mrs_msgs::UavState &uav_state, const Controller::ControlOutput &last_control_output) = 0;
 
   /**
    * @brief A request for the tracker's status.
@@ -201,6 +203,8 @@ public:
    * @return a service response
    */
   virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
+
+  virtual ~Tracker() = default;
 };
 
 }  // namespace mrs_uav_managers
