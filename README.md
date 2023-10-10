@@ -2,6 +2,10 @@
 
 ![](.fig/thumbnail.jpg)
 
+> :warning: **Attention please: This README is outdated.**
+>
+> The MRS UAV System 1.5 is being released and this page needs updating. Please, keep in mind that the information on this page might not be valid.
+
 This package contains *high-level* flight managers.
 
 > :warning: **Attention please: This page is outdated.**
@@ -40,7 +44,7 @@ This package contains *high-level* flight managers.
   * missing estimator data
   * the validity of desired references
 * allows controlling the UAV using a ROS-compatible joystick
-* allows controlling the UAV using the **RC controller** through our pipeline
+* allows controlling the UAV using **RC** through our pipeline
   * the RC channels are picked up from [HW API](https://github.com/ctu-mrs/mrs_uav_hw_api)
   * a relative reference is generated for the active tracker
   * **escalating failsafe** can be triggered by a dedicated switch
