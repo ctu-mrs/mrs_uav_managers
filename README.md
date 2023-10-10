@@ -2,24 +2,19 @@
 
 ![](.fig/thumbnail.jpg)
 
-| Build status | [![Build Status](https://github.com/ctu-mrs/mrs_uav_managers/workflows/Noetic/badge.svg)](https://github.com/ctu-mrs/mrs_uav_managers/actions) |
-|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-
 This package contains *high-level* flight managers.
 
-### Notable quotes
-
-* Quote #1: "The ControlManager is responsible for most of the crashes.", Dan Hert
-* Quote #2: "It is better than humans at ensuring flight safety.", Tomas Baca
-* Quote #3: "Was this supposed to happen?...", Martin Saska
+> :warning: **Attention please: This page is outdated.**
+>
+> The MRS UAV System 1.5 is being released and this page needs updating. Plase, keep in mind that the information on this page might not ve valid.
 
 ## ControlManager
 
 * integrates the control and tracking part of the MRS UAV pipeline
 * dynamically loads [feedback controllers](https://github.com/ctu-mrs/mrs_uav_controllers) and [reference trackers](https://github.com/ctu-mrs/mrs_uav_trackers) plugins
-* subscribes to the [UAV state estimate](https://github.com/ctu-mrs/mrs_uav_odometry) and provides it to all loaded trackers and controllers
+* subscribes to the estimated UAV state and provides it to all loaded trackers and controllers
 * runs the iteration of the currently active controller and tracker with every received state estimator message
-* outputs the attitude rate command the [Mavros](http://wiki.ros.org/mavros)
+* outputs the attitude control command to the [HW API](https://github.com/ctu-mrs/mrs_uav_hw_api)
 * provides constraints to [trackers](https://github.com/ctu-mrs/mrs_uav_trackers) through a common interface
 * allows in-mid-air switching of [feedback controllers](https://github.com/ctu-mrs/mrs_uav_controllers) and [reference trackers](https://github.com/ctu-mrs/mrs_uav_trackers)
 * provides common services for
@@ -46,14 +41,12 @@ This package contains *high-level* flight managers.
   * the validity of desired references
 * allows controlling the UAV using a ROS-compatible joystick
 * allows controlling the UAV using the **RC controller** through our pipeline
-  * the RC channels are picked up from [Mavros](http://wiki.ros.org/mavros)
+  * the RC channels are picked up from [HW API](https://github.com/ctu-mrs/mrs_uav_hw_api)
   * a relative reference is generated for the active tracker
   * **escalating failsafe** can be triggered by a dedicated switch
 * provides an **obstacle bumper** feature
   * has priority over user-provided references
   * for slow-flight only
-* **default config file**: [control_manager.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/control_manager.yaml)
-* **launch file**: [control_manager.launch](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/launch/control_manager.launch)
 
 ## UavManager
 
@@ -77,25 +70,17 @@ This package contains *high-level* flight managers.
   * triggers a landing if it exceeds a limit
 * provides a **flight timer**
   * triggers a landing if it exceeds a limit
-* **default config file**: [uav_manager.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/uav_manager.yaml)
-* **launch file**: [uav_manager.launch](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/launch/uav_manager.launch)
 
 ## ConstraintManager
 
 * stores and provides sets of dynamics constraints for the [trackers](https://github.com/ctu-mrs/mrs_uav_trackers)
-* allows mapping each set of constraints to only some state estimators of [mrs_uav_odometry](https://github.com/ctu-mrs/mrs_uav_odometry)
+* allows mapping each set of constraints to only some state estimators
 * automatically switches to a fallback set of constraints if the current ones are not allowed
 * provides a service for switching to a desired set of constraints
-* only works when [mrs_uav_odometry](https://github.com/ctu-mrs/mrs_uav_odometry) is used
-* **default config files**: [constraints.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/constraint_manager/constraints.yaml), [constraint_manager.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/constraint_manager/constraint_manager.yaml)
-* **launch file**: [constraint_manager.launch](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/launch/constraint_manager.launch)
 
 ## GainManager
 
 * stores and provides sets of gains for the [Se3Controller](https://github.com/ctu-mrs/mrs_uav_controllers)
-* allows mapping each set of gains to only some state estimators of [mrs_uav_odometry](https://github.com/ctu-mrs/mrs_uav_odometry)
+* allows mapping each set of gains to only some state estimators
 * automatically switches to a fallback set of gains if the current ones are not allowed
 * provides a service for switching to a desired set of gains
-* only works when [mrs_uav_odometry](https://github.com/ctu-mrs/mrs_uav_odometry) is used
-* **default config files**: [gains.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/gain_manager/gains.yaml), [gain_manager.yaml](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/config/default/gain_manager/gain_manager.yaml)
-* **launch file**: [gain_manager.launch](https://github.com/ctu-mrs/mrs_uav_managers/blob/master/launch/gain_manager.launch)
