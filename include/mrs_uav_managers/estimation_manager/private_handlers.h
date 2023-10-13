@@ -2,6 +2,7 @@
 #define ESTIMATION_MANAGER_PRIVATE_HANDLERS_H
 
 #include <string>
+#include <mrs_lib/param_loader.h>
 
 namespace mrs_uav_managers
 {
@@ -13,7 +14,8 @@ typedef boost::function<bool(const std::string)> loadConfigFile_t;
 
 struct PrivateHandlers_t
 {
-  loadConfigFile_t loadConfigFile;
+  std::shared_ptr<mrs_lib::ParamLoader> param_loader;
+  loadConfigFile_t                      loadConfigFile;
 };
 
 }  // namespace estimation_manager

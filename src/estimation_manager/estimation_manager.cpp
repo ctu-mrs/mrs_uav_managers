@@ -128,7 +128,7 @@ public:
       case INITIALIZED_STATE: {
         if (current_state_ != UNINITIALIZED_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
-                    getStateAsString(UNINITIALIZED_STATE).c_str());
+                             getStateAsString(UNINITIALIZED_STATE).c_str());
           return false;
         }
         break;
@@ -136,8 +136,9 @@ public:
 
       case READY_FOR_TAKEOFF_STATE: {
         if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(READY_FOR_TAKEOFF_STATE).c_str(),
-                    getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(LANDED_STATE).c_str());
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                             getStateAsString(READY_FOR_TAKEOFF_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
+                             getStateAsString(LANDED_STATE).c_str());
           return false;
         }
         break;
@@ -146,7 +147,7 @@ public:
       case TAKING_OFF_STATE: {
         if (current_state_ != READY_FOR_TAKEOFF_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
-                    getStateAsString(READY_FOR_TAKEOFF_STATE).c_str());
+                             getStateAsString(READY_FOR_TAKEOFF_STATE).c_str());
           return false;
         }
         break;
@@ -155,7 +156,8 @@ public:
       case FLYING_STATE: {
         if (current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(),
-                    getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+                             getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -164,7 +166,7 @@ public:
       case HOVER_STATE: {
         if (current_state_ != FLYING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
-                    getStateAsString(FLYING_STATE).c_str());
+                             getStateAsString(FLYING_STATE).c_str());
           return false;
         }
         break;
@@ -172,8 +174,9 @@ public:
 
       case ESTIMATOR_SWITCHING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(),
-                    getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
+                             getStateAsString(HOVER_STATE).c_str());
           return false;
         }
         pre_switch_state_ = current_state_;
@@ -183,7 +186,7 @@ public:
       case LANDING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
-                    getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
           return false;
         }
         break;
@@ -192,7 +195,7 @@ public:
       case LANDED_STATE: {
         if (current_state_ != LANDING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(LANDED_STATE).c_str(),
-                    getStateAsString(LANDING_STATE).c_str());
+                             getStateAsString(LANDING_STATE).c_str());
           return false;
         }
         break;
@@ -201,7 +204,7 @@ public:
       case DUMMY_STATE: {
         if (current_state_ != INITIALIZED_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(DUMMY_STATE).c_str(),
-                    getStateAsString(INITIALIZED_STATE).c_str());
+                             getStateAsString(INITIALIZED_STATE).c_str());
           return false;
         }
         break;
@@ -296,6 +299,7 @@ private:
 
   std::string _custom_config_;
   std::string _platform_config_;
+  std::string _world_config_;
 
   std::shared_ptr<CommonHandlers_t> ch_;
 
@@ -482,7 +486,6 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     agl_height = est_alt_agl_->getUavAglHeight();
     ph_altitude_agl_.publish(agl_height);
   }
-
 }
 /*//}*/
 
@@ -646,7 +649,8 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
         sm_->changeState(StateMachine::READY_FOR_TAKEOFF_STATE);
       } else {
-        ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(), est_alt_agl_->getName().c_str());
+        ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(),
+                          est_alt_agl_->getName().c_str());
       }
     }
   }
@@ -699,6 +703,27 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   mrs_lib::ParamLoader param_loader(nh_, getName());
 
+  param_loader.loadParam("custom_config", _custom_config_);
+  param_loader.loadParam("platform_config", _platform_config_);
+  param_loader.loadParam("world_config", _world_config_);
+
+  if (_custom_config_ != "") {
+    param_loader.addYamlFile(_custom_config_);
+  }
+
+  if (_platform_config_ != "") {
+    param_loader.addYamlFile(_platform_config_);
+  }
+
+  if (_world_config_ != "") {
+    param_loader.addYamlFile(_world_config_);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("estimators_config");
+  param_loader.addYamlFileFromParam("active_estimators_config");
+
   param_loader.loadParam("uav_name", ch_->uav_name);
 
   // load maximum flight z from safety area
@@ -749,9 +774,6 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   }
   /*//}*/
 
-  param_loader.loadParam("custom_config", _custom_config_);
-  param_loader.loadParam("platform_config", _platform_config_);
-
   param_loader.setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
 
   /*//{ load parameters into common handlers */
@@ -800,7 +822,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_ =
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
   while (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO("[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_hw_api_capabilities_.topicName().c_str());
+    ROS_INFO("[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
+             sh_hw_api_capabilities_.topicName().c_str());
     ros::Duration(1.0).sleep();
   }
 
@@ -810,7 +833,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//{ wait for desired uav_state rate */
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   while (!sh_control_manager_diag_.hasMsg()) {
-    ROS_INFO("[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_control_manager_diag_.topicName().c_str());
+    ROS_INFO("[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
+             sh_control_manager_diag_.topicName().c_str());
     ros::Duration(1.0).sleep();
   }
 
@@ -912,6 +936,19 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
+    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, estimator->getName()), "EstimationManager/" + estimator->getName());
+
+    if (_custom_config_ != "") {
+      ph->param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      ph->param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      ph->param_loader->addYamlFile(_world_config_);
+    }
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
@@ -934,6 +971,19 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
+    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
+
+    if (_custom_config_ != "") {
+      ph->param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      ph->param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      ph->param_loader->addYamlFile(_world_config_);
+    }
 
     try {
       ROS_INFO("[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());

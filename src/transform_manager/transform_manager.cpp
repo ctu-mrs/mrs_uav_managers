@@ -59,6 +59,10 @@ public:
   std::string getPrintName() const;
 
 private:
+  std::string _custom_config_;
+  std::string _platform_config_;
+  std::string _world_config_;
+
   const std::string package_name_ = "mrs_uav_managers";
   const std::string nodelet_name_ = "TransformManager";
   const std::string name_         = "transform_manager";
@@ -137,6 +141,26 @@ void TransformManager::onInit() {
   ch_->transformer->retryLookupNewest(true);
 
   mrs_lib::ParamLoader param_loader(nh_, getPrintName());
+
+  param_loader.loadParam("custom_config", _custom_config_);
+  param_loader.loadParam("platform_config", _platform_config_);
+  param_loader.loadParam("world_config", _world_config_);
+
+  if (_custom_config_ != "") {
+    param_loader.addYamlFile(_custom_config_);
+  }
+
+  if (_platform_config_ != "") {
+    param_loader.addYamlFile(_platform_config_);
+  }
+
+  if (_world_config_ != "") {
+    param_loader.addYamlFile(_world_config_);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("estimators_config");
 
   const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
@@ -249,26 +273,88 @@ void TransformManager::onInit() {
 
   /*//{ initialize tf sources */
   for (size_t i = 0; i < tf_source_names_.size(); i++) {
+
     const std::string tf_source_name = tf_source_names_[i];
     const bool        is_utm_source  = tf_source_name == utm_source_name;
+
     ROS_INFO("[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
-    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, broadcaster_, ch_, is_utm_source));
+
+    auto source_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/" + tf_source_name);
+
+    if (_custom_config_ != "") {
+      source_param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      source_param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      source_param_loader->addYamlFile(_world_config_);
+    }
+
+    source_param_loader->addYamlFileFromParam("private_config");
+    source_param_loader->addYamlFileFromParam("public_config");
+    source_param_loader->addYamlFileFromParam("estimators_config");
+
+    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, source_param_loader, broadcaster_, ch_, is_utm_source));
   }
 
   // additionally publish tf of all available estimators
   for (int i = 0; i < int(estimator_names_.size()); i++) {
+
     const std::string estimator_name = estimator_names_[i];
     const bool        is_utm_source  = estimator_name == utm_source_name;
     ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
-    tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, broadcaster_, ch_, is_utm_source));
+
+    auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/" + estimator_name);
+
+    if (_custom_config_ != "") {
+      estimator_param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      estimator_param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      estimator_param_loader->addYamlFile(_world_config_);
+    }
+
+    estimator_param_loader->addYamlFileFromParam("private_config");
+    estimator_param_loader->addYamlFileFromParam("public_config");
+    estimator_param_loader->addYamlFileFromParam("estimators_config");
+
+    tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, estimator_param_loader, broadcaster_, ch_, is_utm_source));
   }
 
   // initialize mapping_origin tf
   bool mapping_origin_tf_enabled;
   param_loader.loadParam(yaml_prefix + "mapping_origin_tf/enabled", mapping_origin_tf_enabled);
+
   if (mapping_origin_tf_enabled) {
-    tf_mapping_origin_ = std::make_unique<TfMappingOrigin>(nh_, broadcaster_, ch_);
+
+    auto mapping_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/mapping_origin_tf");
+
+    if (_custom_config_ != "") {
+      mapping_param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      mapping_param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      mapping_param_loader->addYamlFile(_world_config_);
+    }
+
+    mapping_param_loader->addYamlFileFromParam("private_config");
+    mapping_param_loader->addYamlFileFromParam("public_config");
+    mapping_param_loader->addYamlFileFromParam("estimators_config");
+
+    tf_mapping_origin_ = std::make_unique<TfMappingOrigin>(nh_, mapping_param_loader, broadcaster_, ch_);
   }
+
   //}
 
   /*//{ initialize subscribers */

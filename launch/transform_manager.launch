@@ -39,14 +39,22 @@
       <param name="enable_profiler" value="$(arg PROFILER)" />
       <param name="uav_name" value="$(arg UAV_NAME)" />
 
-      <rosparam file="$(find mrs_uav_managers)/config/private/transform_manager/transform_manager.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/transform_manager/transform_manager.yaml" command="load" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/active_estimators.yaml" command="load" />
+      <param name="private_config" value="$(find mrs_uav_managers)/config/private/transform_manager/transform_manager.yaml" />
+      <param name="public_config" value="$(find mrs_uav_managers)/config/public/transform_manager/transform_manager.yaml" />
+      <param name="estimators_config" value="$(find mrs_uav_managers)/config/public/active_estimators.yaml" />
 
       <!-- Load a user param file -->
-      <rosparam if="$(eval not arg('world_config') == '')" file="$(arg world_config)" />
-      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+      <param if="$(eval arg('platform_config') == '')" name="platform_config" value="" />
+      <param if="$(eval not arg('platform_config') == '' and arg('platform_config')[0] == '/')" name="platform_config" value="$(arg platform_config)" />
+      <param if="$(eval not arg('platform_config') == '' and not arg('platform_config')[0] == '/')" name="platform_config" value="$(env PWD)/$(arg platform_config)" />
+
+      <param if="$(eval arg('custom_config') == '')" name="custom_config" value="" />
+      <param if="$(eval not arg('custom_config') == '' and arg('custom_config')[0] == '/')" name="custom_config" value="$(arg custom_config)" />
+      <param if="$(eval not arg('custom_config') == '' and not arg('custom_config')[0] == '/')" name="custom_config" value="$(env PWD)/$(arg custom_config)" />
+
+      <param if="$(eval arg('world_config') == '')" name="world_config" value="" />
+      <param if="$(eval not arg('world_config') == '' and arg('world_config')[0] == '/')" name="world_config" value="$(arg world_config)" />
+      <param if="$(eval not arg('world_config') == '' and not arg('world_config')[0] == '/')" name="world_config" value="$(env PWD)/$(arg world_config)" />
 
       <!-- Subscribers -->
       <remap from="~uav_state_in" to="estimation_manager/uav_state" />

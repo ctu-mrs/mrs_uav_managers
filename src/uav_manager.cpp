@@ -197,13 +197,13 @@ public:
 
   // max height checking
   bool              _max_height_enabled_ = false;
-  int               _max_height_checking_rate_;
+  double            _max_height_checking_rate_;
   double            _max_height_offset_;
   std::atomic<bool> fixing_max_height_ = false;
 
   // min height checking
   bool              _min_height_enabled_ = false;
-  int               _min_height_checking_rate_;
+  double            _min_height_checking_rate_;
   double            _min_height_offset_;
   double            _min_height_;
   std::atomic<bool> fixing_min_height_ = false;
@@ -350,6 +350,29 @@ void UavManager::initialize() {
   ROS_INFO("[UavManager]: initializing");
 
   mrs_lib::ParamLoader param_loader(nh_, "UavManager");
+
+  std::string custom_config_path;
+  std::string platform_config_path;
+  std::string world_config_path;
+
+  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("platform_config", platform_config_path);
+  param_loader.loadParam("world_config", world_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
+  }
+
+  if (world_config_path != "") {
+    param_loader.addYamlFile(world_config_path);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
 
   const std::string yaml_prefix = "mrs_uav_managers/uav_manager/";
 

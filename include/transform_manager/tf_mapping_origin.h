@@ -8,6 +8,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/transform_broadcaster.h>
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/publisher_handler.h>
 
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/QuaternionStamped.h>
@@ -26,29 +27,27 @@ class TfMappingOrigin {
 
 public:
   /*//{ constructor */
-  TfMappingOrigin(ros::NodeHandle nh, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster,
+  TfMappingOrigin(ros::NodeHandle nh, std::shared_ptr<mrs_lib::ParamLoader> param_loader, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster,
                   const std::shared_ptr<estimation_manager::CommonHandlers_t> ch)
       : nh_(nh), broadcaster_(broadcaster), ch_(ch) {
 
     ROS_INFO("[%s]: initializing", getPrintName().c_str());
 
-
-    mrs_lib::ParamLoader param_loader(nh_, getPrintName());
-
     const std::string yaml_prefix = "mrs_uav_managers/transform_manager/mapping_origin_tf/";
 
     /*//{ load mapping origin parameters */
-    param_loader.loadParam(yaml_prefix + "debug_prints", debug_prints_);
-    param_loader.loadParam(yaml_prefix + "lateral_topic", lateral_topic_);
-    param_loader.loadParam(yaml_prefix + "altitude_topic", altitude_topic_);
-    param_loader.loadParam(yaml_prefix + "orientation_topic", orientation_topic_);
-    param_loader.loadParam(yaml_prefix + "inverted", tf_inverted_);
-    param_loader.loadParam(yaml_prefix + "custom_frame_id/enabled", custom_frame_id_enabled_);
+    param_loader->loadParam(yaml_prefix + "debug_prints", debug_prints_);
+    param_loader->loadParam(yaml_prefix + "lateral_topic", lateral_topic_);
+    param_loader->loadParam(yaml_prefix + "altitude_topic", altitude_topic_);
+    param_loader->loadParam(yaml_prefix + "orientation_topic", orientation_topic_);
+    param_loader->loadParam(yaml_prefix + "inverted", tf_inverted_);
+    param_loader->loadParam(yaml_prefix + "custom_frame_id/enabled", custom_frame_id_enabled_);
+
     if (custom_frame_id_enabled_) {
-      param_loader.loadParam(yaml_prefix + "custom_frame_id/frame_id", custom_frame_id_);
+      param_loader->loadParam(yaml_prefix + "custom_frame_id/frame_id", custom_frame_id_);
     }
 
-    if (!param_loader.loadedSuccessfully()) {
+    if (!param_loader->loadedSuccessfully()) {
       ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
       ros::shutdown();
     }

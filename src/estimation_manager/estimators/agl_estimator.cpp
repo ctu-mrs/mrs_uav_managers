@@ -11,7 +11,7 @@ void AglEstimator::publishAglHeight() const {
 
 /*//{ publishCovariance() */
 void AglEstimator::publishCovariance() const {
-  
+
   if (!ch_->debug_topics.covariance) {
     return;
   }
@@ -23,32 +23,25 @@ void AglEstimator::publishCovariance() const {
 /*//{ isCompatibleWithHwApi() */
 bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
 
-  bool success = true;
+  ph_->param_loader->addYamlFile(ros::package::getPath(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
+  ph_->param_loader->addYamlFile(ros::package::getPath(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
 
-  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
-  success *= ph_->loadConfigFile(ros::package::getPath(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
-
-  if (!success) {
-    ROS_ERROR("[%s]: could not load config file", getPrintName().c_str());
-    ros::shutdown();
-  }
-
-  mrs_lib::ParamLoader param_loader(nh_, getPrintName());
-  param_loader.setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
+  ph_->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
   bool requires_gnss, requires_imu, requires_distance_sensor, requires_altitude, requires_magnetometer_heading, requires_position, requires_orientation,
       requires_velocity, requires_angular_velocity;
-  param_loader.loadParam("requires/gnss", requires_gnss);
-  param_loader.loadParam("requires/imu", requires_imu);
-  param_loader.loadParam("requires/distance_sensor", requires_distance_sensor);
-  param_loader.loadParam("requires/altitude", requires_altitude);
-  param_loader.loadParam("requires/magnetometer_heading", requires_magnetometer_heading);
-  param_loader.loadParam("requires/position", requires_position);
-  param_loader.loadParam("requires/orientation", requires_orientation);
-  param_loader.loadParam("requires/velocity", requires_velocity);
-  param_loader.loadParam("requires/angular_velocity", requires_angular_velocity);
 
-  if (!param_loader.loadedSuccessfully()) {
+  ph_->param_loader->loadParam("requires/gnss", requires_gnss);
+  ph_->param_loader->loadParam("requires/imu", requires_imu);
+  ph_->param_loader->loadParam("requires/distance_sensor", requires_distance_sensor);
+  ph_->param_loader->loadParam("requires/altitude", requires_altitude);
+  ph_->param_loader->loadParam("requires/magnetometer_heading", requires_magnetometer_heading);
+  ph_->param_loader->loadParam("requires/position", requires_position);
+  ph_->param_loader->loadParam("requires/orientation", requires_orientation);
+  ph_->param_loader->loadParam("requires/velocity", requires_velocity);
+  ph_->param_loader->loadParam("requires/angular_velocity", requires_angular_velocity);
+
+  if (!ph_->param_loader->loadedSuccessfully()) {
     ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
     ros::shutdown();
   }
@@ -102,6 +95,4 @@ bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstP
 }
 /*//}*/
 
-
 }  // namespace mrs_uav_managers
-

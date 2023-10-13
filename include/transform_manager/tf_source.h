@@ -35,47 +35,48 @@ class TfSource {
 
 public:
   /*//{ constructor */
-  TfSource(const std::string& name, ros::NodeHandle nh, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster,
-           const std::shared_ptr<estimation_manager::CommonHandlers_t> ch, const bool is_utm_source)
+  TfSource(const std::string& name, ros::NodeHandle nh, std::shared_ptr<mrs_lib::ParamLoader> param_loader,
+           const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch,
+           const bool is_utm_source)
       : name_(name), nh_(nh), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
 
     ROS_INFO("[%s]: initializing", getPrintName().c_str());
 
     if (name != "dummy") {
+
       /*//{ load parameters */
-      mrs_lib::ParamLoader param_loader(nh_, getPrintName());
 
       const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
       std::string odom_topic, attitude_topic, ns;
 
-      param_loader.loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
-      param_loader.loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
+      param_loader->loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
+      param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
       if (custom_frame_id_enabled_) {
-        param_loader.loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
+        param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
       }
-      param_loader.loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
+      param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
       if (tf_from_attitude_enabled_) {
-        param_loader.loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
+        param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
       }
-      param_loader.loadParam(yaml_prefix + getName() + "/namespace", ns);
+      param_loader->loadParam(yaml_prefix + getName() + "/namespace", ns);
       full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
       full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
-      param_loader.loadParam(yaml_prefix + getName() + "/inverted", is_inverted_);
-      param_loader.loadParam(yaml_prefix + getName() + "/republish_in_frames", republish_in_frames_);
+      param_loader->loadParam(yaml_prefix + getName() + "/inverted", is_inverted_);
+      param_loader->loadParam(yaml_prefix + getName() + "/republish_in_frames", republish_in_frames_);
 
       /* coordinate frames origins //{ */
-      param_loader.loadParam(yaml_prefix + getName() + "/utm_based", is_utm_based_);
-      /* param_loader.loadParam(yaml_prefix + getName() + "/publish_local_tf", publish_local_tf_); */
+      param_loader->loadParam(yaml_prefix + getName() + "/utm_based", is_utm_based_);
+      /* param_loader->loadParam(yaml_prefix + getName() + "/publish_local_tf", publish_local_tf_); */
 
       /*//{ utm source */
       if (is_utm_based_) {
         std::string utm_origin_parent_frame_id;
-        param_loader.loadParam(yaml_prefix + "utm_origin_tf/parent", utm_origin_parent_frame_id);
+        param_loader->loadParam(yaml_prefix + "utm_origin_tf/parent", utm_origin_parent_frame_id);
         ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
 
         std::string utm_origin_child_frame_id;
-        param_loader.loadParam(yaml_prefix + "utm_origin_tf/child", utm_origin_child_frame_id);
+        param_loader->loadParam(yaml_prefix + "utm_origin_tf/child", utm_origin_child_frame_id);
         ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
       }
       /*//}*/
@@ -83,18 +84,18 @@ public:
       /*//{ world source */
       if (is_utm_based_) {
         std::string world_origin_parent_frame_id;
-        param_loader.loadParam(yaml_prefix + "world_origin_tf/parent", world_origin_parent_frame_id);
+        param_loader->loadParam(yaml_prefix + "world_origin_tf/parent", world_origin_parent_frame_id);
         ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
 
         std::string world_origin_child_frame_id;
-        param_loader.loadParam(yaml_prefix + "world_origin_tf/child", world_origin_child_frame_id);
+        param_loader->loadParam(yaml_prefix + "world_origin_tf/child", world_origin_child_frame_id);
         ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
       }
       /*//}*/
 
       //}
 
-      if (!param_loader.loadedSuccessfully()) {
+      if (!param_loader->loadedSuccessfully()) {
         ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
         ros::shutdown();
       }

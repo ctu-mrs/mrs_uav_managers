@@ -32,14 +32,19 @@
     <!-- Gain Manager -->
     <node pkg="nodelet" type="nodelet" name="gain_manager" args="$(arg nodelet) mrs_uav_managers/GainManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
-      <!-- Load the particular param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/private/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gain_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/gain_manager/gains.yaml" />
+      <!-- Load the default param files -->
+      <param name="private_config" value="$(find mrs_uav_managers)/config/private/gain_manager/gain_manager.yaml" />
+      <param name="public_config" value="$(find mrs_uav_managers)/config/public/gain_manager/gain_manager.yaml" />
+      <param name="public_gains" value="$(find mrs_uav_managers)/config/public/gain_manager/gains.yaml" />
 
-      <!-- Load a user param file -->
-      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+      <!-- Load user param files -->
+      <param if="$(eval arg('platform_config') == '')" name="platform_config" value="" />
+      <param if="$(eval not arg('platform_config') == '' and arg('platform_config')[0] == '/')" name="platform_config" value="$(arg platform_config)" />
+      <param if="$(eval not arg('platform_config') == '' and not arg('platform_config')[0] == '/')" name="platform_config" value="$(env PWD)/$(arg platform_config)" />
+
+      <param if="$(eval arg('custom_config') == '')" name="custom_config" value="" />
+      <param if="$(eval not arg('custom_config') == '' and arg('custom_config')[0] == '/')" name="custom_config" value="$(arg custom_config)" />
+      <param if="$(eval not arg('custom_config') == '' and not arg('custom_config')[0] == '/')" name="custom_config" value="$(env PWD)/$(arg custom_config)" />
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
 

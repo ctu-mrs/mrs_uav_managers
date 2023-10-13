@@ -65,7 +65,7 @@ mrs_uav_managers:
         pitch: 20.0
         yaw: 10.0
 
-      tilt: deg(60)
+      tilt: 60.0 # [deg]
 
     scope_timer:
 

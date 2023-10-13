@@ -86,7 +86,7 @@ private:
 
   void       timerGainManagement(const ros::TimerEvent& event);
   ros::Timer timer_gain_management_;
-  int        _gain_management_rate_;
+  double     _gain_management_rate_;
 
   std::string current_gains_;
   std::mutex  mutex_current_gains_;
@@ -97,7 +97,7 @@ private:
 
   void       timerDiagnostics(const ros::TimerEvent& event);
   ros::Timer timer_diagnostics_;
-  int        _diagnostics_rate_;
+  double     _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
 
@@ -129,6 +129,24 @@ void GainManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "GainManager");
+
+  std::string custom_config_path;
+  std::string platform_config_path;
+
+  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("platform_config", platform_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("public_gains");
 
   const std::string yaml_prefix = "mrs_uav_managers/gain_manager/";
 

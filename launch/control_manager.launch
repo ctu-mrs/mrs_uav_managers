@@ -44,16 +44,11 @@
     <node pkg="nodelet" type="nodelet" name="control_manager" args="$(arg nodelet) mrs_uav_managers/ControlManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <!-- Load the default param files -->
-      <rosparam file="$(find mrs_uav_managers)/config/private/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/control_manager.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/private/trackers.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/private/controllers.yaml" />
-      <rosparam file="$(find mrs_uav_managers)/config/public/controllers.yaml" />
-
-      <rosparam if="$(eval not arg('platform_config') == '')" file="$(arg platform_config)" />
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
-      <rosparam if="$(eval not arg('world_config') == '')" file="$(arg world_config)" />
-      <rosparam if="$(eval not arg('network_config') == '')" file="$(arg network_config)" />
+      <param name="private_config" value="$(find mrs_uav_managers)/config/private/control_manager.yaml" />
+      <param name="public_config" value="$(find mrs_uav_managers)/config/public/control_manager.yaml" />
+      <param name="private_trackers" value="$(find mrs_uav_managers)/config/private/trackers.yaml" />
+      <param name="private_controllers" value="$(find mrs_uav_managers)/config/private/controllers.yaml" />
+      <param name="public_controllers" value="$(find mrs_uav_managers)/config/public/controllers.yaml" />
 
       <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
@@ -67,9 +62,17 @@
       <param if="$(eval not arg('platform_config') == '' and arg('platform_config')[0] == '/')" name="platform_config" value="$(arg platform_config)" />
       <param if="$(eval not arg('platform_config') == '' and not arg('platform_config')[0] == '/')" name="platform_config" value="$(env PWD)/$(arg platform_config)" />
 
-      <param if="$(eval not arg('custom_config') == '')" name="custom_config" value="$(arg custom_config)" />
+      <param if="$(eval arg('custom_config') == '')" name="custom_config" value="" />
       <param if="$(eval not arg('custom_config') == '' and arg('custom_config')[0] == '/')" name="custom_config" value="$(arg custom_config)" />
       <param if="$(eval not arg('custom_config') == '' and not arg('custom_config')[0] == '/')" name="custom_config" value="$(env PWD)/$(arg custom_config)" />
+
+      <param if="$(eval arg('world_config') == '')" name="world_config" value="" />
+      <param if="$(eval not arg('world_config') == '' and arg('world_config')[0] == '/')" name="world_config" value="$(arg world_config)" />
+      <param if="$(eval not arg('world_config') == '' and not arg('world_config')[0] == '/')" name="world_config" value="$(env PWD)/$(arg world_config)" />
+
+      <param if="$(eval arg('network_config') == '')" name="network_config" value="" />
+      <param if="$(eval not arg('network_config') == '' and arg('network_config')[0] == '/')" name="network_config" value="$(arg network_config)" />
+      <param if="$(eval not arg('network_config') == '' and not arg('network_config')[0] == '/')" name="network_config" value="$(env PWD)/$(arg network_config)" />
 
       <!-- Trackers' configs -->
 

@@ -73,7 +73,7 @@ private:
 
   void       timerConstraintManagement(const ros::TimerEvent& event);
   ros::Timer timer_constraint_management_;
-  int        _constraint_management_rate_;
+  double     _constraint_management_rate_;
 
   std::string current_constraints_;
   std::mutex  mutex_current_constraints_;
@@ -94,7 +94,7 @@ private:
 
   void       timerDiagnostics(const ros::TimerEvent& event);
   ros::Timer timer_diagnostics_;
-  int        _diagnostics_rate_;
+  double     _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
 
@@ -126,6 +126,24 @@ void ConstraintManager::onInit() {
   // | ------------------------- params ------------------------- |
 
   mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
+
+  std::string custom_config_path;
+  std::string platform_config_path;
+
+  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("platform_config", platform_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("public_constraints");
 
   const std::string yaml_prefix = "mrs_uav_managers/constraint_manager/";
 
@@ -172,7 +190,11 @@ void ConstraintManager::onInit() {
     param_loader.loadParam(yaml_prefix + *it + "/angular_speed/pitch", new_constraints.constraints.pitch_rate);
     param_loader.loadParam(yaml_prefix + *it + "/angular_speed/yaw", new_constraints.constraints.yaw_rate);
 
-    param_loader.loadParam(yaml_prefix + *it + "/tilt", new_constraints.constraints.tilt);
+    double tilt_deg;
+
+    param_loader.loadParam(yaml_prefix + *it + "/tilt", tilt_deg);
+
+    new_constraints.constraints.tilt = M_PI * (tilt_deg / 180.0);
 
     _constraints_.insert(std::pair<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>(*it, new_constraints));
   }

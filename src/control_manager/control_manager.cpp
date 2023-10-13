@@ -251,6 +251,8 @@ private:
 
   std::string _custom_config_;
   std::string _platform_config_;
+  std::string _world_config_;
+  std::string _network_config_;
 
   // | --------------- dynamic loading of trackers -------------- |
 
@@ -963,6 +965,33 @@ void ControlManager::initialize(void) {
 
   mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
 
+  param_loader.loadParam("custom_config", _custom_config_);
+  param_loader.loadParam("platform_config", _platform_config_);
+  param_loader.loadParam("world_config", _world_config_);
+  param_loader.loadParam("network_config", _network_config_);
+
+  if (_custom_config_ != "") {
+    param_loader.addYamlFile(_custom_config_);
+  }
+
+  if (_platform_config_ != "") {
+    param_loader.addYamlFile(_platform_config_);
+  }
+
+  if (_world_config_ != "") {
+    param_loader.addYamlFile(_world_config_);
+  }
+
+  if (_network_config_ != "") {
+    param_loader.addYamlFile(_network_config_);
+  }
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("private_trackers");
+  param_loader.addYamlFileFromParam("private_controllers");
+  param_loader.addYamlFileFromParam("public_controllers");
+
   const std::string yaml_prefix = "mrs_uav_managers/control_manager/";
 
   // params passed from the launch file are not prefixed
@@ -973,9 +1002,6 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("body_disturbance_x", _initial_body_disturbance_x_);
   param_loader.loadParam("body_disturbance_y", _initial_body_disturbance_y_);
   param_loader.loadParam("g", common_handlers_->g);
-
-  param_loader.loadParam("custom_config", _custom_config_);
-  param_loader.loadParam("platform_config", _platform_config_);
 
   // motor params are also not prefixed, since they are common to more nodes
   param_loader.loadParam("motor_params/a", common_handlers_->throttle_model.A);
@@ -1011,6 +1037,8 @@ void ControlManager::initialize(void) {
   param_loader.loadParam(yaml_prefix + "safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
   param_loader.loadParam(yaml_prefix + "safety/tilt_limit/eland/limit", _tilt_limit_eland_);
 
+  _tilt_limit_eland_ = M_PI * (_tilt_limit_eland_ / 180.0);
+
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -1019,6 +1047,8 @@ void ControlManager::initialize(void) {
   param_loader.loadParam(yaml_prefix + "safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
   param_loader.loadParam(yaml_prefix + "safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
 
+  _tilt_limit_disarm_ = M_PI * (_tilt_limit_disarm_ / 180.0);
+
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
     ros::shutdown();
@@ -1026,6 +1056,8 @@ void ControlManager::initialize(void) {
 
   param_loader.loadParam(yaml_prefix + "safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
   param_loader.loadParam(yaml_prefix + "safety/yaw_error_eland/limit", _yaw_error_eland_);
+
+  _yaw_error_eland_ = M_PI * (_yaw_error_eland_ / 180.0);
 
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
@@ -1043,6 +1075,8 @@ void ControlManager::initialize(void) {
   param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
   param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
   param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+
+  _tilt_error_disarm_threshold_ = M_PI * (_tilt_error_disarm_threshold_ / 180.0);
 
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
@@ -1077,6 +1111,8 @@ void ControlManager::initialize(void) {
   param_loader.loadParam(yaml_prefix + "default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
 
   param_loader.loadParam(yaml_prefix + "default_constraints/tilt", current_constraints_.constraints.tilt);
+
+  current_constraints_.constraints.tilt = M_PI * (current_constraints_.constraints.tilt / 180.0);
 
   // joystick
 
@@ -1337,6 +1373,23 @@ void ControlManager::initialize(void) {
     private_handlers->loadConfigFile = boost::bind(&ControlManager::loadConfigFile, this, _1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _tracker_names_[i];
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, it->second.name_space), _tracker_names_[i]);
+
+    if (_custom_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_world_config_);
+    }
+
+    if (_network_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_network_config_);
+    }
 
     bool success = false;
 
@@ -1614,6 +1667,23 @@ void ControlManager::initialize(void) {
     private_handlers->loadConfigFile = boost::bind(&ControlManager::loadConfigFile, this, _1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _controller_names_[i];
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, it->second.name_space), _controller_names_[i]);
+
+    if (_custom_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_custom_config_);
+    }
+
+    if (_platform_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_platform_config_);
+    }
+
+    if (_world_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_world_config_);
+    }
+
+    if (_network_config_ != "") {
+      private_handlers->param_loader->addYamlFile(_network_config_);
+    }
 
     bool success = false;
 

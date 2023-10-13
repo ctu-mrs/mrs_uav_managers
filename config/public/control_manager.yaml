@@ -21,20 +21,20 @@ mrs_uav_managers:
 
         eland:
           enabled: true
-          limit: deg(75) # [rad]
+          limit: 75.0 # [deg]
 
         disarm:
           enabled: true
-          limit: deg(75) # [rad]
+          limit: 75.0 # [deg]
 
       tilt_error_disarm:
         enabled: true
         timeout: 0.5 # [s] # for how long the error has to be present to disarm
-        error_threshold: deg(20) # [rad]
+        error_threshold: 20.0 # [deg]
 
       yaw_error_eland:
         enabled: true
-        limit: deg(90) # [rad]
+        limit: 90.0 # [deg]
 
       # tracker used for emergency hover routine
       ehover_tracker: "LandoffTracker"
