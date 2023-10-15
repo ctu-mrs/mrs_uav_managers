@@ -1611,15 +1611,21 @@ void ControlManager::initialize(void) {
       _safety_timer_rate_     = 100.0;
       desired_uav_state_rate_ = 100.0;
     } else if (lowest_output == ACCELERATION_HDG_RATE || lowest_output == ACCELERATION_HDG) {
-      _safety_timer_rate_          = 30.0;
-      _status_timer_rate_          = 1.0;
-      desired_uav_state_rate_      = 40.0;
-      _uav_state_max_missing_time_ = 0.2;
+      _safety_timer_rate_     = 30.0;
+      _status_timer_rate_     = 1.0;
+      desired_uav_state_rate_ = 40.0;
+
+      if (_uav_state_max_missing_time_ < 0.2) {
+        _uav_state_max_missing_time_ = 0.2;
+      }
     } else if (lowest_output >= VELOCITY_HDG_RATE) {
-      _safety_timer_rate_          = 20.0;
-      _status_timer_rate_          = 1.0;
-      desired_uav_state_rate_      = 20.0;
-      _uav_state_max_missing_time_ = 0.2;
+      _safety_timer_rate_     = 20.0;
+      _status_timer_rate_     = 1.0;
+      desired_uav_state_rate_ = 20.0;
+
+      if (_uav_state_max_missing_time_ < 1.0) {
+        _uav_state_max_missing_time_ = 1.0;
+      }
     }
 
     if (eland_threshold == 0) {
@@ -4285,7 +4291,9 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
 void ControlManager::timeoutUavState(const double& missing_for) {
 
-  if (output_enabled_ && !failsafe_triggered_) {
+  auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
+
+  if (output_enabled_ && last_control_output.control_output && !failsafe_triggered_) {
 
     // We need to fire up timerFailsafe, which will regularly trigger the controllers
     // in place of the callbackUavState/callbackOdometry().
