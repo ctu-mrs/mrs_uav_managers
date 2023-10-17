@@ -7055,11 +7055,15 @@ double ControlManager::getMinZ(const std::string& frame_id) {
     return std::numeric_limits<double>::lowest();
   }
 
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
   geometry_msgs::PointStamped point;
 
-  point.header.frame_id = _safety_area_frame_;
+  std::string from_frame = _safety_area_frame_;
+
+  if (_safety_area_frame_ == "latlon_origin") {
+    from_frame = "world_origin";
+  }
+
+  point.header.frame_id = from_frame;
   point.point.x         = 0;
   point.point.y         = 0;
   point.point.z         = safety_area_min_z_;
@@ -7071,10 +7075,9 @@ double ControlManager::getMinZ(const std::string& frame_id) {
     return std::numeric_limits<double>::lowest();
   }
 
-  geometry_msgs::PointStamped point_transformed = ret.value();
-
-  return mrs_lib::get_mutexed(mutex_safety_area_min_z_, point_transformed.point.z);
+  return ret->point.z;
 }
+
 
 //}
 
