@@ -7060,7 +7060,7 @@ double ControlManager::getMinZ(const std::string& frame_id) {
   std::string from_frame = _safety_area_frame_;
 
   if (_safety_area_frame_ == "latlon_origin") {
-    from_frame = "world_origin";
+    from_frame = frame_id;
   }
 
   point.header.frame_id = from_frame;
