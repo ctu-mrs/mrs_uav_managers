@@ -2908,7 +2908,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", error_size, _eland_threshold_,
+          ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size, _eland_threshold_,
                     position_error.value()[0], position_error.value()[1], position_error.value()[2]);
 
           eland();
