@@ -90,7 +90,7 @@ private:
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
 
   std::vector<std::string> utm_source_priority_list_;
-  std::string              utm_source_name;
+  std::string              utm_source_name_;
 
   std::mutex mtx_broadcast_utm_origin_;
   std::mutex mtx_broadcast_world_origin_;
@@ -266,7 +266,7 @@ void TransformManager::onInit() {
   for (auto utm_source : utm_source_priority_list_) {
     if (Support::isStringInVector(utm_source, estimator_names_)) {
       ROS_INFO("[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
-      utm_source_name = utm_source;
+      utm_source_name_ = utm_source;
       break;
     }
   }
@@ -275,7 +275,7 @@ void TransformManager::onInit() {
   for (size_t i = 0; i < tf_source_names_.size(); i++) {
 
     const std::string tf_source_name = tf_source_names_[i];
-    const bool        is_utm_source  = tf_source_name == utm_source_name;
+    const bool        is_utm_source  = tf_source_name == utm_source_name_;
 
     ROS_INFO("[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
 
@@ -304,7 +304,7 @@ void TransformManager::onInit() {
   for (int i = 0; i < int(estimator_names_.size()); i++) {
 
     const std::string estimator_name = estimator_names_[i];
-    const bool        is_utm_source  = estimator_name == utm_source_name;
+    const bool        is_utm_source  = estimator_name == utm_source_name_;
     ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
 
     auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/" + estimator_name);
