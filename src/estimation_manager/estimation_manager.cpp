@@ -631,7 +631,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
 
   /*//}*/
 
-  if (!callbacks_disabled_by_service_ && (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE))) {
+  if (!callbacks_disabled_by_service_ && (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE))) {
     callbacks_enabled_ = true;
   } else {
     callbacks_enabled_ = false;
