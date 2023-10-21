@@ -8,6 +8,8 @@ mrs_uav_managers:
       address: "mrs_uav_state_estimators/GpsBaro"
     rtk:
       address: "mrs_uav_state_estimators/Rtk"
+    rtk_garmin:
+      address: "mrs_uav_state_estimators/RtkGarmin"
     aloam:
       address: "mrs_uav_state_estimators/Aloam"
     vio:

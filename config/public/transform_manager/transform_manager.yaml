@@ -91,6 +91,16 @@ mrs_uav_managers:
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
 
+    rtk_garmin:
+      odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+      tf_from_attitude: # used for transforming velocities before full transform is available
+        enabled: true
+        attitude_topic: "attitude" # name of the attitude topic(expects geometry_msgs/QuaternionStamped topic type)
+      namespace: "estimation_manager/rtk_garmin" # the namespace of the topic (usually the node that publishes the topic)
+      utm_based: true # if true, will publish tf to utm_origin
+      inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+      republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+
     aloam:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
       tf_from_attitude: # used for transforming velocities before full transform is available
