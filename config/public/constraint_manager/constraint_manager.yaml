@@ -6,6 +6,7 @@ mrs_uav_managers:
       "gps_garmin",
       "gps_baro",
       "rtk",
+      "rtk_garmin",
       "aloam",
       "hector_garmin",
       "vio",
@@ -26,6 +27,7 @@ mrs_uav_managers:
       gps_garmin: ["slow", "medium", "fast"]
       gps_baro: ["slow", "medium", "fast"]
       rtk: ["slow", "medium", "fast"]
+      rtk_garmin: ["slow", "medium", "fast"]
       aloam: ["slow"]
       hector_garmin: ["slow"]
       vio: ["slow"]
@@ -40,6 +42,7 @@ mrs_uav_managers:
       gps_garmin: "slow"
       gps_baro: "slow"
       rtk: "slow"
+      rtk_garmin: "slow"
       aloam: "slow"
       hector_garmin: "slow"
       vio: "slow"
