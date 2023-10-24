@@ -146,6 +146,12 @@ public:
   }
   /*//}*/
 
+  /*//{ getIsUtmSource() */
+  bool getIsUtmSource() {
+    return is_utm_source_;
+  }
+  /*//}*/
+
   /*//{ setIsUtmSource() */
   void setIsUtmSource(const bool is_utm_source) {
     is_utm_source_ = is_utm_source;

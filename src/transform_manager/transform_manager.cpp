@@ -550,13 +550,13 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
     for (size_t i = 0; i < tf_sources_.size(); i++) {
 
-      // first check if tf source can publish utm origin and is not the switched from estimator
+      // first check if tf source can publish utm origin and is not the switched-from estimator
       if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() != last_estimator_name) {
 
         valid_utm_source_found     = true;
         potential_utm_source_index = i;
 
-        // check if switched to estimator is utm_based, if so, use it
+        // check if switched-to estimator is utm_based, if so, use it
         if (tf_sources_.at(i)->getIsUtmBased() && tf_sources_.at(i)->getName() == current_estimator_name) {
           potential_utm_source_index = i;
           break;
@@ -565,19 +565,20 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     }
 
 
-    // if we found a valid utm source, use it, otherwise stay with the switched from estimator
+    // if we found a valid utm source, use it, otherwise stay with the switched-from estimator
     if (valid_utm_source_found) {
 
-      tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
-      ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
-
-      // stop previous estimator from publishing utm source
+      // stop all estimators from publishing utm source
       for (size_t i = 0; i < tf_sources_.size(); i++) {
-        if (tf_sources_.at(i)->getName() == last_estimator_name) {
+        if (tf_sources_.at(i)->getIsUtmSource()) {
           tf_sources_.at(i)->setIsUtmSource(false);
           ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
         }
       }
+
+      tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
+      ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+
     }
   }
   /*//}*/
