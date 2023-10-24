@@ -88,3 +88,26 @@ This package contains *high-level* flight managers.
 * allows mapping each set of gains to only some state estimators
 * automatically switches to a fallback set of gains if the current ones are not allowed
 * provides a service for switching to a desired set of gains
+
+## EstimationManager
+
+* provides the state estimation of the UAV
+* dynamically loads default [state estimator](https://github.com/ctu-mrs/mrs_uav_state_estimators) or custom user-made plugins
+* publishes following topics:
+  * the `uav_state` topic that is used for feedback control in ControlManager
+    * **velocities in `uav_state` are in the `headed/frame_id` frame!!**
+  * visualizable `odom` topic 
+    * **velocities in `odom` are in the `child_frame_id` frame!! (follows the ROS convention for `nav_msgs/Odometry` msg)**
+  * current UAV height above terrain on topic `height_agl` (if available)
+  * maximum height above terrain that the UAV can fly in (based on the current estimator used for control)
+* provides common services for
+  * switching of state estimator currently used in control feedback  
+* checks health of current state estimator and switches to a healthy one in case current estimator becomes unhealthy 
+* if no estimator is healthy, calls failsafe landing
+
+## TransformManager
+* provides the following default TFs from the `fcu` frame (can be turned off/on or renamed by custom configs):
+  * `fcu_untilted_origin`, `world_origin`, `local_origin`, `stable_origin`, `fixed_origin`, `utm_origin`, `mapping_origin_tf` (if a SLAM algorithm is running)  
+* publishes the delay of odometry produced by a SLAM algorithm (if available) on topic `map_delay` 
+* additionally can provide custom TFs from `nav_msgs/Odometry` topics by adding them to the `tf_sources` array in custom config
+  * the msg can also be republished in another frame by adding the `frame_id` to the `republish_in_frames` array
