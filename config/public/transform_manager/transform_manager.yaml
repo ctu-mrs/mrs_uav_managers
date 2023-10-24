@@ -8,12 +8,12 @@ mrs_uav_managers:
       child: "local_origin"
 
     stable_origin_tf:
-      enabled: false # stable_origin tf should be published by default unless some other node already publishes it
+      enabled: true # stable_origin tf should be published by default unless some other node already publishes it
       parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "stable_origin"
 
     fixed_origin_tf:
-      enabled: false # fixed_origin tf should be published by default unless some other node already publishes it
+      enabled: true # fixed_origin tf should be published by default unless some other node already publishes it
       parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "fixed_origin"
 
