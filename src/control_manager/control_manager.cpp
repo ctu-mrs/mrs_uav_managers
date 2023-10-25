@@ -6993,11 +6993,17 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
 
   double safety_area_max_z = std::numeric_limits<float>::max();
 
+  std::string from_frame = _safety_area_frame_;
+
+  if (_safety_area_frame_ == "latlon_origin") {
+    from_frame = frame_id;
+  }
+
   {
 
     geometry_msgs::PointStamped point;
 
-    point.header.frame_id = _safety_area_frame_;
+    point.header.frame_id = from_frame;
     point.point.x         = 0;
     point.point.y         = 0;
     point.point.z         = _safety_area_max_z_;
