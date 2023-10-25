@@ -330,7 +330,7 @@ void TransformManager::onInit() {
 
   // initialize mapping_origin tf
   bool mapping_origin_tf_enabled;
-  param_loader.loadParam(yaml_prefix + "mapping_origin_tf/enabled", mapping_origin_tf_enabled);
+  param_loader.loadParam(yaml_prefix + "mapping_origin_tf/enabled", mapping_origin_tf_enabled, false);
 
   if (mapping_origin_tf_enabled) {
 

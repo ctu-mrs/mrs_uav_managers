@@ -7,7 +7,6 @@ mrs_uav_managers:
       "gps_baro",
       "rtk",
       "rtk_garmin",
-      "aloam",
       "hector_garmin",
       "vio",
       "optflow",
@@ -27,7 +26,6 @@ mrs_uav_managers:
       gps_baro: ["supersoft", "soft"]
       rtk: ["supersoft", "soft"]
       rtk_garmin: ["supersoft", "soft"]
-      aloam: ["supersoft", "soft"]
       hector_garmin: ["supersoft", "soft"]
       vio: ["supersoft", "soft"]
       optflow: ["supersoft", "soft"]
@@ -42,7 +40,6 @@ mrs_uav_managers:
       gps_baro: "soft"
       rtk: "soft"
       rtk_garmin: "soft"
-      aloam: "supersoft"
       hector_garmin: "supersoft"
       vio: "supersoft"
       optflow: "supersoft"

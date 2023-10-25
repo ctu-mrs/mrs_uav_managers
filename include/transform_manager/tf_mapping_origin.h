@@ -148,7 +148,7 @@ private:
 
     const double hdg_mapping_old = mrs_lib::AttitudeConverter(msg->pose.pose.orientation).getHeading();
 
-    /* publish aloam mapping origin tf //{ */
+    /* publish mapping origin tf //{ */
 
     bool clear_needed = false;
 
