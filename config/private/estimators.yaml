@@ -10,10 +10,6 @@ mrs_uav_managers:
       address: "mrs_uav_state_estimators/Rtk"
     rtk_garmin:
       address: "mrs_uav_state_estimators/RtkGarmin"
-    vio:
-      address: "mrs_uav_state_estimators/Vio"
-    hector_garmin:
-      address: "mrs_uav_state_estimators/HectorGarmin"
     passthrough:
       address: "mrs_uav_state_estimators/Passthrough"
     ground_truth:

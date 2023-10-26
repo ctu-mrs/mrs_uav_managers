@@ -7,9 +7,6 @@ mrs_uav_managers:
       "gps_baro",
       "rtk",
       "rtk_garmin",
-      "hector_garmin",
-      "vio",
-      "optflow",
       "other",
       "ground_truth",
       "passthrough",
@@ -27,9 +24,6 @@ mrs_uav_managers:
       gps_baro: ["slow", "medium", "fast"]
       rtk: ["slow", "medium", "fast"]
       rtk_garmin: ["slow", "medium", "fast"]
-      hector_garmin: ["slow"]
-      vio: ["slow"]
-      optflow: ["slow"]
       other: ["slow"]
       ground_truth: ["slow", "medium", "fast"]
       passthrough: ["slow", "medium", "fast"]
@@ -41,9 +35,6 @@ mrs_uav_managers:
       gps_baro: "slow"
       rtk: "slow"
       rtk_garmin: "slow"
-      hector_garmin: "slow"
-      vio: "slow"
-      optflow: "slow"
       other: "slow"
       ground_truth: "slow"
       passthrough: "slow"
