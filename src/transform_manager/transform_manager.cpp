@@ -13,6 +13,7 @@
 
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/HwApiAltitude.h>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -83,6 +84,10 @@ private:
   geometry_msgs::Pose pose_fixed_;
   geometry_msgs::Pose pose_fixed_diff_;
 
+  std::string         ns_amsl_origin_parent_frame_id_;
+  std::string         ns_amsl_origin_child_frame_id_;
+  bool                publish_amsl_origin_tf_;
+
   std::string          world_origin_units_;
   geometry_msgs::Point world_origin_;
 
@@ -113,6 +118,9 @@ private:
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_height_agl_;
   void                                                callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg);
+
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude> sh_altitude_amsl_;
+  void                                                callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg);
 
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
   void                                                        callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg);
@@ -259,6 +267,18 @@ void TransformManager::onInit() {
   param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
+/*//{ load amsl_origin parameters*/
+  std::string amsl_parent_frame_id, amsl_child_frame_id;
+  param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/enabled", publish_amsl_origin_tf_);
+  param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/parent", amsl_parent_frame_id);
+  param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/child", amsl_child_frame_id);
+  ch_->frames.amsl    = amsl_child_frame_id;
+  ch_->frames.ns_amsl = ch_->uav_name + "/" + amsl_child_frame_id;
+  ns_amsl_origin_parent_frame_id_ = ch_->uav_name + "/" + amsl_parent_frame_id;
+  ns_amsl_origin_child_frame_id_ = ch_->uav_name + "/" + amsl_child_frame_id;
+
+/*//}*/
+
   param_loader.loadParam("mrs_uav_managers/estimation_manager/state_estimators", estimator_names_);
   param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
 
@@ -370,6 +390,8 @@ void TransformManager::onInit() {
   sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
   sh_height_agl_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_agl_in", &TransformManager::callbackHeightAgl, this);
+
+  sh_altitude_amsl_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude>(shopts, "altitude_amsl_in", &TransformManager::callbackAltitudeAmsl, this);
 
   sh_hw_api_orientation_ =
       mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
@@ -595,7 +617,7 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPt
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publish>HeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackHeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   geometry_msgs::TransformStamped tf_msg;
   tf_msg.header.stamp    = msg->header.stamp;
@@ -605,6 +627,45 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPt
   tf_msg.transform.translation.x = 0;
   tf_msg.transform.translation.y = 0;
   tf_msg.transform.translation.z = -msg->value;
+  tf_msg.transform.rotation.x    = 0;
+  tf_msg.transform.rotation.y    = 0;
+  tf_msg.transform.rotation.z    = 0;
+  tf_msg.transform.rotation.w    = 1;
+
+  if (Support::noNans(tf_msg)) {
+    try {
+      broadcaster_->sendTransform(tf_msg);
+    }
+    catch (...) {
+      ROS_ERROR("exception caught ");
+    }
+  } else {
+    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                      tf_msg.child_frame_id.c_str());
+  }
+  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                tf_msg.child_frame_id.c_str());
+}
+/*//}*/
+
+/*//{ callbackAltitudeAmsl() */
+
+void TransformManager::callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackAltitudeAmsl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  geometry_msgs::TransformStamped tf_msg;
+  tf_msg.header.stamp    = msg->stamp;
+  tf_msg.header.frame_id = ch_->frames.ns_fcu_untilted;
+  tf_msg.child_frame_id  = ch_->frames.ns_amsl;
+
+  tf_msg.transform.translation.x = 0;
+  tf_msg.transform.translation.y = 0;
+  tf_msg.transform.translation.z = -msg->amsl;
   tf_msg.transform.rotation.x    = 0;
   tf_msg.transform.rotation.y    = 0;
   tf_msg.transform.rotation.z    = 0;

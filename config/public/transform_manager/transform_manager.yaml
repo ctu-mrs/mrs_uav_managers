@@ -32,6 +32,11 @@ mrs_uav_managers:
       parent: "fcu" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "fcu_untilted"
 
+    altitude_amsl_tf:
+      enabled: true # amsl tf should be published by default unless some other node already publishes it
+      parent: "fcu_untilted" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
+      child: "amsl_origin"
+
     # the list of additional source topics from which the tfs will be constructed
     tf_sources: []
 

@@ -20,6 +20,8 @@ struct CommonFrames_t
   std::string ns_fcu_untilted;
   std::string rtk_antenna;
   std::string ns_rtk_antenna;
+  std::string amsl;
+  std::string ns_amsl;
 };
 
 struct WorldOrigin_t
