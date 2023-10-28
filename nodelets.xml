@@ -39,3 +39,9 @@
     <description>TransformManager nodelet</description>
   </class>
 </library>
+
+<library path="lib/libMrsUavManagers_SafetyAreaManager">
+  <class name="mrs_uav_managers/SafetyAreaManager" type="mrs_uav_managers::safety_area_manager::SafetyAreaManager" base_class_type="nodelet::Nodelet">
+    <description>SafetyAreaManager nodelet</description>
+  </class>
+</library>

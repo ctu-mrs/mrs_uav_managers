@@ -157,6 +157,20 @@ target_link_libraries(MrsUavManagers_TransformManager
   ${Eigen_LIBRARIES}
   )
 
+# MrsUavManagers_SafetyAreaManager
+add_library(MrsUavManagers_SafetyAreaManager
+  src/safety_area_manager/safety_area_manager.cpp
+)
+
+add_dependencies(MrsUavManagers_SafetyAreaManager
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(MrsUavManagers_SafetyAreaManager
+  ${catkin_LIBRARIES}
+  )
+
 ## --------------------------------------------------------------
 ## |                           Install                          |
 ## --------------------------------------------------------------
