@@ -71,3 +71,13 @@ mrs_uav_managers:
 
       enabled: false
       log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+
+    obstacle_bumper:
+
+      timer_rate: 20.0 # [Hz]
+
+      horizontal:
+        overshoot: 0.2 # [m]
+
+      vertical:
+        overshoot: 1.2 # [m]

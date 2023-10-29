@@ -30,18 +30,6 @@ struct SafetyArea_t
 
 //}
 
-/* obstacle bumper handler //{ */
-
-typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidatePoint_t;
-
-struct Bumper_t
-{
-  bool                                                     enabled;
-  mrs_uav_managers::control_manager::bumperValidatePoint_t bumperValidatePoint;
-};
-
-//}
-
 /* scope timer handler //{ */
 
 struct ScopeTimer_t
@@ -82,7 +70,6 @@ struct CommonHandlers_t
   SafetyArea_t                                     safety_area;
   std::shared_ptr<mrs_lib::Transformer>            transformer;
   ScopeTimer_t                                     scope_timer;
-  Bumper_t                                         bumper;
   getMass_t                                        getMass;
   double                                           g;
   mrs_lib::quadratic_throttle_model::MotorParams_t throttle_model;
