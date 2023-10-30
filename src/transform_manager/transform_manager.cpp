@@ -84,9 +84,9 @@ private:
   geometry_msgs::Pose pose_fixed_;
   geometry_msgs::Pose pose_fixed_diff_;
 
-  std::string         ns_amsl_origin_parent_frame_id_;
-  std::string         ns_amsl_origin_child_frame_id_;
-  bool                publish_amsl_origin_tf_;
+  std::string ns_amsl_origin_parent_frame_id_;
+  std::string ns_amsl_origin_child_frame_id_;
+  bool        publish_amsl_origin_tf_;
 
   std::string          world_origin_units_;
   geometry_msgs::Point world_origin_;
@@ -120,7 +120,7 @@ private:
   void                                                callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg);
 
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude> sh_altitude_amsl_;
-  void                                                callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg);
+  void                                               callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg);
 
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
   void                                                        callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg);
@@ -187,18 +187,18 @@ void TransformManager::onInit() {
   double world_origin_x     = 0;
   double world_origin_y     = 0;
 
-  param_loader.loadParam("world_origin_units", world_origin_units_);
+  param_loader.loadParam("world_origin/units", world_origin_units_);
 
   if (Support::toLowercase(world_origin_units_) == "utm") {
     ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("world_origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("world_origin_y", world_origin_y);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units_) == "latlon") {
     double lat, lon;
     ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("world_origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("world_origin_y", lon);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
@@ -267,17 +267,17 @@ void TransformManager::onInit() {
   param_loader.loadParam(yaml_prefix + "fcu_untilted_tf/enabled", publish_fcu_untilted_tf_);
   /*//}*/
 
-/*//{ load amsl_origin parameters*/
+  /*//{ load amsl_origin parameters*/
   std::string amsl_parent_frame_id, amsl_child_frame_id;
   param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/enabled", publish_amsl_origin_tf_);
   param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/parent", amsl_parent_frame_id);
   param_loader.loadParam(yaml_prefix + "altitude_amsl_tf/child", amsl_child_frame_id);
-  ch_->frames.amsl    = amsl_child_frame_id;
-  ch_->frames.ns_amsl = ch_->uav_name + "/" + amsl_child_frame_id;
+  ch_->frames.amsl                = amsl_child_frame_id;
+  ch_->frames.ns_amsl             = ch_->uav_name + "/" + amsl_child_frame_id;
   ns_amsl_origin_parent_frame_id_ = ch_->uav_name + "/" + amsl_parent_frame_id;
-  ns_amsl_origin_child_frame_id_ = ch_->uav_name + "/" + amsl_child_frame_id;
+  ns_amsl_origin_child_frame_id_  = ch_->uav_name + "/" + amsl_child_frame_id;
 
-/*//}*/
+  /*//}*/
 
   param_loader.loadParam("mrs_uav_managers/estimation_manager/state_estimators", estimator_names_);
   param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
@@ -600,7 +600,6 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
       tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
       ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
-
     }
   }
   /*//}*/

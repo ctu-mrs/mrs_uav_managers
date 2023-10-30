@@ -369,9 +369,7 @@ private:
   boost::shared_ptr<mrs_uav_managers::AglEstimator>                       est_alt_agl_;
   bool                                                                    is_using_agl_estimator_;
 
-  double      max_flight_z_;
-  double      max_safety_area_z_;
-  std::string safety_area_frame_id_;
+  double max_flight_z_;
 
   bool switchToHealthyEstimator();
   void switchToEstimator(const boost::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator);
@@ -631,7 +629,8 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
 
   /*//}*/
 
-  if (!callbacks_disabled_by_service_ && (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE))) {
+  if (!callbacks_disabled_by_service_ &&
+      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE))) {
     callbacks_enabled_ = true;
   } else {
     callbacks_enabled_ = false;
@@ -726,18 +725,6 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   param_loader.loadParam("uav_name", ch_->uav_name);
 
-  // load maximum flight z from safety area
-  bool use_safety_area;
-  param_loader.loadParam("safety_area/use_safety_area", use_safety_area);
-  if (use_safety_area) {
-    param_loader.loadParam("safety_area/max_z", max_safety_area_z_);
-    param_loader.loadParam("safety_area/frame_name", safety_area_frame_id_);
-  } else {
-    ROS_WARN("[%s]: NOT USING SAFETY AREA!!!", getName().c_str());
-    safety_area_frame_id_ = "";
-    max_safety_area_z_    = std::numeric_limits<double>::max();
-  }
-
   /*//{ load world_origin parameters */
 
   std::string world_origin_units;
@@ -745,18 +732,18 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   double      world_origin_x     = 0;
   double      world_origin_y     = 0;
 
-  param_loader.loadParam("world_origin_units", world_origin_units);
+  param_loader.loadParam("world_origin/units", world_origin_units);
 
   if (Support::toLowercase(world_origin_units) == "utm") {
     ROS_INFO("[%s]: Loading world origin in UTM units.", getName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("world_origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("world_origin_y", world_origin_y);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units) == "latlon") {
     double lat, lon;
     ROS_INFO("[%s]: Loading world origin in LatLon units.", getName().c_str());
-    is_origin_param_ok &= param_loader.loadParam("world_origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("world_origin_y", lon);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
+    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getName().c_str(), world_origin_x, world_origin_y);
 

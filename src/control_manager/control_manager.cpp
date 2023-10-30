@@ -372,7 +372,6 @@ private:
   // | -------------- safety area max z subscriber -------------- |
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
-  double                                              _safety_area_max_z_ = 0;
 
   // | ------------- odometry innovation subscriber ------------- |
 
@@ -573,19 +572,21 @@ private:
 
   // safety area
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
-  bool                                 use_safety_area_ = false;
-  std::string                          _safety_area_frame_;
-  double                               safety_area_min_z_ = 0;
-  std::mutex                           mutex_safety_area_min_z_;
-  bool                                 _obstacle_points_enabled_   = false;
-  bool                                 _obstacle_polygons_enabled_ = false;
+
+  std::atomic<bool> use_safety_area_ = false;
+
+  std::string _safety_area_horizontal_frame_;
+  std::string _safety_area_vertical_frame_;
+
+  double _safety_area_min_z_ = 0;
+  double _safety_area_max_z_ = 0;
 
   // safety area routines
   // those are passed to trackers using the common_handlers object
-  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
-  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
-  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
-  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
+  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
   double getMinZ(const std::string& frame_id);
   double getMaxZ(const std::string& frame_id);
 
@@ -999,67 +1000,34 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- safety area ---------------------- |
 
-  param_loader.loadParam("safety_area/use_safety_area", use_safety_area_);
-  param_loader.loadParam("safety_area/frame_name", _safety_area_frame_);
-  param_loader.loadParam("safety_area/min_z", safety_area_min_z_);
-  param_loader.loadParam("safety_area/max_z", _safety_area_max_z_);
+  bool use_safety_area;
+  param_loader.loadParam("safety_area/enabled", use_safety_area);
+  use_safety_area_ = use_safety_area;
+
+  param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
+
+  param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
+  param_loader.loadParam("safety_area/vertical/min_z", _safety_area_min_z_);
+  param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
 
   if (use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/safety_area", -1, 2);
 
-    param_loader.loadParam("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-
-    if (_obstacle_polygons_enabled_) {
-      polygon_obstacle_points = param_loader.loadMatrixArray2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    param_loader.loadParam("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
-    std::vector<Eigen::MatrixXd> point_obstacle_points;
-
-    if (_obstacle_points_enabled_) {
-
-      point_obstacle_points = param_loader.loadMatrixArray2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
-
-      if (_safety_area_frame_ == "latlon_origin") {
-
-        for (int i = 0; i < int(point_obstacle_points.size()); i++) {
-
-          Eigen::MatrixXd temp = point_obstacle_points[i];
-          temp(0, 2) *= 8.9832e-06;
-          point_obstacle_points[i] = temp;
-        }
-      }
-
-    } else {
-      point_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    // TODO: remove this when param loader supports proper loading
-    for (auto& matrix : polygon_obstacle_points) {
-      matrix.transposeInPlace();
-    }
+    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
 
     try {
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
+
+      std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+      std::vector<Eigen::MatrixXd> point_obstacle_points;
+
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points);
     }
 
     catch (mrs_lib::SafetyZone::BorderError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
       ros::shutdown();
     }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone polygon obstacles");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PointObstacleError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
-      ros::shutdown();
-    }
     catch (...) {
-      ROS_ERROR("[ControlManager]: SafetyArea: unhandler exception!");
+      ROS_ERROR("[ControlManager]: SafetyArea: unhandled exception!");
       ros::shutdown();
     }
 
@@ -1278,7 +1246,6 @@ void ControlManager::initialize(void) {
   common_handlers_->scope_timer.logger  = scope_timer_logger_;
 
   common_handlers_->safety_area.use_safety_area       = use_safety_area_;
-  common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
   common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this, _1);
@@ -2162,11 +2129,11 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   if (use_safety_area_) {
 
     mrs_msgs::ReferenceStamped temp_ref;
-    temp_ref.header.frame_id = _safety_area_frame_;
+    temp_ref.header.frame_id = _safety_area_horizontal_frame_;
 
     geometry_msgs::TransformStamped tf;
 
-    auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0));
+    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", ros::Time(0));
 
     if (ret) {
 
@@ -2177,8 +2144,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       mrs_lib::Polygon border = safety_zone_->getBorder();
 
-      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_frame_));
-      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_frame_));
+      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_horizontal_frame_));
+      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_horizontal_frame_));
 
       std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
       std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
@@ -2194,7 +2161,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       // transform border bottom points to local origin
       for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
-        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
         temp_ref.header.stamp         = ros::Time(0);
         temp_ref.reference.position.x = border_points_bot_original[i].x;
         temp_ref.reference.position.y = border_points_bot_original[i].y;
@@ -2216,7 +2183,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       // transform border top points to local origin
       for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
-        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
         temp_ref.header.stamp         = ros::Time(0);
         temp_ref.reference.position.x = border_points_top_original[i].x;
         temp_ref.reference.position.y = border_points_top_original[i].y;
@@ -2273,7 +2240,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         std::stringstream ss;
 
-        if (_safety_area_frame_ == "latlon_origin") {
+        if (_safety_area_horizontal_frame_ == "latlon_origin") {
           ss << "idx: " << i << std::endl
              << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
              << "lon: " << border_points_bot_original[i].y;
@@ -2305,7 +2272,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         std::stringstream ss;
 
-        if (_safety_area_frame_ == "latlon_origin") {
+        if (_safety_area_horizontal_frame_ == "latlon_origin") {
           ss << "idx: " << i << std::endl
              << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
              << "lon: " << border_points_bot_original[i].y;
@@ -2324,151 +2291,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
         safety_area_coordinates_marker.id++;
 
         safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
-      }
-
-      //}
-
-      /* adding polygon obstacles points //{ */
-
-      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
-
-      for (auto polygon : polygon_obstacles) {
-
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinZ(_safety_area_frame_));
-        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxZ(_safety_area_frame_));
-
-        // transform border bottom points to local origin
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_bot[i].x;
-          temp_ref.reference.position.y = points_bot[i].y;
-          temp_ref.reference.position.z = points_bot[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_bot[i].x = temp_ref.reference.position.x;
-            points_bot[i].y = temp_ref.reference.position.y;
-            points_bot[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // transform border top points to local origin
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_top[i].x;
-          temp_ref.reference.position.y = points_top[i].y;
-          temp_ref.reference.position.z = points_top[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_top[i].x = temp_ref.reference.position.x;
-            points_top[i].y = temp_ref.reference.position.y;
-            points_top[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // bottom points
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
-        }
-
-        // top points + top/bot edges
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_top[i]);
-          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_top[i]);
-        }
-      }
-
-      //}
-
-      /* adding point-obstacle points //{ */
-
-      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
-
-      for (auto point : point_obstacles) {
-
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinZ(_safety_area_frame_));
-        std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
-
-        // transform bottom points to local origin
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_bot[i].x;
-          temp_ref.reference.position.y = points_bot[i].y;
-          temp_ref.reference.position.z = points_bot[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref        = ret.value();
-            points_bot[i].x = temp_ref.reference.position.x;
-            points_bot[i].y = temp_ref.reference.position.y;
-            points_bot[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // transform top points to local origin
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_top[i].x;
-          temp_ref.reference.position.y = points_top[i].y;
-          temp_ref.reference.position.z = points_top[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_top[i].x = temp_ref.reference.position.x;
-            points_top[i].y = temp_ref.reference.position.y;
-            points_top[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // botom points
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
-        }
-
-        // top points + bot/top edges
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          safety_area_marker.points.push_back(points_top[i]);
-          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_top[i]);
-        }
       }
 
       //}
@@ -6073,88 +5895,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   bool trajectory_modified = false;
 
-  /* transform the trajectory to the safety area frame //{ */
-
-  if (use_safety_area_) {
-
-    auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, _safety_area_frame_, uav_state_.header.stamp);
-
-    if (!ret) {
-
-      ss << "could not create TF transformer from the trajectory frame to the safety area frame";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
-
-    geometry_msgs::TransformStamped tf = ret.value();
-
-    for (int i = 0; i < trajectory_size; i++) {
-
-      mrs_msgs::ReferenceStamped trajectory_point;
-      trajectory_point.header    = processed_trajectory.header;
-      trajectory_point.reference = processed_trajectory.points[i];
-
-      auto ret = transformer_->transform(trajectory_point, tf);
-
-      if (!ret) {
-
-        ss << "the trajectory can not be transformed to the safety area frame";
-        ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-
-      } else {
-
-        // transform the points in the trajectory to the current frame
-        processed_trajectory.points[i] = ret.value().reference;
-      }
-    }
-
-    processed_trajectory.header.frame_id = transformer_->frame_to(tf);
-  }
-
-  //}
-
   /* safety area check //{ */
 
   if (use_safety_area_) {
-
-    // transform the current state to the safety area frame
-    mrs_msgs::ReferenceStamped x_current_frame;
-    x_current_frame.header = uav_state.header;
-
-    if (last_tracker_cmd) {
-
-      x_current_frame.reference.position.x = last_tracker_cmd->position.x;
-      x_current_frame.reference.position.y = last_tracker_cmd->position.y;
-      x_current_frame.reference.position.z = last_tracker_cmd->position.z;
-
-    } else if (got_uav_state_) {
-
-      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-      x_current_frame.reference.position.x = uav_state.pose.position.x;
-      x_current_frame.reference.position.y = uav_state.pose.position.y;
-      x_current_frame.reference.position.z = uav_state.pose.position.z;
-
-    } else {
-
-      ss << "cannot check agains safety area, missing odometry";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
-
-    auto res = transformer_->transformSingle(x_current_frame, _safety_area_frame_);
-
-    mrs_msgs::ReferenceStamped x_area_frame;
-
-    if (res) {
-      x_area_frame = res.value();
-    } else {
-
-      ss << "could not transform current state to safety area frame!";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
 
     int last_valid_idx    = 0;
     int first_invalid_idx = -1;
@@ -6282,7 +6025,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   if (trajectory_size == 0) {
 
-    ss << "the trajectory somehow happened to be empty after all the checks! This message should not appear!";
+    ss << "the trajectory happened to be empty after all the checks! This message should not appear!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
@@ -6291,19 +6034,21 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   /* transform the trajectory to the current control frame //{ */
 
-  // TODO this should be in the time of the processed_trajectory.header.frame_id
-  auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
+  std::optional<geometry_msgs::TransformStamped> tf_traj_state;
 
-  if (!ret) {
+  if (processed_trajectory.header.stamp > ros::Time::now()) {
+    tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", processed_trajectory.header.stamp);
+  } else {
+    tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
+  }
 
+  if (!tf_traj_state) {
     ss << "could not create TF transformer for the trajectory";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
-  geometry_msgs::TransformStamped tf = ret.value();
-
-  processed_trajectory.header.frame_id = transformer_->frame_to(tf);
+  processed_trajectory.header.frame_id = transformer_->frame_to(*tf_traj_state);
 
   for (int i = 0; i < trajectory_size; i++) {
 
@@ -6311,7 +6056,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     trajectory_point.header    = processed_trajectory.header;
     trajectory_point.reference = processed_trajectory.points[i];
 
-    auto ret = transformer_->transform(trajectory_point, tf);
+    auto ret = transformer_->transform(trajectory_point, *tf_traj_state);
 
     if (!ret) {
 
@@ -6737,72 +6482,74 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
 
 // | ----------------------- safety area ---------------------- |
 
-/* //{ isInSafetyArea3d() */
+/* //{ isPointInSafetyArea3d() */
 
-bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point) {
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point) {
 
   if (!use_safety_area_) {
     return true;
   }
 
-  // copy member variables
-  auto min_z = mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
 
-  auto ret = transformer_->transformSingle(point, _safety_area_frame_);
-
-  if (!ret) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area frame");
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
     return false;
   }
 
-  mrs_msgs::ReferenceStamped point_transformed = ret.value();
-
-  if (safety_zone_->isPointValid3d(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
-      point_transformed.reference.position.z >= min_z && point_transformed.reference.position.z <= getMaxZ(_safety_area_frame_)) {
-    return true;
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
   }
 
-  return false;
+  if (point.reference.position.z < getMinZ(point.header.frame_id) || point.reference.position.z > getMaxZ(point.header.frame_id)) {
+    return false;
+  }
+
+  return true;
 }
 
 //}
 
-/* //{ isInSafetyArea2d() */
+/* //{ isPointInSafetyArea2d() */
 
-bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point) {
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point) {
 
   if (!use_safety_area_) {
     return true;
   }
 
-  auto ret = transformer_->transformSingle(point, _safety_area_frame_);
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
 
-  if (!ret) {
-
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform reference to the safety area frame");
-
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
     return false;
   }
 
-  mrs_msgs::ReferenceStamped point_transformed = ret.value();
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
+  }
 
-  return safety_zone_->isPointValid2d(point_transformed.reference.position.x, point_transformed.reference.position.y);
+  return true;
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea3d() */
 
-bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
 
   if (!use_safety_area_) {
     return true;
   }
 
+  if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end)) {
+    return false;
+  }
+
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
   {
-    auto ret = transformer_->transformSingle(start, _safety_area_frame_);
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
 
     if (!ret) {
 
@@ -6815,7 +6562,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
   }
 
   {
-    auto ret = transformer_->transformSingle(end, _safety_area_frame_);
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
 
     if (!ret) {
 
@@ -6827,24 +6574,27 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid3d(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
-                                     end_transformed.reference.position.x, end_transformed.reference.position.y, end_transformed.reference.position.z);
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea2d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
-
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
   if (!use_safety_area_) {
     return true;
   }
 
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
+  if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end)) {
+    return false;
+  }
+
   {
-    auto ret = transformer_->transformSingle(start, _safety_area_frame_);
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
 
     if (!ret) {
 
@@ -6857,7 +6607,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
   }
 
   {
-    auto ret = transformer_->transformSingle(end, _safety_area_frame_);
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
 
     if (!ret) {
 
@@ -6869,8 +6619,8 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid2d(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-                                     end_transformed.reference.position.y);
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
 }
 
 //}
@@ -6883,17 +6633,11 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
 
   double safety_area_max_z = std::numeric_limits<float>::max();
 
-  std::string from_frame = _safety_area_frame_;
-
-  if (_safety_area_frame_ == "latlon_origin") {
-    from_frame = frame_id;
-  }
-
   {
 
     geometry_msgs::PointStamped point;
 
-    point.header.frame_id = from_frame;
+    point.header.frame_id = _safety_area_vertical_frame_;
     point.point.x         = 0;
     point.point.y         = 0;
     point.point.z         = _safety_area_max_z_;
@@ -6901,7 +6645,7 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
     auto ret = transformer_->transformSingle(point, frame_id);
 
     if (!ret) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to the current control frame");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
     }
 
     safety_area_max_z = ret->point.z;
@@ -6953,27 +6697,20 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 
   geometry_msgs::PointStamped point;
 
-  std::string from_frame = _safety_area_frame_;
-
-  if (_safety_area_frame_ == "latlon_origin") {
-    from_frame = frame_id;
-  }
-
-  point.header.frame_id = from_frame;
+  point.header.frame_id = _safety_area_vertical_frame_;
   point.point.x         = 0;
   point.point.y         = 0;
-  point.point.z         = safety_area_min_z_;
+  point.point.z         = _safety_area_min_z_;
 
   auto ret = transformer_->transformSingle(point, frame_id);
 
   if (!ret) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform min_z to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's min_z to '%s'", frame_id.c_str());
     return std::numeric_limits<double>::lowest();
   }
 
   return ret->point.z;
 }
-
 
 //}
 
@@ -6982,7 +6719,6 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 /* bumperPushFromObstacle() //{ */
 
 bool ControlManager::bumperPushFromObstacle(void) {
-
   if (!bumper_enabled_) {
     return true;
   }
@@ -7259,7 +6995,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
 /* bumperGetSectorId() //{ */
 
 int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
-
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
 
@@ -7293,7 +7028,6 @@ int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_
 /* //{ changeLandingState() */
 
 void ControlManager::changeLandingState(LandingStates_t new_state) {
-
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
@@ -7330,7 +7064,6 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 /* hover() //{ */
 
 std::tuple<bool, std::string> ControlManager::hover(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7367,7 +7100,6 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
 /* //{ ehover() */
 
 std::tuple<bool, std::string> ControlManager::ehover(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7436,7 +7168,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 /* eland() //{ */
 
 std::tuple<bool, std::string> ControlManager::eland(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7529,7 +7260,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 /* failsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::failsafe(void) {
-
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
@@ -7638,7 +7368,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 /* escalatingFailsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
-
   std::stringstream ss;
 
   if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
@@ -7759,7 +7488,6 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 /* getNextEscFailsafeState() //{ */
 
 EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
-
   EscalatingFailsafeStates_t current_state = state_escalating_failsafe_;
 
   switch (current_state) {
@@ -7830,7 +7558,6 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
 /* startTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7862,7 +7589,6 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
 /* stopTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7894,7 +7620,6 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
 /* resumeTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7926,7 +7651,6 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
 /* gotoTrajectoryStart() //{ */
 
 std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7959,7 +7683,6 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 /* arming() //{ */
 
 std::tuple<bool, std::string> ControlManager::arming(const bool input) {
-
   std::stringstream ss;
 
   if (input) {
@@ -8029,7 +7752,6 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 /* odometryCallbacksSrv() //{ */
 
 void ControlManager::odometryCallbacksSrv(const bool input) {
-
   ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
@@ -8054,7 +7776,6 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 /* elandSrv() //{ */
 
 bool ControlManager::elandSrv(void) {
-
   ROS_INFO("[ControlManager]: calling for eland");
 
   std_srvs::Trigger srv;
@@ -8082,7 +7803,6 @@ bool ControlManager::elandSrv(void) {
 /* shutdown() //{ */
 
 void ControlManager::shutdown() {
-
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -8100,7 +7820,6 @@ void ControlManager::shutdown() {
 /* parachuteSrv() //{ */
 
 bool ControlManager::parachuteSrv(void) {
-
   ROS_INFO("[ControlManager]: calling for parachute deployment");
 
   std_srvs::Trigger srv;
@@ -8128,7 +7847,6 @@ bool ControlManager::parachuteSrv(void) {
 /* ungripSrv() //{ */
 
 void ControlManager::ungripSrv(void) {
-
   std_srvs::Trigger srv;
 
   bool res = sch_ungrip_.call(srv);
@@ -8151,7 +7869,6 @@ void ControlManager::ungripSrv(void) {
 /* toggleOutput() //{ */
 
 void ControlManager::toggleOutput(const bool& input) {
-
   if (input == output_enabled_) {
     ROS_WARN_THROTTLE(0.1, "[ControlManager]: output is already %s", input ? "ON" : "OFF");
     return;
@@ -8215,7 +7932,6 @@ void ControlManager::toggleOutput(const bool& input) {
 /* switchTracker() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8349,7 +8065,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 /* switchController() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8464,7 +8179,6 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 /* updateTrackers() //{ */
 
 void ControlManager::updateTrackers(void) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8575,7 +8289,6 @@ void ControlManager::updateTrackers(void) {
 /* updateControllers() //{ */
 
 void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8702,7 +8415,6 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 /* publish() //{ */
 
 void ControlManager::publish(void) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publish");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8828,7 +8540,6 @@ void ControlManager::publish(void) {
 /* deployParachute() //{ */
 
 std::tuple<bool, std::string> ControlManager::deployParachute(void) {
-
   // if not enabled, return false
   if (!_parachute_enabled_) {
 
@@ -8873,7 +8584,6 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 /* velocityReferenceToReference() //{ */
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
-
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
@@ -8922,7 +8632,6 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
                                                  [[maybe_unused]] const Controller::ControlOutput&               control_output) {
-
   if (!tracker_command || !control_output.control_output) {
     return;
   }
@@ -9001,7 +8710,6 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
 /* initializeControlOutput() //{ */
 
 void ControlManager::initializeControlOutput(void) {
-
   Controller::ControlOutput controller_output;
 
   controller_output.diagnostics.total_mass       = _uav_mass_;

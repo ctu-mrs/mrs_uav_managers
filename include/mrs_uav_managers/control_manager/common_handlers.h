@@ -13,8 +13,8 @@ namespace control_manager
 
 /* safety area handler //{ */
 
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea3d_t;
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea2d_t;
+typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea3d_t;
+typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea2d_t;
 typedef boost::function<double(const std::string &frame_id)>          getMaxZ_t;
 typedef boost::function<double(const std::string &frame_id)>          getMinZ_t;
 
@@ -24,7 +24,6 @@ struct SafetyArea_t
   mrs_uav_managers::control_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
   mrs_uav_managers::control_manager::getMaxZ_t               getMaxZ;
   mrs_uav_managers::control_manager::getMinZ_t               getMinZ;
-  std::string                                                frame_id;
   bool                                                       use_safety_area;
 };
 
