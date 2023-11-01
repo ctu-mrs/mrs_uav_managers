@@ -1253,7 +1253,7 @@ void ControlManager::initialize(void) {
 
   common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
 
-  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager");
+  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager", _platform_config_, _custom_config_);
 
   common_handlers_->control_output_modalities = _hw_api_inputs_;
 
