@@ -1,11 +1,14 @@
 #include "ros/ros.h"
 
 #include "mrs_msgs/ReferenceStamped.h"
+#include "mrs_msgs/HwApiCapabilities.h"
 
 #include "std_msgs/String.h"
 
 #include "mrs_lib/mutex.h"
 #include "mrs_lib/transformer.h"
+#include "mrs_lib/param_loader.h"
+#include "mrs_lib/subscribe_handler.h"
 #include "mrs_lib/safety_zone/safety_zone.h"
 
 #include "nodelet/nodelet.h"
@@ -21,34 +24,59 @@ namespace safety_area_manager
 class SafetyAreaManager : public nodelet::Nodelet
 {
 private:
-    std::shared_ptr<mrs_lib::Transformer> transformer_;
+  std::shared_ptr<mrs_lib::Transformer> transformer_;
 
-    std::mutex                           mutex_safety_area_min_z_;
-    double                               safety_area_min_z_ = 0;
-    std::string                          _safety_area_frame_;
-    std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
+  bool is_initialized_ = false;
 
-    ros::NodeHandle nh;
-    ros::Publisher publisher;
+  std::mutex                           mutex_safety_area_min_z_;
+  bool                                 use_safety_area_;
+  bool                                 obstacle_polygons_enabled_ = false;
+  bool                                 obstacle_points_enabled_   = false;
+  double                               safety_area_min_z_ = 0;
+  double                               safety_area_max_z_ = 0;
+  std::string                          safety_area_frame_;
+  std::string                          uav_name_;
+  std::string                          body_frame_;
+  std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
 
-    /* data */
+  ros::NodeHandle nh_;
+  ros::Publisher  publisher_;
+
+  // safety area services
+  ros::ServiceServer service_server_validate_reference_;
+  ros::ServiceServer service_server_validate_reference_2d_;
+  ros::ServiceServer service_server_validate_reference_list_;
+
+  // safety area min z servers
+  ros::ServiceServer service_server_set_min_z_;
+  ros::ServiceServer service_server_get_min_z_;
+  
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+
+  void preinitialize();
+
+  void initialize();
+
+  // this timer will check till we already got the hardware api diagnostics
+  // then it will trigger the initialization of the controllers and finish
+  // the initialization of the ControlManager
+  ros::Timer timer_hw_api_capabilities_;
+  void timerHwApiCapabilities(const ros::TimerEvent& event);
+
+  bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
+
+  bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
+
+  bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
+
+  bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
+
+  double getMaxZ(const std::string& frame_id);
+
+  double getMinZ(const std::string& frame_id);
+
 public:
-    virtual void onInit();
-
-    // SafetyAreaManager(/* args */);
-    // ~SafetyAreaManager();
-
-    bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
-
-    bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
-
-    bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
-
-    bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
-
-    double getMaxZ(const std::string& frame_id);
-
-    double getMinZ(const std::string& frame_id);
+  virtual void onInit();
 
 }; // class SafetyAreaManager
 
