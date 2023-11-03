@@ -352,9 +352,14 @@ private:
       /*//}*/
 
       /*//{ tf utm origin */
+
       geometry_msgs::TransformStamped tf_utm_msg;
       if (is_utm_source_) {
-
+        
+        if (!is_utm_origin_set_) {
+          ROS_INFO_THROTTLE(5.0, "[%s]: %s utm_origin initialization", getPrintName().c_str(), Support::waiting_for_string.c_str());
+          return;
+        }
 
         geometry_msgs::Pose pose_utm = odom->pose.pose;
         pose_utm.position.x += utm_origin_.x - first_msg_->pose.pose.position.x;

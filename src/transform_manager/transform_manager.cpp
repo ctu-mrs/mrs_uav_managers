@@ -14,6 +14,7 @@
 #include <mrs_msgs/UavState.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/HwApiAltitude.h>
+#include <mrs_msgs/RtkGps.h>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -128,6 +129,11 @@ private:
   mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
   void                                              callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg);
   std::atomic<bool>                                 got_utm_offset_ = false;
+
+  mrs_lib::SubscribeHandler<mrs_msgs::RtkGps> sh_rtk_gps_;
+  void                                        callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg);
+
+  std::optional<geometry_msgs::Pose> transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const;
 
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
 };
@@ -279,6 +285,9 @@ void TransformManager::onInit() {
 
   /*//}*/
 
+  param_loader.loadParam(yaml_prefix + "rtk_antenna/frame_id", ch_->frames.rtk_antenna);
+  ch_->frames.ns_rtk_antenna = ch_->uav_name + "/" + ch_->frames.rtk_antenna;
+
   param_loader.loadParam("mrs_uav_managers/estimation_manager/state_estimators", estimator_names_);
   param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
 
@@ -396,7 +405,11 @@ void TransformManager::onInit() {
   sh_hw_api_orientation_ =
       mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
-  sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+  if (utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin") {
+    sh_rtk_gps_ = mrs_lib::SubscribeHandler<mrs_msgs::RtkGps>(shopts, "rtk_gps_in", &TransformManager::callbackRtkGps, this);
+  } else {
+    sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+  }
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -708,38 +721,122 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
     return;
   }
 
+  if (got_utm_offset_) {
+    return;
+  }
+
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-  if (!got_utm_offset_) {
+  double out_x;
+  double out_y;
 
-    double out_x;
-    double out_y;
+  mrs_lib::UTM(msg->latitude, msg->longitude, &out_x, &out_y);
 
-    mrs_lib::UTM(msg->latitude, msg->longitude, &out_x, &out_y);
-
-    if (!std::isfinite(out_x)) {
-      ROS_ERROR_THROTTLE(1.0, "[Odometry]: NaN detected in UTM variable \"out_x\"!!!");
-      return;
-    }
-
-    if (!std::isfinite(out_y)) {
-      ROS_ERROR_THROTTLE(1.0, "[Odometry]: NaN detected in UTM variable \"out_y\"!!!");
-      return;
-    }
-
-    geometry_msgs::Point utm_origin;
-    utm_origin.x = out_x;
-    utm_origin.y = out_y;
-    utm_origin.z = msg->altitude;
-
-    ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
-
-    for (size_t i = 0; i < tf_sources_.size(); i++) {
-      tf_sources_[i]->setUtmOrigin(utm_origin);
-      tf_sources_[i]->setWorldOrigin(world_origin_);
-    }
-    got_utm_offset_ = true;
+  if (!std::isfinite(out_x)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
+    return;
   }
+
+  if (!std::isfinite(out_y)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  geometry_msgs::Point utm_origin;
+  utm_origin.x = out_x;
+  utm_origin.y = out_y;
+  utm_origin.z = msg->altitude;
+
+  ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
+
+  for (size_t i = 0; i < tf_sources_.size(); i++) {
+    tf_sources_[i]->setUtmOrigin(utm_origin);
+    tf_sources_[i]->setWorldOrigin(world_origin_);
+  }
+  got_utm_offset_ = true;
+}
+/*//}*/
+
+/*//{ callbackRtkGps() */
+void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (got_utm_offset_) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackRtkGps", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  double out_x;
+  double out_y;
+
+  geometry_msgs::PoseStamped rtk_pos;
+
+  if (!std::isfinite(msg->gps.latitude)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->latitude\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  if (!std::isfinite(msg->gps.longitude)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->longitude\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  if (!std::isfinite(msg->gps.altitude)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->altitude\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  if (msg->fix_type.fix_type != mrs_msgs::RtkFixType::RTK_FIX) {
+    ROS_INFO_THROTTLE(1.0, "[%s] %s RTK FIX", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    return;
+  }
+
+  rtk_pos.header = msg->header;
+  mrs_lib::UTM(msg->gps.latitude, msg->gps.longitude, &rtk_pos.pose.position.x, &rtk_pos.pose.position.y);
+  rtk_pos.pose.position.z  = msg->gps.altitude;
+  rtk_pos.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
+
+  rtk_pos.pose.position.x -= ch_->world_origin.x;
+  rtk_pos.pose.position.y -= ch_->world_origin.y;
+
+
+  // transform the RTK position from antenna to FCU
+  auto res = transformRtkToFcu(rtk_pos);
+  if (res) {
+    rtk_pos.pose = res.value();
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: transform to fcu failed", getPrintName().c_str());
+    return;
+  }
+
+  mrs_lib::UTM(msg->gps.latitude, msg->gps.longitude, &out_x, &out_y);
+
+  if (!std::isfinite(out_x)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  if (!std::isfinite(out_y)) {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
+    return;
+  }
+
+  geometry_msgs::Point utm_origin;
+  utm_origin.x = out_x;
+  utm_origin.y = out_y;
+  utm_origin.z = msg->gps.altitude;
+
+  ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
+
+  for (size_t i = 0; i < tf_sources_.size(); i++) {
+    tf_sources_[i]->setUtmOrigin(utm_origin);
+    tf_sources_[i]->setWorldOrigin(world_origin_);
+  }
+  got_utm_offset_ = true;
 }
 /*//}*/
 
@@ -783,6 +880,49 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
     ROS_ERROR_THROTTLE(1.0, "[%s]: NaN encountered in fcu_untilted tf", getPrintName().c_str());
   }
   scope_timer.checkpoint("tf pub");
+}
+/*//}*/
+
+/*//{ transformRtkToFcu() */
+std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const {
+
+  geometry_msgs::PoseStamped pose_tmp = pose_in;
+
+  // inject current orientation into rtk pose
+  auto res1 = ch_->transformer->getTransform(ch_->frames.ns_fcu_untilted, ch_->frames.ns_fcu, ros::Time::now());
+  if (res1) {
+    pose_tmp.pose.orientation = res1.value().transform.rotation;
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(),
+                       ch_->frames.ns_fcu_untilted.c_str(), ch_->frames.ns_fcu.c_str());
+    return {};
+  }
+
+  // invert tf
+  tf2::Transform             tf_utm_to_antenna = Support::tf2FromPose(pose_tmp.pose);
+  geometry_msgs::PoseStamped utm_in_antenna;
+  utm_in_antenna.pose            = Support::poseFromTf2(tf_utm_to_antenna.inverse());
+  utm_in_antenna.header.stamp    = pose_in.header.stamp;
+  utm_in_antenna.header.frame_id = ch_->frames.ns_rtk_antenna;
+
+  // transform to fcu
+  geometry_msgs::PoseStamped utm_in_fcu;
+  utm_in_fcu.header.frame_id = ch_->frames.ns_fcu;
+  utm_in_fcu.header.stamp    = pose_in.header.stamp;
+  auto res2                  = ch_->transformer->transformSingle(utm_in_antenna, ch_->frames.ns_fcu);
+
+  if (res2) {
+    utm_in_fcu = res2.value();
+  } else {
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(), ch_->frames.ns_fcu.c_str());
+    return {};
+  }
+
+  // invert tf
+  tf2::Transform      tf_fcu_to_utm = Support::tf2FromPose(utm_in_fcu.pose);
+  geometry_msgs::Pose fcu_in_utm    = Support::poseFromTf2(tf_fcu_to_utm.inverse());
+
+  return fcu_in_utm;
 }
 /*//}*/
 

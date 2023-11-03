@@ -37,11 +37,15 @@ mrs_uav_managers:
       parent: "fcu_untilted" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "amsl_origin"
 
+    # frame_id with the frame defined by the position of the RTK antenna
+    rtk_antenna:
+      frame_id: "rtk_antenna"
+
     # the list of additional source topics from which the tfs will be constructed
     tf_sources: []
 
     # first available tf source from this list will produce the utm and world origin tfs
-    utm_source_priority: ["ground_truth", "rtk", "gps_garmin", "gps_baro"]
+    utm_source_priority: ["rtk_garmin", "rtk", "gps_garmin", "gps_baro"]
 
     # configuration of individual tf sources
     hw_api_raw:
