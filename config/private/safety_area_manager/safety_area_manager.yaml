@@ -1,0 +1,5 @@
+mrs_uav_managers:
+
+  safety_area_manager:
+  
+    status_timer_rate: 10

@@ -43,11 +43,18 @@
   <group ns="$(arg UAV_NAME)">
     <node pkg="nodelet" type="nodelet" name="safety_area_manager" args="$(arg nodelet) mrs_uav_managers/SafetyAreaManager $(arg nodelet_manager) $(arg bond_suffix)" output="screen" launch-prefix="$(arg launch_prefix)">
 
+      <!-- Load the default param files -->
+      <param name="private_config" value="$(find mrs_uav_managers)/config/private/safety_area_manager/safety_area_manager.yaml" />
+      <param name="public_config" value="$(find mrs_uav_managers)/config/public/safety_area_manager/safety_area_manager.yaml" />
+
+      <param name="enable_profiler" type="bool" value="$(arg PROFILER)" />
+      <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
+      <param name="body_frame" type="string" value="$(arg body_frame)" />
 
       <param if="$(eval arg('world_config') == '')" name="world_config" value="" />
       <param if="$(eval not arg('world_config') == '' and arg('world_config')[0] == '/')" name="world_config" value="$(arg world_config)" />
       <param if="$(eval not arg('world_config') == '' and not arg('world_config')[0] == '/')" name="world_config" value="$(env PWD)/$(arg world_config)" />
-      
+
 
     <!-- Subscribers -->
     <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />

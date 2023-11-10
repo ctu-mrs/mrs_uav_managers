@@ -1289,6 +1289,7 @@ void ControlManager::initialize(void) {
     ROS_INFO("[ControlManager]: safety area initialized");
   }
 
+  // Azat Note: is safety_area.use_safety_area being updated on callbackUseSafetyArea ?
   common_handlers_->safety_area.use_safety_area       = use_safety_area_;
   common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);

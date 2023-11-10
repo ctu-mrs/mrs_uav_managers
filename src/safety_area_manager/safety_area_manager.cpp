@@ -1,12 +1,10 @@
 #include "mrs_uav_managers/safety_area_manager/safety_area_manager.h"
 
 // TODO: 
-//    initialize atributes:
-//      [x] mutex_safety_area_min_z_
-//      [x] safety_area_min_z_
-//      [x] safety_area_frame_
-//      [x] safety_zone_                        !!!!!
-//      [x] transformer_
+// Provide sevices and implement them
+//
+// Do i need use_safety_area? It seems to be ControlManagers's responsibility
+// Like, I can ask for point verification even if its using is disabled.
 
 namespace mrs_uav_managers
 {
@@ -45,6 +43,7 @@ void SafetyAreaManager::preinitialize(){
 }
 
 void SafetyAreaManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
+mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
@@ -75,8 +74,16 @@ void SafetyAreaManager::initialize() {
     param_loader.addYamlFile(world_config);
   }
 
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+
+  const std::string yaml_prefix = "mrs_uav_managers/safety_area_manager/";
+
   param_loader.loadParam("uav_name", uav_name_);
   param_loader.loadParam("body_frame", body_frame_);
+  param_loader.loadParam("enable_profiler", profiler_enabled_);
+
+  param_loader.loadParam(yaml_prefix + "status_timer_rate", status_timer_rate_); // todo: add parameter
 
   param_loader.loadParam("safety_area/use_safety_area", use_safety_area_);
   param_loader.loadParam("safety_area/min_z", safety_area_min_z_);
@@ -147,7 +154,17 @@ void SafetyAreaManager::initialize() {
     transformer_->retryLookupNewest(true);
 
   }
-  
+
+  // | ------------------------ profiler ------------------------ |
+
+  profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
+
+  // ROS_INFO("[SafetyAreaManager]: uav_name:          %s", uav_name_.c_str());
+  // ROS_INFO("[SafetyAreaManager]: safety_area_frame: %s", safety_area_frame_.c_str());
+  // ROS_INFO("[SafetyAreaManager]: body_frame:        %s", body_frame_.c_str());
+  // ROS_INFO("[SafetyAreaManager]: safety_area_min_z: %f", safety_area_min_z_);
+  // ROS_INFO("[SafetyAreaManager]: safety_area_max_z: %f", safety_area_max_z_);
+
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {

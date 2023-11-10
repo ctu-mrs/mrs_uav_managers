@@ -6,6 +6,7 @@
 #include "std_msgs/String.h"
 
 #include "mrs_lib/mutex.h"
+#include <mrs_lib/profiler.h>
 #include "mrs_lib/transformer.h"
 #include "mrs_lib/param_loader.h"
 #include "mrs_lib/subscribe_handler.h"
@@ -41,6 +42,12 @@ private:
 
   ros::NodeHandle nh_;
   ros::Publisher  publisher_;
+
+  // profiling
+  mrs_lib::Profiler profiler_;
+  bool              profiler_enabled_ = false;
+
+  int status_timer_rate_   = 0;
 
   // safety area services
   ros::ServiceServer service_server_validate_reference_;
