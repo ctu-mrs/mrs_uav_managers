@@ -1,6 +1,8 @@
 #include "ros/ros.h"
 
 #include "mrs_msgs/ReferenceStamped.h"
+#include "mrs_msgs/ReferenceStampedSrv.h"
+#include "mrs_msgs/PathToPointInSafetyArea.h"
 #include "mrs_msgs/HwApiCapabilities.h"
 
 #include "std_msgs/String.h"
@@ -50,13 +52,16 @@ private:
   int status_timer_rate_   = 0;
 
   // safety area services
-  ros::ServiceServer service_server_validate_reference_;
-  ros::ServiceServer service_server_validate_reference_2d_;
-  ros::ServiceServer service_server_validate_reference_list_;
+  ros::ServiceServer service_server_point_in_safety_area_3d_;
+  ros::ServiceServer service_server_point_in_safety_area_2d_;
+  ros::ServiceServer service_server_path_in_safety_area_3d_;
+  ros::ServiceServer service_server_path_in_safety_area_2d_;
 
   // safety area min z servers
   ros::ServiceServer service_server_set_min_z_;
   ros::ServiceServer service_server_get_min_z_;
+  ros::ServiceServer service_server_set_max_z_;
+  ros::ServiceServer service_server_get_max_z_;
   
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -70,13 +75,13 @@ private:
   ros::Timer timer_hw_api_capabilities_;
   void timerHwApiCapabilities(const ros::TimerEvent& event);
 
-  bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
+  bool isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
-  bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
+  bool isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
-  bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
+  bool isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
 
-  bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end);
+  bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
 
   double getMaxZ(const std::string& frame_id);
 

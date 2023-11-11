@@ -1,10 +1,16 @@
 #include "mrs_uav_managers/safety_area_manager/safety_area_manager.h"
 
 // TODO: 
-// Provide sevices and implement them
+// Provide services and implement them
 //
-// Do i need use_safety_area? It seems to be ControlManagers's responsibility
+// Do i need to use_safety_area? It seems to be ControlManagers's responsibility
 // Like, I can ask for point verification even if its using is disabled.
+// On the other hand, why would a user need it?
+
+// Add "set use_safety_area" service callback
+
+// One more: to implement the bumper or not to implement? - I think general
+// safetyness is ControlManagers's responsibility
 
 namespace mrs_uav_managers
 {
@@ -155,15 +161,16 @@ void SafetyAreaManager::initialize() {
 
   }
 
+  // | ------------------------ services ------------------------ |
+
+  service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
+  service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::isPointInSafetyArea2d, this);
+  service_server_path_in_safety_area_3d_  = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
+  service_server_path_in_safety_area_2d_  = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
+
   // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
-
-  // ROS_INFO("[SafetyAreaManager]: uav_name:          %s", uav_name_.c_str());
-  // ROS_INFO("[SafetyAreaManager]: safety_area_frame: %s", safety_area_frame_.c_str());
-  // ROS_INFO("[SafetyAreaManager]: body_frame:        %s", body_frame_.c_str());
-  // ROS_INFO("[SafetyAreaManager]: safety_area_min_z: %f", safety_area_min_z_);
-  // ROS_INFO("[SafetyAreaManager]: safety_area_max_z: %f", safety_area_max_z_);
 
   // | ----------------------- finish init ---------------------- |
 
@@ -177,44 +184,78 @@ void SafetyAreaManager::initialize() {
   ROS_INFO("[SafetyAreaManager]: initialized");
 }
 
-bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point) {
+bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+
   // copy member variables
   auto min_z = mrs_lib::get_mutexed(mutex_safety_area_min_z_, safety_area_min_z_);
+  mrs_msgs::ReferenceStamped point;
+  point.reference = req.reference;
+  point.header    = req.header;
 
   auto ret = transformer_->transformSingle(point, safety_area_frame_);
 
   if (!ret) {
-      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area frame");
-      return false;
+      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area frame");
+      res.message = "SafetyArea: Could not transform the point to the safety area frame";
+      res.success = false;
+      return true;
   }
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
   if (safety_zone_->isPointValid3d(point_transformed.reference.position.x, point_transformed.reference.position.y, point_transformed.reference.position.z) &&
       point_transformed.reference.position.z >= min_z && point_transformed.reference.position.z <= getMaxZ(safety_area_frame_)) {
+      res.success = true;
       return true;
   }
-
-  return false;
+  res.success = false;
+  return true;
 }
 
-bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point) {
+bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+  
+  mrs_msgs::ReferenceStamped point;
+  point.reference = req.reference;
+  point.header    = req.header;
   auto ret = transformer_->transformSingle(point, safety_area_frame_);
 
   if (!ret) {
 
     ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform reference to the safety area frame");
-
-    return false;
+    res.success = false;
+    res.message = "Could not transform reference to the safety area frame";
+    return true;
   }
 
   mrs_msgs::ReferenceStamped point_transformed = ret.value();
 
-  return safety_zone_->isPointValid2d(point_transformed.reference.position.x, point_transformed.reference.position.y);
+  res.success = safety_zone_->isPointValid2d(point_transformed.reference.position.x, point_transformed.reference.position.y);
+  return true;
 }
 
-bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
+  
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+  
+  mrs_msgs::ReferenceStamped start = req.start;
+  mrs_msgs::ReferenceStamped end   = req.end;
+  
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
   {
@@ -224,7 +265,9 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceSta
 
       ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
-      return false;
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
+      return true;
     }
 
     start_transformed = ret.value();
@@ -235,20 +278,33 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceSta
 
     if (!ret) {
 
-      ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
+      ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the second point in the path");
 
-      return false;
+      res.message = "Could not transform the second point in the path";
+      res.success = false;
+      return true;
     }
 
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid3d(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
+  res.success = safety_zone_->isPathValid3d(start_transformed.reference.position.x, start_transformed.reference.position.y, start_transformed.reference.position.z,
                                     end_transformed.reference.position.x, end_transformed.reference.position.y, end_transformed.reference.position.z);
+  return true;
 }
 
 
-bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
+  
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+  
+  mrs_msgs::ReferenceStamped start = req.start;
+  mrs_msgs::ReferenceStamped end   = req.end;
+
   mrs_msgs::ReferenceStamped start_transformed, end_transformed;
 
   {
@@ -258,7 +314,9 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceSta
 
       ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
-      return false;
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
+      return true;
     }
 
     start_transformed = ret.value();
@@ -269,16 +327,19 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceSta
 
     if (!ret) {
 
-      ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
-
-      return false;
+      ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the second point in the path");
+      
+      res.message = "Could not transform the second point in the path";
+      res.success = false;
+      return true;
     }
 
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid2d(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+  res.success = safety_zone_->isPathValid2d(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
                                     end_transformed.reference.position.y);
+  return true;
 }
 
 } // namespace safety_area_manager
