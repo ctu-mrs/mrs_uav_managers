@@ -340,11 +340,11 @@ private:
   double _min_throttle_null_tracker_ = 0.0;
 
   // rates of all the timers
-  int _status_timer_rate_   = 0;
-  int _safety_timer_rate_   = 0;
-  int _elanding_timer_rate_ = 0;
-  int _failsafe_timer_rate_ = 0;
-  int _bumper_timer_rate_   = 0;
+  double _status_timer_rate_   = 0;
+  double _safety_timer_rate_   = 0;
+  double _elanding_timer_rate_ = 0;
+  double _failsafe_timer_rate_ = 0;
+  double _bumper_timer_rate_   = 0;
 
   bool _snap_trajectory_to_safety_area_ = false;
 
@@ -373,7 +373,6 @@ private:
   // | -------------- safety area max z subscriber -------------- |
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
-  double                                              _safety_area_max_z_ = 0;
 
   // | ------------- odometry innovation subscriber ------------- |
 
@@ -384,7 +383,6 @@ private:
   // | --------------------- common handlers -------------------- |
 
   // contains handlers that are shared with trackers and controllers
-  // safety area, tf transformer, scope timer logger, and bumper
   std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers_;
 
   // | --------------- tracker and controller IDs --------------- |
@@ -486,7 +484,6 @@ private:
 
   // bumper service servers
   ros::ServiceServer service_server_bumper_enabler_;
-  ros::ServiceServer service_server_bumper_set_params_;
   ros::ServiceServer service_server_bumper_repulsion_enabler_;
 
   // service clients
@@ -582,19 +579,21 @@ private:
 
   // safety area
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
-  bool                                 use_safety_area_ = false;
-  std::string                          _safety_area_frame_;
-  double                               safety_area_min_z_ = 0;
-  std::mutex                           mutex_safety_area_min_z_;
-  bool                                 _obstacle_points_enabled_   = false;
-  bool                                 _obstacle_polygons_enabled_ = false;
+
+  std::atomic<bool> use_safety_area_ = false;
+
+  std::string _safety_area_horizontal_frame_;
+  std::string _safety_area_vertical_frame_;
+
+  double _safety_area_min_z_ = 0;
+  double _safety_area_max_z_ = 0;
 
   // safety area routines
   // those are passed to trackers using the common_handlers object
-  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point);
-  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point);
-  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
-  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped from, const mrs_msgs::ReferenceStamped to);
+  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
   double getMinZ(const std::string& frame_id);
   double getMaxZ(const std::string& frame_id);
 
@@ -646,7 +645,6 @@ private:
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
   bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
@@ -728,22 +726,16 @@ private:
   std::string bumper_previous_tracker_;
   std::string bumper_previous_controller_;
 
-  bool bumper_enabled_           = false;
-  bool _bumper_hugging_enabled_  = false;
-  bool bumper_repulsion_enabled_ = false;
-  bool repulsing_                = false;
+  std::atomic<bool> bumper_enabled_ = false;
+  std::atomic<bool> repulsing_      = false;
 
-  double bumper_horizontal_distance_ = 0;
-  double bumper_vertical_distance_   = 0;
+  double _bumper_horizontal_distance_ = 0;
+  double _bumper_vertical_distance_   = 0;
 
-  double     bumper_repulsion_horizontal_distance_ = 0;
-  double     bumper_repulsion_horizontal_offset_   = 0;
-  double     bumper_repulsion_vertical_distance_   = 0;
-  double     bumper_repulsion_vertical_offset_     = 0;
-  std::mutex mutex_bumper_params_;
+  double _bumper_horizontal_overshoot_ = 0;
+  double _bumper_vertical_overshoot_   = 0;
 
-  bool bumperValidatePoint(mrs_msgs::ReferenceStamped& point);
-  int  bumperGetSectorId(const double x, const double y, const double z);
+  int  bumperGetSectorId(const double& x, const double& y, const double& z);
   bool bumperPushFromObstacle(void);
 
   // | --------------- safety checks and failsafes -------------- |
@@ -999,8 +991,6 @@ void ControlManager::initialize(void) {
   param_loader.addYamlFileFromParam("private_controllers");
   param_loader.addYamlFileFromParam("public_controllers");
 
-  const std::string yaml_prefix = "mrs_uav_managers/control_manager/";
-
   // params passed from the launch file are not prefixed
   param_loader.loadParam("uav_name", _uav_name_);
   param_loader.loadParam("body_frame", _body_frame_);
@@ -1015,34 +1005,72 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("motor_params/b", common_handlers_->throttle_model.B);
   param_loader.loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
 
-  param_loader.loadParam(yaml_prefix + "state_input", _state_input_);
+  // | ----------------------- safety area ---------------------- |
+
+  bool use_safety_area;
+  param_loader.loadParam("safety_area/enabled", use_safety_area);
+  use_safety_area_ = use_safety_area;
+
+  param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
+
+  param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
+  param_loader.loadParam("safety_area/vertical/min_z", _safety_area_min_z_);
+  param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
+
+  if (use_safety_area_) {
+
+    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
+
+    try {
+
+      std::vector<Eigen::MatrixXd> polygon_obstacle_points;
+      std::vector<Eigen::MatrixXd> point_obstacle_points;
+
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points);
+    }
+
+    catch (mrs_lib::SafetyZone::BorderError& e) {
+      ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
+      ros::shutdown();
+    }
+    catch (...) {
+      ROS_ERROR("[ControlManager]: SafetyArea: unhandled exception!");
+      ros::shutdown();
+    }
+
+    ROS_INFO("[ControlManager]: safety area initialized");
+  }
+
+  param_loader.setPrefix("mrs_uav_managers/control_manager/");
+
+  param_loader.loadParam("state_input", _state_input_);
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
     ros::shutdown();
   }
 
-  param_loader.loadParam(yaml_prefix + "safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
-  param_loader.loadParam(yaml_prefix + "safety/ehover_tracker", _ehover_tracker_name_);
-  param_loader.loadParam(yaml_prefix + "safety/failsafe_controller", _failsafe_controller_name_);
+  param_loader.loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
+  param_loader.loadParam("safety/ehover_tracker", _ehover_tracker_name_);
+  param_loader.loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
-  param_loader.loadParam(yaml_prefix + "safety/eland/controller", _eland_controller_name_);
-  param_loader.loadParam(yaml_prefix + "safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
-  param_loader.loadParam(yaml_prefix + "safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
-  param_loader.loadParam(yaml_prefix + "safety/eland/timer_rate", _elanding_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "safety/eland/disarm", _eland_disarm_enabled_);
+  param_loader.loadParam("safety/eland/controller", _eland_controller_name_);
+  param_loader.loadParam("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
+  param_loader.loadParam("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
+  param_loader.loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
+  param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
-  param_loader.loadParam(yaml_prefix + "safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
+  param_loader.loadParam("safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
+  param_loader.loadParam("safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
+  param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
+  param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
+  param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
+  param_loader.loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
 
-  param_loader.loadParam(yaml_prefix + "safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/tilt_limit/eland/limit", _tilt_limit_eland_);
+  param_loader.loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
+  param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
 
   _tilt_limit_eland_ = M_PI * (_tilt_limit_eland_ / 180.0);
 
@@ -1051,8 +1079,8 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam(yaml_prefix + "safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
+  param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
+  param_loader.loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
 
   _tilt_limit_disarm_ = M_PI * (_tilt_limit_disarm_ / 180.0);
 
@@ -1061,8 +1089,8 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam(yaml_prefix + "safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/yaw_error_eland/limit", _yaw_error_eland_);
+  param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
+  param_loader.loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
 
   _yaw_error_eland_ = M_PI * (_yaw_error_eland_ / 180.0);
 
@@ -1071,17 +1099,17 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam(yaml_prefix + "status_timer_rate", _status_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "safety/safety_timer_rate", _safety_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "safety/failsafe_timer_rate", _failsafe_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "safety/rc_emergency_handoff/enabled", _rc_emergency_handoff_);
+  param_loader.loadParam("status_timer_rate", _status_timer_rate_);
+  param_loader.loadParam("safety/safety_timer_rate", _safety_timer_rate_);
+  param_loader.loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
+  param_loader.loadParam("safety/rc_emergency_handoff/enabled", _rc_emergency_handoff_);
 
-  param_loader.loadParam(yaml_prefix + "safety/odometry_max_missing_time", _uav_state_max_missing_time_);
-  param_loader.loadParam(yaml_prefix + "safety/odometry_innovation_eland/enabled", _odometry_innovation_check_enabled_);
+  param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
+  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_check_enabled_);
 
-  param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
-  param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
-  param_loader.loadParam(yaml_prefix + "safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+  param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
+  param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
+  param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
 
   _tilt_error_disarm_threshold_ = M_PI * (_tilt_error_disarm_threshold_ / 180.0);
 
@@ -1092,90 +1120,87 @@ void ControlManager::initialize(void) {
 
   // default constraints
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
-  param_loader.loadParam(yaml_prefix + "default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
-  param_loader.loadParam(yaml_prefix + "default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
-  param_loader.loadParam(yaml_prefix + "default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
+  param_loader.loadParam("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
+  param_loader.loadParam("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
+  param_loader.loadParam("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
+  param_loader.loadParam("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
+  param_loader.loadParam("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
+  param_loader.loadParam("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
+  param_loader.loadParam("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
+  param_loader.loadParam("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/descending/acceleration",
-                         current_constraints_.constraints.vertical_descending_acceleration);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
-  param_loader.loadParam(yaml_prefix + "default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
+  param_loader.loadParam("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
+  param_loader.loadParam("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
+  param_loader.loadParam("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
+  param_loader.loadParam("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
-  param_loader.loadParam(yaml_prefix + "default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
-  param_loader.loadParam(yaml_prefix + "default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
-  param_loader.loadParam(yaml_prefix + "default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
+  param_loader.loadParam("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
+  param_loader.loadParam("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
+  param_loader.loadParam("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
+  param_loader.loadParam("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/angular_speed/roll", current_constraints_.constraints.roll_rate);
-  param_loader.loadParam(yaml_prefix + "default_constraints/angular_speed/pitch", current_constraints_.constraints.pitch_rate);
-  param_loader.loadParam(yaml_prefix + "default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
+  param_loader.loadParam("default_constraints/angular_speed/roll", current_constraints_.constraints.roll_rate);
+  param_loader.loadParam("default_constraints/angular_speed/pitch", current_constraints_.constraints.pitch_rate);
+  param_loader.loadParam("default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
 
-  param_loader.loadParam(yaml_prefix + "default_constraints/tilt", current_constraints_.constraints.tilt);
+  param_loader.loadParam("default_constraints/tilt", current_constraints_.constraints.tilt);
 
   current_constraints_.constraints.tilt = M_PI * (current_constraints_.constraints.tilt / 180.0);
 
   // joystick
 
-  param_loader.loadParam(yaml_prefix + "joystick/enabled", _joystick_enabled_);
-  param_loader.loadParam(yaml_prefix + "joystick/mode", _joystick_mode_);
-  param_loader.loadParam(yaml_prefix + "joystick/carrot_distance", _joystick_carrot_distance_);
-  param_loader.loadParam(yaml_prefix + "joystick/joystick_timer_rate", _joystick_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "joystick/attitude_control/tracker", _joystick_tracker_name_);
-  param_loader.loadParam(yaml_prefix + "joystick/attitude_control/controller", _joystick_controller_name_);
-  param_loader.loadParam(yaml_prefix + "joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
-  param_loader.loadParam(yaml_prefix + "joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
+  param_loader.loadParam("joystick/enabled", _joystick_enabled_);
+  param_loader.loadParam("joystick/mode", _joystick_mode_);
+  param_loader.loadParam("joystick/carrot_distance", _joystick_carrot_distance_);
+  param_loader.loadParam("joystick/joystick_timer_rate", _joystick_timer_rate_);
+  param_loader.loadParam("joystick/attitude_control/tracker", _joystick_tracker_name_);
+  param_loader.loadParam("joystick/attitude_control/controller", _joystick_controller_name_);
+  param_loader.loadParam("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
+  param_loader.loadParam("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
 
-  param_loader.loadParam(yaml_prefix + "joystick/channels/A", _channel_A_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/B", _channel_B_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/X", _channel_X_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/Y", _channel_Y_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/start", _channel_start_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/back", _channel_back_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/LT", _channel_LT_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/RT", _channel_RT_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/L_joy", _channel_L_joy_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/R_joy", _channel_R_joy_);
+  param_loader.loadParam("joystick/channels/A", _channel_A_);
+  param_loader.loadParam("joystick/channels/B", _channel_B_);
+  param_loader.loadParam("joystick/channels/X", _channel_X_);
+  param_loader.loadParam("joystick/channels/Y", _channel_Y_);
+  param_loader.loadParam("joystick/channels/start", _channel_start_);
+  param_loader.loadParam("joystick/channels/back", _channel_back_);
+  param_loader.loadParam("joystick/channels/LT", _channel_LT_);
+  param_loader.loadParam("joystick/channels/RT", _channel_RT_);
+  param_loader.loadParam("joystick/channels/L_joy", _channel_L_joy_);
+  param_loader.loadParam("joystick/channels/R_joy", _channel_R_joy_);
 
   // load channels
-  param_loader.loadParam(yaml_prefix + "joystick/channels/pitch", _channel_pitch_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/roll", _channel_roll_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/heading", _channel_heading_);
-  param_loader.loadParam(yaml_prefix + "joystick/channels/throttle", _channel_throttle_);
+  param_loader.loadParam("joystick/channels/pitch", _channel_pitch_);
+  param_loader.loadParam("joystick/channels/roll", _channel_roll_);
+  param_loader.loadParam("joystick/channels/heading", _channel_heading_);
+  param_loader.loadParam("joystick/channels/throttle", _channel_throttle_);
 
   // load channel multipliers
-  param_loader.loadParam(yaml_prefix + "joystick/channel_multipliers/pitch", _channel_mult_pitch_);
-  param_loader.loadParam(yaml_prefix + "joystick/channel_multipliers/roll", _channel_mult_roll_);
-  param_loader.loadParam(yaml_prefix + "joystick/channel_multipliers/heading", _channel_mult_heading_);
-  param_loader.loadParam(yaml_prefix + "joystick/channel_multipliers/throttle", _channel_mult_throttle_);
+  param_loader.loadParam("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
+  param_loader.loadParam("joystick/channel_multipliers/roll", _channel_mult_roll_);
+  param_loader.loadParam("joystick/channel_multipliers/heading", _channel_mult_heading_);
+  param_loader.loadParam("joystick/channel_multipliers/throttle", _channel_mult_throttle_);
 
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/enabled", bumper_enabled_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/switch_controller", _bumper_switch_controller_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/tracker", _bumper_tracker_name_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/controller", _bumper_controller_name_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/timer_rate", _bumper_timer_rate_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/horizontal_distance", bumper_horizontal_distance_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/vertical_distance", bumper_vertical_distance_);
+  bool bumper_enabled;
+  param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled);
+  bumper_enabled_ = bumper_enabled;
 
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/obstacle_hugging/enabled", _bumper_hugging_enabled_);
+  param_loader.loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
+  param_loader.loadParam("obstacle_bumper/switch_controller", _bumper_switch_controller_);
+  param_loader.loadParam("obstacle_bumper/tracker", _bumper_tracker_name_);
+  param_loader.loadParam("obstacle_bumper/controller", _bumper_controller_name_);
+  param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
 
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/repulsion/enabled", bumper_repulsion_enabled_);
+  param_loader.loadParam("obstacle_bumper/horizontal/threshold_distance", _bumper_horizontal_distance_);
+  param_loader.loadParam("obstacle_bumper/vertical/threshold_distance", _bumper_vertical_distance_);
 
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/repulsion/horizontal_distance", bumper_repulsion_horizontal_distance_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/repulsion/horizontal_offset", bumper_repulsion_horizontal_offset_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/repulsion/vertical_distance", bumper_repulsion_vertical_distance_);
-  param_loader.loadParam(yaml_prefix + "obstacle_bumper/repulsion/vertical_offset", bumper_repulsion_vertical_offset_);
+  param_loader.loadParam("obstacle_bumper/horizontal/overshoot", _bumper_horizontal_overshoot_);
+  param_loader.loadParam("obstacle_bumper/vertical/overshoot", _bumper_vertical_overshoot_);
 
-  param_loader.loadParam(yaml_prefix + "safety/tracker_error_action", _tracker_error_action_);
+  param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
 
-  param_loader.loadParam(yaml_prefix + "trajectory_tracking/snap_to_safety_area", _snap_trajectory_to_safety_area_);
+  param_loader.loadParam("trajectory_tracking/snap_to_safety_area", _snap_trajectory_to_safety_area_);
 
   // check the values of tracker error action
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
@@ -1184,23 +1209,23 @@ void ControlManager::initialize(void) {
     ros::shutdown();
   }
 
-  param_loader.loadParam(yaml_prefix + "rc_joystick/enabled", _rc_goto_enabled_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/horizontal_speed", _rc_horizontal_speed_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/vertical_speed", _rc_vertical_speed_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/heading_rate", _rc_heading_rate_);
+  param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
+  param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
+  param_loader.loadParam("rc_joystick/horizontal_speed", _rc_horizontal_speed_);
+  param_loader.loadParam("rc_joystick/vertical_speed", _rc_vertical_speed_);
+  param_loader.loadParam("rc_joystick/heading_rate", _rc_heading_rate_);
 
-  param_loader.loadParam(yaml_prefix + "rc_joystick/channels/pitch", _rc_channel_pitch_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/channels/roll", _rc_channel_roll_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/channels/heading", _rc_channel_heading_);
-  param_loader.loadParam(yaml_prefix + "rc_joystick/channels/throttle", _rc_channel_throttle_);
+  param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
+  param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
+  param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
+  param_loader.loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
 
-  param_loader.loadParam(yaml_prefix + "automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
+  param_loader.loadParam("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
 
-  param_loader.loadParam(yaml_prefix + "pirouette/speed", _pirouette_speed_);
-  param_loader.loadParam(yaml_prefix + "pirouette/timer_rate", _pirouette_timer_rate_);
+  param_loader.loadParam("pirouette/speed", _pirouette_speed_);
+  param_loader.loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
 
-  param_loader.loadParam(yaml_prefix + "safety/parachute/enabled", _parachute_enabled_);
+  param_loader.loadParam("safety/parachute/enabled", _parachute_enabled_);
 
   // --------------------------------------------------------------
   // |             initialize the last control output             |
@@ -1216,7 +1241,7 @@ void ControlManager::initialize(void) {
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
+  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -1227,77 +1252,7 @@ void ControlManager::initialize(void) {
   common_handlers_->scope_timer.enabled = scope_timer_enabled_;
   common_handlers_->scope_timer.logger  = scope_timer_logger_;
 
-  // | ----------------------- safety area ---------------------- |
-
-  param_loader.loadParam("safety_area/use_safety_area", use_safety_area_);
-  param_loader.loadParam("safety_area/frame_name", _safety_area_frame_);
-  param_loader.loadParam("safety_area/min_z", safety_area_min_z_);
-  param_loader.loadParam("safety_area/max_z", _safety_area_max_z_);
-
-  if (use_safety_area_) {
-    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/safety_area", -1, 2);
-
-    param_loader.loadParam("safety_area/polygon_obstacles/enabled", _obstacle_polygons_enabled_);
-    std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-
-    if (_obstacle_polygons_enabled_) {
-      polygon_obstacle_points = param_loader.loadMatrixArray2("safety_area/polygon_obstacles", std::vector<Eigen::MatrixXd>{});
-    } else {
-      polygon_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    param_loader.loadParam("safety_area/point_obstacles/enabled", _obstacle_points_enabled_);
-    std::vector<Eigen::MatrixXd> point_obstacle_points;
-
-    if (_obstacle_points_enabled_) {
-
-      point_obstacle_points = param_loader.loadMatrixArray2("safety_area/point_obstacles", std::vector<Eigen::MatrixXd>{});
-
-      if (_safety_area_frame_ == "latlon_origin") {
-
-        for (int i = 0; i < int(point_obstacle_points.size()); i++) {
-
-          Eigen::MatrixXd temp = point_obstacle_points[i];
-          temp(0, 2) *= 8.9832e-06;
-          point_obstacle_points[i] = temp;
-        }
-      }
-
-    } else {
-      point_obstacle_points = std::vector<Eigen::MatrixXd>();
-    }
-
-    // TODO: remove this when param loader supports proper loading
-    for (auto& matrix : polygon_obstacle_points) {
-      matrix.transposeInPlace();
-    }
-
-    try {
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points, polygon_obstacle_points, point_obstacle_points);
-    }
-
-    catch (mrs_lib::SafetyZone::BorderError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PolygonObstacleError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone polygon obstacles");
-      ros::shutdown();
-    }
-    catch (mrs_lib::SafetyZone::PointObstacleError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configuration for one of the safety zone point obstacles");
-      ros::shutdown();
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: SafetyArea: unhandler exception!");
-      ros::shutdown();
-    }
-
-    ROS_INFO("[ControlManager]: safety area initialized");
-  }
-
   common_handlers_->safety_area.use_safety_area       = use_safety_area_;
-  common_handlers_->safety_area.frame_id              = _safety_area_frame_;
   common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
   common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
   common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this, _1);
@@ -1305,10 +1260,7 @@ void ControlManager::initialize(void) {
 
   common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
 
-  common_handlers_->bumper.bumperValidatePoint = boost::bind(&ControlManager::bumperValidatePoint, this, _1);
-  common_handlers_->bumper.enabled             = bumper_enabled_;
-
-  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager");
+  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager", _platform_config_, _custom_config_);
 
   common_handlers_->control_output_modalities = _hw_api_inputs_;
 
@@ -1322,15 +1274,15 @@ void ControlManager::initialize(void) {
 
   std::vector<std::string> custom_trackers;
 
-  param_loader.loadParam(yaml_prefix + "mrs_trackers", _tracker_names_);
-  param_loader.loadParam(yaml_prefix + "trackers", custom_trackers);
+  param_loader.loadParam("mrs_trackers", _tracker_names_);
+  param_loader.loadParam("trackers", custom_trackers);
 
   if (!custom_trackers.empty()) {
     _tracker_names_.insert(_tracker_names_.end(), custom_trackers.begin(), custom_trackers.end());
   }
 
-  param_loader.loadParam(yaml_prefix + "null_tracker", _null_tracker_name_);
-  param_loader.loadParam(yaml_prefix + "landing_takeoff_tracker", _landoff_tracker_name_);
+  param_loader.loadParam("null_tracker", _null_tracker_name_);
+  param_loader.loadParam("landing_takeoff_tracker", _landoff_tracker_name_);
 
   tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::Tracker>>("mrs_uav_managers", "mrs_uav_managers::Tracker");
 
@@ -1343,9 +1295,9 @@ void ControlManager::initialize(void) {
     std::string name_space;
     bool        human_switchable;
 
-    param_loader.loadParam(yaml_prefix + tracker_name + "/address", address);
-    param_loader.loadParam(yaml_prefix + tracker_name + "/namespace", name_space);
-    param_loader.loadParam(yaml_prefix + tracker_name + "/human_switchable", human_switchable, false);
+    param_loader.loadParam(tracker_name + "/address", address);
+    param_loader.loadParam(tracker_name + "/namespace", name_space);
+    param_loader.loadParam(tracker_name + "/human_switchable", human_switchable, false);
 
     TrackerParams new_tracker(address, name_space, human_switchable);
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
@@ -1503,8 +1455,8 @@ void ControlManager::initialize(void) {
 
   std::vector<std::string> custom_controllers;
 
-  param_loader.loadParam(yaml_prefix + "mrs_controllers", _controller_names_);
-  param_loader.loadParam(yaml_prefix + "controllers", custom_controllers);
+  param_loader.loadParam("mrs_controllers", _controller_names_);
+  param_loader.loadParam("controllers", custom_controllers);
 
   if (!custom_controllers.empty()) {
     _controller_names_.insert(_controller_names_.end(), custom_controllers.begin(), custom_controllers.end());
@@ -1522,26 +1474,26 @@ void ControlManager::initialize(void) {
     std::string name_space;
     double      eland_threshold, failsafe_threshold, odometry_innovation_threshold;
     bool        human_switchable;
-    param_loader.loadParam(yaml_prefix + controller_name + "/address", address);
-    param_loader.loadParam(yaml_prefix + controller_name + "/namespace", name_space);
-    param_loader.loadParam(yaml_prefix + controller_name + "/eland_threshold", eland_threshold);
-    param_loader.loadParam(yaml_prefix + controller_name + "/failsafe_threshold", failsafe_threshold);
-    param_loader.loadParam(yaml_prefix + controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
-    param_loader.loadParam(yaml_prefix + controller_name + "/human_switchable", human_switchable, false);
+    param_loader.loadParam(controller_name + "/address", address);
+    param_loader.loadParam(controller_name + "/namespace", name_space);
+    param_loader.loadParam(controller_name + "/eland_threshold", eland_threshold);
+    param_loader.loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
+    param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
+    param_loader.loadParam(controller_name + "/human_switchable", human_switchable, false);
 
     // check if the controller can output some of the required outputs
     {
 
       ControlOutputModalities_t outputs;
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/actuators", outputs.actuators, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/control_group", outputs.control_group, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/attitude", outputs.attitude, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/acceleration_hdg_rate", outputs.acceleration_hdg_rate, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/acceleration_hdg", outputs.acceleration_hdg, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/velocity_hdg_rate", outputs.velocity_hdg_rate, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/velocity_hdg", outputs.velocity_hdg, false);
-      param_loader.loadParam(yaml_prefix + controller_name + "/outputs/position", outputs.position, false);
+      param_loader.loadParam(controller_name + "/outputs/actuators", outputs.actuators, false);
+      param_loader.loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
+      param_loader.loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/attitude", outputs.attitude, false);
+      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg_rate", outputs.acceleration_hdg_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg", outputs.acceleration_hdg, false);
+      param_loader.loadParam(controller_name + "/outputs/velocity_hdg_rate", outputs.velocity_hdg_rate, false);
+      param_loader.loadParam(controller_name + "/outputs/velocity_hdg", outputs.velocity_hdg, false);
+      param_loader.loadParam(controller_name + "/outputs/position", outputs.position, false);
 
       bool meets_actuators             = (_hw_api_inputs_.actuators && outputs.actuators);
       bool meets_control_group         = (_hw_api_inputs_.control_group && outputs.control_group);
@@ -1882,8 +1834,6 @@ void ControlManager::initialize(void) {
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
-  service_server_bumper_set_params_          = nh_.advertiseService("bumper_set_params_in", &ControlManager::callbackBumperSetParams, this);
-  service_server_bumper_repulsion_enabler_   = nh_.advertiseService("bumper_repulsion_in", &ControlManager::callbackBumperEnableRepulsion, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
@@ -2191,11 +2141,11 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   if (use_safety_area_) {
 
     mrs_msgs::ReferenceStamped temp_ref;
-    temp_ref.header.frame_id = _safety_area_frame_;
+    temp_ref.header.frame_id = _safety_area_horizontal_frame_;
 
     geometry_msgs::TransformStamped tf;
 
-    auto ret = transformer_->getTransform(_safety_area_frame_, "local_origin", ros::Time(0));
+    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", ros::Time(0));
 
     if (ret) {
 
@@ -2206,8 +2156,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       mrs_lib::Polygon border = safety_zone_->getBorder();
 
-      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_frame_));
-      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_frame_));
+      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_horizontal_frame_));
+      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_horizontal_frame_));
 
       std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
       std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
@@ -2223,7 +2173,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       // transform border bottom points to local origin
       for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
-        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
         temp_ref.header.stamp         = ros::Time(0);
         temp_ref.reference.position.x = border_points_bot_original[i].x;
         temp_ref.reference.position.y = border_points_bot_original[i].y;
@@ -2245,7 +2195,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       // transform border top points to local origin
       for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
-        temp_ref.header.frame_id      = _safety_area_frame_;
+        temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
         temp_ref.header.stamp         = ros::Time(0);
         temp_ref.reference.position.x = border_points_top_original[i].x;
         temp_ref.reference.position.y = border_points_top_original[i].y;
@@ -2302,7 +2252,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         std::stringstream ss;
 
-        if (_safety_area_frame_ == "latlon_origin") {
+        if (_safety_area_horizontal_frame_ == "latlon_origin") {
           ss << "idx: " << i << std::endl
              << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
              << "lon: " << border_points_bot_original[i].y;
@@ -2334,7 +2284,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
         std::stringstream ss;
 
-        if (_safety_area_frame_ == "latlon_origin") {
+        if (_safety_area_horizontal_frame_ == "latlon_origin") {
           ss << "idx: " << i << std::endl
              << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original[i].x << std::endl
              << "lon: " << border_points_bot_original[i].y;
@@ -2353,151 +2303,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
         safety_area_coordinates_marker.id++;
 
         safety_area_coordinates_marker_array.markers.push_back(safety_area_coordinates_marker);
-      }
-
-      //}
-
-      /* adding polygon obstacles points //{ */
-
-      std::vector<mrs_lib::Polygon> polygon_obstacles = safety_zone_->getObstacles();
-
-      for (auto polygon : polygon_obstacles) {
-
-        std::vector<geometry_msgs::Point> points_bot = polygon.getPointMessageVector(getMinZ(_safety_area_frame_));
-        std::vector<geometry_msgs::Point> points_top = polygon.getPointMessageVector(getMaxZ(_safety_area_frame_));
-
-        // transform border bottom points to local origin
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_bot[i].x;
-          temp_ref.reference.position.y = points_bot[i].y;
-          temp_ref.reference.position.z = points_bot[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_bot[i].x = temp_ref.reference.position.x;
-            points_bot[i].y = temp_ref.reference.position.y;
-            points_bot[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // transform border top points to local origin
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_top[i].x;
-          temp_ref.reference.position.y = points_top[i].y;
-          temp_ref.reference.position.z = points_top[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_top[i].x = temp_ref.reference.position.x;
-            points_top[i].y = temp_ref.reference.position.y;
-            points_top[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // bottom points
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
-        }
-
-        // top points + top/bot edges
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_top[i]);
-          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_top[i]);
-        }
-      }
-
-      //}
-
-      /* adding point-obstacle points //{ */
-
-      std::vector<mrs_lib::PointObstacle> point_obstacles = safety_zone_->getPointObstacles();
-
-      for (auto point : point_obstacles) {
-
-        std::vector<geometry_msgs::Point> points_bot = point.getPointMessageVector(getMinZ(_safety_area_frame_));
-        std::vector<geometry_msgs::Point> points_top = point.getPointMessageVector(-1);
-
-        // transform bottom points to local origin
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_bot[i].x;
-          temp_ref.reference.position.y = points_bot[i].y;
-          temp_ref.reference.position.z = points_bot[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref        = ret.value();
-            points_bot[i].x = temp_ref.reference.position.x;
-            points_bot[i].y = temp_ref.reference.position.y;
-            points_bot[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // transform top points to local origin
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          temp_ref.header.frame_id      = _safety_area_frame_;
-          temp_ref.header.stamp         = ros::Time(0);
-          temp_ref.reference.position.x = points_top[i].x;
-          temp_ref.reference.position.y = points_top[i].y;
-          temp_ref.reference.position.z = points_top[i].z;
-
-          if (auto ret = transformer_->transform(temp_ref, tf)) {
-
-            temp_ref = ret.value();
-
-            points_top[i].x = temp_ref.reference.position.x;
-            points_top[i].y = temp_ref.reference.position.y;
-            points_top[i].z = temp_ref.reference.position.z;
-
-          } else {
-            tf_success = false;
-          }
-        }
-
-        // botom points
-        for (size_t i = 0; i < points_bot.size(); i++) {
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_bot[(i + 1) % points_bot.size()]);
-        }
-
-        // top points + bot/top edges
-        for (size_t i = 0; i < points_top.size(); i++) {
-
-          safety_area_marker.points.push_back(points_top[i]);
-          safety_area_marker.points.push_back(points_top[(i + 1) % points_top.size()]);
-
-          safety_area_marker.points.push_back(points_bot[i]);
-          safety_area_marker.points.push_back(points_top[i]);
-        }
       }
 
       //}
@@ -3443,14 +3248,9 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!bumper_enabled_ || !bumper_repulsion_enabled_) {
+  if (!bumper_enabled_) {
     return;
   }
-
-  /* // do not use the bumper, unless with non-special tracker */
-  /* if (active_tracker_idx == _ehover_tracker_idx_ || active_tracker_idx == _null_tracker_idx_ || active_tracker_idx == _landoff_tracker_idx_) { */
-  /*   return; */
-  /* } */
 
   if (!isFlyingNormally()) {
     return;
@@ -5167,59 +4967,6 @@ bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_
 
 //}
 
-/* //{ callbackBumperEnableRepulsion() */
-
-bool ControlManager::callbackBumperEnableRepulsion(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
-
-  if (!is_initialized_)
-    return false;
-
-  bumper_repulsion_enabled_ = req.data;
-
-  std::stringstream ss;
-
-  ss << "bumper repulsion " << (bumper_repulsion_enabled_ ? "enalbed" : "disabled");
-
-  ROS_INFO_STREAM("[ControlManager]: " << ss.str());
-
-  res.success = true;
-  res.message = ss.str();
-
-  return true;
-}
-
-//}
-
-/* //{ callbackBumperSetParams() */
-
-bool ControlManager::callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res) {
-
-  if (!is_initialized_)
-    return false;
-
-  {
-    std::scoped_lock lock(mutex_bumper_params_);
-
-    bumper_horizontal_distance_ = req.horizontal_limit;
-    bumper_vertical_distance_   = req.vertical_limit;
-
-    bumper_repulsion_horizontal_distance_ = req.repulsion_horizontal_limit;
-    bumper_repulsion_vertical_distance_   = req.repulsion_vertical_limit;
-
-    bumper_repulsion_horizontal_offset_ = req.repulsion_horizontal_offset;
-    bumper_repulsion_vertical_offset_   = req.repulsion_vertical_offset;
-  }
-
-  ROS_INFO("[ControlManager]: bumper params were set");
-
-  res.success = true;
-  res.message = "bumper params set";
-
-  return true;
-}
-
-//}
-
 /* //{ callbackGetMinZ() */
 
 bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
@@ -5275,14 +5022,6 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
   }
 
   mrs_msgs::ReferenceStamped transformed_reference = ret.value();
-
-  // check the obstacle bumper
-  if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, potential collision with an obstacle!");
-    res.message = "potential collision with an obstacle";
-    res.success = false;
-    return true;
-  }
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
@@ -5351,14 +5090,6 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
   }
 
   mrs_msgs::ReferenceStamped transformed_reference = ret.value();
-
-  // check the obstacle bumper
-  if (!bumperValidatePoint(transformed_reference)) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, potential collision with an obstacle!");
-    res.message = "potential collision with an obstacle";
-    res.success = false;
-    return true;
-  }
 
   if (!isPointInSafetyArea2d(transformed_reference)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
@@ -5434,11 +5165,6 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
     }
 
     mrs_msgs::ReferenceStamped transformed_reference = ret.value();
-
-    // check the obstacle bumper
-    if (!bumperValidatePoint(transformed_reference)) {
-      res.success[i] = false;
-    }
 
     if (!isPointInSafetyArea3d(transformed_reference)) {
       res.success[i] = false;
@@ -5853,13 +5579,6 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
   mrs_msgs::ReferenceStamped transformed_reference = ret.value();
 
-  // check the obstacle bumper
-  if (!bumperValidatePoint(transformed_reference)) {
-    ss << "failed to set the reference, potential collision with an obstacle!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
   // safety area check
   if (!isPointInSafetyArea3d(transformed_reference)) {
     ss << "failed to set the reference, the point is outside of the safety area!";
@@ -6013,13 +5732,6 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
             eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
-
-  // check the obstacle bumper
-  if (!bumperValidatePoint(eqivalent_reference)) {
-    ss << "failed to set the reference, potential collision with an obstacle!";
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
 
   // safety area check
   if (!isPointInSafetyArea3d(eqivalent_reference)) {
@@ -6195,88 +5907,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   bool trajectory_modified = false;
 
-  /* transform the trajectory to the safety area frame //{ */
-
-  if (use_safety_area_) {
-
-    auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, _safety_area_frame_, uav_state_.header.stamp);
-
-    if (!ret) {
-
-      ss << "could not create TF transformer from the trajectory frame to the safety area frame";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
-
-    geometry_msgs::TransformStamped tf = ret.value();
-
-    for (int i = 0; i < trajectory_size; i++) {
-
-      mrs_msgs::ReferenceStamped trajectory_point;
-      trajectory_point.header    = processed_trajectory.header;
-      trajectory_point.reference = processed_trajectory.points[i];
-
-      auto ret = transformer_->transform(trajectory_point, tf);
-
-      if (!ret) {
-
-        ss << "the trajectory can not be transformed to the safety area frame";
-        ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-
-      } else {
-
-        // transform the points in the trajectory to the current frame
-        processed_trajectory.points[i] = ret.value().reference;
-      }
-    }
-
-    processed_trajectory.header.frame_id = transformer_->frame_to(tf);
-  }
-
-  //}
-
   /* safety area check //{ */
 
   if (use_safety_area_) {
-
-    // transform the current state to the safety area frame
-    mrs_msgs::ReferenceStamped x_current_frame;
-    x_current_frame.header = uav_state.header;
-
-    if (last_tracker_cmd) {
-
-      x_current_frame.reference.position.x = last_tracker_cmd->position.x;
-      x_current_frame.reference.position.y = last_tracker_cmd->position.y;
-      x_current_frame.reference.position.z = last_tracker_cmd->position.z;
-
-    } else if (got_uav_state_) {
-
-      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-      x_current_frame.reference.position.x = uav_state.pose.position.x;
-      x_current_frame.reference.position.y = uav_state.pose.position.y;
-      x_current_frame.reference.position.z = uav_state.pose.position.z;
-
-    } else {
-
-      ss << "cannot check agains safety area, missing odometry";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
-
-    auto res = transformer_->transformSingle(x_current_frame, _safety_area_frame_);
-
-    mrs_msgs::ReferenceStamped x_area_frame;
-
-    if (res) {
-      x_area_frame = res.value();
-    } else {
-
-      ss << "could not transform current state to safety area frame!";
-      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
-    }
 
     int last_valid_idx    = 0;
     int first_invalid_idx = -1;
@@ -6404,7 +6037,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   if (trajectory_size == 0) {
 
-    ss << "the trajectory somehow happened to be empty after all the checks! This message should not appear!";
+    ss << "the trajectory happened to be empty after all the checks! This message should not appear!";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
@@ -6413,19 +6046,21 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   /* transform the trajectory to the current control frame //{ */
 
-  // TODO this should be in the time of the processed_trajectory.header.frame_id
-  auto ret = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
+  std::optional<geometry_msgs::TransformStamped> tf_traj_state;
 
-  if (!ret) {
+  if (processed_trajectory.header.stamp > ros::Time::now()) {
+    tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", processed_trajectory.header.stamp);
+  } else {
+    tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
+  }
 
+  if (!tf_traj_state) {
     ss << "could not create TF transformer for the trajectory";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
-  geometry_msgs::TransformStamped tf = ret.value();
-
-  processed_trajectory.header.frame_id = transformer_->frame_to(tf);
+  processed_trajectory.header.frame_id = transformer_->frame_to(*tf_traj_state);
 
   for (int i = 0; i < trajectory_size; i++) {
 
@@ -6433,7 +6068,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     trajectory_point.header    = processed_trajectory.header;
     trajectory_point.reference = processed_trajectory.points[i];
 
-    auto ret = transformer_->transform(trajectory_point, tf);
+    auto ret = transformer_->transform(trajectory_point, *tf_traj_state);
 
     if (!ret) {
 
@@ -6859,13 +6494,19 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
 
 // | ----------------------- safety area ---------------------- |
 
-/* //{ isInSafetyArea3d() */
+/* //{ isPointInSafetyArea3d() */
 
+<<<<<<< HEAD
 bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped point) {
+=======
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point) {
+
+>>>>>>> master
   if (!use_safety_area_) {
     return true;
   }
 
+<<<<<<< HEAD
   mrs_msgs::ReferenceStampedSrv service;
   service.request.reference = point.reference;
   service.request.header = point.header;
@@ -6880,17 +6521,41 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped poin
   }
 
   return service.response.success;
+=======
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
+
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+    return false;
+  }
+
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
+  }
+
+  if (point.reference.position.z < getMinZ(point.header.frame_id) || point.reference.position.z > getMaxZ(point.header.frame_id)) {
+    return false;
+  }
+
+  return true;
+>>>>>>> master
 }
 
 //}
 
-/* //{ isInSafetyArea2d() */
+/* //{ isPointInSafetyArea2d() */
 
+<<<<<<< HEAD
 bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped point) {
+=======
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point) {
+
+>>>>>>> master
   if (!use_safety_area_) {
     return true;
   }
 
+<<<<<<< HEAD
   mrs_msgs::ReferenceStampedSrv service;
   service.request.reference = point.reference;
   service.request.header = point.header;
@@ -6904,56 +6569,133 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped poin
     ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
   }
   return service.response.success;
+=======
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
+
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+    return false;
+  }
+
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
+  }
+
+  return true;
+>>>>>>> master
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea3d() */
 
-bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
 
   if (!use_safety_area_) {
     return true;
   }
 
+<<<<<<< HEAD
   mrs_msgs::PathToPointInSafetyArea service;
   service.request.start = start;
   service.request.end = end;
+=======
+  if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end)) {
+    return false;
+  }
+
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  {
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+>>>>>>> master
 
   if(!path_in_safety_area_3d_.call(service)){
     ROS_WARN("[ControlManager]: SafetyArea: Could not call service path_in_safety_area_3d");
     return false;
   }
 
+<<<<<<< HEAD
   if(service.response.message != ""){
     ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
   }
   return service.response.success;
+=======
+  {
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
+  }
+
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
+>>>>>>> master
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea2d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped start, const mrs_msgs::ReferenceStamped end) {
-
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
   if (!use_safety_area_) {
     return true;
   }
 
+<<<<<<< HEAD
   mrs_msgs::PathToPointInSafetyArea service;
   service.request.start = start;
   service.request.end = end;
+=======
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end)) {
+    return false;
+  }
+
+  {
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+>>>>>>> master
 
   if(!path_in_safety_area_2d_.call(service)){
     ROS_WARN("[ControlManager]: SafetyArea: Could not call service path_in_safety_area_2d");
     return false;
   }
 
+<<<<<<< HEAD
   if(service.response.message != ""){
     ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
   }
   return service.response.success;
+=======
+  {
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
+  }
+
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
+>>>>>>> master
 }
 
 //}
@@ -6966,17 +6708,11 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
 
   double safety_area_max_z = std::numeric_limits<float>::max();
 
-  std::string from_frame = _safety_area_frame_;
-
-  if (_safety_area_frame_ == "latlon_origin") {
-    from_frame = frame_id;
-  }
-
   {
 
     geometry_msgs::PointStamped point;
 
-    point.header.frame_id = from_frame;
+    point.header.frame_id = _safety_area_vertical_frame_;
     point.point.x         = 0;
     point.point.y         = 0;
     point.point.z         = _safety_area_max_z_;
@@ -6984,7 +6720,7 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
     auto ret = transformer_->transformSingle(point, frame_id);
 
     if (!ret) {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to the current control frame");
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
     }
 
     safety_area_max_z = ret->point.z;
@@ -7036,212 +6772,29 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 
   geometry_msgs::PointStamped point;
 
-  std::string from_frame = _safety_area_frame_;
-
-  if (_safety_area_frame_ == "latlon_origin") {
-    from_frame = frame_id;
-  }
-
-  point.header.frame_id = from_frame;
+  point.header.frame_id = _safety_area_vertical_frame_;
   point.point.x         = 0;
   point.point.y         = 0;
-  point.point.z         = safety_area_min_z_;
+  point.point.z         = _safety_area_min_z_;
 
   auto ret = transformer_->transformSingle(point, frame_id);
 
   if (!ret) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform min_z to the current control frame");
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's min_z to '%s'", frame_id.c_str());
     return std::numeric_limits<double>::lowest();
   }
 
   return ret->point.z;
 }
 
-
 //}
 
 // | --------------------- obstacle bumper -------------------- |
 
-/* bumperValidatePoint() //{ */
-
-// everything here happens in FCU
-bool ControlManager::bumperValidatePoint(mrs_msgs::ReferenceStamped& point) {
-
-  if (!bumper_enabled_) {
-    return true;
-  }
-
-  if (!sh_bumper_.hasMsg()) {
-    return true;
-  }
-
-  // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
-
-  auto [bumper_vertical_distance, bumper_horizontal_distance] =
-      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_vertical_distance_, bumper_horizontal_distance_);
-
-  if ((ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
-    return true;
-  }
-
-  auto ret = transformer_->transformSingle(point, "fcu_untilted");
-
-  if (!ret) {
-
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: can not transform reference to fcu frame");
-
-    return false;
-  }
-
-  mrs_msgs::ReferenceStamped point_fcu = ret.value();
-
-  double fcu_x = point_fcu.reference.position.x;
-  double fcu_y = point_fcu.reference.position.y;
-  double fcu_z = point_fcu.reference.position.z;
-
-  // get the id of the sector, where the reference is
-  int horizontal_vector_idx = bumperGetSectorId(fcu_x, fcu_y, fcu_z);
-  int vertical_vector_idx   = fcu_z < 0 ? bumper_data->n_horizontal_sectors : bumper_data->n_horizontal_sectors + 1;
-
-  // calculate the horizontal distance to the point
-  double horizontal_point_distance = sqrt(pow(fcu_x, 2.0) + pow(fcu_y, 2.0));
-  double vertical_point_distance   = fabs(fcu_z);
-
-  // check whether we measure in that direction
-  if (bumper_data->sectors[horizontal_vector_idx] == bumper_data->OBSTACLE_NO_DATA) {
-
-    ROS_WARN_THROTTLE(1.0,
-                      "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, we do not measure in that direction",
-                      fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
-    return false;
-  }
-
-  if (bumper_data->sectors[horizontal_vector_idx] == bumper_data->OBSTACLE_NOT_DETECTED &&
-      bumper_data->sectors[vertical_vector_idx] == bumper_data->OBSTACLE_NOT_DETECTED) {
-
-    return true;
-  }
-
-  if (horizontal_point_distance <= (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance) &&
-      (fabs(fcu_z) <= 0.1 || vertical_point_distance <= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance))) {
-
-    return true;
-  }
-
-  // if the obstacle is too close and hugging can't be done, we can't fly, return false
-  if (horizontal_point_distance > 0.1 &&
-      (bumper_data->sectors[horizontal_vector_idx] > 0 && bumper_data->sectors[horizontal_vector_idx] <= bumper_horizontal_distance)) {
-
-    ROS_WARN_THROTTLE(1.0,
-                      "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f (sector %d) is not valid, obstacle is too close (horizontally)",
-                      fcu_x, fcu_y, fcu_z, horizontal_vector_idx);
-
-    mrs_msgs::BumperStatus bumper_status;
-    bumper_status.modifying_reference = true;
-
-    ph_bumper_status_.publish(bumper_status);
-
-    return false;
-  }
-
-  // if the obstacle is too close and hugging can't be done, we can't fly, return false
-  if (vertical_point_distance > 0.1 &&
-      (bumper_data->sectors[vertical_vector_idx] > 0 && bumper_data->sectors[vertical_vector_idx] <= bumper_vertical_distance)) {
-
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference x: %.2f, y: %.2f, z: %.2f is not valid, obstacle is too close (vertically)", fcu_x,
-                      fcu_y, fcu_z);
-
-    mrs_msgs::BumperStatus bumper_status;
-    bumper_status.modifying_reference = true;
-
-    ph_bumper_status_.publish(bumper_status);
-
-    return false;
-  }
-
-  // otherwise, if hugging enabled, fix the coordinates
-  if (_bumper_hugging_enabled_) {
-
-    // heading of the point in drone frame
-    double point_heading_horizontal = atan2(fcu_y, fcu_x);
-    double point_heading_vertical   = fcu_z > 0 ? 1.0 : -1.0;
-
-    double new_x = fcu_x;
-    double new_y = fcu_y;
-    double new_z = fcu_z;
-
-    if (bumper_data->sectors[horizontal_vector_idx] > 0 &&
-        horizontal_point_distance >= (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance)) {
-
-      new_x = cos(point_heading_horizontal) * (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance);
-      new_y = sin(point_heading_horizontal) * (bumper_data->sectors[horizontal_vector_idx] - bumper_horizontal_distance);
-
-      // horizontal_point_distance                    = uav distance to the reference
-      // bumper_data->sectors[horizontal_vector_idx]   = uav distance to the obstacle
-      // _bumper_horizontal_distance_                 = the bumper limit
-
-      ROS_WARN_THROTTLE(1.0,
-                        "[ControlManager]: Bumper: the fcu reference [%.2f, %.2f] (sector %d) is not valid, distance %.2f >= (%.2f - %.2f)., HUGGING IT it "
-                        "to x: %.2f, y: %.2f",
-                        fcu_x, fcu_y, horizontal_vector_idx, horizontal_point_distance, bumper_data->sectors[horizontal_vector_idx], bumper_horizontal_distance,
-                        new_x, new_y);
-
-      point_fcu.reference.position.x = new_x;
-      point_fcu.reference.position.y = new_y;
-
-      mrs_msgs::BumperStatus bumper_status;
-      bumper_status.modifying_reference = true;
-
-      ph_bumper_status_.publish(bumper_status);
-    }
-
-    if (bumper_data->sectors[vertical_vector_idx] > 0 && vertical_point_distance >= (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance)) {
-
-      new_z = point_heading_vertical * (bumper_data->sectors[vertical_vector_idx] - bumper_vertical_distance);
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: the fcu reference z: %.2f is not valid, distance %.2f > (%.2f - %.2f)., HUGGING IT it z: %.2f", fcu_z,
-                        vertical_point_distance, bumper_data->sectors[vertical_vector_idx], bumper_vertical_distance, new_z);
-
-      point_fcu.reference.position.z = new_z;
-
-      mrs_msgs::BumperStatus bumper_status;
-      bumper_status.modifying_reference = true;
-
-      ph_bumper_status_.publish(bumper_status);
-    }
-
-    // express the point back in the original FRAME
-    auto ret = transformer_->transformSingle(point_fcu, point.header.frame_id);
-
-    if (!ret) {
-
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: Bumper: can not transform reference back to original frame");
-
-      return false;
-    }
-
-    point = ret.value();
-
-    return true;
-
-  } else {
-
-    return false;
-  }
-}
-
-//}
-
 /* bumperPushFromObstacle() //{ */
 
 bool ControlManager::bumperPushFromObstacle(void) {
-
   if (!bumper_enabled_) {
-    return true;
-  }
-
-  if (!bumper_repulsion_enabled_) {
     return true;
   }
 
@@ -7253,20 +6806,11 @@ bool ControlManager::bumperPushFromObstacle(void) {
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
   auto                              uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  auto [bumper_repulsion_horizontal_offset, bumper_repulsion_vertical_offset] =
-      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_offset_, bumper_repulsion_vertical_offset_);
-
-  auto [bumper_repulsion_horizontal_distance, bumper_repulsion_vertical_distance] =
-      mrs_lib::get_mutexed(mutex_bumper_params_, bumper_repulsion_horizontal_distance_, bumper_repulsion_vertical_distance_);
-
   double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
   double direction                     = 0;
   double repulsion_distance            = std::numeric_limits<double>::max();
   bool   horizontal_collision_detected = false;
-
-  // TODO why is this not used?
-  /* double min_distance                  = std::numeric_limits<double>::max(); */
 
   bool vertical_collision_detected = false;
 
@@ -7279,19 +6823,19 @@ bool ControlManager::bumperPushFromObstacle(void) {
     bool wall_locked_horizontal = false;
 
     // if the sector is under critical distance
-    if (bumper_data->sectors[i] <= bumper_repulsion_horizontal_distance && bumper_data->sectors[i] < repulsion_distance) {
+    if (bumper_data->sectors[i] <= _bumper_horizontal_distance_ && bumper_data->sectors[i] < repulsion_distance) {
 
       // check for locking between the oposite walls
       // get the desired direction of motion
       double oposite_direction  = double(i) * sector_size + M_PI;
       int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
 
-      if (bumper_data->sectors[oposite_sector_idx] > 0 && ((bumper_data->sectors[i] + bumper_data->sectors[oposite_sector_idx]) <=
-                                                           (2 * bumper_repulsion_horizontal_distance + 2 * bumper_repulsion_horizontal_offset))) {
+      if (bumper_data->sectors[oposite_sector_idx] > 0 &&
+          ((bumper_data->sectors[i] + bumper_data->sectors[oposite_sector_idx]) <= (2 * _bumper_horizontal_distance_ + 2 * _bumper_horizontal_overshoot_))) {
 
         wall_locked_horizontal = true;
 
-        if (fabs(bumper_data->sectors[i] - bumper_data->sectors[oposite_sector_idx]) <= 2 * bumper_repulsion_horizontal_offset) {
+        if (fabs(bumper_data->sectors[i] - bumper_data->sectors[oposite_sector_idx]) <= 2 * _bumper_horizontal_overshoot_) {
 
           ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between two walls");
           continue;
@@ -7310,16 +6854,13 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       if (wall_locked_horizontal) {
         if (bumper_data->sectors[i] < bumper_data->sectors[oposite_sector_idx]) {
-          repulsion_distance = bumper_repulsion_horizontal_offset;
+          repulsion_distance = _bumper_horizontal_overshoot_;
         } else {
-          repulsion_distance = -bumper_repulsion_horizontal_offset;
+          repulsion_distance = -_bumper_horizontal_overshoot_;
         }
       } else {
-        repulsion_distance = bumper_repulsion_horizontal_distance + bumper_repulsion_horizontal_offset - bumper_data->sectors[i];
+        repulsion_distance = _bumper_horizontal_distance_ + _bumper_horizontal_overshoot_ - bumper_data->sectors[i];
       }
-
-      // TODO why is this not used?
-      // min_distance = bumper_data->sectors[i];
 
       horizontal_collision_detected = true;
     }
@@ -7329,43 +6870,36 @@ bool ControlManager::bumperPushFromObstacle(void) {
   bool   collision_below             = false;
   double vertical_repulsion_distance = 0;
 
-  // TODO: why is this not used?
-  /* bool   wall_locked_vertical        = false; */
-
   // check for vertical collision down
-  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 &&
-      bumper_data->sectors[bumper_data->n_horizontal_sectors] <= bumper_repulsion_vertical_distance) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= _bumper_vertical_distance_) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
     collision_above             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = bumper_repulsion_vertical_distance - bumper_data->sectors[bumper_data->n_horizontal_sectors];
+    vertical_repulsion_distance = _bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors];
   }
 
   // check for vertical collision up
   if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 &&
-      bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= bumper_repulsion_vertical_distance) {
+      bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= _bumper_vertical_distance_) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
     collision_below             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(bumper_repulsion_vertical_distance - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
+    vertical_repulsion_distance = -(_bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
   }
 
   // check the up/down wall locking
   if (collision_above && collision_below) {
 
     if (((bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-         (2 * bumper_repulsion_vertical_distance + 2 * bumper_repulsion_vertical_offset))) {
-
-      // TODO: why is this not used?
-      /* wall_locked_vertical = true; */
+         (2 * _bumper_vertical_distance_ + 2 * _bumper_vertical_overshoot_))) {
 
       vertical_repulsion_distance =
           (-bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) / 2.0;
 
       if (fabs(bumper_data->sectors[bumper_data->n_horizontal_sectors] - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-          2 * bumper_repulsion_vertical_offset) {
+          2 * _bumper_vertical_overshoot_) {
 
         ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between the floor and ceiling");
         vertical_collision_detected = false;
@@ -7535,8 +7069,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
 /* bumperGetSectorId() //{ */
 
-int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_unused]] const double z) {
-
+int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
 
@@ -7570,7 +7103,6 @@ int ControlManager::bumperGetSectorId(const double x, const double y, [[maybe_un
 /* //{ changeLandingState() */
 
 void ControlManager::changeLandingState(LandingStates_t new_state) {
-
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
@@ -7607,7 +7139,6 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 /* hover() //{ */
 
 std::tuple<bool, std::string> ControlManager::hover(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7644,7 +7175,6 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
 /* //{ ehover() */
 
 std::tuple<bool, std::string> ControlManager::ehover(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7713,7 +7243,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 /* eland() //{ */
 
 std::tuple<bool, std::string> ControlManager::eland(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -7806,7 +7335,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 /* failsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::failsafe(void) {
-
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
@@ -7915,7 +7443,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 /* escalatingFailsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
-
   std::stringstream ss;
 
   if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
@@ -8036,7 +7563,6 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 /* getNextEscFailsafeState() //{ */
 
 EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
-
   EscalatingFailsafeStates_t current_state = state_escalating_failsafe_;
 
   switch (current_state) {
@@ -8107,7 +7633,6 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
 /* startTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -8139,7 +7664,6 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
 /* stopTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -8171,7 +7695,6 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
 /* resumeTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -8203,7 +7726,6 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
 /* gotoTrajectoryStart() //{ */
 
 std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
-
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -8236,7 +7758,6 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 /* arming() //{ */
 
 std::tuple<bool, std::string> ControlManager::arming(const bool input) {
-
   std::stringstream ss;
 
   if (input) {
@@ -8306,7 +7827,6 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 /* odometryCallbacksSrv() //{ */
 
 void ControlManager::odometryCallbacksSrv(const bool input) {
-
   ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
@@ -8331,7 +7851,6 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 /* elandSrv() //{ */
 
 bool ControlManager::elandSrv(void) {
-
   ROS_INFO("[ControlManager]: calling for eland");
 
   std_srvs::Trigger srv;
@@ -8359,7 +7878,6 @@ bool ControlManager::elandSrv(void) {
 /* shutdown() //{ */
 
 void ControlManager::shutdown() {
-
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -8377,7 +7895,6 @@ void ControlManager::shutdown() {
 /* parachuteSrv() //{ */
 
 bool ControlManager::parachuteSrv(void) {
-
   ROS_INFO("[ControlManager]: calling for parachute deployment");
 
   std_srvs::Trigger srv;
@@ -8405,7 +7922,6 @@ bool ControlManager::parachuteSrv(void) {
 /* ungripSrv() //{ */
 
 void ControlManager::ungripSrv(void) {
-
   std_srvs::Trigger srv;
 
   bool res = sch_ungrip_.call(srv);
@@ -8428,7 +7944,6 @@ void ControlManager::ungripSrv(void) {
 /* toggleOutput() //{ */
 
 void ControlManager::toggleOutput(const bool& input) {
-
   if (input == output_enabled_) {
     ROS_WARN_THROTTLE(0.1, "[ControlManager]: output is already %s", input ? "ON" : "OFF");
     return;
@@ -8492,7 +8007,6 @@ void ControlManager::toggleOutput(const bool& input) {
 /* switchTracker() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8626,7 +8140,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 /* switchController() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8741,7 +8254,6 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 /* updateTrackers() //{ */
 
 void ControlManager::updateTrackers(void) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8852,7 +8364,6 @@ void ControlManager::updateTrackers(void) {
 /* updateControllers() //{ */
 
 void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8979,7 +8490,6 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 /* publish() //{ */
 
 void ControlManager::publish(void) {
-
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publish");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
@@ -9105,7 +8615,6 @@ void ControlManager::publish(void) {
 /* deployParachute() //{ */
 
 std::tuple<bool, std::string> ControlManager::deployParachute(void) {
-
   // if not enabled, return false
   if (!_parachute_enabled_) {
 
@@ -9150,7 +8659,6 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 /* velocityReferenceToReference() //{ */
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
-
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
@@ -9199,7 +8707,6 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
                                                  [[maybe_unused]] const Controller::ControlOutput&               control_output) {
-
   if (!tracker_command || !control_output.control_output) {
     return;
   }
@@ -9278,7 +8785,6 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
 /* initializeControlOutput() //{ */
 
 void ControlManager::initializeControlOutput(void) {
-
   Controller::ControlOutput controller_output;
 
   controller_output.diagnostics.total_mass       = _uav_mass_;

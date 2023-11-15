@@ -492,9 +492,18 @@ double RCChannelToRange(double rc_value, double range, double deadband) {
 
 /* loadDetailedUavModelParams() //{ */
 
-std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name) {
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name, const std::string& platform_config,
+                                                                const std::string& custom_config) {
 
   mrs_lib::ParamLoader param_loader(nh, node_name);
+
+  if (custom_config != "") {
+    param_loader.addYamlFile(custom_config);
+  }
+
+  if (platform_config != "") {
+    param_loader.addYamlFile(platform_config);
+  }
 
   double arm_length;
   double body_height;

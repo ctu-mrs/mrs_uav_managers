@@ -66,7 +66,8 @@ bool validateUavState(const mrs_msgs::UavState& msg, const std::string& node_nam
 bool validateVelocityReference(const mrs_msgs::VelocityReference& msg, const std::string& node_name, const std::string& var_name);
 bool validateReference(const mrs_msgs::Reference& msg, const std::string& node_name, const std::string& var_name);
 
-std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name);
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle& nh, const std::string& node_name, const std::string& platform_config,
+                                                                const std::string& custom_config);
 
 // translates the channel values to desired range
 double RCChannelToRange(double rc_value, double range, double deadband);

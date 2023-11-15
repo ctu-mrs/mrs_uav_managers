@@ -104,32 +104,19 @@ mrs_uav_managers:
 
     obstacle_bumper:
 
+      enabled: false
+
       switch_tracker: true
       tracker: "MpcTracker"
 
       switch_controller: true
       controller: "Se3Controller"
 
-      enabled: false
-      timer_rate: 20 # [Hz]
+      horizontal:
+        threshold_distance: 1.2 # [m]
 
-      horizontal_distance: 1.2 # [m]
-      vertical_distance: 1.2 # [m]
-
-      obstacle_hugging:
-
-        enabled: true
-
-      # true: the drone will move away from obstacles that appear within the radius
-      repulsion:
-
-        enabled: true
-
-        horizontal_distance: 1.0 # [m]
-        horizontal_offset: 0.1 # [m] by how much to repulse from the horizontal_distance limit
-
-        vertical_distance: 1.0 # [m]
-        vertical_offset: 0.1 # [m]
+      vertical:
+        threshold_distance: 1.2 # [m]
 
     automatic_pc_shutdown:
 

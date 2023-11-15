@@ -13,8 +13,8 @@ namespace control_manager
 
 /* safety area handler //{ */
 
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea3d_t;
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped point)> isPointInSafetyArea2d_t;
+typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea3d_t;
+typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea2d_t;
 typedef boost::function<double(const std::string &frame_id)>          getMaxZ_t;
 typedef boost::function<double(const std::string &frame_id)>          getMinZ_t;
 
@@ -24,20 +24,7 @@ struct SafetyArea_t
   mrs_uav_managers::control_manager::isPointInSafetyArea2d_t isPointInSafetyArea2d;
   mrs_uav_managers::control_manager::getMaxZ_t               getMaxZ;
   mrs_uav_managers::control_manager::getMinZ_t               getMinZ;
-  std::string                                                frame_id;
   bool                                                       use_safety_area;
-};
-
-//}
-
-/* obstacle bumper handler //{ */
-
-typedef boost::function<bool(mrs_msgs::ReferenceStamped &point)> bumperValidatePoint_t;
-
-struct Bumper_t
-{
-  bool                                                     enabled;
-  mrs_uav_managers::control_manager::bumperValidatePoint_t bumperValidatePoint;
 };
 
 //}
@@ -82,7 +69,6 @@ struct CommonHandlers_t
   SafetyArea_t                                     safety_area;
   std::shared_ptr<mrs_lib::Transformer>            transformer;
   ScopeTimer_t                                     scope_timer;
-  Bumper_t                                         bumper;
   getMass_t                                        getMass;
   double                                           g;
   mrs_lib::quadratic_throttle_model::MotorParams_t throttle_model;

@@ -61,6 +61,8 @@
       <remap from="~height_agl_in" to="estimation_manager/height_agl" />
       <remap from="~orientation_in" to="hw_api/orientation" />
       <remap from="~gnss_in" to="hw_api/gnss" />
+      <remap from="~rtk_gps_in" to="hw_api/rtk" />
+      <remap from="~altitude_amsl_in" to="hw_api/altitude" />
 
       <!-- Publishers -->
       <remap from="~profiler" to="profiler" />
