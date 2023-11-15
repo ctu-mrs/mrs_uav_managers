@@ -45,6 +45,8 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  # Todo: this must not be here
+  /home/azat/mrs_workspace/devel/include
   )
 
 # MrsUavManagers_ControlManager

@@ -61,6 +61,12 @@
 
     <remap from="chatter" to="chatter_remapped" />
 
+    <!-- Service servers -->
+    <remap from="~point_in_safety_area_3d_in" to="~point_in_safety_area_3d"/>
+    <remap from="~point_in_safety_area_2d_in" to="~point_in_safety_area_2d"/>
+    <remap from="~path_in_safety_area_3d_in" to="~path_in_safety_area_3d"/>
+    <remap from="~path_in_safety_area_2d_in" to="~path_in_safety_area_2d"/>
+
     <!-- todo: add params, remappings -->
     </node>
   </group>

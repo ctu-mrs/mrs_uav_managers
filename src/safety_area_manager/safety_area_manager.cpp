@@ -185,7 +185,6 @@ void SafetyAreaManager::initialize() {
 }
 
 bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
-
   if (!use_safety_area_) {
     res.success = true;
     res.message = "Safety area is disabled";
@@ -219,7 +218,6 @@ bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Req
 }
 
 bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
-
   if (!use_safety_area_) {
     res.success = true;
     res.message = "Safety area is disabled";
@@ -246,7 +244,6 @@ bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Req
 }
 
 bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
-  
   if (!use_safety_area_) {
     res.success = true;
     res.message = "Safety area is disabled";
@@ -295,7 +292,6 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafet
 
 
 bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
-  
   if (!use_safety_area_) {
     res.success = true;
     res.message = "Safety area is disabled";
@@ -340,6 +336,14 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
   res.success = safety_zone_->isPathValid2d(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
                                     end_transformed.reference.position.y);
   return true;
+}
+
+double SafetyAreaManager::getMaxZ(const std::string& frame_id){
+  return 10;
+}
+
+double SafetyAreaManager::getMinZ(const std::string& frame_id){
+  return 0;
 }
 
 } // namespace safety_area_manager
