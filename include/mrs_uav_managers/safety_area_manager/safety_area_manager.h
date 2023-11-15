@@ -38,6 +38,8 @@ private:
   double                               safety_area_min_z_ = 0;
   double                               safety_area_max_z_ = 0;
   std::string                          safety_area_frame_;
+  std::string                          safety_area_horizontal_frame_;
+  std::string                          safety_area_vertical_frame_;
   std::string                          uav_name_;
   std::string                          body_frame_;
   std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
