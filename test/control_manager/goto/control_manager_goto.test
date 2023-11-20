@@ -1,7 +1,5 @@
 <launch>
 
-  <env name="ROSCONSOLE_CONFIG_FILE" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
-
   <include file="$(find mrs_uav_managers)/test/sessions/x500_in_mid_air/launch/mrs_uav_system.launch" />
 
   <test pkg="mrs_uav_managers" type="MrsUavManagers_ControlManagerGotoTest" test-name="goto_test" time-limit="60.0" />
