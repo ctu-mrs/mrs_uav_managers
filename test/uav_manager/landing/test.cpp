@@ -1,8 +1,9 @@
-#include <ros/ros.h>
+#include <gtest/gtest.h>
+#include <ros/console.h>
+#include <log4cxx/logger.h>
 
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/service_client_handler.h>
-#include <mrs_lib/attitude_converter.h>
 
 #include <std_msgs/Bool.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
@@ -12,11 +13,7 @@
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 
-#include <gtest/gtest.h>
-#include <ros/console.h>
-#include <log4cxx/logger.h>
-
-TEST(TESTSuite, goto) {
+TEST(TESTSuite, landing) {
 
   // | ------------------ initialize test node ------------------ |
 
@@ -53,8 +50,12 @@ TEST(TESTSuite, goto) {
   // | --------------------- service clients -------------------- |
 
   mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_arming = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh, "/" + uav_name + "/hw_api/arming");
+
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_midair =
       mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh, "/" + uav_name + "/uav_manager/midair_activation");
+
+  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_land = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh, "/" + uav_name + "/uav_manager/land");
+
   mrs_lib::ServiceClientHandler<mrs_msgs::Vec4> sch_goto = mrs_lib::ServiceClientHandler<mrs_msgs::Vec4>(nh, "/" + uav_name + "/control_manager/goto");
 
   ROS_INFO("[%s]: service client initialized", ros::this_node::getName().c_str());
@@ -115,16 +116,14 @@ TEST(TESTSuite, goto) {
 
   ros::Duration(1.0).sleep();
 
-  // --------------------------------------------------------------
-  // |                          test goto                         |
-  // --------------------------------------------------------------
+  // | -------------------------- goto -------------------------- |
 
   mrs_msgs::Vec4 goto_cmd;
 
-  goto_cmd.request.goal[0] = -10;
-  goto_cmd.request.goal[1] = -20;
-  goto_cmd.request.goal[2] = 5.5;
-  goto_cmd.request.goal[3] = 2.2;
+  goto_cmd.request.goal[0] = 5;
+  goto_cmd.request.goal[1] = 5;
+  goto_cmd.request.goal[2] = 8;
+  goto_cmd.request.goal[3] = 1;
 
   ROS_INFO("[%s]: calling goto", ros::this_node::getName().c_str());
 
@@ -137,27 +136,50 @@ TEST(TESTSuite, goto) {
     }
   }
 
-  // | ------------------ check for the result ------------------ |
+  ros::Duration(1.0).sleep();
+
+  // | ------------ check for the result of the goto ------------ |
 
   while (ros::ok()) {
 
     ROS_INFO_THROTTLE(1.0, "[%s]: waiting for goto", ros::this_node::getName().c_str());
 
-    auto diag = sh_estim_manager_diag.getMsg();
+    if (!sh_control_manager_diag.getMsg()->tracker_status.have_goal) {
 
-    auto hdg = mrs_lib::AttitudeConverter(diag->pose.orientation).getHeading();
+      ROS_INFO("[%s]: goto finished", ros::this_node::getName().c_str());
+      break;
+    }
 
-    auto flying_normally = sh_control_manager_diag.getMsg()->flying_normally;
+    ros::Duration(0.01).sleep();
+  }
 
-    if (std::abs(goto_cmd.request.goal[0] - diag->pose.position.x) < 1e-1 && std::abs(goto_cmd.request.goal[1] - diag->pose.position.y) < 1e-1 &&
-        std::abs(goto_cmd.request.goal[2] - diag->pose.position.z) < 1e-1 && std::abs(goto_cmd.request.goal[3] - hdg) < 1e-1 && flying_normally) {
+  // | ------------------ initiate the landing ------------------ |
+
+  ROS_INFO("[%s]: calling for landing", ros::this_node::getName().c_str());
+
+  std_srvs::Trigger landing;
+
+  {
+    bool service_call = sch_land.call(landing);
+
+    if (!service_call || !landing.response.success) {
+      ROS_ERROR("[%s]: landing service call failed", ros::this_node::getName().c_str());
+      GTEST_FAIL();
+    }
+  }
+
+  // | ------------ waiting for the landing to finish ----------- |
+
+  while (ros::ok()) {
+
+    ROS_INFO_THROTTLE(1.0, "[%s]: waiting for the landing to finish", ros::this_node::getName().c_str());
+
+    if (!sh_control_manager_diag.getMsg()->output_enabled) {
 
       ROS_INFO("[%s]: finished", ros::this_node::getName().c_str());
 
       GTEST_SUCCEED();
       return;
-
-      break;
     }
 
     ros::Duration(0.01).sleep();
@@ -168,9 +190,9 @@ TEST(TESTSuite, goto) {
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 
-  ros::init(argc, argv, "goto_test");
-
   testing::InitGoogleTest(&argc, argv);
+
+  ros::init(argc, argv, "takeoff_test");
 
   return RUN_ALL_TESTS();
 }

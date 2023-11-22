@@ -7869,6 +7869,7 @@ void ControlManager::ungripSrv(void) {
 /* toggleOutput() //{ */
 
 void ControlManager::toggleOutput(const bool& input) {
+
   if (input == output_enabled_) {
     ROS_WARN_THROTTLE(0.1, "[ControlManager]: output is already %s", input ? "ON" : "OFF");
     return;

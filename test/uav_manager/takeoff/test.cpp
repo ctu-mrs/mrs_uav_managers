@@ -12,11 +12,7 @@
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 
-/* TEST(TESTSuite, takeoff) //{ */
-
 TEST(TESTSuite, takeoff) {
-
-  int result = 0;
 
   // | ------------------ initialize test node ------------------ |
 
@@ -25,6 +21,9 @@ TEST(TESTSuite, takeoff) {
   ROS_INFO("[%s]: ROS node initialized", ros::this_node::getName().c_str());
 
   ros::Time::waitForValid();
+
+  ros::AsyncSpinner spinner(2);
+  spinner.start();
 
   std::string uav_name = "uav1";
 
@@ -63,8 +62,7 @@ TEST(TESTSuite, takeoff) {
       break;
     }
 
-    ros::spinOnce();
-    ros::Duration(0.1).sleep();
+    ros::Duration(0.01).sleep();
   }
 
   // | ---------------------- arm the drone --------------------- |
@@ -74,7 +72,14 @@ TEST(TESTSuite, takeoff) {
   std_srvs::SetBool arming;
   arming.request.data = true;
 
-  sch_arming.call(arming);
+  {
+    bool service_call = sch_arming.call(arming);
+
+    if (!service_call || !arming.response.success) {
+      ROS_ERROR("[%s]: arming service call failed", ros::this_node::getName().c_str());
+      GTEST_FAIL();
+    }
+  }
 
   // | -------------------------- wait -------------------------- |
 
@@ -86,7 +91,14 @@ TEST(TESTSuite, takeoff) {
 
   std_srvs::Trigger offboard;
 
-  sch_offboard.call(offboard);
+  {
+    bool service_call = sch_offboard.call(offboard);
+
+    if (!service_call || !offboard.response.success) {
+      ROS_ERROR("[%s]: offboard service call failed", ros::this_node::getName().c_str());
+      GTEST_FAIL();
+    }
+  }
 
   // | -------------- wait for the takeoff finished ------------- |
 
@@ -95,20 +107,18 @@ TEST(TESTSuite, takeoff) {
     ROS_INFO_THROTTLE(1.0, "[%s]: waiting for the takeoff to finish", ros::this_node::getName().c_str());
 
     if (sh_control_manager_diag.getMsg()->flying_normally) {
-      result = 1;
-      break;
+
+      ROS_INFO("[%s]: finished", ros::this_node::getName().c_str());
+
+      GTEST_SUCCEED();
+      return;
     }
 
-    ros::spinOnce();
-    ros::Duration(0.1).sleep();
+    ros::Duration(0.01).sleep();
   }
 
-  ROS_INFO("[%s]: finished", ros::this_node::getName().c_str());
-
-  EXPECT_TRUE(result);
+  GTEST_FAIL();
 }
-
-//}
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 

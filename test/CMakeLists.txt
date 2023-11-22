@@ -18,6 +18,24 @@ add_dependencies(
   ${catkin_EXPORTED_TARGETS}
   )
 
+# landing test
+
+add_rostest_gtest(MrsUavManagers_UavManagerLandingTest
+  uav_manager/landing/uav_manager_landing.test
+  uav_manager/landing/test.cpp
+  )
+
+target_link_libraries(
+  MrsUavManagers_UavManagerLandingTest
+  ${catkin_LIBRARIES}
+  )
+
+add_dependencies(
+  MrsUavManagers_UavManagerLandingTest
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
 # goto test
 
 add_rostest_gtest(MrsUavManagers_ControlManagerGotoTest
