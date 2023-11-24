@@ -558,7 +558,6 @@ private:
   bool   _odometry_innovation_check_enabled_ = false;
   double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
 
-  // are callbacks enabled to trackers?
   bool callbacks_enabled_ = true;
 
   // | ------------------------ parachute ----------------------- |
@@ -4492,7 +4491,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
   std::stringstream ss;
 
-  ss << "callbacks " << (output_enabled_ ? "enabled" : "disabled");
+  ss << "callbacks " << (callbacks_enabled_ ? "enabled" : "disabled");
 
   res.message = ss.str();
   res.success = true;
