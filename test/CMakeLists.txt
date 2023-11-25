@@ -53,3 +53,39 @@ add_dependencies(
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
   )
+
+# eland innovation test
+
+add_rostest_gtest(MrsUavManagers_ControlManagerElandInnovationTest
+  control_manager/eland_innovation/control_manager_eland_innovation.test
+  control_manager/eland_innovation/test.cpp
+  )
+
+target_link_libraries(
+  MrsUavManagers_ControlManagerElandInnovationTest
+  ${catkin_LIBRARIES}
+  )
+
+add_dependencies(
+  MrsUavManagers_ControlManagerElandInnovationTest
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+
+# eland service test
+
+add_rostest_gtest(MrsUavManagers_ControlManagerElandServiceTest
+  control_manager/eland_service/control_manager_eland_service.test
+  control_manager/eland_service/test.cpp
+  )
+
+target_link_libraries(
+  MrsUavManagers_ControlManagerElandServiceTest
+  ${catkin_LIBRARIES}
+  )
+
+add_dependencies(
+  MrsUavManagers_ControlManagerElandServiceTest
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
