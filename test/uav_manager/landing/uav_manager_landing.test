@@ -2,6 +2,6 @@
 
   <include file="$(find mrs_uav_managers)/test/sessions/x500_in_mid_air/launch/mrs_uav_system.launch" />
 
-  <test pkg="mrs_uav_managers" type="MrsUavManagers_UavManagerLandingTest" test-name="landing_test" time-limit="60.0" />
+  <test pkg="mrs_uav_managers" type="MrsUavManagers_UavManagerLandingTest" test-name="landing" time-limit="60.0" />
 
 </launch>

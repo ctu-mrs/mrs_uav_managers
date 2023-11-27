@@ -210,7 +210,7 @@ bool Tester::test() {
 
 std::shared_ptr<Tester> tester_;
 
-TEST(TESTSuite, eland) {
+TEST(TESTSuite, eland_innovation) {
 
   bool result = tester_->test();
 

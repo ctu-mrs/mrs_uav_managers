@@ -205,7 +205,7 @@ TEST(TESTSuite, landing) {
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 
-  ros::init(argc, argv, "goto_service_test");
+  ros::init(argc, argv, "landing_test");
 
   tester_ = std::make_shared<Tester>();
 

@@ -199,7 +199,7 @@ bool Tester::test() {
 
 std::shared_ptr<Tester> tester_;
 
-TEST(TESTSuite, eland) {
+TEST(TESTSuite, eland_control_error) {
 
   bool result = tester_->test();
 

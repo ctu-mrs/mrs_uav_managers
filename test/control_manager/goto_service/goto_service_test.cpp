@@ -205,7 +205,7 @@ bool Tester::test() {
 
 std::shared_ptr<Tester> tester_;
 
-TEST(TESTSuite, eland_service) {
+TEST(TESTSuite, goto_service) {
 
   bool result = tester_->test();
 
