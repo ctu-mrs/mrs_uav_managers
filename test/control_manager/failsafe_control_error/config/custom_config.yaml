@@ -1,0 +1,23 @@
+# GET ALL PARAMETERS USABLE FOR CUSTOM CONFIG BY RUNNING:
+## --------------------------------------------------------------
+## |          rosrun mrs_uav_core get_public_params.py          #
+## --------------------------------------------------------------
+
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # loaded state estimator plugins
+    state_estimators: [
+      "passthrough",
+    ]
+
+    initial_state_estimator: "passthrough" # will be used as the first state estimator
+    agl_height_estimator: "" # only slightly filtered height for checking min height (not used in control feedback)
+
+  control_manager:
+
+    MpcController:
+      eland_threshold: 0.0 # [m], position error triggering eland
+      failsafe_threshold: 0.2 # [m], position error triggering failsafe land
+      odometry_innovation_threshold: 0.0 # [m], position odometry innovation threshold

@@ -1,0 +1,7 @@
+<launch>
+
+  <include file="$(find mrs_uav_managers)test/control_manager/eland_control_error/launch/mrs_uav_system.launch" />
+
+  <test pkg="mrs_uav_managers" type="MrsUavManagers_ControlManagerElandControlErrorTest" test-name="eland_control_error" time-limit="60.0" />
+
+</launch>

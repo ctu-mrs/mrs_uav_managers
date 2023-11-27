@@ -7,7 +7,6 @@
 
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
-#include <mrs_msgs/Vec4.h>
 
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
@@ -76,7 +75,7 @@ Tester::Tester() {
 
   ros::Time::waitForValid();
 
-  spinner_ = std::make_shared<ros::AsyncSpinner>(2);
+  spinner_ = std::make_shared<ros::AsyncSpinner>(4);
   spinner_->start();
 
   std::string uav_name = "uav1";
@@ -137,17 +136,19 @@ bool Tester::test() {
 
   // | ---------------------- arm the drone --------------------- |
 
-  ROS_INFO("[%s]: arming the edrone", ros::this_node::getName().c_str());
-
-  std_srvs::SetBool arming;
-  arming.request.data = true;
+  ROS_INFO("[%s]: arming the drone", ros::this_node::getName().c_str());
 
   {
-    bool service_call = sch_arming_.call(arming);
+    std_srvs::SetBool arming;
+    arming.request.data = true;
 
-    if (!service_call || !arming.response.success) {
-      ROS_ERROR("[%s]: arming service call failed", ros::this_node::getName().c_str());
-      return false;
+    {
+      bool service_call = sch_arming_.call(arming);
+
+      if (!service_call || !arming.response.success) {
+        ROS_ERROR("[%s]: arming service call failed", ros::this_node::getName().c_str());
+        return false;
+      }
     }
   }
 
@@ -159,14 +160,16 @@ bool Tester::test() {
 
   ROS_INFO("[%s]: activating the drone 'in mid air'", ros::this_node::getName().c_str());
 
-  std_srvs::Trigger midair;
-
   {
-    bool service_call = sch_midair_.call(midair);
+    std_srvs::Trigger trigger;
 
-    if (!service_call || !midair.response.success) {
-      ROS_ERROR("[%s]: midair activation service call failed", ros::this_node::getName().c_str());
-      return false;
+    {
+      bool service_call = sch_midair_.call(trigger);
+
+      if (!service_call || !trigger.response.success) {
+        ROS_ERROR("[%s]: midair activation service call failed", ros::this_node::getName().c_str());
+        return false;
+      }
     }
   }
 
@@ -193,7 +196,7 @@ bool Tester::test() {
 
   while (ros::ok()) {
 
-    ROS_INFO_THROTTLE(1.0, "[%s]: waiting for lainding", ros::this_node::getName().c_str());
+    ROS_INFO_THROTTLE(1.0, "[%s]: waiting for landing", ros::this_node::getName().c_str());
 
     if (sh_control_manager_diag_.getMsg()->output_enabled == false) {
       break;

@@ -1,6 +1,6 @@
 <launch>
 
-  <include file="$(find mrs_uav_managers)/test/sessions/x500_on_the_ground/launch/mrs_uav_system.launch" />
+  <include file="$(find mrs_uav_managers)/test/uav_manager/takeoff/launch/mrs_uav_system.launch" />
 
   <test pkg="mrs_uav_managers" type="MrsUavManagers_UavManagerTakeoffTest" test-name="takeoff_test" time-limit="60.0" />
 

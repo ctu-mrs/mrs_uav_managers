@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="this_session_path" default="$(find mrs_uav_managers)/test/sessions/x500_on_the_ground" />
+  <arg name="this_session_path" default="$(find mrs_uav_managers)/test/control_manager/eland_control_error" />
 
   <arg name="UAV_NAME" default="uav1" />
   <arg name="RUN_TYPE" default="simulation" />
@@ -11,11 +11,6 @@
   </include>
 
   <include file="$(find mrs_multirotor_simulator)/launch/hw_api.launch">
-    <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
-    <arg name="RUN_TYPE" default="$(arg RUN_TYPE)" />
-  </include>
-
-  <include file="$(find mrs_uav_autostart)/launch/automatic_start.launch">
     <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
     <arg name="RUN_TYPE" default="$(arg RUN_TYPE)" />
   </include>
