@@ -13,14 +13,14 @@ VERBOSE=1
 
 # build the package
 catkin build $PACKAGE # it has to be fully built normally before building with --catkin-make-args tests
-catkin build $PACKAGE --catkin-make-args tests
+catkin build $PACKAGE --no-deps --catkin-make-args tests
 
 # folder for test results
 TEST_RESULT_PATH=$(realpath /tmp/$RANDOM)
 mkdir -p $TEST_RESULT_PATH
 
 # run the test
-rostest $PACKAGE uav_manager_takeoff.test $TEXT_OUTPUT --results-filename=$PACKAGE.test --results-base-dir="$TEST_RESULT_PATH"
+rostest $PACKAGE control_manager_eland_control_error.test $TEXT_OUTPUT --results-filename=$PACKAGE.test --results-base-dir="$TEST_RESULT_PATH"
 
 # evaluate the test results
 echo test result path is $TEST_RESULT_PATH

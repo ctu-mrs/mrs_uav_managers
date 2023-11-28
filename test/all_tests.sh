@@ -13,11 +13,13 @@ VERBOSE=1
 
 # build the package
 catkin build $PACKAGE # it has to be fully built normally before building with --catkin-make-args tests
-catkin build $PACKAGE --catkin-make-args tests
+catkin build $PACKAGE --no-deps --catkin-make-args tests
 
 TEST_FILES=$(find . -name "*.test" -type f -printf "%f\n")
 
 for TEST_FILE in `echo $TEST_FILES`; do
+
+  echo "$0: running test '$TEST_FILE'"
 
   # folder for test results
   TEST_RESULT_PATH=$(realpath /tmp/$RANDOM)
