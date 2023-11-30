@@ -174,6 +174,19 @@ target_link_libraries(MrsUavManagers_SafetyAreaManager
   )
 
 ## --------------------------------------------------------------
+## |                           Testing                          |
+## --------------------------------------------------------------
+
+if(CATKIN_ENABLE_TESTING)
+
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+
+  add_subdirectory(test)
+
+endif()
+
+## --------------------------------------------------------------
 ## |                           Install                          |
 ## --------------------------------------------------------------
 

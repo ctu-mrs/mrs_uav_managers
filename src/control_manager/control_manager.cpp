@@ -565,7 +565,6 @@ private:
   bool   _odometry_innovation_check_enabled_ = false;
   double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
 
-  // are callbacks enabled to trackers?
   bool callbacks_enabled_ = true;
 
   // | ------------------------ parachute ----------------------- |
@@ -4504,7 +4503,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
   std::stringstream ss;
 
-  ss << "callbacks " << (output_enabled_ ? "enabled" : "disabled");
+  ss << "callbacks " << (callbacks_enabled_ ? "enabled" : "disabled");
 
   res.message = ss.str();
   res.success = true;
@@ -6502,16 +6501,22 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& poi
   service.request.reference = point.reference;
   service.request.header = point.header;
 
-  if(!point_in_safety_area_3d_.call(service)){
-    ROS_WARN("[ControlManager]: SafetyArea: Could not call service point_in_safety_area_3d");
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
+
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
     return false;
   }
 
-  if(service.response.message != ""){
-    ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
   }
 
-  return service.response.success;
+  if (point.reference.position.z < getMinZ(point.header.frame_id) || point.reference.position.z > getMaxZ(point.header.frame_id)) {
+    return false;
+  }
+
+  return true;
 }
 
 //}
@@ -6524,19 +6529,18 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& poi
     return true;
   }
 
-  mrs_msgs::ReferenceStampedSrv service;
-  service.request.reference = point.reference;
-  service.request.header = point.header;
-  
-  if(!point_in_safety_area_2d_.call(service)){
-    ROS_WARN("[ControlManager]: SafetyArea: Could not call service point_in_safety_area_2d");
+  auto tfed_horizontal = transformer_->transformSingle(point, _safety_area_horizontal_frame_);
+
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
     return false;
   }
 
-  if(service.response.message != ""){
-    ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
   }
-  return service.response.success;
+
+  return true;
 }
 
 //}
@@ -6548,19 +6552,42 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
     return true;
   }
 
-  mrs_msgs::PathToPointInSafetyArea service;
-  service.request.start = start;
-  service.request.end = end;
+  if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end)) {
+    return false;
+  }
+
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  {
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
 
   if(!path_in_safety_area_3d_.call(service)){
     ROS_WARN("[ControlManager]: SafetyArea: Could not call service path_in_safety_area_3d");
     return false;
   }
 
-  if(service.response.message != ""){
-    ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
+  {
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
   }
-  return service.response.success;
+
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
 }
 
 //}
@@ -6572,19 +6599,42 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
     return true;
   }
 
-  mrs_msgs::PathToPointInSafetyArea service;
-  service.request.start = start;
-  service.request.end = end;
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end)) {
+    return false;
+  }
+
+  {
+    auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
 
   if(!path_in_safety_area_2d_.call(service)){
     ROS_WARN("[ControlManager]: SafetyArea: Could not call service path_in_safety_area_2d");
     return false;
   }
 
-  if(service.response.message != ""){
-    ROS_INFO("[ControlManager]: SafetyArea: %s", service.response.message.c_str());
+  {
+    auto ret = transformer_->transformSingle(end, _safety_area_horizontal_frame_);
+
+    if (!ret) {
+
+      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
+    }
+
+    end_transformed = ret.value();
   }
-  return service.response.success;
+
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
+                                   end_transformed.reference.position.y);
 }
 
 

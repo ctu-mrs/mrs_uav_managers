@@ -8,10 +8,6 @@
 
 This package contains *high-level* flight managers.
 
-> :warning: **Attention please: This page is outdated.**
->
-> The MRS UAV System 1.5 is being released and this page needs updating. Plase, keep in mind that the information on this page might not ve valid.
-
 ## ControlManager
 
 * integrates the control and tracking part of the MRS UAV pipeline
