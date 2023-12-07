@@ -1,0 +1,30 @@
+<launch>
+
+  <arg name="UAV_NAME" default="uav1" />
+  <arg name="UAV_TYPE" default="x500" />
+
+  <!-- these will be filled in from the CMakeLists -->
+  <arg name="test_path" default="" />
+  <arg name="test_name" default="" />
+  <arg name="package_name" default="" />
+
+  <include file="$(find mrs_uav_testing)/launch/mrs_simulator.launch">
+    <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
+  </include>
+
+  <include file="$(find mrs_multirotor_simulator)/launch/hw_api.launch">
+    <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
+  </include>
+
+  <include file="$(find mrs_uav_testing)/launch/mrs_uav_system.launch">
+    <arg name="automatic_start" default="false" />
+    <arg name="platform_config" default="$(find mrs_multirotor_simulator)/config/mrs_uav_system/$(arg UAV_TYPE).yaml" />
+    <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
+  </include>
+
+  <test pkg="$(arg package_name)" type="test_$(arg test_name)" test-name="$(arg test_name)" time-limit="60.0">
+    <param name="test_name" value="$(arg test_name)" />
+    <param name="uav_name" value="$(arg UAV_NAME)" />
+  </test>
+
+</launch>
