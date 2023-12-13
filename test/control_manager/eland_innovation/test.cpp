@@ -4,7 +4,7 @@
 
 #include <nav_msgs/Odometry.h>
 
-#define POS_JUMP_SIZE 3.0
+#define POS_JUMP_SIZE 4.0
 
 class Tester : public mrs_uav_testing::TestGeneric {
 
