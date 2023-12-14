@@ -447,6 +447,9 @@ private:
     tf_msg.header.stamp = msg->header.stamp;
 
     geometry_msgs::Pose pose;
+    pose.position.x = 0.0;
+    pose.position.y = 0.0;
+    pose.position.z = 0.0;
     pose.orientation = msg->quaternion;
     if (is_inverted_) {
 
