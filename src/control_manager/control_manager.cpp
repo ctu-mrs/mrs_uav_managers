@@ -2869,16 +2869,10 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     return;
   }
 
-  double throttle = 0;
+  auto throttle = extractThrottle(last_control_output);
 
-  if (std::holds_alternative<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
-  } else {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement eland timer for this control mode");
+  if (!throttle) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement landing detection mechanism for the current control modality");
     return;
   }
 
@@ -2888,6 +2882,14 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == LANDING_STATE) {
 
+    // --------------------------------------------------------------
+    // |                            TODO                            |
+    // This section needs work. The throttle landing detection      |
+    // mechanism should be extracted and other mechanisms, such     |
+    // as velocity-based detection should be used for high          |
+    // modalities                                                   |
+    // --------------------------------------------------------------
+
     if (!last_control_output.control_output) {
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerEland: last_control_output has not been initialized, returning");
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
@@ -2895,7 +2897,7 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     }
 
     // recalculate the mass based on the throttle
-    throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle) / common_handlers_->g;
+    throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value()) / common_handlers_->g;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
     // condition for automatic motor turn off
@@ -2976,6 +2978,14 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: FailsafeTimer: could not extract throttle out of the last control output");
     return;
   }
+
+  // --------------------------------------------------------------
+  // |                            TODO                            |
+  // This section needs work. The throttle landing detection      |
+  // mechanism should be extracted and other mechanisms, such     |
+  // as velocity-based detection should be used for high          |
+  // modalities                                                   |
+  // --------------------------------------------------------------
 
   double throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value()) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
@@ -7259,6 +7269,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 /* failsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::failsafe(void) {
+
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
@@ -7286,6 +7297,10 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     toggleOutput(false);
 
     return std::tuple(true, "RC emergency handoff is ON, disabling output");
+  }
+
+  if (getLowestOuput(_hw_api_inputs_) == POSITION) {
+    return eland();
   }
 
   if (_parachute_enabled_) {
