@@ -39,6 +39,8 @@ bool Tester::test() {
     if (!isFlyingNormally() && getActiveController() == "FailsafeController") {
       break;
     }
+
+    sleep(0.01);
   }
 
   // | -------------------- wait for landing -------------------- |
@@ -52,6 +54,8 @@ bool Tester::test() {
     if (!this->isOutputEnabled()) {
       return true;
     }
+
+    sleep(0.01);
   }
 
   return false;

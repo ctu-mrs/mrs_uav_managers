@@ -66,6 +66,8 @@ bool Tester::test() {
     if (!isFlyingNormally() && getActiveController() == "EmergencyController" && getActiveTracker() == "LandoffTracker") {
       break;
     }
+
+    sleep(0.01);
   }
 
   // | -------------------- wait for landing -------------------- |
@@ -79,6 +81,8 @@ bool Tester::test() {
     if (!this->isOutputEnabled()) {
       return true;
     }
+
+    sleep(0.01);
   }
 
   return false;
