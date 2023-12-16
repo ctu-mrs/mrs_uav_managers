@@ -69,14 +69,14 @@ typedef enum
 {
 
   IDLE_STATE,
-  FLY_THERE_STATE,
+  GOTO_STATE,
   LANDING_STATE,
 
 } LandingStates_t;
 
 const char* state_names[3] = {
 
-    "IDLING", "FLYING HOME", "LANDING"};
+    "IDLING", "GOTO", "LANDING"};
 
 class UavManager : public nodelet::Nodelet {
 
@@ -648,7 +648,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
     return;
 
-  } else if (current_state_landing_ == FLY_THERE_STATE) {
+  } else if (current_state_landing_ == GOTO_STATE) {
 
     auto [pos_x, pos_y, pos_z] = mrs_lib::getPosition(*tracker_cmd);
     auto [ref_x, ref_y, ref_z] = mrs_lib::getPosition(land_there_current_frame);
@@ -1754,7 +1754,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     throttle_under_threshold_          = false;
     throttle_mass_estimate_first_time_ = ros::Time(0);
 
-    changeLandingState(FLY_THERE_STATE);
+    changeLandingState(GOTO_STATE);
 
     timer_landing_.start();
 
@@ -1874,7 +1874,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
     throttle_under_threshold_          = false;
     throttle_mass_estimate_first_time_ = ros::Time(0);
 
-    changeLandingState(FLY_THERE_STATE);
+    changeLandingState(GOTO_STATE);
 
     timer_landing_.start();
 
@@ -2140,7 +2140,7 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
         takingoff_           = false;
         timer_takeoff_.stop();
 
-        changeLandingState(FLY_THERE_STATE);
+        changeLandingState(GOTO_STATE);
 
         throttle_under_threshold_          = false;
         throttle_mass_estimate_first_time_ = ros::Time(0);
