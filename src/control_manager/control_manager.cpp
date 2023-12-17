@@ -6419,7 +6419,7 @@ std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceCo
 
 bool ControlManager::isFlyingNormally(void) {
 
-  return (output_enabled_) && (offboard_mode_) && (armed_) &&
+  return callbacks_enabled_ && (output_enabled_) && (offboard_mode_) && (armed_) &&
          (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) &&
            (active_controller_idx_ != _failsafe_controller_idx_)) ||
           _controller_names_.size() == 1) &&

@@ -880,7 +880,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
-  if (!control_manager_diag->flying_normally) {
+  if (!fixing_min_height_ && !control_manager_diag->flying_normally) {
     return;
   }
 
@@ -977,7 +977,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
-  if (!control_manager_diag->flying_normally) {
+  if (!fixing_min_height_ && !control_manager_diag->flying_normally) {
     return;
   }
 
@@ -987,6 +987,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
   auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
 
   double odometry_heading = 0;
+
   try {
     odometry_heading = mrs_lib::getHeading(odometry);
   }
