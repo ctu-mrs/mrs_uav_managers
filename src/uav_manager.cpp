@@ -880,7 +880,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
-  if (!fixing_min_height_ && !control_manager_diag->flying_normally) {
+  if (!fixing_max_height_ && !control_manager_diag->flying_normally) {
     return;
   }
 
