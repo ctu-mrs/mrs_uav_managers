@@ -45,13 +45,13 @@ set(LIBRARIES
   )
 
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include test/include
   LIBRARIES ${LIBRARIES}
   CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
 include_directories(
-  include
+  include test/include
   ${catkin_INCLUDE_DIRS}
   )
 
