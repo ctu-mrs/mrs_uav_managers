@@ -34,6 +34,7 @@ set(LIBRARIES
   MrsUavManagers_EstimationManager
   MrsUavManagers_TransformManager
   MrsUavManagers_NullTracker
+  MrsUavManagers_SafetyAreaManager
   )
 
 catkin_package(
@@ -43,10 +44,12 @@ catkin_package(
   )
 
 include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
   # Todo: this must not be here
   /home/azat/mrs_workspace/devel/include
+  /home/azat/mrs_workspace/src/mrs_lib/include
+
+  include
+  ${catkin_INCLUDE_DIRS}
   )
 
 # MrsUavManagers_ControlManager
