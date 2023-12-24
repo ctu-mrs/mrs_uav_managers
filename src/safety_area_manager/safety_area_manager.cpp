@@ -3,18 +3,6 @@
 #include <XmlRpcException.h>
 #include <geometry_msgs/Point.h>
 
-// TODO: 
-// Provide services and implement them
-//
-// Do i need to use_safety_area? It seems to be ControlManagers's responsibility
-// Like, I can ask for point verification even if its using is disabled.
-// On the other hand, why would a user need it?
-
-// Add "set use_safety_area" service callback
-
-// One more: to implement the bumper or not to implement? - I think general
-// safetyness is ControlManagers's responsibility
-
 namespace mrs_uav_managers
 {
 
@@ -22,14 +10,25 @@ namespace safety_area_manager
 {
 
 void SafetyAreaManager::onInit(){
-  // ROS_INFO("SafetyAreaManager: onInit called");
-  // publisher_ = nh_.advertise<std_msgs::String>("chatter", 1000);
-  // ROS_INFO("SafetyAreaManager: topic inited");
-  // std_msgs::String msg;
-  // msg.data = "hello world";
-  // publisher_.publish(msg);
-  // ROS_INFO("SafetyAreaManager: msg published");
   preinitialize();
+}
+
+SafetyAreaManager::~SafetyAreaManager(){
+  for(size_t i=0; i<static_edges_.size(); i++){
+    delete static_edges_[i];
+  }
+  for(size_t i=0; i<int_edges_.size(); i++){
+    delete int_edges_[i];
+  }
+  for(size_t i=0; i<vertices_.size(); i++){
+    delete vertices_[i];
+  }
+  for(size_t i=0; i<centers_.size(); i++){
+    delete centers_[i];
+  }
+  for(size_t i=0; i<bounds_.size(); i++){
+    delete bounds_[i];
+  }
 }
 
 void SafetyAreaManager::preinitialize(){
@@ -54,11 +53,12 @@ void SafetyAreaManager::preinitialize(){
 void SafetyAreaManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
 
-  if (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
-    ROS_INFO("[SafetyAreaManager]: waiting for HW API capabilities");
-    return;
-  }
+  // TODO: uncomment this
+  // if (!sh_hw_api_capabilities_.hasMsg()) {
+  //   ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
+  //   ROS_INFO("[SafetyAreaManager]: waiting for HW API capabilities");
+  //   return;
+  // }
 
   // Note: all the hw_ap_capabilities seemed to be useless
 
@@ -76,8 +76,8 @@ void SafetyAreaManager::initialize() {
 
   std::string world_config;
   mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+  
   param_loader.loadParam("world_config", world_config);
-
   ROS_INFO("[SafetyAreaManager] Debug: world_config file = %s", world_config.c_str());
   if (world_config != "") {
     param_loader.addYamlFile(world_config);
@@ -140,8 +140,8 @@ void SafetyAreaManager::initialize() {
 
 mrs_lib::Prism SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z) {
   std::vector<mrs_lib::Point2d> points = std::vector<mrs_lib::Point2d>();
-  for(int i=0; i<matrix.rows(); i++){
-    points.push_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
+  for(int i=0; i<matrix.cols(); i++){
+    points.push_back(mrs_lib::Point2d{matrix(0, i), matrix(1, i)});
   }
 
   mrs_lib::Prism result = mrs_lib::Prism(points, max_z, min_z);
@@ -149,63 +149,71 @@ mrs_lib::Prism SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z
 }
 
 void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader) {
-  param_loader.loadParam("safety_area/horizontal/frame_name", safety_area_horizontal_frame_);
-  param_loader.loadParam("safety_area/vertical/frame_name", safety_area_vertical_frame_);
+  param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
+  param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
 
-  // Making border prism
-  Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/boarder/points", -1, 2);
-  double max_z;
-  double min_z;
-  param_loader.loadParam2("safety_area/border/max_z", max_z);
-  param_loader.loadParam2("safety_area/border/min_z", min_z);
+  // Make border prism
+  Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", 2, -1);
+  double max_z = param_loader.loadParam2("safety_area/border/max_z", max_z);
+  double min_z = param_loader.loadParam2("safety_area/border/min_z", min_z);
   max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
   min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
   mrs_lib::Prism border = makePrism(border_points, max_z, min_z);
 
-  XmlRpc::XmlRpcValue value;
-  if(!param_loader.loadParam("safety_area/obstacles", value)) {
+  // Read parameters for obstacles
+  std::vector<Eigen::MatrixXd> obstacles_mat;
+  param_loader.loadMatrixArray("safety_area/obstacles", obstacles_mat);
+
+  Eigen::MatrixXd max_z_mat;
+  Eigen::MatrixXd min_z_mat;
+  param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
+  param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
+
+  if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == obstacles_mat.size())){
+    ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
     return;
   }
 
+  // Make obstacle prisms
   std::vector<mrs_lib::Prism> obstacles;
-  for(int i=0; i<value.size(); i++){
-    std::string obstacle_id = value[i].begin()->first;
-    std::string prefix = "safety_area/obstacles/" + obstacle_id;
-
-    // Making obstacle prisms
-    Eigen::MatrixXd obstacle_points = param_loader.loadMatrixDynamic2(prefix + "points", -1, 2);
-    param_loader.loadParam2(prefix + "max_z", max_z);
-    param_loader.loadParam2(prefix + "min_z", min_z);
+  for(size_t i=0; i<obstacles_mat.size(); i++){
+    max_z = max_z_mat(i, 0);
+    min_z = min_z_mat(i, 0);
     max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
     min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
-    obstacles.push_back(makePrism(obstacle_points, max_z, min_z));
+    obstacles.push_back(makePrism(obstacles_mat[i], max_z, min_z));
   }
 
+  // Initialize safety_zone_
   safety_zone_ = new mrs_lib::SafetyZone(border, obstacles);
   
-  // Adding visualization
-  static_edges_.push_back(mrs_lib::StaticEdgesVisualization(safety_zone_, safety_area_horizontal_frame_, nh_, 2));
-  int_edges_.push_back(mrs_lib::IntEdgesVisualization(safety_zone_, safety_area_horizontal_frame_, nh_));
-  vertices_.push_back(mrs_lib::VertexControl(safety_zone_, safety_area_horizontal_frame_, nh_));
-  centers_.push_back(mrs_lib::CenterControl(safety_zone_, safety_area_horizontal_frame_, nh_)); 
-  bounds_.push_back(mrs_lib::BoundsControl(safety_zone_, safety_area_horizontal_frame_, nh_));
+  // Add visualizations
+  static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, safety_area_horizontal_frame_, nh_, 2));
+  int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, safety_area_horizontal_frame_, nh_));
+  vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, safety_area_horizontal_frame_, nh_));
+  centers_.push_back(new mrs_lib::CenterControl(safety_zone_, safety_area_horizontal_frame_, nh_)); 
+  bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, safety_area_horizontal_frame_, nh_));
 
   for(auto it= safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++){
-    static_edges_.push_back(mrs_lib::StaticEdgesVisualization(safety_zone_, it->first, safety_area_horizontal_frame_, nh_, 2));
-    int_edges_.push_back(mrs_lib::IntEdgesVisualization(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
-    vertices_.push_back(mrs_lib::VertexControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
-    centers_.push_back(mrs_lib::CenterControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_)); 
-    bounds_.push_back(mrs_lib::BoundsControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
+    static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, it->first, safety_area_horizontal_frame_, nh_, 2));
+    int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
+    vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
+    centers_.push_back(new mrs_lib::CenterControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_)); 
+    bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, it->first, safety_area_horizontal_frame_, nh_));
   }
 }
 
 double SafetyAreaManager::transformZ(std::string from, std::string to, double z) {
+  // TODO: delete this if
+  if(from == to){
+    return z;
+  }
   geometry_msgs::Point point;
   point.x = 0;
   point.y = 0;
   point.z = z;
-
+  
   auto res = transformer_->transformSingle(from, point, to);
   if(!res){
     ROS_ERROR("[SafetyAreaManager]: Could not transform point from %s to %s.", from.c_str(), to.c_str());

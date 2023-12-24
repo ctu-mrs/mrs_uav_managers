@@ -13,8 +13,8 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/safety_zone/safety_zone.h>
-#include <mrs_lib/safety_zone/int_edges_visualization.h>
 #include <mrs_lib/safety_zone/static_edges_visualization.h>
+#include <mrs_lib/safety_zone/int_edges_visualization.h>
 #include <mrs_lib/safety_zone/vertex_control.h>
 #include <mrs_lib/safety_zone/center_control.h>
 #include <mrs_lib/safety_zone/bounds_control.h>
@@ -35,27 +35,19 @@ private:
   std::shared_ptr<mrs_lib::Transformer> transformer_;
 
   bool is_initialized_ = false;
-
-  // std::mutex                           mutex_safety_area_min_z_;
   bool                                 use_safety_area_;
-  // bool                                 obstacle_polygons_enabled_ = false;
-  // bool                                 obstacle_points_enabled_   = false;
-  // double                               safety_area_min_z_ = 0;
-  // double                               safety_area_max_z_ = 0;
   std::string                          safety_area_frame_;
   std::string                          safety_area_horizontal_frame_;
   std::string                          safety_area_vertical_frame_;
   std::string                          uav_name_;
-  // std::string                          body_frame_;
   mrs_lib::SafetyZone* safety_zone_;
 
   // Visualization objects
-  std::vector<mrs_lib::StaticEdgesVisualization> static_edges_;
-  std::vector<mrs_lib::IntEdgesVisualization>    int_edges_;
-  std::vector<mrs_lib::VertexControl>            vertices_;
-  std::vector<mrs_lib::CenterControl>            centers_;
-  std::vector<mrs_lib::BoundsControl>            bounds_;
-
+  std::vector<mrs_lib::StaticEdgesVisualization*> static_edges_;
+  std::vector<mrs_lib::IntEdgesVisualization*>    int_edges_;
+  std::vector<mrs_lib::VertexControl*>            vertices_;
+  std::vector<mrs_lib::CenterControl*>            centers_;
+  std::vector<mrs_lib::BoundsControl*>            bounds_;
 
   ros::NodeHandle nh_;
   ros::Publisher  publisher_;
@@ -104,6 +96,8 @@ private:
 
 public:
   virtual void onInit();
+
+  ~SafetyAreaManager();
 
 }; // class SafetyAreaManager
 
