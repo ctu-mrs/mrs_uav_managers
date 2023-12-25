@@ -132,6 +132,7 @@ void SafetyAreaManager::initialize() {
   service_server_path_in_safety_area_2d_  = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
   service_server_save_world_config_       = nh_.advertiseService("save_world_config_in",      &SafetyAreaManager::saveWorldConfig, this);
   service_server_use_safety_area_         = nh_.advertiseService("set_use_safety_area_in",    &SafetyAreaManager::setUseSafetyArea, this);
+  service_server_add_obstacle_            = nh_.advertiseService("add_obstacle_in",           &SafetyAreaManager::addObstacle, this);
 
   // | ------------------------ profiler ------------------------ |
 
@@ -237,6 +238,47 @@ double SafetyAreaManager::transformZ(std::string from, std::string to, double z)
 // --------------------------------------------------------------
 // |                          services                          |
 // --------------------------------------------------------------
+
+bool SafetyAreaManager::addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+  mrs_msgs::ReferenceStamped point;
+  point.header = req.header;
+  point.reference = req.reference;
+  std::cout << "transforming...\n";
+  auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
+
+  std::cout << "transformed...\n";
+
+  double offset_x = tfed_horizontal->reference.position.x;
+  double offset_y = tfed_horizontal->reference.position.y;
+  
+  std::vector<mrs_lib::Point2d> points = {
+    mrs_lib::Point2d{2.5 + offset_x, 2.5 + offset_y},
+    mrs_lib::Point2d{2.5 + offset_x, -2.5 + offset_y},
+    mrs_lib::Point2d{-2.5 + offset_x, -2.5 + offset_y},
+    mrs_lib::Point2d{-2.5 + offset_x, 2.5 + offset_y},
+    };
+
+  std::cout << "made points\n";
+
+  int id = safety_zone_->addObstacle(mrs_lib::Prism(points, 5, 0));
+
+  std::cout << "prism created\n";
+  static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, id, safety_area_horizontal_frame_, nh_, 2));
+  int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, id, safety_area_horizontal_frame_, nh_));
+  vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, id, safety_area_horizontal_frame_, nh_));
+  centers_.push_back(new mrs_lib::CenterControl(safety_zone_, id, safety_area_horizontal_frame_, nh_)); 
+  bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, id, safety_area_horizontal_frame_, nh_));
+
+  std::cout << "vis added\n";
+  return true;
+}
 
 bool SafetyAreaManager::setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
   use_safety_area_ = req.data;

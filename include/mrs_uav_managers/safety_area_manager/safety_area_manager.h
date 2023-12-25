@@ -66,6 +66,7 @@ private:
   ros::ServiceServer service_server_path_in_safety_area_2d_;
   ros::ServiceServer service_server_save_world_config_;
   ros::ServiceServer service_server_use_safety_area_;
+  ros::ServiceServer service_server_add_obstacle_;
   
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -85,6 +86,8 @@ private:
   ros::Timer timer_hw_api_capabilities_;
   void timerHwApiCapabilities(const ros::TimerEvent& event);
 
+  // Services
+
   bool isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   bool isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
@@ -96,6 +99,8 @@ private:
   bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
   bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+
+  bool addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   // double getMaxZ(const std::string& frame_id);
 
