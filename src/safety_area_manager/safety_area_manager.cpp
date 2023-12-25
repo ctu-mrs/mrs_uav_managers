@@ -75,16 +75,7 @@ void SafetyAreaManager::initialize() {
 
   ROS_INFO("[SafetyAreaManager]: initializing");
 
-  // --------------------------------------------------------------
-  // |                          services                          |
-  // --------------------------------------------------------------
-
-  // service_server_point_in_safety_area_3d_ = nh_.advertiseService()
-  // service_server_point_in_safety_area_2d_ = nh_.advertiseService()
-  // service_server_path_in_safety_area_3d_ = nh_.advertiseService()
-  // service_server_path_in_safety_area_2d_ = nh_.advertiseService()
-  service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::saveWorldConfig, this);
-  service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::setUseSafetyArea, this);
+  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -135,11 +126,12 @@ void SafetyAreaManager::initialize() {
   }
 
   // | ------------------------ services ------------------------ |
-
   service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
   service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::isPointInSafetyArea2d, this);
   service_server_path_in_safety_area_3d_  = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
   service_server_path_in_safety_area_2d_  = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
+  service_server_save_world_config_       = nh_.advertiseService("save_world_config_in",      &SafetyAreaManager::saveWorldConfig, this);
+  service_server_use_safety_area_         = nh_.advertiseService("set_use_safety_area_in",    &SafetyAreaManager::setUseSafetyArea, this);
 
   // | ------------------------ profiler ------------------------ |
 
@@ -275,223 +267,187 @@ bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs
 }
 
 bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
-  // ROS_INFO("point 3d");
-  // if (!use_safety_area_) {
-  //   res.success = true;
-  //   res.message = "Safety area is disabled";
-  //   return true;
-  // }
+  ROS_INFO("point 3d");
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
 
-  // mrs_msgs::ReferenceStamped point;
-  // point.header = req.header;
-  // point.reference = req.reference;
+  mrs_msgs::ReferenceStamped point;
+  point.header = req.header;
+  point.reference = req.reference;
 
-  // auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+  auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
 
-  // if (!tfed_horizontal) {
-  //   res.message = "Could not transform the point to the safety area horizontal frame";
-  //   ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-  //   res.success = false;
-  //   return true;
-  // }
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
 
-  // if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
-  //   res.success = false;
-  //   return true;
-  // }
+  std::cout << "transformed\n";
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z)) {
+    res.success = false;
+    return true;
+  }
 
-  // if (point.reference.position.z < getMinZ(point.header.frame_id) || point.reference.position.z > getMaxZ(point.header.frame_id)) {
-  //   res.success = false;
-  //   return true;
-  // }
-
-  // res.success = true;
-  // return true;
+  res.success = true;
+  return true;
 }
 
 bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
-  // ROS_INFO("point 2d");
-  // if (!use_safety_area_) {
-  //   res.success = true;
-  //   res.message = "Safety area is disabled";
-  //   return true;
-  // }
+  ROS_INFO("point 2d");
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
   
-  // ROS_INFO("point 2d about to transform");
-  // mrs_msgs::ReferenceStamped point;
-  // point.reference = req.reference;
-  // point.header    = req.header;
-  // ROS_INFO("safety_area_hor_frame = %s", safety_area_horizontal_frame_.c_str());
-  // ROS_INFO("point frame = %s", point.header.frame_id.c_str());
-  // auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+  mrs_msgs::ReferenceStamped point;
+  point.reference = req.reference;
+  point.header    = req.header;
 
-  // ROS_INFO("point 2d transformed");
-  // if (!tfed_horizontal) {
-  //   ROS_INFO("point 2d transform was not successfull");
-  //   ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-  //   res.message = "Could not transform the point to the safety area horizontal frame";
-  //   res.success = false;
-  //   return true;
-  // }
+  auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
 
-  // ROS_INFO("point 2d transform was successfull");
+  if (!tfed_horizontal) {
+    ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
 
-  // if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
-  //   ROS_INFO("Point 2d is not valid");
-  //   res.success = false;
-  //   return true;
-  // }
-  // ROS_INFO("Point 2d is valid");
+  std::cout << "transformed\n";
 
-  // res.success = true;
-  // return true;
+  if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    res.success = false;
+    return true;
+  }
+
+  res.success = true;
+  return true;
 }
 
 // Note: it was decided not to use isPointInSafetyAreaNd() because
-// 1) It requires making new service message instances 
+// 1) It requires making new service message types
 // 2) If primary verification fails, we have no info of what exactly went wrong
 // 3) The same transformations have to be done twice
 bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
-  // ROS_INFO("path 3d");
-  // if (!use_safety_area_) {
-  //   res.success = true;
-  //   res.message = "Safety area is disabled";
-  //   return true;
-  // }
+  ROS_INFO("path 3d");
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
   
-  // mrs_msgs::ReferenceStamped start = req.start;
-  // mrs_msgs::ReferenceStamped end   = req.end;
+  geometry_msgs::PointStamped start = req.start;
+  geometry_msgs::PointStamped end   = req.end;
 
-  // // transform points
-  // mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+  // transform points
+  geometry_msgs::PointStamped start_transformed, end_transformed;
 
-  // {
-  //   auto ret = transformer_->transformSingle(start, safety_area_horizontal_frame_);
+  {
+    auto ret = transformer_->transformSingle(start, safety_area_horizontal_frame_);
 
-  //   if (!ret) {
-  //     ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-  //     res.message = "Could not transform the first point in the path";
-  //     res.success = false;
-  //     return true;
-  //   }
+    if (!ret) {
+      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
+      return true;
+    }
 
-  //   start_transformed = ret.value();
-  // }
+    start_transformed = ret.value();
+  }
 
-  // {
-  //   auto ret = transformer_->transformSingle(end, safety_area_horizontal_frame_);
+  {
+    auto ret = transformer_->transformSingle(end, safety_area_horizontal_frame_);
 
-  //   if (!ret) {
-  //     ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-  //     res.message = "Could not transform the first point in the path";
-  //     return true;
-  //   }
+    if (!ret) {
+      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      return true;
+    }
 
-  //   end_transformed = ret.value();
-  // }
+    end_transformed = ret.value();
+  }
+  std::cout << "transformed\n";
 
-  // // verify if the points are in safety area
-  // if(!safety_zone_->isPointValid(start_transformed.reference.position.x, start_transformed.reference.position.y)){
-  //   res.message = "The first point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
+  // verify the whole path
+  mrs_lib::Point3d start_point, end_point;
+  start_point.set<0>(start_transformed.point.x);
+  start_point.set<1>(start_transformed.point.y);
+  start_point.set<2>(start_transformed.point.z);
+  end_point.set<0>(end_transformed.point.x);
+  end_point.set<1>(end_transformed.point.y);
+  end_point.set<2>(end_transformed.point.z);
 
-  // if(start.reference.position.z < getMinZ(start.header.frame_id) || start.reference.position.z > getMaxZ(start.header.frame_id)){
-  //   res.message = "The first point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
+  if(safety_zone_->isPathValid(start_point, end_point)){
+    res.message = "The path is not valid";
+    res.success = false;
+    return true;
+  }
 
-  // if(!safety_zone_->isPointValid(end_transformed.reference.position.x, end_transformed.reference.position.y)){
-  //   res.message = "The second point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
-
-  // if(end.reference.position.z < getMinZ(end.header.frame_id) || end.reference.position.z > getMaxZ(end.header.frame_id)){
-  //   res.message = "The second point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
-
-  // // verify the whole path
-  // if(safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-  //                                  end_transformed.reference.position.y)){
-  //   res.message = "The path is not valid";
-  //   res.success = false;
-  //   return true;
-  // }
-
-  // res.message = "";
-  // res.success = true;
-  // return true;
+  res.success = true;
+  return true;
 }
 
 
 bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
-  // ROS_INFO("path 2d");
-  // if (!use_safety_area_) {
-  //   res.success = true;
-  //   res.message = "Safety area is disabled";
-  //   return true;
-  // }
+  ROS_INFO("path 2d");
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
   
-  // mrs_msgs::ReferenceStamped start = req.start;
-  // mrs_msgs::ReferenceStamped end   = req.end;
+  geometry_msgs::PointStamped start = req.start;
+  geometry_msgs::PointStamped end   = req.end;
 
-  // // transform points
-  // mrs_msgs::ReferenceStamped start_transformed, end_transformed;
-  // {
-  //   auto ret = transformer_->transformSingle(start, safety_area_frame_);
+  // transform points
+  geometry_msgs::PointStamped start_transformed, end_transformed;
 
-  //   if (!ret) {
-  //     ROS_ERROR("[SafetyAreaManager]: Could not transform the first point in the path");
-  //     res.message = "Could not transform the first point in the path";
-  //     res.success = false;
-  //     return true;
-  //   }
+  {
+    auto ret = transformer_->transformSingle(start, safety_area_horizontal_frame_);
 
-  //   start_transformed = ret.value();
-  // }
+    if (!ret) {
+      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
+      return true;
+    }
 
-  // {
-  //   auto ret = transformer_->transformSingle(end, safety_area_frame_);
+    start_transformed = ret.value();
+  }
 
-  //   if (!ret) {
-  //     ROS_ERROR("[SafetyAreaManager]: Could not transform the second point in the path");
-  //     res.message = "Could not transform the second point in the path";
-  //     res.success = false;
-  //     return true;
-  //   }
+  {
+    auto ret = transformer_->transformSingle(end, safety_area_horizontal_frame_);
 
-  //   end_transformed = ret.value();
-  // }
+    if (!ret) {
+      ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      return true;
+    }
 
-  // // verify if the points are in safety area
-  // if(!safety_zone_->isPointValid(start_transformed.reference.position.x, start_transformed.reference.position.y)){
-  //   res.message = "The first point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
+    end_transformed = ret.value();
+  }
 
-  // if(!safety_zone_->isPointValid(end_transformed.reference.position.x, end_transformed.reference.position.y)){
-  //   res.message = "The second point is not in safety area";
-  //   res.success = false;
-  //   return true;
-  // }
+  std::cout << "transformed\n";
+  // verify the whole path
+  mrs_lib::Point2d start_point, end_point;
+  start_point.set<0>(start_transformed.point.x);
+  start_point.set<1>(start_transformed.point.y);
+  end_point.set<0>(end_transformed.point.x);
+  end_point.set<1>(end_transformed.point.y);
 
-  // // verify the whole path
-  // res.message = "";
-  // if(safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-  //                                  end_transformed.reference.position.y)){
-  //   res.success = false;
-  //   res.message = "The path is not valid";
-  //   return true;
-  // }
+  if(safety_zone_->isPathValid(start_point, end_point)){
+    res.message = "The path is not valid";
+    res.success = false;
+    return true;
+  }
 
-  // res.success = true;
-  // return true;
+  res.success = true;
+  return true;
 }
 
 // double SafetyAreaManager::getMaxZ(const std::string& frame_id){

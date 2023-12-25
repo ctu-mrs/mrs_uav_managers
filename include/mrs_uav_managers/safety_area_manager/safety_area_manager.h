@@ -53,12 +53,10 @@ private:
   std::vector<mrs_lib::BoundsControl*>            bounds_;
 
   ros::NodeHandle nh_;
-  ros::Publisher  publisher_;
 
   // profiling
   mrs_lib::Profiler profiler_;
   bool              profiler_enabled_ = false;
-
   int status_timer_rate_   = 0;
 
   // safety area services
