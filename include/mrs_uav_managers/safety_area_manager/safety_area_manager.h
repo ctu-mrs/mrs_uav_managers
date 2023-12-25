@@ -4,8 +4,9 @@
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/PathToPointInSafetyArea.h>
 #include <mrs_msgs/HwApiCapabilities.h>
+#include <mrs_msgs/String.h>
 
-#include <std_msgs/String.h>
+#include <std_srvs/SetBool.h>
 
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/profiler.h>
@@ -33,14 +34,16 @@ class SafetyAreaManager : public nodelet::Nodelet
 {
 private:
   std::shared_ptr<mrs_lib::Transformer> transformer_;
-
   bool is_initialized_ = false;
-  bool                                 use_safety_area_;
-  std::string                          safety_area_frame_;
-  std::string                          safety_area_horizontal_frame_;
-  std::string                          safety_area_vertical_frame_;
-  std::string                          uav_name_;
+
   mrs_lib::SafetyZone* safety_zone_;
+  std::string          uav_name_;
+  std::string          safety_area_horizontal_frame_;
+  std::string          safety_area_vertical_frame_;
+  std::string          world_origin_units_;
+  double               origin_y_;
+  double               origin_x_;
+  bool                 use_safety_area_;
 
   // Visualization objects
   std::vector<mrs_lib::StaticEdgesVisualization*> static_edges_;
@@ -63,6 +66,8 @@ private:
   ros::ServiceServer service_server_point_in_safety_area_2d_;
   ros::ServiceServer service_server_path_in_safety_area_3d_;
   ros::ServiceServer service_server_path_in_safety_area_2d_;
+  ros::ServiceServer service_server_save_world_config_;
+  ros::ServiceServer service_server_use_safety_area_;
   
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -89,6 +94,10 @@ private:
   bool isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
 
   bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
+
+  bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+
+  bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   // double getMaxZ(const std::string& frame_id);
 

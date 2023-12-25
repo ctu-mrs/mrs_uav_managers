@@ -1,7 +1,12 @@
 #include "mrs_uav_managers/safety_area_manager/safety_area_manager.h"
 
+#include <mrs_lib/safety_zone/yaml_export_visitor.h>
+
 #include <XmlRpcException.h>
 #include <geometry_msgs/Point.h>
+
+#include <iostream>
+#include <fstream>
 
 namespace mrs_uav_managers
 {
@@ -69,7 +74,18 @@ mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabi
 void SafetyAreaManager::initialize() {
 
   ROS_INFO("[SafetyAreaManager]: initializing");
-  
+
+  // --------------------------------------------------------------
+  // |                          services                          |
+  // --------------------------------------------------------------
+
+  // service_server_point_in_safety_area_3d_ = nh_.advertiseService()
+  // service_server_point_in_safety_area_2d_ = nh_.advertiseService()
+  // service_server_path_in_safety_area_3d_ = nh_.advertiseService()
+  // service_server_path_in_safety_area_2d_ = nh_.advertiseService()
+  service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::saveWorldConfig, this);
+  service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::setUseSafetyArea, this);
+
   // --------------------------------------------------------------
   // |                           params                           |
   // --------------------------------------------------------------
@@ -92,6 +108,9 @@ void SafetyAreaManager::initialize() {
   const std::string yaml_prefix = "mrs_uav_managers/safety_area_manager/";
   param_loader.loadParam(yaml_prefix + "status_timer_rate", status_timer_rate_);
 
+  param_loader.loadParam("world_origin/units", world_origin_units_);
+  param_loader.loadParam("world_origin/origin_x", origin_x_);
+  param_loader.loadParam("world_origin/origin_y", origin_y_);
 
   param_loader.loadParam("safety_area/enabled", use_safety_area_);
 
@@ -221,6 +240,38 @@ double SafetyAreaManager::transformZ(std::string from, std::string to, double z)
   }
 
   return res.value().z;
+}
+
+// --------------------------------------------------------------
+// |                          services                          |
+// --------------------------------------------------------------
+
+bool SafetyAreaManager::setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+  use_safety_area_ = req.data;
+  res.success = true;
+  ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (use_safety_area_ ? "on" : "off"));
+  return true;
+}
+
+bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+  mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, 
+                            safety_area_horizontal_frame_, safety_area_vertical_frame_, 
+                            world_origin_units_, origin_x_, origin_y_);
+
+  safety_zone_->accept(visitor);
+
+  if(!visitor.isSuccessful()){
+    res.message = "Something went wrong during exporting parameters";
+    res.success = false;
+    return true;
+  }
+
+  std::ofstream ofs(req.value, std::ofstream::out | std::ofstream::trunc);
+  ofs << visitor.getResult();
+  ofs.close();
+  res.success = true;
+  ROS_INFO("[SafetyAreaManager]: world config has been saved to %s", req.value.c_str());
+  return true;
 }
 
 bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
