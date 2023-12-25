@@ -78,6 +78,9 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <mrs_msgs/String.h>
+#include <mrs_msgs/PathToPointInSafetyArea.h>
+
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
 #include <mrs_msgs/ReferenceList.h>
@@ -427,6 +430,15 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
+
+  // | --------------------- service clients -------------------- |
+
+  ros::ServiceClient service_client_point_in_safety_area_3d_;
+  ros::ServiceClient service_client_point_in_safety_area_2d_;
+  ros::ServiceClient service_client_path_in_safety_area_3d_;
+  ros::ServiceClient service_client_path_in_safety_area_2d_;
+  ros::ServiceClient service_client_max_z_;
+  ros::ServiceClient service_client_min_z_;
 
   // | --------------------- service servers -------------------- |
 
@@ -1811,6 +1823,17 @@ void ControlManager::initialize(void) {
   sh_hw_api_rc_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
 
   sh_hw_api_status_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
+
+  // | ------------------ safety area clients ------------------- |
+
+  ros::ServiceClient service_client_point_in_safety_area_3d_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("point_in_safety_area_3d");
+  ros::ServiceClient service_client_point_in_safety_area_2d_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("point_in_safety_area_2d");
+  ros::ServiceClient service_client_path_in_safety_area_3d_  = nh_.serviceClient<mrs_msgs::PathToPointInSafetyArea>("path_in_safety_area_3d");
+  ros::ServiceClient service_client_path_in_safety_area_2d_  = nh_.serviceClient<mrs_msgs::PathToPointInSafetyArea>("path_in_safety_area_2d");
+  ros::ServiceClient service_client_max_z_                   = nh_.serviceClient<mrs_msgs::String>("get_max_z");
+  ros::ServiceClient service_client_min_z_                   = nh_.serviceClient<mrs_msgs::String>("get_min_z");
+
+  std::cout << "created service:" <<service_client_point_in_safety_area_3d_.getService() << std::endl;
 
   // | -------------------- general services -------------------- |
 

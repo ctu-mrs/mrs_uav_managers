@@ -5,6 +5,7 @@
 #include <mrs_msgs/PathToPointInSafetyArea.h>
 #include <mrs_msgs/HwApiCapabilities.h>
 #include <mrs_msgs/String.h>
+#include <mrs_msgs/GetPointStamped.h>
 
 #include <std_srvs/SetBool.h>
 
@@ -67,6 +68,8 @@ private:
   ros::ServiceServer service_server_save_world_config_;
   ros::ServiceServer service_server_use_safety_area_;
   ros::ServiceServer service_server_add_obstacle_;
+  ros::ServiceServer service_server_get_max_z_;
+  ros::ServiceServer service_server_get_min_z_;
   
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -102,9 +105,9 @@ private:
 
   bool addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
-  // double getMaxZ(const std::string& frame_id);
+  bool getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
 
-  // double getMinZ(const std::string& frame_id);
+  bool getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
 
 public:
   virtual void onInit();

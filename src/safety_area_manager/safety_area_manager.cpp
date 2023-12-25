@@ -126,6 +126,7 @@ void SafetyAreaManager::initialize() {
   }
 
   // | ------------------------ services ------------------------ |
+
   service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
   service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::isPointInSafetyArea2d, this);
   service_server_path_in_safety_area_3d_  = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
@@ -133,6 +134,8 @@ void SafetyAreaManager::initialize() {
   service_server_save_world_config_       = nh_.advertiseService("save_world_config_in",      &SafetyAreaManager::saveWorldConfig, this);
   service_server_use_safety_area_         = nh_.advertiseService("set_use_safety_area_in",    &SafetyAreaManager::setUseSafetyArea, this);
   service_server_add_obstacle_            = nh_.advertiseService("add_obstacle_in",           &SafetyAreaManager::addObstacle, this);
+  service_server_get_max_z_               = nh_.advertiseService("get_max_z_in",              &SafetyAreaManager::getMaxZ, this);
+  service_server_get_min_z_               = nh_.advertiseService("get_min_z_in",              &SafetyAreaManager::getMinZ, this);
 
   // | ------------------------ profiler ------------------------ |
 
@@ -434,7 +437,6 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafet
   return true;
 }
 
-
 bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
   ROS_INFO("path 2d");
   if (!use_safety_area_) {
@@ -492,13 +494,25 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
   return true;
 }
 
-// double SafetyAreaManager::getMaxZ(const std::string& frame_id){
-//   return 1000;
-// }
+bool SafetyAreaManager::getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
+  res.result.header.frame_id = safety_area_horizontal_frame_;
+  res.result.point.x = 0;
+  res.result.point.y = 0;
+  res.result.point.z = safety_zone_->getBorder().getMaxZ();
 
-// double SafetyAreaManager::getMinZ(const std::string& frame_id){
-//   return -1000;
-// }
+  res.success = true;
+  return true;
+}
+
+bool SafetyAreaManager::getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
+  res.result.header.frame_id = safety_area_horizontal_frame_;
+  res.result.point.x = 0;
+  res.result.point.y = 0;
+  res.result.point.z = safety_zone_->getBorder().getMinZ();
+
+  res.success = true;
+  return true;
+}
 
 } // namespace safety_area_manager
 
