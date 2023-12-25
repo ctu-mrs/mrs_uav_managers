@@ -6,6 +6,7 @@
 #include <mrs_msgs/HwApiCapabilities.h>
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/GetPointStamped.h>
+#include <mrs_msgs/GetBool.h>
 
 #include <std_srvs/SetBool.h>
 
@@ -70,6 +71,7 @@ private:
   ros::ServiceServer service_server_add_obstacle_;
   ros::ServiceServer service_server_get_max_z_;
   ros::ServiceServer service_server_get_min_z_;
+  ros::ServiceServer service_server_get_use;
   
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -108,6 +110,8 @@ private:
   bool getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
 
   bool getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
+
+  bool getUse(mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res);
 
 public:
   virtual void onInit();

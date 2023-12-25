@@ -70,7 +70,7 @@
     <remap from="~save_world_config_in" to="~save_world_config"/>
     <remap from="~add_obstacle_in" to="~add_obstacle"/>
     <remap from="~get_max_z_in" to="~get_max_z"/>
-    <remap from="~get_min_z_in" to="~get_min_z"/>
+    <remap from="~get_use_in" to="~get_use"/>
 
     <!-- todo: add params, remappings -->
     </node>
