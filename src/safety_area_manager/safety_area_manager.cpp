@@ -20,6 +20,7 @@ void SafetyAreaManager::onInit(){
 }
 
 SafetyAreaManager::~SafetyAreaManager(){
+  delete safety_zone_;
   for(size_t i=0; i<static_edges_.size(); i++){
     delete static_edges_[i];
   }
@@ -162,14 +163,13 @@ void SafetyAreaManager::initialize() {
   ROS_INFO("[SafetyAreaManager]: initialized");
 }
 
-mrs_lib::Prism SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z) {
+mrs_lib::Prism* SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z) {
   std::vector<mrs_lib::Point2d> points = std::vector<mrs_lib::Point2d>();
   for(int i=0; i<matrix.cols(); i++){
     points.push_back(mrs_lib::Point2d{matrix(0, i), matrix(1, i)});
   }
 
-  mrs_lib::Prism result = mrs_lib::Prism(points, max_z, min_z);
-  return result;
+  return new mrs_lib::Prism(points, max_z, min_z);
 }
 
 void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader) {
@@ -183,7 +183,9 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
   max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
   min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
-  mrs_lib::Prism border = makePrism(border_points, max_z, min_z);
+  mrs_lib::Prism* tmp = makePrism(border_points, max_z, min_z);
+  mrs_lib::Prism border = *tmp;
+  delete tmp;
 
   // Read parameters for obstacles
   std::vector<Eigen::MatrixXd> obstacles_mat;
@@ -200,7 +202,7 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
   }
 
   // Make obstacle prisms
-  std::vector<mrs_lib::Prism> obstacles;
+  std::vector<mrs_lib::Prism*> obstacles;
   for(size_t i=0; i<obstacles_mat.size(); i++){
     max_z = max_z_mat(i, 0);
     min_z = min_z_mat(i, 0);
@@ -274,7 +276,7 @@ bool SafetyAreaManager::addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req,
     mrs_lib::Point2d{-2.5 + offset_x, 2.5 + offset_y},
     };
 
-  int id = safety_zone_->addObstacle(mrs_lib::Prism(points, 5, 0));
+  int id = safety_zone_->addObstacle(new mrs_lib::Prism(points, 5, 0));
 
   static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, id, uav_name_ + "/" +safety_area_horizontal_frame_, nh_, 2));
   int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, id, uav_name_ + "/" +safety_area_horizontal_frame_, nh_));
@@ -363,14 +365,10 @@ bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Req
   }
 
   if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
-    std::cout <<safety_area_horizontal_frame_ << std::endl;
-    std::cout << tfed_horizontal->reference.position.x << "  " << tfed_horizontal->reference.position.y << std::endl;
     res.success = false;
-    ROS_INFO("2d returning false");
     
     return true;
   }
-  ROS_INFO("2d returning true");
   res.success = true;
   return true;
 }
@@ -426,7 +424,7 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafet
   end_point.set<1>(end_transformed.point.y);
   end_point.set<2>(end_transformed.point.z);
 
-  if(safety_zone_->isPathValid(start_point, end_point)){
+  if(!safety_zone_->isPathValid(start_point, end_point)){
     res.message = "The path is not valid";
     res.success = false;
     return true;
@@ -481,7 +479,7 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
   end_point.set<0>(end_transformed.point.x);
   end_point.set<1>(end_transformed.point.y);
 
-  if(safety_zone_->isPathValid(start_point, end_point)){
+  if(!safety_zone_->isPathValid(start_point, end_point)){
     res.message = "The path is not valid";
     res.success = false;
     return true;
@@ -496,7 +494,7 @@ bool SafetyAreaManager::getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msg
   res.result.point.x = 0;
   res.result.point.y = 0;
   if(use_safety_area_){
-    res.result.point.z = safety_zone_->getBorder().getMaxZ();
+    res.result.point.z = safety_zone_->getBorder()->getMaxZ();
   }else{
     res.result.point.z = std::numeric_limits<double>::max();
   }
@@ -510,7 +508,7 @@ bool SafetyAreaManager::getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msg
   res.result.point.x = 0;
   res.result.point.y = 0;
   if(use_safety_area_){
-    res.result.point.z = safety_zone_->getBorder().getMinZ();
+    res.result.point.z = safety_zone_->getBorder()->getMinZ();
   }else{
     res.result.point.z = std::numeric_limits<double>::lowest();
   }

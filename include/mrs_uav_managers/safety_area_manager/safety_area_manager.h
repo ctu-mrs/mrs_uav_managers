@@ -79,7 +79,7 @@ private:
 
   void initialize();
 
-  mrs_lib::Prism makePrism(Eigen::MatrixXd matrix, double max_z, double min_z);
+  mrs_lib::Prism* makePrism(Eigen::MatrixXd matrix, double max_z, double min_z);
 
   void initializeSafetyZone(mrs_lib::ParamLoader& param_loader);
 

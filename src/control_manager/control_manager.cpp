@@ -1783,8 +1783,6 @@ void ControlManager::initialize(void) {
   service_client_min_z_                   = nh_.serviceClient<mrs_msgs::GetPointStamped>("get_min_z_out");
   service_client_get_use_                 = nh_.serviceClient<mrs_msgs::GetBool>("get_use_out");
 
-  std::cout << "created service:" <<service_client_point_in_safety_area_3d_.getService() << std::endl;
-
   // | -------------------- general services -------------------- |
 
   service_server_switch_tracker_             = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
@@ -6400,7 +6398,7 @@ double ControlManager::getMinZ(const std::string& frame_id) {
   double result = std::numeric_limits<double>::lowest();
 
   mrs_msgs::GetPointStamped srv;
-  if(!service_client_max_z_.call(srv)){
+  if(!service_client_min_z_.call(srv)){
     ROS_WARN("[ControlManager]: Could not call get_min_z server");
     return result;
   }
