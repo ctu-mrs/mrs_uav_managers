@@ -179,28 +179,36 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
   mrs_lib::Prism border = *tmp;
   delete tmp;
 
-  // Read parameters for obstacles
-  std::vector<Eigen::MatrixXd> obstacles_mat;
-  param_loader.loadMatrixArray("safety_area/obstacles", obstacles_mat);
-
-  Eigen::MatrixXd max_z_mat;
-  Eigen::MatrixXd min_z_mat;
-  param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
-  param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
-
-  if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == (long int)obstacles_mat.size())){
-    ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
-    return;
-  }
-
-  // Make obstacle prisms
+  // Making obstacle prisms
   std::vector<mrs_lib::Prism*> obstacles;
-  for(size_t i=0; i<obstacles_mat.size(); i++){
-    max_z = max_z_mat(i, 0);
-    min_z = min_z_mat(i, 0);
-    max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
-    min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
-    obstacles.push_back(makePrism(obstacles_mat[i], max_z, min_z));
+
+  bool is_obstacle_present = false;
+  param_loader.loadParam("safety_area/obstacles/present", is_obstacle_present, is_obstacle_present);
+
+  // If any is present, fill obstacles
+  if(is_obstacle_present){
+    // Read parameters for obstacles
+    std::vector<Eigen::MatrixXd> obstacles_mat;
+    param_loader.loadMatrixArray("safety_area/obstacles", obstacles_mat);
+
+    Eigen::MatrixXd max_z_mat;
+    Eigen::MatrixXd min_z_mat;
+    param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
+    param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
+
+    if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == (long int)obstacles_mat.size())){
+      ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
+      return;
+    }
+
+    // Make obstacle prisms
+    for(size_t i=0; i<obstacles_mat.size(); i++){
+      max_z = max_z_mat(i, 0);
+      min_z = min_z_mat(i, 0);
+      max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
+      min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
+      obstacles.push_back(makePrism(obstacles_mat[i], max_z, min_z));
+    }
   }
 
   // Initialize safety_zone_
