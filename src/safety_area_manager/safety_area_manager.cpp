@@ -57,10 +57,9 @@ void SafetyAreaManager::preinitialize(){
   timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
 }
 
-void SafetyAreaManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
-mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
+void SafetyAreaManager::timerHwApiCapabilities( [[maybe_unused]] const ros::TimerEvent& event) {
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
 
-  // TODO: uncomment this
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
     ROS_INFO("[SafetyAreaManager]: waiting for HW API capabilities");
@@ -74,13 +73,9 @@ mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabi
 }
 
 void SafetyAreaManager::initialize() {
-
   ROS_INFO("[SafetyAreaManager]: initializing");
 
-
-  // --------------------------------------------------------------
-  // |                           params                           |
-  // --------------------------------------------------------------
+  // | --------------------- parameters ---------------------- |
 
   std::string world_config;
   mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
@@ -144,21 +139,18 @@ void SafetyAreaManager::initialize() {
   service_server_add_obstacle_            = nh_.advertiseService("add_obstacle_in",           &SafetyAreaManager::addObstacle, this);
   service_server_get_max_z_               = nh_.advertiseService("get_max_z_in",              &SafetyAreaManager::getMaxZ, this);
   service_server_get_min_z_               = nh_.advertiseService("get_min_z_in",              &SafetyAreaManager::getMinZ, this);
-  service_server_get_use                  = nh_.advertiseService("get_use_in",                &SafetyAreaManager::getUse, this);
+  service_server_get_use_                 = nh_.advertiseService("get_use_in",                &SafetyAreaManager::getUse, this);
 
   // | ------------------------ profiler ------------------------ |
 
   profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
   
-
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
     ros::shutdown();
   }
-
-  is_initialized_ = true;
 
   ROS_INFO("[SafetyAreaManager]: initialized");
 }
@@ -196,7 +188,7 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
   param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
   param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
 
-  if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == obstacles_mat.size())){
+  if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == (long int)obstacles_mat.size())){
     ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
     return;
   }
@@ -231,10 +223,6 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
 }
 
 double SafetyAreaManager::transformZ(std::string from, std::string to, double z) {
-  // TODO: delete this if
-  if(from == to){
-    return z;
-  }
   geometry_msgs::Point point;
   point.x = 0;
   point.y = 0;
@@ -373,10 +361,6 @@ bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Req
   return true;
 }
 
-// Note: it was decided not to use isPointInSafetyAreaNd() because
-// 1) It requires making new service message types
-// 2) If primary verification fails, we have no info of what exactly went wrong
-// 3) The same transformations have to be done twice
 bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res) {
   if (!use_safety_area_) {
     res.success = true;
@@ -489,7 +473,7 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
   return true;
 }
 
-bool SafetyAreaManager::getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
+bool SafetyAreaManager::getMaxZ( [[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
   res.result.header.frame_id = safety_area_horizontal_frame_;
   res.result.point.x = 0;
   res.result.point.y = 0;
@@ -503,7 +487,7 @@ bool SafetyAreaManager::getMaxZ(mrs_msgs::GetPointStamped::Request& req, mrs_msg
   return true;
 }
 
-bool SafetyAreaManager::getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
+bool SafetyAreaManager::getMinZ( [[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res){
   res.result.header.frame_id = safety_area_horizontal_frame_;
   res.result.point.x = 0;
   res.result.point.y = 0;
@@ -517,7 +501,7 @@ bool SafetyAreaManager::getMinZ(mrs_msgs::GetPointStamped::Request& req, mrs_msg
   return true;
 }
 
-bool SafetyAreaManager::getUse(mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res){
+bool SafetyAreaManager::getUse( [[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res){
   res.result = use_safety_area_;
   return true;
 }
@@ -525,7 +509,6 @@ bool SafetyAreaManager::getUse(mrs_msgs::GetBool::Request& req, mrs_msgs::GetBoo
 } // namespace safety_area_manager
 
 } // namespace mrs_uav_managers
-
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::safety_area_manager::SafetyAreaManager, nodelet::Nodelet)
