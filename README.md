@@ -107,3 +107,8 @@ This package contains *high-level* flight managers.
 * publishes the delay of odometry produced by a SLAM algorithm (if available) on topic `map_delay` 
 * additionally can provide custom TFs from `nav_msgs/Odometry` topics by adding them to the `tf_sources` array in custom config
   * the msg can also be republished in another frame by adding the `frame_id` to the `republish_in_frames` array
+
+## SafetyAreaManager
+* provides services to check, if a point is inside of the safety zone
+* provides interactive correcting of the safety zone and obstacles within via Rviz
+* provides saving the configuration for further loadings
