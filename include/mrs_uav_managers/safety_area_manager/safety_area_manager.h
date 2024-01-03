@@ -64,6 +64,7 @@ private:
   ros::ServiceServer service_server_path_in_safety_area_3d_;
   ros::ServiceServer service_server_path_in_safety_area_2d_;
   ros::ServiceServer service_server_save_world_config_;
+  ros::ServiceServer service_server_load_world_config_;
   ros::ServiceServer service_server_use_safety_area_;
   ros::ServiceServer service_server_add_obstacle_;
   ros::ServiceServer service_server_get_max_z_;
@@ -75,7 +76,7 @@ private:
   // Tools for convenience
   mrs_lib::Prism* makePrism(Eigen::MatrixXd matrix, double max_z, double min_z);
   double transformZ(std::string from, std::string to, double z);
-  void initializeSafetyZone(mrs_lib::ParamLoader& param_loader);
+  bool initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename);
 
   // this timer will check till we already got the hardware api diagnostics
   // then it will trigger the initialization of the controllers and finish
@@ -91,6 +92,7 @@ private:
   bool isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
   bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
   bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
   bool getMaxZ( [[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);

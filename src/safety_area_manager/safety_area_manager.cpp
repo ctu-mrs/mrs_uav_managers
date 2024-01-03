@@ -77,14 +77,10 @@ void SafetyAreaManager::initialize() {
 
   // | --------------------- parameters ---------------------- |
 
-  std::string world_config;
   mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
   
+  std::string world_config;
   param_loader.loadParam("world_config", world_config);
-  ROS_INFO("[SafetyAreaManager] Debug: world_config file = %s", world_config.c_str());
-  if (world_config != "") {
-    param_loader.addYamlFile(world_config);
-  }
 
   param_loader.addYamlFileFromParam("private_config");
   param_loader.addYamlFileFromParam("public_config");
@@ -95,12 +91,6 @@ void SafetyAreaManager::initialize() {
   const std::string yaml_prefix = "mrs_uav_managers/safety_area_manager/";
   param_loader.loadParam(yaml_prefix + "status_timer_rate", status_timer_rate_);
 
-  param_loader.loadParam("world_origin/units", world_origin_units_);
-  param_loader.loadParam("world_origin/origin_x", origin_x_);
-  param_loader.loadParam("world_origin/origin_y", origin_y_);
-
-  param_loader.loadParam("safety_area/enabled", use_safety_area_);
-
   // | ---------------------- transformer ----------------------- |
 
   transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
@@ -108,9 +98,10 @@ void SafetyAreaManager::initialize() {
 
   // | ---------------------- safety zone ----------------------- |
   // Note: safety_zone is initialized even if the use_safety_area_ is false
-  // It will just allways return true untill it's turned on
+  // The manager will just always return true untill it's turned on
+  bool safety_zone_inited = false;
   try {
-    initializeSafetyZone(param_loader);
+    safety_zone_inited = initializeSafetyZone(param_loader, world_config);
   }
   catch (std::invalid_argument& e){
     ROS_ERROR("[SafetyAreaManager]: wrong configruation for the safety zone polygons. %s", e.what());
@@ -127,7 +118,6 @@ void SafetyAreaManager::initialize() {
 
   ROS_INFO("[SafetyAreaManager]: safety area initialized");
   
-
   // | ------------------------ services ------------------------ |
 
   service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
@@ -135,6 +125,7 @@ void SafetyAreaManager::initialize() {
   service_server_path_in_safety_area_3d_  = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
   service_server_path_in_safety_area_2d_  = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
   service_server_save_world_config_       = nh_.advertiseService("save_world_config_in",      &SafetyAreaManager::saveWorldConfig, this);
+  service_server_load_world_config_       = nh_.advertiseService("load_world_config_in",      &SafetyAreaManager::loadWorldConfig, this);
   service_server_use_safety_area_         = nh_.advertiseService("set_use_safety_area_in",    &SafetyAreaManager::setUseSafetyArea, this);
   service_server_add_obstacle_            = nh_.advertiseService("add_obstacle_in",           &SafetyAreaManager::addObstacle, this);
   service_server_get_max_z_               = nh_.advertiseService("get_max_z_in",              &SafetyAreaManager::getMaxZ, this);
@@ -147,7 +138,7 @@ void SafetyAreaManager::initialize() {
   
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loadedSuccessfully()) {
+  if (!param_loader.loadedSuccessfully() || !safety_zone_inited) {
     ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
     ros::shutdown();
   }
@@ -164,7 +155,15 @@ mrs_lib::Prism* SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_
   return new mrs_lib::Prism(points, max_z, min_z);
 }
 
-void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader) {
+bool SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename) {
+  if(!param_loader.addYamlFile(filename)){
+    return false;
+  }
+
+  param_loader.loadParam("world_origin/units", world_origin_units_);
+  param_loader.loadParam("world_origin/origin_x", origin_x_);
+  param_loader.loadParam("world_origin/origin_y", origin_y_);
+  param_loader.loadParam("safety_area/enabled", use_safety_area_);
   param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
   param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
 
@@ -198,7 +197,7 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
 
     if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == (long int)obstacles_mat.size())){
       ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
-      return;
+      return false;
     }
 
     // Make obstacle prisms
@@ -228,6 +227,8 @@ void SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader)
     centers_.push_back(new mrs_lib::CenterControl(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_)); 
     bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
   }
+
+  return param_loader.loadedSuccessfully();
 }
 
 double SafetyAreaManager::transformZ(std::string from, std::string to, double z) {
@@ -287,6 +288,97 @@ bool SafetyAreaManager::setUseSafetyArea(std_srvs::SetBool::Request& req, std_sr
   use_safety_area_ = req.data;
   res.success = true;
   ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (use_safety_area_ ? "on" : "off"));
+  return true;
+}
+
+bool SafetyAreaManager::loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+  // Backup
+  mrs_lib::SafetyZone*                            old_safety_zone = safety_zone_;
+  std::vector<mrs_lib::StaticEdgesVisualization*> old_static_edges = static_edges_;
+  std::vector<mrs_lib::IntEdgesVisualization*>    old_int_edges = int_edges_;
+  std::vector<mrs_lib::VertexControl*>            old_vertices = vertices_;
+  std::vector<mrs_lib::CenterControl*>            old_centers = centers_;
+  std::vector<mrs_lib::BoundsControl*>            old_bounds = bounds_;
+  std::string                                     old_world_origin_units = world_origin_units_;
+  std::string                                     old_safety_area_horizontal_frame = safety_area_horizontal_frame_;
+  std::string                                     old_safety_area_vertical_frame = safety_area_vertical_frame_;
+  double                                          old_origin_y = origin_y_;
+  double                                          old_origin_x = origin_x_;
+  bool                                            old_use_safety_area = use_safety_area_;
+  safety_zone_ = nullptr;
+  static_edges_.clear();
+  int_edges_.clear();
+  vertices_.clear();
+  centers_.clear();
+  bounds_.clear();
+
+  mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+  bool success = initializeSafetyZone(param_loader, req.value);
+
+  res.success = true;
+  if(!param_loader.loadedSuccessfully()){
+    ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
+    res.message = "Could not read the file. Probably data format is not correct.";
+    res.success = false;
+  } 
+  if(!success){
+    ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
+    res.message = "Could not load world config. Please, check the config file.";
+    res.success = false;
+  }
+
+  // In case of success, clean the backup
+  if(res.success){
+    delete old_safety_zone;
+    for(size_t i=0; i<old_static_edges.size(); i++){
+      delete old_static_edges[i];
+    }
+    for(size_t i=0; i<old_int_edges.size(); i++){
+      delete old_int_edges[i];
+    }
+    for(size_t i=0; i<old_vertices.size(); i++){
+      delete old_vertices[i];
+    }
+    for(size_t i=0; i<old_centers.size(); i++){
+      delete old_centers[i];
+    }
+    for(size_t i=0; i<old_bounds.size(); i++){
+      delete old_bounds[i];
+    }
+  }
+  // If smth went wrong, restore from backup
+  else{
+    if(safety_zone_){
+      delete safety_zone_;
+    }
+    for(size_t i=0; i<static_edges_.size(); i++){
+      delete static_edges_[i];
+    }
+    for(size_t i=0; i<int_edges_.size(); i++){
+      delete int_edges_[i];
+    }
+    for(size_t i=0; i<vertices_.size(); i++){
+      delete vertices_[i];
+    }
+    for(size_t i=0; i<centers_.size(); i++){
+      delete centers_[i];
+    }
+    for(size_t i=0; i<bounds_.size(); i++){
+      delete bounds_[i];
+    }
+    safety_zone_ = old_safety_zone;
+    static_edges_ = old_static_edges;
+    int_edges_ = old_int_edges;
+    vertices_ = old_vertices;
+    centers_ = old_centers;
+    bounds_ = old_bounds;
+    world_origin_units_ = old_world_origin_units;
+    safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
+    safety_area_vertical_frame_ = old_safety_area_vertical_frame;
+    origin_y_ = old_origin_y;
+    origin_x_ = old_origin_x;
+    use_safety_area_ = old_use_safety_area;
+  }
   return true;
 }
 
