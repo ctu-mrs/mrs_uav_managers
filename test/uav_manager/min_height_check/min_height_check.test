@@ -32,6 +32,8 @@
   <test pkg="$(arg package)" type="test_$(arg test_name)" test-name="$(arg test_name)" time-limit="60.0">
     <param name="test" value="$(arg test_name)" />
     <param name="uav_name" value="$(arg UAV_NAME)" />
+
+    <rosparam file="$(find mrs_uav_managers)/config/public/uav_manager.yaml" command="load" />
   </test>
 
 </launch>

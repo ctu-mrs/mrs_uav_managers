@@ -6,9 +6,25 @@ class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
   bool test();
+
+  Tester();
+
+  double _min_height_offset_;
+  double _min_height_;
 };
 
+Tester::Tester() : mrs_uav_testing::TestGeneric() {
+}
+
 bool Tester::test() {
+
+  pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/safety_height_offset", _min_height_offset_);
+  pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/min_height", _min_height_);
+
+  if (!pl_->loadedSuccessfully()) {
+    ROS_ERROR("[%s]: failed to load parameters", ros::this_node::getName().c_str());
+    return false;
+  }
 
   {
     auto [success, message] = activateMidAir();
@@ -48,7 +64,7 @@ bool Tester::test() {
   auto height = this->getHeightAgl();
 
   if (height) {
-    if (height.value() > 0.5) {
+    if (height.value() > _min_height_) {
       return true;
     }
   }

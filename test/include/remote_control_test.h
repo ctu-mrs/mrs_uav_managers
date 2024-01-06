@@ -5,7 +5,7 @@ class RemoteControlTest : public mrs_uav_testing::TestGeneric {
 public:
   bool test();
 
-  RemoteControlTest() : mrs_uav_testing::TestGeneric(){};
+  RemoteControlTest();
 
   /* interface to be implemented by the particular test //{ */
 
@@ -23,7 +23,13 @@ public:
 
   virtual void stop() = 0;
 
+  virtual bool getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate) = 0;
+
   //}
+
+  double _horizontal_speed_;
+  double _vertical_speed_;
+  double _heading_rate_;
 
   bool testMoveForward();
   bool testMoveBackward();
@@ -39,6 +45,15 @@ public:
 
   bool setGotoReference();
 };
+
+/* constructor //{ */
+
+RemoteControlTest::RemoteControlTest()
+    : mrs_uav_testing::TestGeneric(){
+
+      };
+
+//}
 
 /* getFcuUntiltedVelocity() //{ */
 
@@ -77,7 +92,7 @@ bool RemoteControlTest::testMoveForward() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (velocity[0] > 0.5 && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
+    if (velocity[0] > 0.8 * _horizontal_speed_ && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
       return true;
     }
 
@@ -107,7 +122,7 @@ bool RemoteControlTest::testMoveBackward() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (velocity[0] < -0.5 && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
+    if (velocity[0] < -0.8 * _horizontal_speed_ && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
       return true;
     }
 
@@ -137,7 +152,7 @@ bool RemoteControlTest::testMoveLeft() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && velocity[1] > 0.5 && abs(velocity[2]) < 0.1) {
+    if (abs(velocity[0]) < 0.1 && velocity[1] > 0.8 * _horizontal_speed_ && abs(velocity[2]) < 0.1) {
       return true;
     }
 
@@ -167,7 +182,7 @@ bool RemoteControlTest::testMoveRight() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && velocity[1] < -0.5 && abs(velocity[2]) < 0.1) {
+    if (abs(velocity[0]) < 0.1 && velocity[1] < -0.8 * _horizontal_speed_ && abs(velocity[2]) < 0.1) {
       return true;
     }
 
@@ -197,7 +212,7 @@ bool RemoteControlTest::testMoveUp() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] > 0.5) {
+    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] > 0.8 * _vertical_speed_) {
       return true;
     }
 
@@ -227,7 +242,7 @@ bool RemoteControlTest::testMoveDown() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] < -0.5) {
+    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] < -0.8 * _vertical_speed_) {
       return true;
     }
 
@@ -257,7 +272,7 @@ bool RemoteControlTest::testRotateLeft() {
 
     auto uav_state = sh_uav_state_.getMsg();
 
-    if (uav_state->velocity.angular.z > 0.2) {
+    if (uav_state->velocity.angular.z > 0.8 * _heading_rate_) {
       return true;
     }
 
@@ -287,7 +302,7 @@ bool RemoteControlTest::testRotateRight() {
 
     auto uav_state = sh_uav_state_.getMsg();
 
-    if (uav_state->velocity.angular.z < -0.2) {
+    if (uav_state->velocity.angular.z < -0.8 * _heading_rate_) {
       return true;
     }
 
@@ -358,7 +373,14 @@ bool RemoteControlTest::setGotoReference() {
 
   auto uav_state = sh_uav_state_.getMsg();
 
-  if (uav_state->velocity.linear.x > 1.0) {
+  auto constraints = getCurrentConstraints();
+
+  if (!constraints) {
+    ROS_ERROR("[%s]: could not get current constraints", ros::this_node::getName().c_str());
+    return false;
+  }
+
+  if (uav_state->velocity.linear.x > 0.8 * constraints->horizontal_speed) {
     return true;
   } else {
     ROS_ERROR("[%s]: velocity not reached, %.2f, %.2f, %.2f", ros::this_node::getName().c_str(), uav_state->velocity.linear.x, uav_state->velocity.linear.y,
@@ -370,6 +392,15 @@ bool RemoteControlTest::setGotoReference() {
 //}
 
 bool RemoteControlTest::test() {
+
+  {
+    bool success = getControllerDynamics(_horizontal_speed_, _vertical_speed_, _heading_rate_);
+
+    if (!success) {
+      ROS_ERROR("[%s]: failed to load the parameters", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
 
   {
     auto [success, message] = activateMidAir();

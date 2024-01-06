@@ -28,16 +28,31 @@ public:
   void rotateLeft();
   void rotateRight();
 
+  bool getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate);
+
   void stop();
 
   mrs_lib::PublisherHandler<mrs_msgs::HwApiRcChannels> ph_rc_channels_;
 
   ros::Timer timer_rc_;
-  void       timerRc(const ros::TimerEvent& event);
+  void       timerRc(const ros::TimerEvent &event);
 
   mrs_msgs::HwApiRcChannels rc_;
   std::mutex                mutex_rc_;
 };
+
+bool Tester::getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate) {
+
+  pl_->loadParam("mrs_uav_managers/control_manager/rc_joystick/horizontal_speed", horizontal_speed);
+  pl_->loadParam("mrs_uav_managers/control_manager/rc_joystick/vertical_speed", vertical_speed);
+  pl_->loadParam("mrs_uav_managers/control_manager/rc_joystick/heading_rate", heading_rate);
+
+  if (!pl_->loadedSuccessfully()) {
+    return false;
+  }
+
+  return true;
+}
 
 Tester::Tester() {
 
@@ -57,7 +72,7 @@ Tester::Tester() {
   timer_rc_ = nh_.createTimer(ros::Rate(100.0), &Tester::timerRc, this, false, true);
 }
 
-void Tester::timerRc([[maybe_unused]] const ros::TimerEvent& event) {
+void Tester::timerRc([[maybe_unused]] const ros::TimerEvent &event) {
 
   {
     std::scoped_lock lock(mutex_rc_);
@@ -205,7 +220,7 @@ TEST(TESTSuite, test) {
   }
 }
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
 
   ros::init(argc, argv, "test");
 
