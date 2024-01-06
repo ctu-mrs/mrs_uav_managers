@@ -24,10 +24,10 @@ Tester::Tester() {
 
   ph_rc_channels_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiRcChannels>(nh_, "/" + _uav_name_ + "/hw_api/rc_channels");
 
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
   rc_.channels.push_back(0.0);
   rc_.channels.push_back(0.0);
   rc_.channels.push_back(0.0);
