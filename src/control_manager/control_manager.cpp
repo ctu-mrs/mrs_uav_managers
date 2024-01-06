@@ -765,9 +765,6 @@ private:
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
 
-  // automatic pc shutdown (DARPA specific)
-  bool _automatic_pc_shutdown_enabled_ = false;
-
   // diagnostics publishing
   void       publishDiagnostics(void);
   std::mutex mutex_diagnostics_;
@@ -878,7 +875,6 @@ private:
 
   mrs_msgs::ReferenceStamped velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference);
 
-  void                          shutdown();
   void                          setCallbacks(bool in);
   bool                          isOffboard(void);
   bool                          elandSrv(void);
@@ -1211,8 +1207,6 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
   param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
   param_loader.loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
-
-  param_loader.loadParam("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
 
   param_loader.loadParam("pirouette/speed", _pirouette_speed_);
   param_loader.loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
@@ -2927,8 +2921,6 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
         ROS_INFO("[ControlManager]: calling for disarm");
         arming(false);
       }
-
-      shutdown();
 
       changeLandingState(IDLE_STATE);
 
@@ -7744,8 +7736,6 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
         ROS_DEBUG("[ControlManager]: stopping the eland timer");
         timer_eland_.stop();
         ROS_DEBUG("[ControlManager]: eland timer stopped");
-
-        shutdown();
       }
 
     } else {
@@ -7809,23 +7799,6 @@ bool ControlManager::elandSrv(void) {
     ROS_ERROR("[ControlManager]: service call for eland failed!");
 
     return false;
-  }
-}
-
-//}
-
-/* shutdown() //{ */
-
-void ControlManager::shutdown() {
-  // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-  if (_automatic_pc_shutdown_enabled_) {
-
-    ROS_INFO("[ControlManager]: calling service for PC shutdown");
-
-    std_srvs::Trigger shutdown_out;
-    sch_shutdown_.call(shutdown_out);
   }
 }
 

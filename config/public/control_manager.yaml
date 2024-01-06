@@ -118,10 +118,6 @@ mrs_uav_managers:
       vertical:
         threshold_distance: 1.2 # [m]
 
-    automatic_pc_shutdown:
-
-      enabled: false
-
     joystick:
 
       enabled: true
