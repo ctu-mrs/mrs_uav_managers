@@ -45,10 +45,16 @@ bool Tester::test() {
 
   // | ------------------- check the altitude ------------------- |
 
-  auto height = this->getHeightAgl();
+  sleep(1.0);
 
-  // TODO substitude with subscribed max agl height
-  double max_height_agl = 40;
+  if (!sh_max_height_.hasMsg()) {
+    ROS_ERROR("[%s]: missing max height msgs", ros::this_node::getName().c_str());
+    return true;
+  }
+
+  double max_height_agl = sh_max_height_.getMsg()->value;
+
+  auto height = this->getHeightAgl();
 
   if (height) {
     if (height.value() < max_height_agl) {
@@ -58,7 +64,6 @@ bool Tester::test() {
 
   return false;
 }
-
 
 TEST(TESTSuite, test) {
 
