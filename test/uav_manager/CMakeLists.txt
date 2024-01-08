@@ -1,5 +1,9 @@
 add_subdirectory(takeoff)
 
+add_subdirectory(failed_takeoff_controller)
+
+add_subdirectory(failed_takeoff_tracker)
+
 add_subdirectory(landing)
 
 add_subdirectory(land_home)

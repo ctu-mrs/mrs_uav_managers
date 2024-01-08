@@ -1,0 +1,3 @@
+# turning off for the takeoff test
+individual_takeoff_platform:
+  enabled: false

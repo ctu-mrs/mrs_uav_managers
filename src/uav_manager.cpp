@@ -397,6 +397,11 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/takeoff_height", _takeoff_height_);
 
+  if (_takeoff_height_ < 0.5 || _takeoff_height_ > 10.0) {
+    ROS_ERROR("[UavManager]: the takeoff height (%.2f m) has to be between 0.5 and 10 meters", _takeoff_height_);
+    ros::shutdown();
+  }
+
   param_loader.loadParam(yaml_prefix + "landing/rate", _landing_timer_rate_);
   param_loader.loadParam(yaml_prefix + "landing/landing_tracker", _landing_tracker_name_);
   param_loader.loadParam(yaml_prefix + "landing/landing_controller", _landing_controller_name_);
@@ -1458,7 +1463,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.success = false;
       res.message = ss.str();
 
-      switchControllerSrv(old_controller);
+      toggleControlOutput(false);
+      disarmSrv();
 
       return true;
     }
@@ -1478,7 +1484,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.success = false;
       res.message = ss.str();
 
-      switchTrackerSrv(old_tracker);
+      toggleControlOutput(false);
+      disarmSrv();
 
       return true;
     }
