@@ -1,8 +1,10 @@
 add_subdirectory(takeoff)
 
-add_subdirectory(failed_takeoff_controller)
+add_subdirectory(takeoff_fail_cause_controller)
 
-add_subdirectory(failed_takeoff_tracker)
+add_subdirectory(takeoff_fail_cause_tracker)
+
+add_subdirectory(midair_fail_cause_enabling_output)
 
 add_subdirectory(landing)
 
