@@ -84,6 +84,7 @@
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
       <remap from="~land_home_in" to="~land_home" />
+      <remap from="~land_there_in" to="~land_there" />
       <remap from="~midair_activation_in" to="~midair_activation" />
 
       <!-- Services out -->

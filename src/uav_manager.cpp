@@ -1843,20 +1843,34 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
   ungripSrv();
 
-  mrs_msgs::ReferenceStamped reference_out;
+  auto odometry = sh_odometry_.getMsg();
+
+  // | ------ transform the reference to the current frame ------ |
+
+  mrs_msgs::ReferenceStamped reference_in;
+  reference_in.header    = req.header;
+  reference_in.reference = req.reference;
+
+  auto result = transformer_->transformSingle(reference_in, odometry->header.frame_id);
+
+  if (!result) {
+    std::stringstream ss;
+    ss << "can not transform the reference to the current control frame!";
+    res.message = ss.str();
+    res.success = false;
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    return true;
+  }
 
   {
     std::scoped_lock lock(mutex_land_there_reference_);
 
-    land_there_reference_.header    = req.header;
-    land_there_reference_.reference = req.reference;
-
-    reference_out.header.frame_id = land_there_reference_.header.frame_id;
-    reference_out.header.stamp    = ros::Time::now();
-    reference_out.reference       = land_there_reference_.reference;
+    land_there_reference_.header               = odometry->header;
+    land_there_reference_.reference            = reference_in.reference;
+    land_there_reference_.reference.position.z = odometry->pose.pose.position.z;
   }
 
-  bool service_success = emergencyReferenceSrv(reference_out);
+  bool service_success = emergencyReferenceSrv(land_there_reference_);
 
   if (service_success) {
 
