@@ -196,20 +196,26 @@ void TransformManager::onInit() {
   param_loader.loadParam("world_origin/units", world_origin_units_);
 
   if (Support::toLowercase(world_origin_units_) == "utm") {
+
     ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
+
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units_) == "latlon") {
-    double lat, lon;
+
     ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
+
+    double lat, lon;
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
+
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
+    ROS_ERROR("[%s]: world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
     ros::shutdown();
   }
 
@@ -221,6 +227,7 @@ void TransformManager::onInit() {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
     ros::shutdown();
   }
+
   /*//}*/
 
   /*//{ load local_origin parameters */
@@ -893,8 +900,8 @@ std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geo
   if (res1) {
     pose_tmp.pose.orientation = res1.value().transform.rotation;
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(),
-                       ch_->frames.ns_fcu_untilted.c_str(), ch_->frames.ns_fcu.c_str());
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu_untilted.c_str(),
+                       ch_->frames.ns_fcu.c_str());
     return {};
   }
 
@@ -914,7 +921,8 @@ std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geo
   if (res2) {
     utm_in_fcu = res2.value();
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(), ch_->frames.ns_fcu.c_str());
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(),
+                       ch_->frames.ns_fcu.c_str());
     return {};
   }
 
