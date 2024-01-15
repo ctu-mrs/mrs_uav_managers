@@ -6114,9 +6114,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     } else {
 
       ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
-      success  = false;
+      success  = true;
       message  = ss.str();
       modified = false;
       tracker_successes.push_back(false);
