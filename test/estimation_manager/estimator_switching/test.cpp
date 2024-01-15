@@ -35,10 +35,10 @@ bool Tester::test() {
       }
     }
 
-    sleep(1.0);
+    sleep(3.0);
 
     if (getActiveEstimator() != estimator) {
-      ROS_ERROR("[%s]: '%s' estimator not active", estimator.c_str(), ros::this_node::getName().c_str());
+      ROS_ERROR("[%s]: '%s' estimator not active", ros::this_node::getName().c_str(), estimator.c_str());
       return false;
     }
 
