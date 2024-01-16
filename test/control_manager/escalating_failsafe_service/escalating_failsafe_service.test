@@ -25,6 +25,7 @@
     <arg name="automatic_start" default="false" />
     <arg name="platform_config" default="$(find mrs_multirotor_simulator)/config/mrs_uav_system/$(arg UAV_TYPE).yaml" />
     <arg name="custom_config" default="$(dirname)/config/custom_config.yaml" />
+    <arg name="world_config" default="$(dirname)/config/world_config.yaml" />
     <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
   </include>
 

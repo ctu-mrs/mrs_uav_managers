@@ -24,7 +24,7 @@ bool EscalatingFailsafeTest::test() {
   // | ----------------------- goto higher ---------------------- |
 
   {
-    auto [success, message] = this->gotoAbs(0, 0, 10.0, 0);
+    auto [success, message] = this->gotoAbs(0, 0, 15.0, 0);
 
     if (!success) {
       ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -85,7 +85,7 @@ bool EscalatingFailsafeTest::test() {
 
   // check if we have not moved
 
-  if (!isAtPosition(0, 0, 10.0, 0, 0.5)) {
+  if (!isAtPosition(0, 0, 15.0, 0, 0.5)) {
     ROS_ERROR("[%s]: we moved after ehover", ros::this_node::getName().c_str());
     return false;
   }
