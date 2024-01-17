@@ -2624,12 +2624,22 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   if (_odometry_innovation_check_enabled_) {
-    {
-      auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
+
+    std::optional<nav_msgs::Odometry::ConstPtr> innovation;
+
+    if (sh_odometry_innovation_.hasMsg()) {
+      innovation = {sh_odometry_innovation_.getMsg()};
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: missing estimator innnovation but the innovation check is enabled!");
+    }
+
+    if (innovation) {
+
+      auto [x, y, z] = mrs_lib::getPosition(innovation.value());
 
       double heading = 0;
       try {
-        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
+        heading = mrs_lib::getHeading(innovation.value());
       }
       catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
