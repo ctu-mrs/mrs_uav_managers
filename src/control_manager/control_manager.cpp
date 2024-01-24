@@ -718,8 +718,8 @@ private:
   std::string bumper_previous_tracker_;
   std::string bumper_previous_controller_;
 
-  std::atomic<bool> bumper_enabled_ = false;
-  std::atomic<bool> repulsing_      = false;
+  std::atomic<bool> bumper_enabled_   = false;
+  std::atomic<bool> bumper_repulsing_ = false;
 
   double _bumper_horizontal_distance_ = 0;
   double _bumper_vertical_distance_   = 0;
@@ -3251,7 +3251,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!isFlyingNormally()) {
+  if (!isFlyingNormally() && !bumper_repulsing_) {
     return;
   }
 
@@ -6730,6 +6730,7 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 /* bumperPushFromObstacle() //{ */
 
 bool ControlManager::bumperPushFromObstacle(void) {
+
   if (!bumper_enabled_) {
     return true;
   }
@@ -6744,73 +6745,43 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
-  double direction                     = 0;
-  double repulsion_distance            = std::numeric_limits<double>::max();
-  bool   horizontal_collision_detected = false;
+  double direction          = 0;
+  double repulsion_distance = std::numeric_limits<double>::max();
 
-  bool vertical_collision_detected = false;
+  bool horizontal_collision_detected = false;
+  bool vertical_collision_detected   = false;
 
-  for (int i = 0; i < int(bumper_data->n_horizontal_sectors); i++) {
+  for (unsigned long i = 0; i < bumper_data->n_horizontal_sectors; i++) {
 
     if (bumper_data->sectors[i] < 0) {
       continue;
     }
 
-    bool wall_locked_horizontal = false;
-
-    // if the sector is under critical distance
+    // if the sector is under the threshold distance
     if (bumper_data->sectors[i] <= _bumper_horizontal_distance_ && bumper_data->sectors[i] < repulsion_distance) {
 
-      // check for locking between the oposite walls
       // get the desired direction of motion
       double oposite_direction  = double(i) * sector_size + M_PI;
       int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
 
-      if (bumper_data->sectors[oposite_sector_idx] > 0 &&
-          ((bumper_data->sectors[i] + bumper_data->sectors[oposite_sector_idx]) <= (2 * _bumper_horizontal_distance_ + 2 * _bumper_horizontal_overshoot_))) {
-
-        wall_locked_horizontal = true;
-
-        if (fabs(bumper_data->sectors[i] - bumper_data->sectors[oposite_sector_idx]) <= 2 * _bumper_horizontal_overshoot_) {
-
-          ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between two walls");
-          continue;
-        }
-      }
-
       // get the id of the oposite sector
       direction = oposite_direction;
 
-      /* int oposite_sector_idx = (i + bumper_data->n_horizontal_sectors / 2) % bumper_data->n_horizontal_sectors; */
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %d vs. %d), obstacle distance: %.2f, repulsing", i,
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", i,
                         oposite_sector_idx, bumper_data->sectors[i]);
 
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: oposite direction: %.2f", oposite_direction);
-
-      if (wall_locked_horizontal) {
-        if (bumper_data->sectors[i] < bumper_data->sectors[oposite_sector_idx]) {
-          repulsion_distance = _bumper_horizontal_overshoot_;
-        } else {
-          repulsion_distance = -_bumper_horizontal_overshoot_;
-        }
-      } else {
-        repulsion_distance = _bumper_horizontal_distance_ + _bumper_horizontal_overshoot_ - bumper_data->sectors[i];
-      }
+      repulsion_distance = _bumper_horizontal_distance_ + _bumper_horizontal_overshoot_ - bumper_data->sectors[i];
 
       horizontal_collision_detected = true;
     }
   }
 
-  bool   collision_above             = false;
-  bool   collision_below             = false;
   double vertical_repulsion_distance = 0;
 
   // check for vertical collision down
   if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= _bumper_vertical_distance_) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
-    collision_above             = true;
     vertical_collision_detected = true;
     vertical_repulsion_distance = _bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors];
   }
@@ -6820,35 +6791,14 @@ bool ControlManager::bumperPushFromObstacle(void) {
       bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= _bumper_vertical_distance_) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
-    collision_below             = true;
     vertical_collision_detected = true;
     vertical_repulsion_distance = -(_bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
-  }
-
-  // check the up/down wall locking
-  if (collision_above && collision_below) {
-
-    if (((bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-         (2 * _bumper_vertical_distance_ + 2 * _bumper_vertical_overshoot_))) {
-
-      vertical_repulsion_distance =
-          (-bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) / 2.0;
-
-      if (fabs(bumper_data->sectors[bumper_data->n_horizontal_sectors] - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-          2 * _bumper_vertical_overshoot_) {
-
-        ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between the floor and ceiling");
-        vertical_collision_detected = false;
-      }
-    }
   }
 
   // if potential collision was detected and we should start the repulsing_
   if (horizontal_collision_detected || vertical_collision_detected) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was initiated");
-
-    if (!repulsing_) {
+    if (!bumper_repulsing_) {
 
       if (_bumper_switch_tracker_) {
 
@@ -6879,10 +6829,10 @@ bool ControlManager::bumperPushFromObstacle(void) {
       }
     }
 
-    repulsing_ = true;
+    bumper_repulsing_ = true;
 
     mrs_msgs::BumperStatus bumper_status;
-    bumper_status.repulsing = repulsing_;
+    bumper_status.repulsing = bumper_repulsing_;
 
     ph_bumper_status_.publish(bumper_status);
 
@@ -6923,7 +6873,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
       auto ret = transformer_->transformSingle(reference_fcu_untilted, uav_state.header.frame_id);
 
       if (!ret) {
-
         ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: bumper reference could not be transformed");
         return false;
       }
@@ -6936,13 +6885,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // disable callbacks of all trackers
       req_enable_callbacks.data = false;
-      for (int i = 0; i < int(tracker_list_.size()); i++) {
+      for (size_t i = 0; i < tracker_list_.size(); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
       // enable the callbacks for the active tracker
       req_enable_callbacks.data = true;
       tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+
+      ROS_INFO("[ControlManager]: calling bumper's goto");
 
       // call the goto
       tracker_response = tracker_list_[active_tracker_idx_]->setReference(
@@ -6955,9 +6906,9 @@ bool ControlManager::bumperPushFromObstacle(void) {
   }
 
   // if repulsing_ and the distance is safe once again
-  if ((repulsing_ && !horizontal_collision_detected && !vertical_collision_detected)) {
+  if (bumper_repulsing_ && !horizontal_collision_detected && !vertical_collision_detected) {
 
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was stopped");
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: no more collision, stopping repulsion");
 
     if (_bumper_switch_tracker_) {
 
@@ -6988,14 +6939,14 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // enable callbacks of all trackers
       req_enable_callbacks.data = true;
-      for (int i = 0; i < int(tracker_list_.size()); i++) {
+      for (size_t i = 0; i < tracker_list_.size(); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
     }
 
     callbacks_enabled_ = true;
 
-    repulsing_ = false;
+    bumper_repulsing_ = false;
   }
 
   return false;
@@ -7006,6 +6957,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 /* bumperGetSectorId() //{ */
 
 int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
+
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
 
@@ -7039,6 +6991,7 @@ int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_
 /* //{ changeLandingState() */
 
 void ControlManager::changeLandingState(LandingStates_t new_state) {
+
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
