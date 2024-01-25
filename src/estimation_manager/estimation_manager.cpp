@@ -731,6 +731,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   param_loader.addYamlFileFromParam("private_config");
   param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("uav_manager_config");
   param_loader.addYamlFileFromParam("estimators_config");
   param_loader.addYamlFileFromParam("active_estimators_config");
 
