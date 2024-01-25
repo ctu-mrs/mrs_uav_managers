@@ -208,7 +208,7 @@ private:
   bool is_inverted_;
 
   bool             is_utm_based_;
-  bool             publish_local_tf_ = true;
+  bool             publish_local_tf_ = false;
   bool             publish_utm_tf_   = false;
   bool             publish_world_tf_ = false;
   std::atomic_bool is_utm_source_    = false;
