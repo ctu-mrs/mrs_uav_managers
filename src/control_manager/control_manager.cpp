@@ -721,6 +721,9 @@ private:
   std::atomic<bool> bumper_enabled_   = false;
   std::atomic<bool> bumper_repulsing_ = false;
 
+  bool _bumper_horizontal_derive_from_dynamics_;
+  bool _bumper_vertical_derive_from_dynamics_;
+
   double _bumper_horizontal_distance_ = 0;
   double _bumper_vertical_distance_   = 0;
 
@@ -728,7 +731,7 @@ private:
   double _bumper_vertical_overshoot_   = 0;
 
   int  bumperGetSectorId(const double& x, const double& y, const double& z);
-  bool bumperPushFromObstacle(void);
+  void bumperPushFromObstacle(void);
 
   // | --------------- safety checks and failsafes -------------- |
 
@@ -1180,8 +1183,11 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("obstacle_bumper/controller", _bumper_controller_name_);
   param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
 
-  param_loader.loadParam("obstacle_bumper/horizontal/threshold_distance", _bumper_horizontal_distance_);
-  param_loader.loadParam("obstacle_bumper/vertical/threshold_distance", _bumper_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/horizontal/min_distance_to_obstacle", _bumper_horizontal_distance_);
+  param_loader.loadParam("obstacle_bumper/horizontal/derived_from_dynamics", _bumper_horizontal_derive_from_dynamics_);
+
+  param_loader.loadParam("obstacle_bumper/vertical/min_distance_to_obstacle", _bumper_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/vertical/derived_from_dynamics", _bumper_vertical_derive_from_dynamics_);
 
   param_loader.loadParam("obstacle_bumper/horizontal/overshoot", _bumper_horizontal_overshoot_);
   param_loader.loadParam("obstacle_bumper/vertical/overshoot", _bumper_vertical_overshoot_);
@@ -1866,7 +1872,7 @@ void ControlManager::initialize(void) {
 
   timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
   timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this, false, bumper_enabled_);
+  timer_bumper_    = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
   timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
@@ -3247,6 +3253,12 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
+  // | ---------------------- preconditions --------------------- |
+
+  if (!sh_bumper_.hasMsg()) {
+    return;
+  }
+
   if (!bumper_enabled_) {
     return;
   }
@@ -3259,13 +3271,16 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if ((ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
+  if (sh_bumper_.hasMsg() && (ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
+
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: obstacle bumper is missing messages although we got them before");
+
     return;
   }
 
-  // --------------------------------------------------------------
-  // |                      bumper repulsion                      |
-  // --------------------------------------------------------------
+  timer_bumper_.setPeriod(ros::Duration(1.0 / _bumper_timer_rate_));
+
+  // | ------------------ call the bumper logic ----------------- |
 
   bumperPushFromObstacle();
 }
@@ -4403,11 +4418,6 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
 
   if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
     ss << "cannot toggle output ON, missing HW API status!";
-    prereq_check = false;
-  }
-
-  if (bumper_enabled_ && !sh_bumper_.hasMsg()) {
-    ss << "cannot toggle output ON, missing bumper data!";
     prereq_check = false;
   }
 
@@ -6729,15 +6739,46 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 
 /* bumperPushFromObstacle() //{ */
 
-bool ControlManager::bumperPushFromObstacle(void) {
+void ControlManager::bumperPushFromObstacle(void) {
 
-  if (!bumper_enabled_) {
-    return true;
+  // | --------------- fabricate the min distances -------------- |
+
+  double min_distance_horizontal = _bumper_horizontal_distance_;
+  double min_distance_vertical   = _bumper_vertical_distance_;
+
+  if (_bumper_horizontal_derive_from_dynamics_ || _bumper_vertical_derive_from_dynamics_) {
+
+    auto constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
+
+    if (_bumper_horizontal_derive_from_dynamics_) {
+
+      const double horizontal_t_stop    = constraints.constraints.horizontal_speed / constraints.constraints.horizontal_acceleration;
+      const double horizontal_stop_dist = (horizontal_t_stop * constraints.constraints.horizontal_speed) / 2.0;
+
+      min_distance_horizontal += horizontal_stop_dist;
+    }
+
+    if (_bumper_vertical_derive_from_dynamics_) {
+
+
+      // larger from the two accelerations
+      const double vert_acc = constraints.constraints.vertical_ascending_acceleration > constraints.constraints.vertical_descending_acceleration
+                                  ? constraints.constraints.vertical_ascending_acceleration
+                                  : constraints.constraints.vertical_descending_acceleration;
+
+      // larger from the two speeds
+      const double vert_speed = constraints.constraints.vertical_ascending_speed > constraints.constraints.vertical_descending_speed
+                                    ? constraints.constraints.vertical_ascending_speed
+                                    : constraints.constraints.vertical_descending_speed;
+
+      const double vertical_t_stop    = vert_speed / vert_acc;
+      const double vertical_stop_dist = (vertical_t_stop * vert_speed) / 2.0;
+
+      min_distance_vertical += vertical_stop_dist;
+    }
   }
 
-  if (!sh_bumper_.hasMsg()) {
-    return true;
-  }
+  // | ----------------------------  ---------------------------- |
 
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
@@ -6751,48 +6792,55 @@ bool ControlManager::bumperPushFromObstacle(void) {
   bool horizontal_collision_detected = false;
   bool vertical_collision_detected   = false;
 
+  double min_horizontal_sector_distance = std::numeric_limits<double>::max();
+  size_t min_sector_id                  = 0;
+
   for (unsigned long i = 0; i < bumper_data->n_horizontal_sectors; i++) {
 
     if (bumper_data->sectors[i] < 0) {
       continue;
     }
 
-    // if the sector is under the threshold distance
-    if (bumper_data->sectors[i] <= _bumper_horizontal_distance_ && bumper_data->sectors[i] < repulsion_distance) {
-
-      // get the desired direction of motion
-      double oposite_direction  = double(i) * sector_size + M_PI;
-      int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
-
-      // get the id of the oposite sector
-      direction = oposite_direction;
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", i,
-                        oposite_sector_idx, bumper_data->sectors[i]);
-
-      repulsion_distance = _bumper_horizontal_distance_ + _bumper_horizontal_overshoot_ - bumper_data->sectors[i];
-
-      horizontal_collision_detected = true;
+    if (bumper_data->sectors[i] < min_horizontal_sector_distance) {
+      min_horizontal_sector_distance = bumper_data->sectors[i];
+      min_sector_id                  = i;
     }
+  }
+
+  // if the sector is under the threshold distance
+  if (min_horizontal_sector_distance < min_distance_horizontal) {
+
+    // get the desired direction of motion
+    double oposite_direction  = double(min_sector_id) * sector_size + M_PI;
+    int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
+
+    // get the id of the oposite sector
+    direction = oposite_direction;
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", min_sector_id,
+                      oposite_sector_idx, bumper_data->sectors[min_sector_id]);
+
+    repulsion_distance = min_distance_horizontal + _bumper_horizontal_overshoot_ - bumper_data->sectors[min_sector_id];
+
+    horizontal_collision_detected = true;
   }
 
   double vertical_repulsion_distance = 0;
 
   // check for vertical collision down
-  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= _bumper_vertical_distance_) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= min_distance_vertical) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
     vertical_collision_detected = true;
-    vertical_repulsion_distance = _bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors];
+    vertical_repulsion_distance = min_distance_vertical - bumper_data->sectors[bumper_data->n_horizontal_sectors];
   }
 
   // check for vertical collision up
-  if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 &&
-      bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= _bumper_vertical_distance_) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= min_distance_vertical) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(_bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
+    vertical_repulsion_distance = -(min_distance_vertical - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
   }
 
   // if potential collision was detected and we should start the repulsing_
@@ -6874,7 +6922,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       if (!ret) {
         ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: bumper reference could not be transformed");
-        return false;
+        return;
       }
 
       reference_fcu_untilted = ret.value();
@@ -6948,8 +6996,6 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
     bumper_repulsing_ = false;
   }
-
-  return false;
 }
 
 //}
@@ -8535,6 +8581,7 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 /* velocityReferenceToReference() //{ */
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
+
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
