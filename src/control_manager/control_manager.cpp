@@ -6755,7 +6755,7 @@ void ControlManager::bumperPushFromObstacle(void) {
       const double horizontal_t_stop    = constraints.constraints.horizontal_speed / constraints.constraints.horizontal_acceleration;
       const double horizontal_stop_dist = (horizontal_t_stop * constraints.constraints.horizontal_speed) / 2.0;
 
-      min_distance_horizontal += horizontal_stop_dist;
+      min_distance_horizontal += 1.5 * horizontal_stop_dist;
     }
 
     if (_bumper_vertical_derive_from_dynamics_) {
@@ -6774,7 +6774,7 @@ void ControlManager::bumperPushFromObstacle(void) {
       const double vertical_t_stop    = vert_speed / vert_acc;
       const double vertical_stop_dist = (vertical_t_stop * vert_speed) / 2.0;
 
-      min_distance_vertical += vertical_stop_dist;
+      min_distance_vertical += 1.5 * vertical_stop_dist;
     }
   }
 
