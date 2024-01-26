@@ -1,15 +1,9 @@
 <launch>
-<!-- todo: clean args -->
 
   <!-- args corresponding to environment variables -->
-  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
   <arg name="PROFILER" default="$(optenv PROFILER false)" />
   <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
-  <arg name="UAV_MASS" default="$(optenv UAV_MASS)" />
-  <arg name="BODY_DISTURBANCE_X" default="$(optenv INITIAL_DISTURBANCE_X 0.0)" />
-  <arg name="BODY_DISTURBANCE_Y" default="$(optenv INITIAL_DISTURBANCE_Y 0.0)" />
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
-  <arg name="OLD_PX4_FW" default="$(optenv OLD_PX4_FW false)" />
 
     <!-- other args -->
   <arg name="debug" default="false" />
@@ -19,14 +13,9 @@
   <arg name="bond" default="$(optenv BOND true)" />
   <arg name="nodelet_manager_name" default="$(optenv NODELET_MANAGER)" />
 
-  <arg name="custom_config" default="" />
   <arg name="world_config" default="" />
-  <arg name="platform_config" default="" />
-  <arg name="network_config" default="" />
 
   <env name="ROSCONSOLE_CONFIG_FILE" if="$(eval arg('LOGGER_DEBUG'))" value="$(find mrs_uav_managers)/config/debug_verbosity.yaml" />
-
-  <arg name="g" default="9.81" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
@@ -74,7 +63,6 @@
     <remap from="~get_min_z_in" to="~get_min_z"/>
     <remap from="~get_use_in" to="~get_use"/>
 
-    <!-- todo: add params, remappings -->
     </node>
   </group>
 </launch>
