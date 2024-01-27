@@ -14,14 +14,12 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
-#include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/DynamicsConstraints.h>
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
 #include <mrs_msgs/ValidateReferenceList.h>
-#include <mrs_msgs/BumperParamsSrv.h>
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/EstimatorInput.h>
 

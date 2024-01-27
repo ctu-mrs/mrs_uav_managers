@@ -423,7 +423,7 @@ bool RemoteControlTest::test() {
       return false;
     }
 
-    if (sh_control_manager_diag_.getMsg()->rc_mode) {
+    if (sh_control_manager_diag_.getMsg()->joystick_active) {
       break;
     }
 
@@ -514,7 +514,7 @@ bool RemoteControlTest::test() {
       return false;
     }
 
-    if (!sh_control_manager_diag_.getMsg()->rc_mode) {
+    if (!sh_control_manager_diag_.getMsg()->joystick_active) {
       break;
     }
 
