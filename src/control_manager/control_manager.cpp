@@ -422,7 +422,6 @@ private:
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_markers_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_coordinates_markers_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_disturbances_markers_;
-  mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>              ph_bumper_status_;
   mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
@@ -637,7 +636,6 @@ private:
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
 
   bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
@@ -1769,7 +1767,6 @@ void ControlManager::initialize(void) {
   ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1, true, 1.0);
   ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1, true, 1.0);
   ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1, false, 10.0);
-  ph_bumper_status_                      = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
   ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
   ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
   ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
@@ -6238,7 +6235,7 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.output_enabled = output_enabled_;
 
-  diagnostics_msg.rc_mode = rc_goto_active_;
+  diagnostics_msg.joystick_active = rc_goto_active_;
 
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
@@ -6878,11 +6875,6 @@ void ControlManager::bumperPushFromObstacle(void) {
     }
 
     bumper_repulsing_ = true;
-
-    mrs_msgs::BumperStatus bumper_status;
-    bumper_status.repulsing = bumper_repulsing_;
-
-    ph_bumper_status_.publish(bumper_status);
 
     callbacks_enabled_ = false;
 
