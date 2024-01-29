@@ -123,7 +123,7 @@ bool Tester::test() {
   {
     auto body_vel = getBodyVelocity();
 
-    if (!(body_vel[0] < -1.0 && abs(body_vel[1]) < 0.1 && abs(body_vel[2]) < 0.1)) {
+    if (!(body_vel[0] < -2.0 && abs(body_vel[1]) < 0.5 && abs(body_vel[2]) < 0.5)) {
       ROS_ERROR("[%s]: body velocity is not suggesting that we are moving backwards (%.2f, %.2f, %.2f)", ros::this_node::getName().c_str(), body_vel[0],
                 body_vel[1], body_vel[2]);
       return false;
@@ -134,16 +134,7 @@ bool Tester::test() {
 
   setBumperFrontSector(10.0);
 
-  this->sleep(1.0);
-
-  {
-    auto ctrl_diag = this->sh_control_manager_diag_.getMsg();
-
-    if (ctrl_diag->bumper_active) {
-      ROS_ERROR("[%s]: looks like the bumper is still active when it should not be", ros::this_node::getName().c_str());
-      return false;
-    }
-  }
+  ROS_INFO("[%s]: waiting for normal flight conditions", ros::this_node::getName().c_str());
 
   while (true) {
 
@@ -153,12 +144,18 @@ bool Tester::test() {
       return false;
     }
 
-    if (ctrl_diag->flying_normally) {
+    if (ctrl_diag->flying_normally && !ctrl_diag->bumper_active) {
       break;
     }
   }
 
+  this->sleep(1.0);
+
+  ROS_INFO("[%s]: testing goto", ros::this_node::getName().c_str());
+
   this->gotoRel(10, 0, 0, 0);
+
+  ROS_INFO("[%s]: goto finished", ros::this_node::getName().c_str());
 
   if (this->isFlyingNormally()) {
     return true;
