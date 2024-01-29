@@ -6241,6 +6241,8 @@ void ControlManager::publishDiagnostics(void) {
     diagnostics_msg.flying_normally = isFlyingNormally();
   }
 
+  diagnostics_msg.bumper_active = bumper_repulsing_;
+
   // | ----------------- fill the tracker status ---------------- |
 
   {
@@ -6930,8 +6932,6 @@ void ControlManager::bumperPushFromObstacle(void) {
       // enable the callbacks for the active tracker
       req_enable_callbacks.data = true;
       tracker_list_[active_tracker_idx_]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
-
-      ROS_INFO("[ControlManager]: calling bumper's goto");
 
       // call the goto
       tracker_response = tracker_list_[active_tracker_idx_]->setReference(
