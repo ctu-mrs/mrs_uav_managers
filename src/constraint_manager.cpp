@@ -41,7 +41,8 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  bool            is_initialized_ = false;
+
+  std::atomic<bool> is_initialized_ = false;
 
   // | ----------------------- parameters ----------------------- |
 
@@ -230,7 +231,7 @@ void ConstraintManager::onInit() {
     _map_type_default_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  ROS_INFO("[ConstraintManager]: done loading dynamical params");
+  ROS_INFO("[ConstraintManager]: done loading dynamic params");
 
   current_constraints_ = "";
   last_estimator_name_ = "";
@@ -258,7 +259,7 @@ void ConstraintManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics>(nh_, "diagnostics_out", 1);
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics>(nh_, "diagnostics_out", 10);
 
   // | ------------------------- timers ------------------------- |
 
@@ -383,7 +384,7 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
     return true;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
   if (!stringInVector(req.value, _constraint_names_)) {
 
@@ -396,7 +397,7 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_constraints_.at(estimation_diagnostics.current_state_estimator))) {
+  if (!stringInVector(req.value, _map_type_allowed_constraints_.at(estimation_diagnostics->current_state_estimator))) {
 
     ss << "the constraints '" << req.value.c_str() << "' are not allowed given the current odometry type";
 
@@ -483,38 +484,38 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
     return;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
   // | --- automatically set constraints when the state estimator changes -- |
-  if (estimation_diagnostics.current_state_estimator != last_estimator_name_) {
+  if (estimation_diagnostics->current_state_estimator != last_estimator_name_) {
 
     ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
-                      estimation_diagnostics.current_state_estimator.c_str());
+                      estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_default_constraints_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_default_constraints_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_default_constraints_.end()) {
 
       ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the state estimator type '%s' was not specified in the constraint_manager's config!",
-                        estimation_diagnostics.current_state_estimator.c_str());
+                        estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
 
       // if the current constraints are within the allowed state estimator types, do nothing
-      if (stringInVector(current_constraints, _map_type_allowed_constraints_.at(estimation_diagnostics.current_state_estimator))) {
+      if (stringInVector(current_constraints, _map_type_allowed_constraints_.at(estimation_diagnostics->current_state_estimator))) {
 
-        last_estimator_name = estimation_diagnostics.current_state_estimator;
+        last_estimator_name = estimation_diagnostics->current_state_estimator;
 
         // else, try to set the initial constraints
       } else {
 
         ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(),
-                          estimation_diagnostics.current_state_estimator.c_str());
+                          estimation_diagnostics->current_state_estimator.c_str());
 
         if (setConstraints(it->second)) {
 
-          last_estimator_name = estimation_diagnostics.current_state_estimator;
+          last_estimator_name = estimation_diagnostics->current_state_estimator;
 
           ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to initial: '%s'", it->second.c_str());
 
@@ -561,9 +562,13 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
     return;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
   auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
+
+  if (current_constraints == "") {  // this could happend just before timerConstraintManagement() finishes
+    return;
+  }
 
   mrs_msgs::ConstraintManagerDiagnostics diagnostics;
 
@@ -574,11 +579,11 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
   // get the available constraints
   {
     std::map<std::string, std::vector<std::string>>::iterator it;
-    it = _map_type_allowed_constraints_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_allowed_constraints_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_constraints_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the odometry.type '%s' was not specified in the constraint_manager's config!",
-                        estimation_diagnostics.current_state_estimator.c_str());
+      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the state estimator '%s' was not specified in the constraint_manager's config!",
+                        estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }
@@ -588,6 +593,11 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
   {
     std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>::iterator it;
     it = _constraints_.find(current_constraints);
+
+    if (it == _constraints_.end()) {
+      ROS_ERROR("[ConstraintManager]: current constraints '%s' not found in the constraint list!", current_constraints.c_str());
+      return;
+    }
 
     diagnostics.current_values = it->second.constraints;
   }
