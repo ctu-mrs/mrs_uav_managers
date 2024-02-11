@@ -10,6 +10,19 @@ public:
 
 bool Tester::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
+  {
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
   // | ------------- wait for the system to be ready ------------ |
 
   while (true) {
@@ -18,20 +31,20 @@ bool Tester::test() {
       return false;
     }
 
-    if (this->mrsSystemReady()) {
+    if (uh->mrsSystemReady()) {
       break;
     }
   }
 
   // | ---------------- save the current position --------------- |
 
-  auto takeoff_pos = this->sh_uav_state_.getMsg()->pose.position;
-  auto takeoff_hdg = mrs_lib::AttitudeConverter(this->sh_uav_state_.getMsg()->pose.orientation).getHeading();
+  auto takeoff_pos = uh->sh_uav_state_.getMsg()->pose.position;
+  auto takeoff_hdg = mrs_lib::AttitudeConverter(uh->sh_uav_state_.getMsg()->pose.orientation).getHeading();
 
   // | ------------------------ take off ------------------------ |
 
   {
-    auto [success, message] = takeoff();
+    auto [success, message] = uh->takeoff();
 
     if (!success) {
       ROS_ERROR("[%s]: takeoff failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -44,7 +57,7 @@ bool Tester::test() {
   // | --------------------- goto somewhere --------------------- |
 
   {
-    auto [success, message] = gotoRel(8, 1, 2, 1.2);
+    auto [success, message] = uh->gotoRel(8, 1, 2, 1.2);
 
     if (!success) {
       ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -55,7 +68,7 @@ bool Tester::test() {
   // | ------------------------ land home ----------------------- |
 
   {
-    auto [success, message] = landHome();
+    auto [success, message] = uh->landHome();
 
     if (!success) {
       ROS_ERROR("[%s]: land home failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -65,7 +78,7 @@ bool Tester::test() {
 
   // | ---------------- check the final position ---------------- |
 
-  if (this->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_pos.z, takeoff_hdg, 0.5)) {
+  if (uh->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_pos.z, takeoff_hdg, 0.5)) {
     return true;
   } else {
     ROS_ERROR("[%s]: land home did end in wrong place", ros::this_node::getName().c_str());

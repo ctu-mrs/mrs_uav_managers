@@ -10,9 +10,22 @@ public:
 
 bool Tester::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
+  {
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
   // TOOD should also work with midair activation
   {
-    auto [success, message] = takeoff();
+    auto [success, message] = uh->takeoff();
 
     if (!success) {
       ROS_ERROR("[%s]: takeoff failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -27,7 +40,7 @@ bool Tester::test() {
 
   for (auto estimator : estimators) {
     {
-      auto [success, message] = switchEstimator(estimator);
+      auto [success, message] = uh->switchEstimator(estimator);
 
       if (!success) {
         ROS_ERROR("[%s]: failed to switch the estimator '%s', message: '%s'", ros::this_node::getName().c_str(), estimator.c_str(), message.c_str());
@@ -37,13 +50,13 @@ bool Tester::test() {
 
     sleep(3.0);
 
-    if (getActiveEstimator() != estimator) {
+    if (uh->getActiveEstimator() != estimator) {
       ROS_ERROR("[%s]: '%s' estimator not active", ros::this_node::getName().c_str(), estimator.c_str());
       return false;
     }
 
     {
-      auto [success, message] = this->gotoRel(5.0, 0, 0, 0);
+      auto [success, message] = uh->gotoRel(5.0, 0, 0, 0);
 
       if (!success) {
         ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -52,7 +65,7 @@ bool Tester::test() {
     }
   }
 
-  if (this->isFlyingNormally()) {
+  if (uh->isFlyingNormally()) {
     return true;
   } else {
     ROS_ERROR("[%s]: not flying normally", ros::this_node::getName().c_str());

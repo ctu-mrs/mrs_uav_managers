@@ -25,6 +25,8 @@ private:
   std::mutex                mutex_bumper_data_;
 
   Eigen::Vector3d getBodyVelocity();
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 /* getBodyVelocity() //{ */
@@ -33,7 +35,7 @@ Eigen::Vector3d Tester::getBodyVelocity() {
 
   geometry_msgs::Vector3Stamped vel;
 
-  auto uav_state = this->sh_uav_state_.getMsg();
+  auto uav_state = uh_->sh_uav_state_.getMsg();
 
   vel.header = uav_state->header;
   vel.vector = uav_state->velocity.linear;
@@ -93,7 +95,18 @@ void Tester::timerBumper([[maybe_unused]] const ros::TimerEvent& event) {
 bool Tester::test() {
 
   {
-    auto [success, message] = activateMidAir();
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh_ = uhopt.value();
+  }
+
+  {
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -110,7 +123,7 @@ bool Tester::test() {
   this->sleep(1.0);
 
   {
-    auto ctrl_diag = this->sh_control_manager_diag_.getMsg();
+    auto ctrl_diag = uh_->sh_control_manager_diag_.getMsg();
 
     if (!(!ctrl_diag->flying_normally && ctrl_diag->bumper_active)) {
       ROS_ERROR("[%s]: missing the signs of the bumper being active", ros::this_node::getName().c_str());
@@ -138,7 +151,7 @@ bool Tester::test() {
 
   while (true) {
 
-    auto ctrl_diag = this->sh_control_manager_diag_.getMsg();
+    auto ctrl_diag = uh_->sh_control_manager_diag_.getMsg();
 
     if (!ros::ok()) {
       return false;
@@ -153,11 +166,11 @@ bool Tester::test() {
 
   ROS_INFO("[%s]: testing goto", ros::this_node::getName().c_str());
 
-  this->gotoRel(10, 0, 0, 0);
+  uh_->gotoRel(10, 0, 0, 0);
 
   ROS_INFO("[%s]: goto finished", ros::this_node::getName().c_str());
 
-  if (this->isFlyingNormally()) {
+  if (uh_->isFlyingNormally()) {
     return true;
   } else {
     ROS_ERROR("[%s]: not flying normally", ros::this_node::getName().c_str());

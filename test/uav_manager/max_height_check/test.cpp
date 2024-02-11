@@ -10,8 +10,21 @@ public:
 
 bool Tester::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
   {
-    auto [success, message] = activateMidAir();
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
+  {
+    auto [success, message] = uh->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -22,7 +35,7 @@ bool Tester::test() {
   // | --------------- goto to violate min height --------------- |
 
   {
-    auto [success, message] = this->gotoAbs(0, 0, 100, 0);
+    auto [success, message] = uh->gotoAbs(0, 0, 100, 0);
 
     if (success) {
       ROS_ERROR("[%s]: goto should fail", ros::this_node::getName().c_str());
@@ -38,7 +51,7 @@ bool Tester::test() {
       return false;
     }
 
-    if (this->isFlyingNormally()) {
+    if (uh->isFlyingNormally()) {
       break;
     }
   }
@@ -47,14 +60,14 @@ bool Tester::test() {
 
   sleep(1.0);
 
-  if (!sh_max_height_.hasMsg()) {
+  if (!uh->sh_max_height_.hasMsg()) {
     ROS_ERROR("[%s]: missing max height msgs", ros::this_node::getName().c_str());
     return true;
   }
 
-  double max_height_agl = sh_max_height_.getMsg()->value;
+  double max_height_agl = uh->sh_max_height_.getMsg()->value;
 
-  auto height = this->getHeightAgl();
+  auto height = uh->getHeightAgl();
 
   if (height) {
     if (height.value() < max_height_agl) {

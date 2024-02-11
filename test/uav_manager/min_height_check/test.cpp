@@ -18,6 +18,19 @@ Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
 bool Tester::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
+  {
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
   pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/safety_height_offset", _min_height_offset_);
   pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/min_height", _min_height_);
 
@@ -27,7 +40,7 @@ bool Tester::test() {
   }
 
   {
-    auto [success, message] = activateMidAir();
+    auto [success, message] = uh->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -38,7 +51,7 @@ bool Tester::test() {
   // | --------------- goto to violate min height --------------- |
 
   {
-    auto [success, message] = this->gotoAbs(0, 0, 0, 0);
+    auto [success, message] = uh->gotoAbs(0, 0, 0, 0);
 
     if (success) {
       ROS_ERROR("[%s]: goto should fail", ros::this_node::getName().c_str());
@@ -54,14 +67,14 @@ bool Tester::test() {
       return false;
     }
 
-    if (this->isFlyingNormally()) {
+    if (uh->isFlyingNormally()) {
       break;
     }
   }
 
   // | ------------------- check the altitude ------------------- |
 
-  auto height = this->getHeightAgl();
+  auto height = uh->getHeightAgl();
 
   if (height) {
     if (height.value() > _min_height_) {

@@ -44,14 +44,13 @@ public:
   Eigen::Vector3d getFcuUntiltedVelocity();
 
   bool setGotoReference();
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 /* constructor //{ */
 
-RemoteControlTest::RemoteControlTest()
-    : mrs_uav_testing::TestGeneric(){
-
-      };
+RemoteControlTest::RemoteControlTest() : mrs_uav_testing::TestGeneric(){};
 
 //}
 
@@ -59,7 +58,7 @@ RemoteControlTest::RemoteControlTest()
 
 Eigen::Vector3d RemoteControlTest::getFcuUntiltedVelocity() {
 
-  auto uav_state = sh_uav_state_.getMsg();
+  auto uav_state = uh_->sh_uav_state_.getMsg();
 
   geometry_msgs::Vector3Stamped vel_world;
   vel_world.header = uav_state->header;
@@ -270,7 +269,7 @@ bool RemoteControlTest::testRotateLeft() {
 
     rotateLeft();
 
-    auto uav_state = sh_uav_state_.getMsg();
+    auto uav_state = uh_->sh_uav_state_.getMsg();
 
     if (uav_state->velocity.angular.z > 0.8 * _heading_rate_) {
       return true;
@@ -300,7 +299,7 @@ bool RemoteControlTest::testRotateRight() {
 
     rotateRight();
 
-    auto uav_state = sh_uav_state_.getMsg();
+    auto uav_state = uh_->sh_uav_state_.getMsg();
 
     if (uav_state->velocity.angular.z < -0.8 * _heading_rate_) {
       return true;
@@ -331,7 +330,7 @@ bool RemoteControlTest::testStop() {
     stop();
 
     auto velocity  = getFcuUntiltedVelocity();
-    auto uav_state = sh_uav_state_.getMsg();
+    auto uav_state = uh_->sh_uav_state_.getMsg();
 
     if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1 && abs(uav_state->velocity.angular.z) < 0.1) {
       return true;
@@ -359,7 +358,7 @@ bool RemoteControlTest::setGotoReference() {
   srv.request.goal[3] = 0;
 
   {
-    bool service_call = sch_goto_relative_.call(srv);
+    bool service_call = uh_->sch_goto_relative_.call(srv);
 
     if (!service_call || !srv.response.success) {
       ROS_ERROR("[%s]: failed to call the service", ros::this_node::getName().c_str());
@@ -371,9 +370,9 @@ bool RemoteControlTest::setGotoReference() {
 
   // check if we gained velocity
 
-  auto uav_state = sh_uav_state_.getMsg();
+  auto uav_state = uh_->sh_uav_state_.getMsg();
 
-  auto constraints = getCurrentConstraints();
+  auto constraints = uh_->getCurrentConstraints();
 
   if (!constraints) {
     ROS_ERROR("[%s]: could not get current constraints", ros::this_node::getName().c_str());
@@ -394,6 +393,17 @@ bool RemoteControlTest::setGotoReference() {
 bool RemoteControlTest::test() {
 
   {
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh_ = uhopt.value();
+  }
+
+  {
     bool success = getControllerDynamics(_horizontal_speed_, _vertical_speed_, _heading_rate_);
 
     if (!success) {
@@ -403,7 +413,7 @@ bool RemoteControlTest::test() {
   }
 
   {
-    auto [success, message] = activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -423,7 +433,7 @@ bool RemoteControlTest::test() {
       return false;
     }
 
-    if (sh_control_manager_diag_.getMsg()->joystick_active) {
+    if (uh_->sh_control_manager_diag_.getMsg()->joystick_active) {
       break;
     }
 
@@ -514,7 +524,7 @@ bool RemoteControlTest::test() {
       return false;
     }
 
-    if (!sh_control_manager_diag_.getMsg()->joystick_active) {
+    if (!uh_->sh_control_manager_diag_.getMsg()->joystick_active) {
       break;
     }
 

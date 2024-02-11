@@ -12,8 +12,21 @@ public:
 
 bool EscalatingFailsafeTest::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
   {
-    auto [success, message] = activateMidAir();
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
+  {
+    auto [success, message] = uh->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -24,7 +37,7 @@ bool EscalatingFailsafeTest::test() {
   // | ----------------------- goto higher ---------------------- |
 
   {
-    auto [success, message] = this->gotoAbs(0, 0, 15.0, 0);
+    auto [success, message] = uh->gotoAbs(0, 0, 15.0, 0);
 
     if (!success) {
       ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -74,7 +87,7 @@ bool EscalatingFailsafeTest::test() {
       return false;
     }
 
-    if (!isFlyingNormally() && getActiveController() == "EmergencyController" && getActiveTracker() == "LandoffTracker") {
+    if (!uh->isFlyingNormally() && uh->getActiveController() == "EmergencyController" && uh->getActiveTracker() == "LandoffTracker") {
       break;
     }
 
@@ -85,7 +98,7 @@ bool EscalatingFailsafeTest::test() {
 
   // check if we have not moved
 
-  if (!isAtPosition(0, 0, 15.0, 0, 0.5)) {
+  if (!uh->isAtPosition(0, 0, 15.0, 0, 0.5)) {
     ROS_ERROR("[%s]: we moved after ehover", ros::this_node::getName().c_str());
     return false;
   }
@@ -130,9 +143,9 @@ bool EscalatingFailsafeTest::test() {
 
   // | ---------------- check if we are elanding ---------------- |
 
-  auto uav_state = this->sh_uav_state_.getMsg();
+  auto uav_state = uh->sh_uav_state_.getMsg();
 
-  if (!(!isFlyingNormally() && getActiveController() == "EmergencyController" && getActiveTracker() == "LandoffTracker" &&
+  if (!(!uh->isFlyingNormally() && uh->getActiveController() == "EmergencyController" && uh->getActiveTracker() == "LandoffTracker" &&
         uav_state->velocity.linear.z < -0.3)) {
     ROS_ERROR("[%s]: we are not elanding", ros::this_node::getName().c_str());
     return false;
@@ -176,7 +189,7 @@ bool EscalatingFailsafeTest::test() {
 
   sleep(1.5);
 
-  if (!(!isFlyingNormally() && getActiveController() == "FailsafeController" && uav_state->velocity.linear.z < -0.3)) {
+  if (!(!uh->isFlyingNormally() && uh->getActiveController() == "FailsafeController" && uav_state->velocity.linear.z < -0.3)) {
     ROS_ERROR("[%s]: we are not in failsafe", ros::this_node::getName().c_str());
     return false;
   }
@@ -207,7 +220,7 @@ bool EscalatingFailsafeTest::test() {
       return false;
     }
 
-    if (!this->isOutputEnabled()) {
+    if (!uh->isOutputEnabled()) {
       return true;
     }
 

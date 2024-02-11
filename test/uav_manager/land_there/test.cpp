@@ -13,6 +13,8 @@ public:
   mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> sch_land_there_;
 
   std::tuple<bool, std::string> landThere(const double x, const double y, const double z, const double hdg);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 Tester::Tester() {
@@ -24,7 +26,7 @@ Tester::Tester() {
 
 std::tuple<bool, std::string> Tester::landThere(const double x, const double y, const double z, const double hdg) {
 
-  if (!isFlyingNormally()) {
+  if (!uh_->isFlyingNormally()) {
     return {false, "not flying normally in the beginning"};
   }
 
@@ -61,7 +63,8 @@ std::tuple<bool, std::string> Tester::landThere(const double x, const double y, 
       return {false, "shut down from outside"};
     }
 
-    if (sh_control_manager_diag_.getMsg()->active_tracker == "LandoffTracker" && sh_control_manager_diag_.getMsg()->active_controller == "MpcController") {
+    if (uh_->sh_control_manager_diag_.getMsg()->active_tracker == "LandoffTracker" &&
+        uh_->sh_control_manager_diag_.getMsg()->active_controller == "MpcController") {
       break;
     }
 
@@ -78,7 +81,7 @@ std::tuple<bool, std::string> Tester::landThere(const double x, const double y, 
 
     ROS_INFO_THROTTLE(1.0, "[%s]: waiting for the landing to finish", name_.c_str());
 
-    if (!isOutputEnabled()) {
+    if (!uh_->isOutputEnabled()) {
 
       return {true, "landing finished"};
     }
@@ -93,6 +96,17 @@ std::tuple<bool, std::string> Tester::landThere(const double x, const double y, 
 
 bool Tester::test() {
 
+  {
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh_ = uhopt.value();
+  }
+
   // | ------------- wait for the system to be ready ------------ |
 
   while (true) {
@@ -101,7 +115,7 @@ bool Tester::test() {
       return false;
     }
 
-    if (this->mrsSystemReady()) {
+    if (uh_->mrsSystemReady()) {
       break;
     }
   }
@@ -109,7 +123,7 @@ bool Tester::test() {
   // | ------------------------ take off ------------------------ |
 
   {
-    auto [success, message] = takeoff();
+    auto [success, message] = uh_->takeoff();
 
     if (!success) {
       ROS_ERROR("[%s]: takeoff failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -122,7 +136,7 @@ bool Tester::test() {
   // | --------------------- goto somewhere --------------------- |
 
   {
-    auto [success, message] = gotoAbs(10, 15, 5, 1.2);
+    auto [success, message] = uh_->gotoAbs(10, 15, 5, 1.2);
 
     if (!success) {
       ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -148,7 +162,7 @@ bool Tester::test() {
 
   // | ---------------- check the final position ---------------- |
 
-  if (this->isAtPosition(des_x, des_y, 0, des_hdg, 0.5)) {
+  if (uh_->isAtPosition(des_x, des_y, 0, des_hdg, 0.5)) {
     return true;
   } else {
     ROS_ERROR("[%s]: land there did end in wrong place", ros::this_node::getName().c_str());

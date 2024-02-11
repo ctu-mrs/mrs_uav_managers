@@ -42,8 +42,21 @@ void Tester::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
 bool Tester::test() {
 
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
+
   {
-    auto [success, message] = activateMidAir();
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
+
+    if (!uhopt) {
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      return false;
+    }
+
+    uh = uhopt.value();
+  }
+
+  {
+    auto [success, message] = uh->activateMidAir();
 
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
@@ -63,7 +76,7 @@ bool Tester::test() {
       return false;
     }
 
-    if (!isFlyingNormally() && getActiveController() == "EmergencyController" && getActiveTracker() == "LandoffTracker") {
+    if (!uh->isFlyingNormally() && uh->getActiveController() == "EmergencyController" && uh->getActiveTracker() == "LandoffTracker") {
       break;
     }
 
@@ -78,7 +91,7 @@ bool Tester::test() {
       return false;
     }
 
-    if (!this->isOutputEnabled()) {
+    if (!uh->isOutputEnabled()) {
       return true;
     }
 
