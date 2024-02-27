@@ -414,6 +414,7 @@ private:
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_nominal_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_throttle_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_thrust_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
@@ -1759,6 +1760,7 @@ void ControlManager::initialize(void) {
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
   ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
   ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
+  ph_mass_nominal_                       = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_nominal_out", 1, true);
   ph_throttle_                           = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "throttle_out", 1, false, 10.0);
   ph_thrust_                             = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "thrust_out", 1, false, 100.0);
   ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
@@ -1770,6 +1772,16 @@ void ControlManager::initialize(void) {
   ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
   pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
+
+  // | ------------------ publish nominal mass ------------------ |
+
+  {
+    std_msgs::Float64 nominal_mass;
+
+    nominal_mass.data = _uav_mass_;
+
+    ph_mass_nominal_.publish(nominal_mass);
+  }
 
   // | ----------------------- subscribers ---------------------- |
 

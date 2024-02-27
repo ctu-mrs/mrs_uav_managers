@@ -126,6 +126,7 @@
       <remap from="~thrust_out" to="~thrust" />
       <remap from="~offboard_on_out" to="~offboard_on" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~mass_nominal_out" to="~mass_nominal" />
       <remap from="~safety_area_markers_out" to="~safety_area_markers" />
       <remap from="~safety_area_coordinates_markers_out" to="~safety_area_coordinates_markers" />
       <remap from="~disturbances_markers_out" to="~disturbances_markers" />
