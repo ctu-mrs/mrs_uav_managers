@@ -329,7 +329,7 @@ void UavManager::preinitialize(void) {
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
-  shopts.node_name          = "ControlManager";
+  shopts.node_name          = "UavManager";
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
@@ -596,16 +596,16 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 void UavManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", 1.0, 1.0, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
+    ROS_INFO_THROTTLE(1.0, "[UavManager]: waiting for HW API capabilities");
     return;
   }
 
   hw_api_capabilities_ = *sh_hw_api_capabilities_.getMsg();
 
-  ROS_INFO("[ControlManager]: got HW API capabilities, initializing");
+  ROS_INFO("[UavManager]: got HW API capabilities, initializing");
 
   initialize();
 
