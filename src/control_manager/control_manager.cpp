@@ -1984,7 +1984,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto yaw_error             = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto position_error        = mrs_lib::get_mutexed(mutex_position_error_, position_error_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
@@ -5803,8 +5802,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
     const mrs_msgs::TrajectoryReference trajectory_in) {
 
-  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   std::stringstream ss;
 
@@ -7124,7 +7122,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   // copy the member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
@@ -7192,7 +7189,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -7277,7 +7273,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -8067,12 +8062,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 /* switchController() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   std::stringstream ss;
@@ -8290,9 +8285,6 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   // the trackers are not running
   if (!last_tracker_cmd) {
 
-    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: tracker command is empty, giving controllers just the uav_state");
-
-    // give the controllers current uav state
     {
       std::scoped_lock lock(mutex_controller_list_);
 
