@@ -135,6 +135,7 @@ public:
   ros::ServiceServer service_server_land_home_;
   ros::ServiceServer service_server_land_there_;
   ros::ServiceServer service_server_midair_activation_;
+  ros::ServiceServer service_server_min_height_check_;
 
   // service callbacks
   bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -202,7 +203,7 @@ public:
   std::atomic<bool> fixing_max_height_ = false;
 
   // min height checking
-  bool              _min_height_enabled_ = false;
+  std::atomic<bool> min_height_check_ = false;
   double            _min_height_checking_rate_;
   double            _min_height_offset_;
   double            _min_height_;
@@ -299,6 +300,8 @@ public:
   void      timerMidairActivation(const ros::TimerEvent& event);
   bool      callbackMidairActivation(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::Time midair_activation_started_;
+
+  bool callbackMinHeightCheck(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   double      _midair_activation_timer_rate_;
   std::string _midair_activation_during_controller_;
@@ -422,7 +425,14 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "max_height_checking/rate", _max_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "max_height_checking/safety_height_offset", _max_height_offset_);
 
-  param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", _min_height_enabled_);
+  {
+    bool tmp;
+
+    param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", tmp);
+
+    min_height_check_ = tmp;
+  }
+
   param_loader.loadParam(yaml_prefix + "min_height_checking/rate", _min_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/safety_height_offset", _min_height_offset_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/min_height", _min_height_);
@@ -495,6 +505,7 @@ void UavManager::initialize() {
   service_server_land_home_         = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
   service_server_land_there_        = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
   service_server_midair_activation_ = nh_.advertiseService("midair_activation_in", &UavManager::callbackMidairActivation, this);
+  service_server_min_height_check_  = nh_.advertiseService("enable_min_height_check_in", &UavManager::callbackMinHeightCheck, this);
 
   // | --------------------- service clients -------------------- |
 
@@ -531,7 +542,7 @@ void UavManager::initialize() {
   timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false,
                                       _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
   timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false,
-                                      _min_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
+                                      min_height_check_ && hw_api_capabilities_.produces_distance_sensor);
 
   bool should_check_throttle = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
                                hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
@@ -2018,6 +2029,35 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
 
   res.message = message;
   res.success = success;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackMinHeightCheck() */
+
+bool UavManager::callbackMinHeightCheck([[maybe_unused]] std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  min_height_check_ = req.data;
+
+  std::stringstream ss;
+
+  ss << "min height check " << (min_height_check_ ? "enabled" : "disabled");
+
+  if (min_height_check_) {
+    timer_min_height_.start();
+  } else {
+    timer_min_height_.stop();
+  }
+
+  ROS_INFO_STREAM("[UavManager]: " << ss.str());
+
+  res.message = ss.str();
+  res.success = true;
 
   return true;
 }

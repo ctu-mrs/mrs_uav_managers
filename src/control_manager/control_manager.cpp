@@ -6611,6 +6611,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
 /* //{ isPathToPointInSafetyArea2d() */
 
 bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
+
   if (!use_safety_area_) {
     return true;
   }
