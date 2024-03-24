@@ -12,6 +12,7 @@
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/Float64StampedSrv.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
@@ -158,9 +159,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char* state_names[2] = {
-
-    "IDLING", "LANDING"};
+const char* state_names[2] = {"IDLING", "LANDING"};
 
 // state machine
 typedef enum
@@ -444,6 +443,7 @@ private:
   ros::ServiceServer service_server_pirouette_;
   ros::ServiceServer service_server_eland_;
   ros::ServiceServer service_server_parachute_;
+  ros::ServiceServer service_server_set_min_z_;
 
   // human callbable services for references
   ros::ServiceServer service_server_goto_;
@@ -491,7 +491,6 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_parachute_;
 
   // safety area min z servers
-  ros::ServiceServer service_server_set_min_z_;
   ros::ServiceServer service_server_get_min_z_;
 
   // | --------- trackers' and controllers' last results -------- |
@@ -575,7 +574,8 @@ private:
   std::string _safety_area_horizontal_frame_;
   std::string _safety_area_vertical_frame_;
 
-  double _safety_area_min_z_ = 0;
+  std::atomic<double> _safety_area_min_z_ = 0;
+
   double _safety_area_max_z_ = 0;
 
   // safety area routines
@@ -630,6 +630,7 @@ private:
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackSetMinZ(mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res);
   bool callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -1002,8 +1003,14 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
 
   param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
-  param_loader.loadParam("safety_area/vertical/min_z", _safety_area_min_z_);
   param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
+
+  {
+    double temp;
+    param_loader.loadParam("safety_area/vertical/min_z", temp);
+
+    _safety_area_min_z_ = temp;
+  }
 
   if (use_safety_area_) {
 
@@ -1829,6 +1836,7 @@ void ControlManager::initialize(void) {
   service_server_use_safety_area_            = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
   service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
+  service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
@@ -4383,6 +4391,39 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
   res.success = success;
   res.message = message;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackSetMinZ() */
+
+bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  // | -------- transform min_z to the safety area frame -------- |
+
+  mrs_msgs::ReferenceStamped point;
+  point.header               = req.header;
+  point.reference.position.z = req.value;
+
+  auto result = transformer_->transformSingle(point, _safety_area_vertical_frame_);
+
+  if (result) {
+
+    _safety_area_min_z_ = result.value().reference.position.z;
+
+    res.success = true;
+    res.message = "safety area's min z updated";
+
+  } else {
+
+    res.success = false;
+    res.message = "could not transform the value to safety area's vertical frame";
+  }
 
   return true;
 }
