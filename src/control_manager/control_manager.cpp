@@ -4404,6 +4404,12 @@ bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSr
   if (!is_initialized_)
     return false;
 
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "safety area is disabled";
+    return true;
+  }
+
   // | -------- transform min_z to the safety area frame -------- |
 
   mrs_msgs::ReferenceStamped point;
