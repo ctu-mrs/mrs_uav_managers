@@ -3,11 +3,16 @@
 #include <mrs_lib/safety_zone/yaml_export_visitor.h>
 
 #include <XmlRpcException.h>
-#include <geometry_msgs/Point.h>
+#include <geometry_msgs/Point32.h>
+#include <geometry_msgs/Polygon.h>
 
 #include <iostream>
 #include <fstream>
 #include <limits>
+
+#include <boost/geometry.hpp>
+
+namespace bg = boost::geometry;
 
 namespace mrs_uav_managers
 {
@@ -120,17 +125,18 @@ void SafetyAreaManager::initialize() {
   
   // | ------------------------ services ------------------------ |
 
-  service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
-  service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::isPointInSafetyArea2d, this);
-  service_server_path_in_safety_area_3d_  = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
-  service_server_path_in_safety_area_2d_  = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
-  service_server_save_world_config_       = nh_.advertiseService("save_world_config_in",      &SafetyAreaManager::saveWorldConfig, this);
-  service_server_load_world_config_       = nh_.advertiseService("load_world_config_in",      &SafetyAreaManager::loadWorldConfig, this);
-  service_server_use_safety_area_         = nh_.advertiseService("set_use_safety_area_in",    &SafetyAreaManager::setUseSafetyArea, this);
-  service_server_add_obstacle_            = nh_.advertiseService("add_obstacle_in",           &SafetyAreaManager::addObstacle, this);
-  service_server_get_max_z_               = nh_.advertiseService("get_max_z_in",              &SafetyAreaManager::getMaxZ, this);
-  service_server_get_min_z_               = nh_.advertiseService("get_min_z_in",              &SafetyAreaManager::getMinZ, this);
-  service_server_get_use_                 = nh_.advertiseService("get_use_in",                &SafetyAreaManager::getUse, this);
+  service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::getSafeZoneAtHeight, this);
+  service_server_point_in_safety_area_3d_   = nh_.advertiseService("point_in_safety_area_3d_in",   &SafetyAreaManager::isPointInSafetyArea3d, this);
+  service_server_point_in_safety_area_2d_   = nh_.advertiseService("point_in_safety_area_2d_in",   &SafetyAreaManager::isPointInSafetyArea2d, this);
+  service_server_path_in_safety_area_3d_    = nh_.advertiseService("path_in_safety_area_3d_in",    &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
+  service_server_path_in_safety_area_2d_    = nh_.advertiseService("path_in_safety_area_2d_in",    &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
+  service_server_save_world_config_         = nh_.advertiseService("save_world_config_in",         &SafetyAreaManager::saveWorldConfig, this);
+  service_server_load_world_config_         = nh_.advertiseService("load_world_config_in",         &SafetyAreaManager::loadWorldConfig, this);
+  service_server_use_safety_area_           = nh_.advertiseService("set_use_safety_area_in",       &SafetyAreaManager::setUseSafetyArea, this);
+  service_server_add_obstacle_              = nh_.advertiseService("add_obstacle_in",              &SafetyAreaManager::addObstacle, this);
+  service_server_get_max_z_                 = nh_.advertiseService("get_max_z_in",                 &SafetyAreaManager::getMaxZ, this);
+  service_server_get_min_z_                 = nh_.advertiseService("get_min_z_in",                 &SafetyAreaManager::getMinZ, this);
+  service_server_get_use_                   = nh_.advertiseService("get_use_in",                   &SafetyAreaManager::getUse, this);
 
   // | ------------------------ profiler ------------------------ |
 
@@ -570,6 +576,43 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
   }
 
   res.success = true;
+  return true;
+}
+
+bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res){
+  // If main prism is on different height, safety zone is empty
+  if(safety_zone_->getBorder()->getMaxZ() < req.height || req.height < safety_zone_->getBorder()->getMinZ()){
+    return true;
+  }
+  
+  // Add polygon of main prism
+  auto border = safety_zone_->getBorder()->getPolygon().outer();
+  geometry_msgs::Polygon border_polygon;
+  for(size_t i=0; i<border.size(); i++){
+    geometry_msgs::Point32 p;
+    p.x = bg::get<0>(border[i]);
+    p.y = bg::get<1>(border[i]);
+    border_polygon.points.push_back(p);
+  }
+  res.safety_zone.push_back(border_polygon);
+
+  // Add polygons of required obstacles
+  for(auto it= safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++){
+    if(it->second->getMaxZ() < req.height || req.height < it->second->getMinZ()){
+      continue;
+    } 
+    
+    geometry_msgs::Polygon polygon;
+    auto outer_ring = it->second->getPolygon().outer();
+    for(size_t i=0; i<outer_ring.size(); i++){
+      geometry_msgs::Point32 p;
+      p.x = bg::get<0>(outer_ring[i]);
+      p.y = bg::get<1>(outer_ring[i]);
+      polygon.points.push_back(p);
+    }
+    res.safety_zone.push_back(polygon);
+  }
+
   return true;
 }
 

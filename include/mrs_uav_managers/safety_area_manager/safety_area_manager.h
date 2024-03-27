@@ -7,6 +7,7 @@
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/GetPointStamped.h>
 #include <mrs_msgs/GetBool.h>
+#include <mrs_msgs/GetSafeZoneAtHeight.h>
 
 #include <std_srvs/SetBool.h>
 
@@ -59,6 +60,7 @@ private:
   int               status_timer_rate_ = 0;
 
   // safety area services
+  ros::ServiceServer service_server_get_safety_zone_at_height_;
   ros::ServiceServer service_server_point_in_safety_area_3d_;
   ros::ServiceServer service_server_point_in_safety_area_2d_;
   ros::ServiceServer service_server_path_in_safety_area_3d_;
@@ -91,6 +93,7 @@ private:
   bool isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
   bool isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
   bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
+  bool getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res);
   bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
