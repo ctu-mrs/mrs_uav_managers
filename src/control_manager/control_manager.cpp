@@ -2556,31 +2556,28 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   {
-    // TODO this whole scope is very clumsy
+    Eigen::Vector3d position_error = Eigen::Vector3d::Zero();
 
-    position_error_ = {};
+    bool position_error_set = false;
 
     if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
+      position_error[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
-
-      position_error_.value()[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
-      position_error_.value()[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
+      position_error_set = true;
     }
 
     if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
+      position_error_set = true;
+    }
 
-      position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
+    if (position_error_set) {
+
+      mrs_lib::set_mutexed(mutex_position_error_, {position_error}, position_error_);
     }
   }
 
