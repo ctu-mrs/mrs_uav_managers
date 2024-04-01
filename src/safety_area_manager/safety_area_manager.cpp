@@ -580,10 +580,16 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafet
 }
 
 bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res){
+  // Transform height to the current frame
+  double height = transformZ(req.header.frame_id, safety_area_horizontal_frame_, req.height);
+  
   // If main prism is on different height, safety zone is empty
-  if(safety_zone_->getBorder()->getMaxZ() < req.height || req.height < safety_zone_->getBorder()->getMinZ()){
+  if(safety_zone_->getBorder()->getMaxZ() < height || height < safety_zone_->getBorder()->getMinZ()){
     return true;
   }
+
+  // Set response header
+  res.header.frame_id = safety_area_horizontal_frame_;
   
   // Add polygon of main prism
   auto border = safety_zone_->getBorder()->getPolygon().outer();
@@ -598,7 +604,7 @@ bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Reque
 
   // Add polygons of required obstacles
   for(auto it= safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++){
-    if(it->second->getMaxZ() < req.height || req.height < it->second->getMinZ()){
+    if(it->second->getMaxZ() < height || height < it->second->getMinZ()){
       continue;
     } 
     

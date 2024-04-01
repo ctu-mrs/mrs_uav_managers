@@ -174,7 +174,7 @@ add_dependencies(MrsUavManagers_SafetyAreaManager
 
 target_link_libraries(MrsUavManagers_SafetyAreaManager
   # TODO: it must not be here    
-  /home/azat/mrs_workspace/devel/lib/libMrsLib_SafetyZone.so
+  # /home/azat/mrs_workspace/devel/lib/libMrsLib_SafetyZone.so
   ${catkin_LIBRARIES}
   )
 
