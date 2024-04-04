@@ -589,7 +589,7 @@ bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Reque
   }
 
   // Set response header
-  res.header.frame_id = safety_area_horizontal_frame_;
+  res.header.frame_id = uav_name_ + "/" + safety_area_horizontal_frame_;
   
   // Add polygon of main prism
   auto border = safety_zone_->getBorder()->getPolygon().outer();
