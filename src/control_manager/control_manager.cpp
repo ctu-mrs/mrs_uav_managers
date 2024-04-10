@@ -8732,15 +8732,23 @@ void ControlManager::initializeControlOutput(void) {
 
   Controller::ControlOutput controller_output;
 
-  controller_output.diagnostics.total_mass       = _uav_mass_;
-  controller_output.diagnostics.mass_difference  = 0.0;
+  controller_output.diagnostics.total_mass      = _uav_mass_;
+  controller_output.diagnostics.mass_difference = 0.0;
+
   controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
   controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+
+  if (std::abs(_initial_body_disturbance_x_) > 0.001 || std::abs(_initial_body_disturbance_y_) > 0.001) {
+    controller_output.diagnostics.disturbance_estimator = true;
+  }
+
   controller_output.diagnostics.disturbance_wx_w = 0.0;
   controller_output.diagnostics.disturbance_wy_w = 0.0;
+
   controller_output.diagnostics.disturbance_bx_w = 0.0;
   controller_output.diagnostics.disturbance_by_w = 0.0;
-  controller_output.diagnostics.controller       = "none";
+
+  controller_output.diagnostics.controller = "none";
 
   mrs_lib::set_mutexed(mutex_last_control_output_, controller_output, last_control_output_);
 }
