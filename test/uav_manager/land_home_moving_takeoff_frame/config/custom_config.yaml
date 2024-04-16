@@ -1,0 +1,15 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # loaded state estimator plugins
+    # available in mrs_uav_state_estimators: gps_garmin, gps_baro, rtk, ground_truth, dummy
+    state_estimators: [
+    "gps_garmin",
+    "gps_baro",
+    # "rtk",
+    # "ground_truth",
+    # "dummy"
+    ]
+
+    initial_state_estimator: "gps_garmin" # will be used as the first state estimator

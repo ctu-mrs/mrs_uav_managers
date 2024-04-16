@@ -1752,6 +1752,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     reference_out.header.frame_id = land_there_reference_.header.frame_id;
     reference_out.header.stamp    = ros::Time::now();
     reference_out.reference       = land_there_reference_.reference;
+
+    land_there_reference_ = reference_out;
   }
 
   bool service_success = emergencyReferenceSrv(reference_out);
