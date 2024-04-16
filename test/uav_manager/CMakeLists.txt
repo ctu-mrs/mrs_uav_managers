@@ -19,3 +19,5 @@ add_subdirectory(land_there)
 add_subdirectory(min_height_check)
 
 add_subdirectory(max_height_check)
+
+add_subdirectory(max_throttle_check)
