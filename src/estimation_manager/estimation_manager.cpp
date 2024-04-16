@@ -56,7 +56,7 @@ public:
 
     UNINITIALIZED_STATE,
     INITIALIZED_STATE,
-    READY_FOR_TAKEOFF_STATE,
+    READY_FOR_FLIGHT_STATE,
     TAKING_OFF_STATE,
     FLYING_STATE,
     HOVER_STATE,
@@ -86,7 +86,7 @@ public:
 
   bool isInPublishableState() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
-    return current_state == READY_FOR_TAKEOFF_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
            current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
   }
 
@@ -134,10 +134,10 @@ public:
         break;
       }
 
-      case READY_FOR_TAKEOFF_STATE: {
+      case READY_FOR_FLIGHT_STATE: {
         if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
-                             getStateAsString(READY_FOR_TAKEOFF_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
+                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
                              getStateAsString(LANDED_STATE).c_str());
           return false;
         }
@@ -145,16 +145,16 @@ public:
       }
 
       case TAKING_OFF_STATE: {
-        if (current_state_ != READY_FOR_TAKEOFF_STATE) {
+        if (current_state_ != READY_FOR_FLIGHT_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
-                             getStateAsString(READY_FOR_TAKEOFF_STATE).c_str());
+                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str());
           return false;
         }
         break;
       }
 
       case FLYING_STATE: {
-        if (current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(),
                              getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
@@ -272,7 +272,7 @@ private:
   const std::vector<std::string> sm_state_names_ = {
   "UNINITIALIZED_STATE",
   "INITIALIZED_STATE",
-  "READY_FOR_TAKEOFF_STATE",
+  "READY_FOR_FLIGHT_STATE",
   "TAKING_OFF_STATE",
   "FLYING_STATE",
   "HOVER_STATE",
@@ -304,6 +304,9 @@ private:
   std::shared_ptr<CommonHandlers_t> ch_;
 
   std::shared_ptr<StateMachine> sm_;
+
+  std::string after_midair_activation_tracker_name_;
+  std::string takeoff_tracker_name_;
 
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>            sh_control_input_;
@@ -630,7 +633,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   /*//}*/
 
   if (!callbacks_disabled_by_service_ &&
-      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE))) {
+      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE))) {
     callbacks_enabled_ = true;
   } else {
     callbacks_enabled_ = false;
@@ -646,7 +649,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       sm_->changeState(StateMachine::DUMMY_STATE);
     } else {
       if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
-        sm_->changeState(StateMachine::READY_FOR_TAKEOFF_STATE);
+        sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
       } else {
         ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(),
                           est_alt_agl_->getName().c_str());
@@ -676,14 +679,22 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     ROS_ERROR_THROTTLE(1.0, "[%s]: we are in failsafe state", getName().c_str());
   }
 
-  if (sm_->isInState(StateMachine::READY_FOR_TAKEOFF_STATE)) {
-    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == "LandoffTracker") {
+  // standard takeoff
+  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_) {
       sm_->changeState(StateMachine::TAKING_OFF_STATE);
     }
   }
 
+  // midair activation
+  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == after_midair_activation_tracker_name_) {
+      sm_->changeState(StateMachine::FLYING_STATE);
+    }
+  }
+
   if (sm_->isInState(StateMachine::TAKING_OFF_STATE)) {
-    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker != "LandoffTracker") {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker != takeoff_tracker_name_) {
       sm_->changeState(StateMachine::FLYING_STATE);
     }
   }
@@ -720,6 +731,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   param_loader.addYamlFileFromParam("private_config");
   param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("uav_manager_config");
   param_loader.addYamlFileFromParam("estimators_config");
   param_loader.addYamlFileFromParam("active_estimators_config");
 
@@ -759,6 +771,11 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getName().c_str());
     ros::shutdown();
   }
+  /*//}*/
+
+  /*//{ load tracker names */
+  param_loader.loadParam("mrs_uav_managers/uav_manager/takeoff/during_takeoff/tracker", takeoff_tracker_name_);
+  param_loader.loadParam("mrs_uav_managers/uav_manager/midair_activation/after_activation/tracker", after_midair_activation_tracker_name_);
   /*//}*/
 
   param_loader.setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");

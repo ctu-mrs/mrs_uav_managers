@@ -15,6 +15,7 @@ set(CATKIN_DEPENDENCIES
   tf2
   tf2_ros
   tf2_geometry_msgs
+  mrs_uav_testing
   )
 
 find_package(catkin REQUIRED COMPONENTS
@@ -24,7 +25,14 @@ find_package(catkin REQUIRED COMPONENTS
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+add_definitions(-Wall)
+add_definitions(-Wextra)
+
+if(COVERAGE)
+  message(WARNING "building with --coverage, the performance might be limited")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+endif()
 
 set(LIBRARIES
   MrsUavManagers_GainManager
@@ -38,7 +46,7 @@ set(LIBRARIES
   )
 
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include test/include
   LIBRARIES ${LIBRARIES}
   CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
@@ -48,7 +56,8 @@ include_directories(
   /home/azat/mrs_workspace/devel/include
   /home/azat/mrs_workspace/src/mrs_lib/include
 
-  include
+  include 
+  test/include
   ${catkin_INCLUDE_DIRS}
   )
 
@@ -182,10 +191,9 @@ target_link_libraries(MrsUavManagers_SafetyAreaManager
 ## |                           Testing                          |
 ## --------------------------------------------------------------
 
-if(CATKIN_ENABLE_TESTING)
+if(CATKIN_ENABLE_TESTING AND MRS_ENABLE_TESTING)
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+  message(WARNING "Testing enabled.")
 
   add_subdirectory(test)
 

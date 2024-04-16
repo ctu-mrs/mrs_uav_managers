@@ -80,11 +80,15 @@
       <remap from="~diagnostics_out" to="~diagnostics" />
       <remap from="~profiler" to="profiler" />
 
-      <!-- Services -->
+      <!-- Services in -->
       <remap from="~takeoff_in" to="~takeoff" />
       <remap from="~land_in" to="~land" />
       <remap from="~land_home_in" to="~land_home" />
       <remap from="~land_there_in" to="~land_there" />
+      <remap from="~midair_activation_in" to="~midair_activation" />
+      <remap from="~enable_min_height_check_in" to="~enable_min_height_check" />
+
+      <!-- Services out -->
       <remap from="~takeoff_out" to="control_manager/landoff_tracker/takeoff" />
       <remap from="~land_out" to="control_manager/landoff_tracker/land" />
       <remap from="~eland_out" to="control_manager/eland" />
@@ -99,7 +103,6 @@
       <remap from="~set_odometry_callbacks_out" to="estimation_manager/toggle_service_callbacks" />
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~offboard_out" to="hw_api/offboard" />
-      <remap from="~midair_activation_in" to="~midair_activation" />
 
     </node>
 

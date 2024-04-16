@@ -12,16 +12,15 @@
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/Float64StampedSrv.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
-#include <mrs_msgs/BumperStatus.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/DynamicsConstraints.h>
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
 #include <mrs_msgs/ValidateReferenceList.h>
-#include <mrs_msgs/BumperParamsSrv.h>
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/EstimatorInput.h>
 #include <mrs_msgs/PathToPointInSafetyArea.h>
@@ -166,9 +165,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char* state_names[2] = {
-
-    "IDLING", "LANDING"};
+const char* state_names[2] = {"IDLING", "LANDING"};
 
 // state machine
 typedef enum
@@ -422,11 +419,11 @@ private:
   mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
+  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_nominal_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_throttle_;
   mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_thrust_;
   mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
   mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_disturbances_markers_;
-  mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>              ph_bumper_status_;
   mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
@@ -460,6 +457,7 @@ private:
   ros::ServiceServer service_server_pirouette_;
   ros::ServiceServer service_server_eland_;
   ros::ServiceServer service_server_parachute_;
+  // ros::ServiceServer service_server_set_min_z_;
 
   // human callbable services for references
   ros::ServiceServer service_server_goto_;
@@ -634,11 +632,13 @@ private:
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  // bool callbackSetMinZ(mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res);
   bool callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
+  // bool callbackBumperSetParams(mrs_msgs::BumperParamsSrv::Request& req, mrs_msgs::BumperParamsSrv::Response& res);
+  // bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
 
@@ -671,8 +671,8 @@ private:
 
   // | ------------------ emergency triggered? ------------------ |
 
-  bool failsafe_triggered_ = false;
-  bool eland_triggered_    = false;
+  std::atomic<bool> failsafe_triggered_ = false;
+  std::atomic<bool> eland_triggered_    = false;
 
   // | ------------------------- timers ------------------------- |
 
@@ -719,8 +719,11 @@ private:
   std::string bumper_previous_tracker_;
   std::string bumper_previous_controller_;
 
-  std::atomic<bool> bumper_enabled_ = false;
-  std::atomic<bool> repulsing_      = false;
+  std::atomic<bool> bumper_enabled_   = false;
+  std::atomic<bool> bumper_repulsing_ = false;
+
+  bool _bumper_horizontal_derive_from_dynamics_;
+  bool _bumper_vertical_derive_from_dynamics_;
 
   double _bumper_horizontal_distance_ = 0;
   double _bumper_vertical_distance_   = 0;
@@ -729,7 +732,7 @@ private:
   double _bumper_vertical_overshoot_   = 0;
 
   int  bumperGetSectorId(const double& x, const double& y, const double& z);
-  bool bumperPushFromObstacle(void);
+  void bumperPushFromObstacle(void);
 
   // | --------------- safety checks and failsafes -------------- |
 
@@ -765,9 +768,6 @@ private:
   // profiling
   mrs_lib::Profiler profiler_;
   bool              _profiler_enabled_ = false;
-
-  // automatic pc shutdown (DARPA specific)
-  bool _automatic_pc_shutdown_enabled_ = false;
 
   // diagnostics publishing
   void       publishDiagnostics(void);
@@ -879,7 +879,6 @@ private:
 
   mrs_msgs::ReferenceStamped velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference);
 
-  void                          shutdown();
   void                          setCallbacks(bool in);
   bool                          isOffboard(void);
   bool                          elandSrv(void);
@@ -1154,8 +1153,11 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("obstacle_bumper/controller", _bumper_controller_name_);
   param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
 
-  param_loader.loadParam("obstacle_bumper/horizontal/threshold_distance", _bumper_horizontal_distance_);
-  param_loader.loadParam("obstacle_bumper/vertical/threshold_distance", _bumper_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/horizontal/min_distance_to_obstacle", _bumper_horizontal_distance_);
+  param_loader.loadParam("obstacle_bumper/horizontal/derived_from_dynamics", _bumper_horizontal_derive_from_dynamics_);
+
+  param_loader.loadParam("obstacle_bumper/vertical/min_distance_to_obstacle", _bumper_vertical_distance_);
+  param_loader.loadParam("obstacle_bumper/vertical/derived_from_dynamics", _bumper_vertical_derive_from_dynamics_);
 
   param_loader.loadParam("obstacle_bumper/horizontal/overshoot", _bumper_horizontal_overshoot_);
   param_loader.loadParam("obstacle_bumper/vertical/overshoot", _bumper_vertical_overshoot_);
@@ -1181,8 +1183,6 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
   param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
   param_loader.loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
-
-  param_loader.loadParam("automatic_pc_shutdown/enabled", _automatic_pc_shutdown_enabled_);
 
   param_loader.loadParam("pirouette/speed", _pirouette_speed_);
   param_loader.loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
@@ -1733,16 +1733,26 @@ void ControlManager::initialize(void) {
   ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
   ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
   ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
+  ph_mass_nominal_                       = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_nominal_out", 1, true);
   ph_throttle_                           = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "throttle_out", 1, false, 10.0);
   ph_thrust_                             = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "thrust_out", 1, false, 100.0);
   ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
   ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1, false, 10.0);
-  ph_bumper_status_                      = mrs_lib::PublisherHandler<mrs_msgs::BumperStatus>(nh_, "bumper_status_out", 1);
   ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
   ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
   ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
   pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
+
+  // | ------------------ publish nominal mass ------------------ |
+
+  {
+    std_msgs::Float64 nominal_mass;
+
+    nominal_mass.data = _uav_mass_;
+
+    ph_mass_nominal_.publish(nominal_mass);
+  }
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -1799,6 +1809,7 @@ void ControlManager::initialize(void) {
   service_server_use_joystick_               = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
   service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
+  // service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
@@ -1849,7 +1860,7 @@ void ControlManager::initialize(void) {
 
   timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
   timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this, false, bumper_enabled_);
+  timer_bumper_    = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
   timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
@@ -1954,7 +1965,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto yaw_error             = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto position_error        = mrs_lib::get_mutexed(mutex_position_error_, position_error_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
@@ -2332,31 +2342,28 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   {
-    // TODO this whole scope is very clumsy
+    Eigen::Vector3d position_error = Eigen::Vector3d::Zero();
 
-    position_error_ = {};
+    bool position_error_set = false;
 
     if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
+      position_error[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
-
-      position_error_.value()[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
-      position_error_.value()[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
+      position_error_set = true;
     }
 
     if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
+      position_error_set = true;
+    }
 
-      position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
+    if (position_error_set) {
+
+      mrs_lib::set_mutexed(mutex_position_error_, {position_error}, position_error_);
     }
   }
 
@@ -2420,12 +2427,22 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
 
   if (_odometry_innovation_check_enabled_) {
-    {
-      auto [x, y, z] = mrs_lib::getPosition(sh_odometry_innovation_.getMsg());
+
+    std::optional<nav_msgs::Odometry::ConstPtr> innovation;
+
+    if (sh_odometry_innovation_.hasMsg()) {
+      innovation = {sh_odometry_innovation_.getMsg()};
+    } else {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: missing estimator innnovation but the innovation check is enabled!");
+    }
+
+    if (innovation) {
+
+      auto [x, y, z] = mrs_lib::getPosition(innovation.value());
 
       double heading = 0;
       try {
-        heading = mrs_lib::getHeading(sh_odometry_innovation_.getMsg());
+        heading = mrs_lib::getHeading(innovation.value());
       }
       catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
         ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception caught: '%s'", e.what());
@@ -2659,16 +2676,10 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     return;
   }
 
-  double throttle = 0;
+  auto throttle = extractThrottle(last_control_output);
 
-  if (std::holds_alternative<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiAttitudeRateCmd>(last_control_output.control_output.value()).throttle;
-  } else if (std::holds_alternative<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value())) {
-    throttle = std::get<mrs_msgs::HwApiControlGroupCmd>(last_control_output.control_output.value()).throttle;
-  } else {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement eland timer for this control mode");
+  if (!throttle) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: TODO: implement landing detection mechanism for the current control modality");
     return;
   }
 
@@ -2678,6 +2689,14 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
   } else if (current_state_landing_ == LANDING_STATE) {
 
+    // --------------------------------------------------------------
+    // |                            TODO                            |
+    // This section needs work. The throttle landing detection      |
+    // mechanism should be extracted and other mechanisms, such     |
+    // as velocity-based detection should be used for high          |
+    // modalities                                                   |
+    // --------------------------------------------------------------
+
     if (!last_control_output.control_output) {
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: timerEland: last_control_output has not been initialized, returning");
       ROS_WARN_THROTTLE(1.0, "[ControlManager]: tip: the RC eland is probably triggered");
@@ -2685,7 +2704,7 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     }
 
     // recalculate the mass based on the throttle
-    throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle) / common_handlers_->g;
+    throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value()) / common_handlers_->g;
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
 
     // condition for automatic motor turn off
@@ -2715,8 +2734,6 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
         ROS_INFO("[ControlManager]: calling for disarm");
         arming(false);
       }
-
-      shutdown();
 
       changeLandingState(IDLE_STATE);
 
@@ -2766,6 +2783,14 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
     ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: FailsafeTimer: could not extract throttle out of the last control output");
     return;
   }
+
+  // --------------------------------------------------------------
+  // |                            TODO                            |
+  // This section needs work. The throttle landing detection      |
+  // mechanism should be extracted and other mechanisms, such     |
+  // as velocity-based detection should be used for high          |
+  // modalities                                                   |
+  // --------------------------------------------------------------
 
   double throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value()) / common_handlers_->g;
   ROS_INFO_THROTTLE(1.0, "[ControlManager]: failsafe: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
@@ -3025,11 +3050,17 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
+  // | ---------------------- preconditions --------------------- |
+
+  if (!sh_bumper_.hasMsg()) {
+    return;
+  }
+
   if (!bumper_enabled_) {
     return;
   }
 
-  if (!isFlyingNormally()) {
+  if (!isFlyingNormally() && !bumper_repulsing_) {
     return;
   }
 
@@ -3037,13 +3068,16 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if ((ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
+  if (sh_bumper_.hasMsg() && (ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
+
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: obstacle bumper is missing messages although we got them before");
+
     return;
   }
 
-  // --------------------------------------------------------------
-  // |                      bumper repulsion                      |
-  // --------------------------------------------------------------
+  timer_bumper_.setPeriod(ros::Duration(1.0 / _bumper_timer_rate_));
+
+  // | ------------------ call the bumper logic ----------------- |
 
   bumperPushFromObstacle();
 }
@@ -4146,6 +4180,45 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
 //}
 
+/* //{ callbackSetMinZ() */
+
+// bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res) {
+
+//   if (!is_initialized_)
+//     return false;
+
+//   if (!use_safety_area_) {
+//     res.success = true;
+//     res.message = "safety area is disabled";
+//     return true;
+//   }
+
+//   // | -------- transform min_z to the safety area frame -------- |
+
+//   mrs_msgs::ReferenceStamped point;
+//   point.header               = req.header;
+//   point.reference.position.z = req.value;
+
+//   auto result = transformer_->transformSingle(point, _safety_area_vertical_frame_);
+
+//   if (result) {
+
+//     _safety_area_min_z_ = result.value().reference.position.z;
+
+//     res.success = true;
+//     res.message = "safety area's min z updated";
+
+//   } else {
+
+//     res.success = false;
+//     res.message = "could not transform the value to safety area's vertical frame";
+//   }
+
+//   return true;
+// }
+
+//}
+
 /* //{ callbackToggleOutput() */
 
 bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
@@ -4181,11 +4254,6 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
 
   if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
     ss << "cannot toggle output ON, missing HW API status!";
-    prereq_check = false;
-  }
-
-  if (bumper_enabled_ && !sh_bumper_.hasMsg()) {
-    ss << "cannot toggle output ON, missing bumper data!";
     prereq_check = false;
   }
 
@@ -5541,8 +5609,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
     const mrs_msgs::TrajectoryReference trajectory_in) {
 
-  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   std::stringstream ss;
 
@@ -5883,9 +5950,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     } else {
 
       ss << "the active tracker '" << _tracker_names_[active_tracker_idx_] << "' does not implement the 'setTrajectoryReference()' function!";
-      ROS_ERROR_STREAM_THROTTLE(1.0, "[ControlManager]: failed to set the trajectory: " << ss.str());
+      ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
 
-      success  = false;
+      success  = true;
       message  = ss.str();
       modified = false;
       tracker_successes.push_back(false);
@@ -5987,13 +6054,15 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.output_enabled = output_enabled_;
 
-  diagnostics_msg.rc_mode = rc_goto_active_;
+  diagnostics_msg.joystick_active = rc_goto_active_;
 
   {
     std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
 
     diagnostics_msg.flying_normally = isFlyingNormally();
   }
+
+  diagnostics_msg.bumper_active = bumper_repulsing_;
 
   // | ----------------- fill the tracker status ---------------- |
 
@@ -6180,7 +6249,7 @@ std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceCo
 
 bool ControlManager::isFlyingNormally(void) {
 
-  return (output_enabled_) && (offboard_mode_) && (armed_) &&
+  return callbacks_enabled_ && (output_enabled_) && (offboard_mode_) && (armed_) &&
          (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) &&
            (active_controller_idx_ != _failsafe_controller_idx_)) ||
           _controller_names_.size() == 1) &&
@@ -6424,14 +6493,46 @@ double ControlManager::getMinZ(const std::string& frame_id) {
 
 /* bumperPushFromObstacle() //{ */
 
-bool ControlManager::bumperPushFromObstacle(void) {
-  if (!bumper_enabled_) {
-    return true;
+void ControlManager::bumperPushFromObstacle(void) {
+
+  // | --------------- fabricate the min distances -------------- |
+
+  double min_distance_horizontal = _bumper_horizontal_distance_;
+  double min_distance_vertical   = _bumper_vertical_distance_;
+
+  if (_bumper_horizontal_derive_from_dynamics_ || _bumper_vertical_derive_from_dynamics_) {
+
+    auto constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
+
+    if (_bumper_horizontal_derive_from_dynamics_) {
+
+      const double horizontal_t_stop    = constraints.constraints.horizontal_speed / constraints.constraints.horizontal_acceleration;
+      const double horizontal_stop_dist = (horizontal_t_stop * constraints.constraints.horizontal_speed) / 2.0;
+
+      min_distance_horizontal += 1.5 * horizontal_stop_dist;
+    }
+
+    if (_bumper_vertical_derive_from_dynamics_) {
+
+
+      // larger from the two accelerations
+      const double vert_acc = constraints.constraints.vertical_ascending_acceleration > constraints.constraints.vertical_descending_acceleration
+                                  ? constraints.constraints.vertical_ascending_acceleration
+                                  : constraints.constraints.vertical_descending_acceleration;
+
+      // larger from the two speeds
+      const double vert_speed = constraints.constraints.vertical_ascending_speed > constraints.constraints.vertical_descending_speed
+                                    ? constraints.constraints.vertical_ascending_speed
+                                    : constraints.constraints.vertical_descending_speed;
+
+      const double vertical_t_stop    = vert_speed / vert_acc;
+      const double vertical_stop_dist = (vertical_t_stop * vert_speed) / 2.0;
+
+      min_distance_vertical += 1.5 * vertical_stop_dist;
+    }
   }
 
-  if (!sh_bumper_.hasMsg()) {
-    return true;
-  }
+  // | ----------------------------  ---------------------------- |
 
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
@@ -6439,111 +6540,67 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
   double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
-  double direction                     = 0;
-  double repulsion_distance            = std::numeric_limits<double>::max();
-  bool   horizontal_collision_detected = false;
+  double direction          = 0;
+  double repulsion_distance = std::numeric_limits<double>::max();
 
-  bool vertical_collision_detected = false;
+  bool horizontal_collision_detected = false;
+  bool vertical_collision_detected   = false;
 
-  for (int i = 0; i < int(bumper_data->n_horizontal_sectors); i++) {
+  double min_horizontal_sector_distance = std::numeric_limits<double>::max();
+  size_t min_sector_id                  = 0;
+
+  for (unsigned long i = 0; i < bumper_data->n_horizontal_sectors; i++) {
 
     if (bumper_data->sectors[i] < 0) {
       continue;
     }
 
-    bool wall_locked_horizontal = false;
-
-    // if the sector is under critical distance
-    if (bumper_data->sectors[i] <= _bumper_horizontal_distance_ && bumper_data->sectors[i] < repulsion_distance) {
-
-      // check for locking between the oposite walls
-      // get the desired direction of motion
-      double oposite_direction  = double(i) * sector_size + M_PI;
-      int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
-
-      if (bumper_data->sectors[oposite_sector_idx] > 0 &&
-          ((bumper_data->sectors[i] + bumper_data->sectors[oposite_sector_idx]) <= (2 * _bumper_horizontal_distance_ + 2 * _bumper_horizontal_overshoot_))) {
-
-        wall_locked_horizontal = true;
-
-        if (fabs(bumper_data->sectors[i] - bumper_data->sectors[oposite_sector_idx]) <= 2 * _bumper_horizontal_overshoot_) {
-
-          ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between two walls");
-          continue;
-        }
-      }
-
-      // get the id of the oposite sector
-      direction = oposite_direction;
-
-      /* int oposite_sector_idx = (i + bumper_data->n_horizontal_sectors / 2) % bumper_data->n_horizontal_sectors; */
-
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %d vs. %d), obstacle distance: %.2f, repulsing", i,
-                        oposite_sector_idx, bumper_data->sectors[i]);
-
-      ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: oposite direction: %.2f", oposite_direction);
-
-      if (wall_locked_horizontal) {
-        if (bumper_data->sectors[i] < bumper_data->sectors[oposite_sector_idx]) {
-          repulsion_distance = _bumper_horizontal_overshoot_;
-        } else {
-          repulsion_distance = -_bumper_horizontal_overshoot_;
-        }
-      } else {
-        repulsion_distance = _bumper_horizontal_distance_ + _bumper_horizontal_overshoot_ - bumper_data->sectors[i];
-      }
-
-      horizontal_collision_detected = true;
+    if (bumper_data->sectors[i] < min_horizontal_sector_distance) {
+      min_horizontal_sector_distance = bumper_data->sectors[i];
+      min_sector_id                  = i;
     }
   }
 
-  bool   collision_above             = false;
-  bool   collision_below             = false;
+  // if the sector is under the threshold distance
+  if (min_horizontal_sector_distance < min_distance_horizontal) {
+
+    // get the desired direction of motion
+    double oposite_direction  = double(min_sector_id) * sector_size + M_PI;
+    int    oposite_sector_idx = bumperGetSectorId(cos(oposite_direction), sin(oposite_direction), 0);
+
+    // get the id of the oposite sector
+    direction = oposite_direction;
+
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", min_sector_id,
+                      oposite_sector_idx, bumper_data->sectors[min_sector_id]);
+
+    repulsion_distance = min_distance_horizontal + _bumper_horizontal_overshoot_ - bumper_data->sectors[min_sector_id];
+
+    horizontal_collision_detected = true;
+  }
+
   double vertical_repulsion_distance = 0;
 
   // check for vertical collision down
-  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= _bumper_vertical_distance_) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors] <= min_distance_vertical) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
-    collision_above             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = _bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors];
+    vertical_repulsion_distance = min_distance_vertical - bumper_data->sectors[bumper_data->n_horizontal_sectors];
   }
 
   // check for vertical collision up
-  if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 &&
-      bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= _bumper_vertical_distance_) {
+  if (bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] > 0 && bumper_data->sectors[bumper_data->n_horizontal_sectors + 1] <= min_distance_vertical) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
-    collision_below             = true;
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(_bumper_vertical_distance_ - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
-  }
-
-  // check the up/down wall locking
-  if (collision_above && collision_below) {
-
-    if (((bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-         (2 * _bumper_vertical_distance_ + 2 * _bumper_vertical_overshoot_))) {
-
-      vertical_repulsion_distance =
-          (-bumper_data->sectors[bumper_data->n_horizontal_sectors] + bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) / 2.0;
-
-      if (fabs(bumper_data->sectors[bumper_data->n_horizontal_sectors] - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]) <=
-          2 * _bumper_vertical_overshoot_) {
-
-        ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: locked between the floor and ceiling");
-        vertical_collision_detected = false;
-      }
-    }
+    vertical_repulsion_distance = -(min_distance_vertical - bumper_data->sectors[bumper_data->n_horizontal_sectors + 1]);
   }
 
   // if potential collision was detected and we should start the repulsing_
   if (horizontal_collision_detected || vertical_collision_detected) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was initiated");
-
-    if (!repulsing_) {
+    if (!bumper_repulsing_) {
 
       if (_bumper_switch_tracker_) {
 
@@ -6574,12 +6631,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
       }
     }
 
-    repulsing_ = true;
-
-    mrs_msgs::BumperStatus bumper_status;
-    bumper_status.repulsing = repulsing_;
-
-    ph_bumper_status_.publish(bumper_status);
+    bumper_repulsing_ = true;
 
     callbacks_enabled_ = false;
 
@@ -6618,9 +6670,8 @@ bool ControlManager::bumperPushFromObstacle(void) {
       auto ret = transformer_->transformSingle(reference_fcu_untilted, uav_state.header.frame_id);
 
       if (!ret) {
-
         ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: bumper reference could not be transformed");
-        return false;
+        return;
       }
 
       reference_fcu_untilted = ret.value();
@@ -6631,7 +6682,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // disable callbacks of all trackers
       req_enable_callbacks.data = false;
-      for (int i = 0; i < int(tracker_list_.size()); i++) {
+      for (size_t i = 0; i < tracker_list_.size(); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
@@ -6650,9 +6701,9 @@ bool ControlManager::bumperPushFromObstacle(void) {
   }
 
   // if repulsing_ and the distance is safe once again
-  if ((repulsing_ && !horizontal_collision_detected && !vertical_collision_detected)) {
+  if (bumper_repulsing_ && !horizontal_collision_detected && !vertical_collision_detected) {
 
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: repulsion was stopped");
+    ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: no more collision, stopping repulsion");
 
     if (_bumper_switch_tracker_) {
 
@@ -6683,17 +6734,15 @@ bool ControlManager::bumperPushFromObstacle(void) {
 
       // enable callbacks of all trackers
       req_enable_callbacks.data = true;
-      for (int i = 0; i < int(tracker_list_.size()); i++) {
+      for (size_t i = 0; i < tracker_list_.size(); i++) {
         tracker_list_[i]->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
     }
 
     callbacks_enabled_ = true;
 
-    repulsing_ = false;
+    bumper_repulsing_ = false;
   }
-
-  return false;
 }
 
 //}
@@ -6701,6 +6750,7 @@ bool ControlManager::bumperPushFromObstacle(void) {
 /* bumperGetSectorId() //{ */
 
 int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
+
   // copy member variables
   mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
 
@@ -6734,6 +6784,7 @@ int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_
 /* //{ changeLandingState() */
 
 void ControlManager::changeLandingState(LandingStates_t new_state) {
+
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
@@ -6806,6 +6857,7 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
 /* //{ ehover() */
 
 std::tuple<bool, std::string> ControlManager::ehover(void) {
+
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -6817,7 +6869,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   // copy the member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
@@ -6874,6 +6925,7 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 /* eland() //{ */
 
 std::tuple<bool, std::string> ControlManager::eland(void) {
+
   if (!is_initialized_)
     return std::tuple(false, "the ControlManager is not initialized");
 
@@ -6884,7 +6936,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -6966,9 +7017,9 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
 /* failsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::failsafe(void) {
+
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -6993,6 +7044,10 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     toggleOutput(false);
 
     return std::tuple(true, "RC emergency handoff is ON, disabling output");
+  }
+
+  if (getLowestOuput(_hw_api_inputs_) == POSITION) {
+    return eland();
   }
 
   if (_parachute_enabled_) {
@@ -7436,8 +7491,6 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
         ROS_DEBUG("[ControlManager]: stopping the eland timer");
         timer_eland_.stop();
         ROS_DEBUG("[ControlManager]: eland timer stopped");
-
-        shutdown();
       }
 
     } else {
@@ -7501,23 +7554,6 @@ bool ControlManager::elandSrv(void) {
     ROS_ERROR("[ControlManager]: service call for eland failed!");
 
     return false;
-  }
-}
-
-//}
-
-/* shutdown() //{ */
-
-void ControlManager::shutdown() {
-  // copy member variables
-  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-
-  if (_automatic_pc_shutdown_enabled_) {
-
-    ROS_INFO("[ControlManager]: calling service for PC shutdown");
-
-    std_srvs::Trigger shutdown_out;
-    sch_shutdown_.call(shutdown_out);
   }
 }
 
@@ -7638,6 +7674,7 @@ void ControlManager::toggleOutput(const bool& input) {
 /* switchTracker() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
@@ -7771,12 +7808,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 /* switchController() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   std::stringstream ss;
@@ -7885,13 +7922,13 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 /* updateTrackers() //{ */
 
 void ControlManager::updateTrackers(void) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   // --------------------------------------------------------------
   // |                     Update the trackers                    |
@@ -7899,47 +7936,44 @@ void ControlManager::updateTrackers(void) {
 
   std::optional<mrs_msgs::TrackerCommand> tracker_command;
 
-  // for each tracker
-  for (size_t i = 0; i < tracker_list_.size(); i++) {
+  unsigned int active_tracker_idx;
 
-    if (i == active_tracker_idx) {
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
 
-      try {
-        std::scoped_lock lock(mutex_tracker_list_);
+    active_tracker_idx = active_tracker_idx_;
 
-        // active tracker => update and retrieve the command
-        tracker_command = tracker_list_[i]->update(uav_state, last_control_output);
-      }
-      catch (std::runtime_error& exrun) {
+    // for each tracker
+    for (size_t i = 0; i < tracker_list_.size(); i++) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active tracker (%s)", _tracker_names_[active_tracker_idx].c_str());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active tracker");
+      if (i == active_tracker_idx) {
 
-        eland();
-      }
+        try {
+          // active tracker => update and retrieve the command
+          tracker_command = tracker_list_[i]->update(uav_state, last_control_output);
+        }
+        catch (std::runtime_error& exrun) {
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: caught an exception while updating the active tracker (%s)", _tracker_names_[active_tracker_idx].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the exception: '%s'", exrun.what());
+          tracker_command = {};
+        }
 
-    } else {
+      } else {
 
-      try {
-        std::scoped_lock lock(mutex_tracker_list_);
-
-        // nonactive tracker => just update without retrieving the command
-        tracker_list_[i]->update(uav_state, last_control_output);
-      }
-      catch (std::runtime_error& exrun) {
-
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the tracker '%s'", _tracker_names_[i].c_str());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the tracker");
-
-        eland();
+        try {
+          // nonactive tracker => just update without retrieving the command
+          tracker_list_[i]->update(uav_state, last_control_output);
+        }
+        catch (std::runtime_error& exrun) {
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: caught an exception while updating the tracker '%s'", _tracker_names_[i].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the exception: '%s'", exrun.what());
+        }
       }
     }
-  }
 
-  if (active_tracker_idx == _null_tracker_idx_) {
-    return;
+    if (active_tracker_idx == _null_tracker_idx_) {
+      return;
+    }
   }
 
   if (validateTrackerCommand(tracker_command, "ControlManager", "tracker_command")) {
@@ -7960,32 +7994,22 @@ void ControlManager::updateTrackers(void) {
 
   } else {
 
-    if (active_tracker_idx != _null_tracker_idx_) {
+    if (active_tracker_idx == _ehover_tracker_idx_) {
 
-      if (active_tracker_idx == _ehover_tracker_idx_) {
-
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the ehover tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
-
-        failsafe();
-
-      } else {
-
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
-
-        if (_tracker_error_action_ == ELAND_STR) {
-          eland();
-        } else if (_tracker_error_action_ == EHOVER_STR) {
-          ehover();
-        } else {
-          failsafe();
-        }
-      }
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the emergency tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
+      failsafe();
 
     } else {
 
-      std::scoped_lock lock(mutex_last_tracker_cmd_);
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the tracker '%s' returned empty or invalid command!", _tracker_names_[active_tracker_idx].c_str());
 
-      last_tracker_cmd_ = tracker_command;
+      if (_tracker_error_action_ == ELAND_STR) {
+        eland();
+      } else if (_tracker_error_action_ == EHOVER_STR) {
+        ehover();
+      } else {
+        failsafe();
+      }
     }
   }
 }
@@ -7995,21 +8019,18 @@ void ControlManager::updateTrackers(void) {
 /* updateControllers() //{ */
 
 void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
-  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // | ----------------- update the controllers ----------------- |
 
   // the trackers are not running
   if (!last_tracker_cmd) {
 
-    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: tracker command is empty, giving controller just the uav_state");
-
-    // give the controllers current uav state
     {
       std::scoped_lock lock(mutex_controller_list_);
 
@@ -8024,49 +8045,40 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
   Controller::ControlOutput control_output;
 
-  // for each controller
-  for (size_t i = 0; i < controller_list_.size(); i++) {
+  unsigned int active_controller_idx;
 
-    if (i == active_controller_idx) {
+  {
+    std::scoped_lock lock(mutex_controller_list_);
 
-      try {
-        std::scoped_lock lock(mutex_controller_list_);
+    active_controller_idx = active_controller_idx_;
 
-        // active controller => update and retrieve the command
-        control_output = controller_list_[active_controller_idx]->updateActive(uav_state, last_tracker_cmd.value());
-      }
-      catch (std::runtime_error& exrun) {
+    // for each controller
+    for (size_t i = 0; i < controller_list_.size(); i++) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the active controller (%s)", _controller_names_[active_controller_idx].c_str());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+      if (i == active_controller_idx) {
 
-        if (eland_triggered_) {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering failsafe due to an exception in the active controller (eland is already active)");
-          failsafe();
-
-        } else {
-
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland due to an exception in the active controller");
-          eland();
+        try {
+          // active controller => update and retrieve the command
+          control_output = controller_list_[active_controller_idx]->updateActive(uav_state, last_tracker_cmd.value());
         }
-      }
+        catch (std::runtime_error& exrun) {
 
-    } else {
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: an exception while updating the active controller (%s)",
+                             _controller_names_[active_controller_idx].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the exception: '%s'", exrun.what());
+        }
 
-      try {
-        std::scoped_lock lock(mutex_controller_list_);
+      } else {
 
-        // nonactive controller => just update without retrieving the command
-        controller_list_[i]->updateInactive(uav_state, last_tracker_cmd);
-      }
-      catch (std::runtime_error& exrun) {
+        try {
+          // nonactive controller => just update without retrieving the command
+          controller_list_[i]->updateInactive(uav_state, last_tracker_cmd);
+        }
+        catch (std::runtime_error& exrun) {
 
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the controller '%s'", _controller_names_[i].c_str());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: triggering eland (somebody should notice this)");
-
-        eland();
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception while updating the controller '%s'", _controller_names_[i].c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
+        }
       }
     }
   }
@@ -8094,21 +8106,21 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
     if (controller_status) {
 
-      if (active_controller_idx_ == _failsafe_controller_idx_) {
+      if (failsafe_triggered_) {
 
-        ROS_ERROR("[ControlManager]: failsafe controller returned empty command, disabling control");
+        ROS_ERROR("[ControlManager]: disabling control, the active controller returned an empty command when failsafe was active");
 
         toggleOutput(false);
 
-      } else if (active_controller_idx_ == _eland_controller_idx_) {
+      } else if (eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: triggering failsafe, the emergency controller returned empty or invalid command");
+        ROS_ERROR("[ControlManager]: triggering failsafe, the active controller returned an empty command when eland was active");
 
         failsafe();
 
       } else {
 
-        ROS_ERROR("[ControlManager]: triggering eland, the controller returned empty or invalid command");
+        ROS_ERROR("[ControlManager]: triggering eland, the active controller returned an empty command");
 
         eland();
       }
@@ -8121,6 +8133,7 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 /* publish() //{ */
 
 void ControlManager::publish(void) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publish");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
@@ -8290,6 +8303,7 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 /* velocityReferenceToReference() //{ */
 
 mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
+
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
@@ -8416,17 +8430,26 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
 /* initializeControlOutput() //{ */
 
 void ControlManager::initializeControlOutput(void) {
+
   Controller::ControlOutput controller_output;
 
-  controller_output.diagnostics.total_mass       = _uav_mass_;
-  controller_output.diagnostics.mass_difference  = 0.0;
+  controller_output.diagnostics.total_mass      = _uav_mass_;
+  controller_output.diagnostics.mass_difference = 0.0;
+
   controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
   controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+
+  if (std::abs(_initial_body_disturbance_x_) > 0.001 || std::abs(_initial_body_disturbance_y_) > 0.001) {
+    controller_output.diagnostics.disturbance_estimator = true;
+  }
+
   controller_output.diagnostics.disturbance_wx_w = 0.0;
   controller_output.diagnostics.disturbance_wy_w = 0.0;
+
   controller_output.diagnostics.disturbance_bx_w = 0.0;
   controller_output.diagnostics.disturbance_by_w = 0.0;
-  controller_output.diagnostics.controller       = "none";
+
+  controller_output.diagnostics.controller = "none";
 
   mrs_lib::set_mutexed(mutex_last_control_output_, controller_output, last_control_output_);
 }

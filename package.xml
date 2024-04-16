@@ -26,6 +26,7 @@
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>rostest</depend>
+  <depend>mrs_uav_testing</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelets.xml" />

@@ -104,7 +104,7 @@ mrs_uav_managers:
 
     obstacle_bumper:
 
-      enabled: false
+      enabled: true
 
       switch_tracker: true
       tracker: "MpcTracker"
@@ -113,14 +113,20 @@ mrs_uav_managers:
       controller: "Se3Controller"
 
       horizontal:
-        threshold_distance: 1.2 # [m]
+
+        min_distance_to_obstacle: 1.2 # [m]
+
+        # when enabled, the min_distance_to_obstacle will increased by the distances
+        # needed for stopping given the current system constraints
+        derived_from_dynamics: true
 
       vertical:
-        threshold_distance: 1.2 # [m]
 
-    automatic_pc_shutdown:
+        min_distance_to_obstacle: 1.2 # [m]
 
-      enabled: false
+        # when enabled, the min_distance_to_obstacle will increased by the distances
+        # needed for stopping given the current system constraints
+        derived_from_dynamics: true
 
     joystick:
 

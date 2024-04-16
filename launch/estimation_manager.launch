@@ -39,6 +39,7 @@
       <!-- Load the default param files -->
       <param name="private_config" value="$(find mrs_uav_managers)/config/private/estimation_manager/estimation_manager.yaml" />
       <param name="public_config" value="$(find mrs_uav_managers)/config/public/estimation_manager/estimation_manager.yaml" />
+      <param name="uav_manager_config" value="$(find mrs_uav_managers)/config/public/uav_manager.yaml" />
       <param name="estimators_config" value="$(find mrs_uav_managers)/config/private/estimators.yaml" />
       <param name="active_estimators_config" value="$(find mrs_uav_managers)/config/public/active_estimators.yaml" />
 

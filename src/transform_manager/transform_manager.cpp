@@ -82,6 +82,7 @@ private:
   std::string         ns_fixed_origin_parent_frame_id_;
   std::string         ns_fixed_origin_child_frame_id_;
   bool                publish_fixed_origin_tf_;
+  geometry_msgs::Pose pose_first_;
   geometry_msgs::Pose pose_fixed_;
   geometry_msgs::Pose pose_fixed_diff_;
 
@@ -106,6 +107,7 @@ private:
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
 
   std::shared_ptr<mrs_lib::TransformBroadcaster> broadcaster_;
+  tf2_ros::StaticTransformBroadcaster            static_broadcaster_;
 
   std::unique_ptr<TfMappingOrigin> tf_mapping_origin_;
 
@@ -115,7 +117,8 @@ private:
   void                                          callbackUavState(const mrs_msgs::UavState::ConstPtr msg);
   std::string                                   first_frame_id_;
   std::string                                   last_frame_id_;
-  bool                                          is_first_frame_id_set_ = false;
+  bool                                          is_first_frame_id_set_        = false;
+  bool                                          is_local_static_tf_published_ = false;
 
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_height_agl_;
   void                                                callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg);
@@ -136,6 +139,8 @@ private:
   std::optional<geometry_msgs::Pose> transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const;
 
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
+
+  void publishLocalTf();
 };
 /*//}*/
 
@@ -196,20 +201,26 @@ void TransformManager::onInit() {
   param_loader.loadParam("world_origin/units", world_origin_units_);
 
   if (Support::toLowercase(world_origin_units_) == "utm") {
+
     ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
+
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units_) == "latlon") {
-    double lat, lon;
+
     ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
+
+    double lat, lon;
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
+
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+
     ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
+    ROS_ERROR("[%s]: world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
     ros::shutdown();
   }
 
@@ -221,6 +232,7 @@ void TransformManager::onInit() {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
     ros::shutdown();
   }
+
   /*//}*/
 
   /*//{ load local_origin parameters */
@@ -437,55 +449,15 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     first_frame_id_                = msg->header.frame_id;
     last_frame_id_                 = msg->header.frame_id;
     pose_fixed_                    = msg->pose;
+    pose_first_                    = msg->pose;
     pose_fixed_diff_.orientation.w = 1;
-    is_first_frame_id_set_         = true;
+
+    is_first_frame_id_set_ = true;
   }
 
-  if (publish_local_origin_tf_) {
-    /*//{ publish local_origin tf*/
-    geometry_msgs::TransformStamped tf_msg;
-    tf_msg.header.stamp    = msg->header.stamp;
-    tf_msg.header.frame_id = ns_local_origin_parent_frame_id_;
-    tf_msg.child_frame_id  = ns_local_origin_child_frame_id_;
-
-    // transform pose to first frame_id
-    geometry_msgs::PoseStamped pose;
-    pose.header = msg->header;
-    pose.pose   = msg->pose;
-
-    if (pose.pose.orientation.w == 0 && pose.pose.orientation.z == 0 && pose.pose.orientation.y == 0 && pose.pose.orientation.x == 0) {
-      ROS_WARN_ONCE("[%s]: Uninitialized quaternion detected during publishing stable_origin tf of %s. Setting w=1", getPrintName().c_str(),
-                    pose.header.frame_id.c_str());
-      pose.pose.orientation.w = 1.0;
-    }
-
-    auto res = ch_->transformer->transformSingle(pose, first_frame_id_.substr(0, first_frame_id_.find("_origin")) + "_local_origin");
-
-    if (res) {
-      const tf2::Transform      tf       = Support::tf2FromPose(res->pose);
-      const tf2::Transform      tf_inv   = tf.inverse();
-      const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
-      tf_msg.transform.translation       = Support::pointToVector3(pose_inv.position);
-      tf_msg.transform.rotation          = pose_inv.orientation;
-
-      if (Support::noNans(tf_msg)) {
-        try {
-          broadcaster_->sendTransform(tf_msg);
-        }
-        catch (...) {
-          ROS_ERROR("exception caught ");
-        }
-      } else {
-        ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                          tf_msg.child_frame_id.c_str());
-      }
-      ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                    tf_msg.child_frame_id.c_str());
-    } else {
-      ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform pose to %s. Not publishing local_origin transform.", getPrintName().c_str(), first_frame_id_.c_str());
-      return;
-    }
-    /*//}*/
+  // publish static tf from fixed_origin to local_origin based on the first message
+  if (publish_local_origin_tf_ && !is_local_static_tf_published_) {
+    publishLocalTf();
   }
 
   if (publish_stable_origin_tf_) {
@@ -575,6 +547,7 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
   /*//{ choose another source of utm and world tfs after estimator switch */
   if (msg->header.frame_id != last_frame_id_) {
+
     const std::string last_estimator_name    = Support::frameIdToEstimatorName(last_frame_id_);
     const std::string current_estimator_name = Support::frameIdToEstimatorName(msg->header.frame_id);
 
@@ -883,6 +856,39 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
 }
 /*//}*/
 
+/* publishLocalTf() //{*/
+void TransformManager::publishLocalTf() {
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  geometry_msgs::TransformStamped tf_msg;
+  tf_msg.header.stamp = ros::Time::now();
+
+  tf_msg.header.frame_id       = ns_fixed_origin_child_frame_id_;
+  tf_msg.child_frame_id        = ns_local_origin_child_frame_id_;
+  tf_msg.transform.translation = Support::pointToVector3(pose_first_.position);
+  tf_msg.transform.rotation    = pose_first_.orientation;
+
+  if (Support::noNans(tf_msg)) {
+
+    try {
+      static_broadcaster_.sendTransform(tf_msg);
+    }
+    catch (...) {
+      ROS_ERROR("[%s]: exception caught while publishing tf from %s to %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                tf_msg.child_frame_id.c_str());
+    }
+
+  } else {
+    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                      tf_msg.child_frame_id.c_str());
+  }
+  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                tf_msg.child_frame_id.c_str());
+  is_local_static_tf_published_ = true;
+}
+/*//}*/
+
 /*//{ transformRtkToFcu() */
 std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const {
 
@@ -893,8 +899,8 @@ std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geo
   if (res1) {
     pose_tmp.pose.orientation = res1.value().transform.rotation;
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(),
-                       ch_->frames.ns_fcu_untilted.c_str(), ch_->frames.ns_fcu.c_str());
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu_untilted.c_str(),
+                       ch_->frames.ns_fcu.c_str());
     return {};
   }
 
@@ -914,7 +920,8 @@ std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geo
   if (res2) {
     utm_in_fcu = res2.value();
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(), ch_->frames.ns_fcu.c_str());
+    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(),
+                       ch_->frames.ns_fcu.c_str());
     return {};
   }
 

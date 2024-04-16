@@ -105,6 +105,7 @@
       <remap from="~validate_reference_in" to="~validate_reference" />
       <remap from="~validate_reference_2d_in" to="~validate_reference_2d" />
       <remap from="~validate_reference_list_in" to="~validate_reference_list" />
+      <remap from="~set_min_z_in" to="~set_min_z" />
 
       <!-- Publishers -->
       <remap from="~hw_api_actuator_cmd_out" to="hw_api/actuator_cmd" />
@@ -126,6 +127,7 @@
       <remap from="~thrust_out" to="~thrust" />
       <remap from="~offboard_on_out" to="~offboard_on" />
       <remap from="~mass_estimate_out" to="~mass_estimate" />
+      <remap from="~mass_nominal_out" to="~mass_nominal" />
       <remap from="~safety_area_markers_out" to="~safety_area_markers" />
       <remap from="~safety_area_coordinates_markers_out" to="~safety_area_coordinates_markers" />
       <remap from="~disturbances_markers_out" to="~disturbances_markers" />
@@ -162,7 +164,6 @@
       <remap from="~failsafe_escalating_in" to="~failsafe_escalating" />
       <remap from="~eland_out" to="~landoff_tracker/eland" />
       <remap from="~land_out" to="~landoff_tracker/land" />
-      <remap from="~shutdown_out" to="~shutdown" />
       <remap from="~pirouette_in" to="~pirouette" />
       <remap from="~bumper_in" to="~bumper" />
       <remap from="~bumper_repulsion_in" to="~bumper_repulsion" />

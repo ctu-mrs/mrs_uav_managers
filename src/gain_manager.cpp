@@ -52,7 +52,8 @@ public:
 
 private:
   ros::NodeHandle nh_;
-  bool            is_initialized_ = false;
+
+  std::atomic<bool> is_initialized_ = false;
 
   // | ----------------------- parameters ----------------------- |
 
@@ -254,7 +255,7 @@ void GainManager::onInit() {
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::GainManagerDiagnostics>(nh_, "diagnostics_out", 1);
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::GainManagerDiagnostics>(nh_, "diagnostics_out", 10);
 
   // | ------------------------- timers ------------------------- |
 
@@ -410,7 +411,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
     return true;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
   if (!stringInVector(req.value, _gain_names_)) {
 
@@ -423,7 +424,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_gains_.at(estimation_diagnostics.current_state_estimator))) {
+  if (!stringInVector(req.value, _map_type_allowed_gains_.at(estimation_diagnostics->current_state_estimator))) {
 
     ss << "the gains '" << req.value.c_str() << "' are not allowed given the current state estimator";
 
@@ -463,7 +464,7 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
 // |                           timers                           |
 // --------------------------------------------------------------
 
-/* gainManagementTimer() //{ */
+/* timerGainManagement() //{ */
 
 void GainManager::timerGainManagement(const ros::TimerEvent& event) {
 
@@ -478,47 +479,47 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
     return;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
-
   if (!sh_control_manager_diag_.hasMsg()) {
     return;
   }
 
-  auto control_manager_diagnostics = *sh_estimation_diag_.getMsg();
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
+
+  auto control_manager_diagnostics = sh_estimation_diag_.getMsg();
 
   auto current_gains       = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
   // | --- automatically set _gains_ when currrent state estimator changes -- |
-  if (estimation_diagnostics.current_state_estimator != last_estimator_name) {
+  if (estimation_diagnostics->current_state_estimator != last_estimator_name) {
 
     ROS_INFO_THROTTLE(1.0, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
-                      estimation_diagnostics.current_state_estimator.c_str());
+                      estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
-    it = _map_type_default_gains_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_default_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_default_gains_.end()) {
 
       ROS_WARN_THROTTLE(1.0, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
-                        estimation_diagnostics.current_state_estimator.c_str());
+                        estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
 
       // if the current gains are within the allowed estimator types, do nothing
-      if (stringInVector(current_gains, _map_type_allowed_gains_.at(estimation_diagnostics.current_state_estimator))) {
+      if (stringInVector(current_gains, _map_type_allowed_gains_.at(estimation_diagnostics->current_state_estimator))) {
 
-        last_estimator_name = estimation_diagnostics.current_state_estimator;
+        last_estimator_name = estimation_diagnostics->current_state_estimator;
 
         // else, try to set the default gains
       } else {
 
         ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
-                          estimation_diagnostics.current_state_estimator.c_str());
+                          estimation_diagnostics->current_state_estimator.c_str());
 
         if (setGains(it->second)) {
 
-          last_estimator_name = estimation_diagnostics.current_state_estimator;
+          last_estimator_name = estimation_diagnostics->current_state_estimator;
 
           ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to default: '%s'", it->second.c_str());
 
@@ -535,7 +536,7 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
 
 //}
 
-/* dignosticsTimer() //{ */
+/* timerDiagnostics() //{ */
 
 void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
 
@@ -547,18 +548,22 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do constraint management, missing estimator diagnostics!");
+    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do gain management, missing estimator diagnostics!");
     return;
   }
 
   if (!sh_control_manager_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do constraint management, missing control manager diagnostics!");
+    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do gain management, missing control manager diagnostics!");
     return;
   }
 
-  auto estimation_diagnostics = *sh_estimation_diag_.getMsg();
-
   auto current_gains = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
+
+  if (current_gains == "") { // this could happend just before timerGainManagement() finishes
+    return;
+  }
+
+  auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
   mrs_msgs::GainManagerDiagnostics diagnostics;
 
@@ -569,11 +574,11 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   // get the available gains
   {
     std::map<std::string, std::vector<std::string>>::iterator it;
-    it = _map_type_allowed_gains_.find(estimation_diagnostics.current_state_estimator);
+    it = _map_type_allowed_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_gains_.end()) {
       ROS_WARN_THROTTLE(1.0, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!",
-                        estimation_diagnostics.current_state_estimator.c_str());
+                        estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }
@@ -583,6 +588,11 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
   {
     std::map<std::string, Gains_t>::iterator it;
     it = _gains_.find(current_gains);
+
+    if (it == _gains_.end()) {
+      ROS_ERROR("[GainManager]: current gains '%s' not found in the gain list!", current_gains.c_str());
+      return;
+    }
 
     diagnostics.current_values.kpxy = it->second.kpxy;
     diagnostics.current_values.kvxy = it->second.kvxy;

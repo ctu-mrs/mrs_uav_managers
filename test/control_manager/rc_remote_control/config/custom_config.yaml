@@ -1,0 +1,7 @@
+mrs_uav_managers:
+
+  constraint_manager:
+
+    default_constraints:
+      gps_garmin: "medium"
+      gps_baro: "medium"

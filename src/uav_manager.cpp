@@ -69,14 +69,14 @@ typedef enum
 {
 
   IDLE_STATE,
-  FLY_THERE_STATE,
+  GOTO_STATE,
   LANDING_STATE,
 
 } LandingStates_t;
 
 const char* state_names[3] = {
 
-    "IDLING", "FLYING HOME", "LANDING"};
+    "IDLING", "GOTO", "LANDING"};
 
 class UavManager : public nodelet::Nodelet {
 
@@ -135,6 +135,7 @@ public:
   ros::ServiceServer service_server_land_home_;
   ros::ServiceServer service_server_land_there_;
   ros::ServiceServer service_server_midair_activation_;
+  ros::ServiceServer service_server_min_height_check_;
 
   // service callbacks
   bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -202,7 +203,7 @@ public:
   std::atomic<bool> fixing_max_height_ = false;
 
   // min height checking
-  bool              _min_height_enabled_ = false;
+  std::atomic<bool> min_height_check_ = false;
   double            _min_height_checking_rate_;
   double            _min_height_offset_;
   double            _min_height_;
@@ -300,6 +301,8 @@ public:
   bool      callbackMidairActivation(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::Time midair_activation_started_;
 
+  bool callbackMinHeightCheck(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+
   double      _midair_activation_timer_rate_;
   std::string _midair_activation_during_controller_;
   std::string _midair_activation_during_tracker_;
@@ -329,7 +332,7 @@ void UavManager::preinitialize(void) {
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
-  shopts.node_name          = "ControlManager";
+  shopts.node_name          = "UavManager";
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
@@ -397,6 +400,11 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/takeoff_height", _takeoff_height_);
 
+  if (_takeoff_height_ < 0.5 || _takeoff_height_ > 10.0) {
+    ROS_ERROR("[UavManager]: the takeoff height (%.2f m) has to be between 0.5 and 10 meters", _takeoff_height_);
+    ros::shutdown();
+  }
+
   param_loader.loadParam(yaml_prefix + "landing/rate", _landing_timer_rate_);
   param_loader.loadParam(yaml_prefix + "landing/landing_tracker", _landing_tracker_name_);
   param_loader.loadParam(yaml_prefix + "landing/landing_controller", _landing_controller_name_);
@@ -417,7 +425,14 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "max_height_checking/rate", _max_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "max_height_checking/safety_height_offset", _max_height_offset_);
 
-  param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", _min_height_enabled_);
+  {
+    bool tmp;
+
+    param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", tmp);
+
+    min_height_check_ = tmp;
+  }
+
   param_loader.loadParam(yaml_prefix + "min_height_checking/rate", _min_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/safety_height_offset", _min_height_offset_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/min_height", _min_height_);
@@ -490,6 +505,7 @@ void UavManager::initialize() {
   service_server_land_home_         = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
   service_server_land_there_        = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
   service_server_midair_activation_ = nh_.advertiseService("midair_activation_in", &UavManager::callbackMidairActivation, this);
+  service_server_min_height_check_  = nh_.advertiseService("enable_min_height_check_in", &UavManager::callbackMinHeightCheck, this);
 
   // | --------------------- service clients -------------------- |
 
@@ -526,7 +542,7 @@ void UavManager::initialize() {
   timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false,
                                       _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
   timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false,
-                                      _min_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
+                                      min_height_check_ && hw_api_capabilities_.produces_distance_sensor);
 
   bool should_check_throttle = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
                                hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
@@ -591,16 +607,16 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 void UavManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", 1.0, 1.0, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("UavManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
-    ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
+    ROS_INFO_THROTTLE(1.0, "[UavManager]: waiting for HW API capabilities");
     return;
   }
 
   hw_api_capabilities_ = *sh_hw_api_capabilities_.getMsg();
 
-  ROS_INFO("[ControlManager]: got HW API capabilities, initializing");
+  ROS_INFO("[UavManager]: got HW API capabilities, initializing");
 
   initialize();
 
@@ -648,7 +664,7 @@ void UavManager::timerLanding(const ros::TimerEvent& event) {
 
     return;
 
-  } else if (current_state_landing_ == FLY_THERE_STATE) {
+  } else if (current_state_landing_ == GOTO_STATE) {
 
     auto [pos_x, pos_y, pos_z] = mrs_lib::getPosition(*tracker_cmd);
     auto [ref_x, ref_y, ref_z] = mrs_lib::getPosition(land_there_current_frame);
@@ -880,7 +896,7 @@ void UavManager::timerMaxHeight(const ros::TimerEvent& event) {
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
-  if (!control_manager_diag->flying_normally) {
+  if (!fixing_max_height_ && !control_manager_diag->flying_normally) {
     return;
   }
 
@@ -977,7 +993,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
-  if (!control_manager_diag->flying_normally) {
+  if (!fixing_min_height_ && !control_manager_diag->flying_normally) {
     return;
   }
 
@@ -987,6 +1003,7 @@ void UavManager::timerMinHeight(const ros::TimerEvent& event) {
   auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
 
   double odometry_heading = 0;
+
   try {
     odometry_heading = mrs_lib::getHeading(odometry);
   }
@@ -1457,7 +1474,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.success = false;
       res.message = ss.str();
 
-      switchControllerSrv(old_controller);
+      toggleControlOutput(false);
+      disarmSrv();
 
       return true;
     }
@@ -1477,7 +1495,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] std_srvs::Trigger::Request& re
       res.success = false;
       res.message = ss.str();
 
-      switchTrackerSrv(old_tracker);
+      toggleControlOutput(false);
+      disarmSrv();
 
       return true;
     }
@@ -1733,6 +1752,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     reference_out.header.frame_id = land_there_reference_.header.frame_id;
     reference_out.header.stamp    = ros::Time::now();
     reference_out.reference       = land_there_reference_.reference;
+
+    land_there_reference_ = reference_out;
   }
 
   bool service_success = emergencyReferenceSrv(reference_out);
@@ -1754,7 +1775,7 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     throttle_under_threshold_          = false;
     throttle_mass_estimate_first_time_ = ros::Time(0);
 
-    changeLandingState(FLY_THERE_STATE);
+    changeLandingState(GOTO_STATE);
 
     timer_landing_.start();
 
@@ -1842,20 +1863,34 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
 
   ungripSrv();
 
-  mrs_msgs::ReferenceStamped reference_out;
+  auto odometry = sh_odometry_.getMsg();
+
+  // | ------ transform the reference to the current frame ------ |
+
+  mrs_msgs::ReferenceStamped reference_in;
+  reference_in.header    = req.header;
+  reference_in.reference = req.reference;
+
+  auto result = transformer_->transformSingle(reference_in, odometry->header.frame_id);
+
+  if (!result) {
+    std::stringstream ss;
+    ss << "can not transform the reference to the current control frame!";
+    res.message = ss.str();
+    res.success = false;
+    ROS_ERROR_STREAM_THROTTLE(1.0, "[UavManager]: " << ss.str());
+    return true;
+  }
 
   {
     std::scoped_lock lock(mutex_land_there_reference_);
 
-    land_there_reference_.header    = req.header;
-    land_there_reference_.reference = req.reference;
-
-    reference_out.header.frame_id = land_there_reference_.header.frame_id;
-    reference_out.header.stamp    = ros::Time::now();
-    reference_out.reference       = land_there_reference_.reference;
+    land_there_reference_.header               = odometry->header;
+    land_there_reference_.reference            = reference_in.reference;
+    land_there_reference_.reference.position.z = odometry->pose.pose.position.z;
   }
 
-  bool service_success = emergencyReferenceSrv(reference_out);
+  bool service_success = emergencyReferenceSrv(land_there_reference_);
 
   if (service_success) {
 
@@ -1874,7 +1909,7 @@ bool UavManager::callbackLandThere(mrs_msgs::ReferenceStampedSrv::Request& req, 
     throttle_under_threshold_          = false;
     throttle_mass_estimate_first_time_ = ros::Time(0);
 
-    changeLandingState(FLY_THERE_STATE);
+    changeLandingState(GOTO_STATE);
 
     timer_landing_.start();
 
@@ -1996,6 +2031,35 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
 
   res.message = message;
   res.success = success;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackMinHeightCheck() */
+
+bool UavManager::callbackMinHeightCheck([[maybe_unused]] std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  min_height_check_ = req.data;
+
+  std::stringstream ss;
+
+  ss << "min height check " << (min_height_check_ ? "enabled" : "disabled");
+
+  if (min_height_check_) {
+    timer_min_height_.start();
+  } else {
+    timer_min_height_.stop();
+  }
+
+  ROS_INFO_STREAM("[UavManager]: " << ss.str());
+
+  res.message = ss.str();
+  res.success = true;
 
   return true;
 }
@@ -2140,7 +2204,7 @@ std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
         takingoff_           = false;
         timer_takeoff_.stop();
 
-        changeLandingState(FLY_THERE_STATE);
+        changeLandingState(GOTO_STATE);
 
         throttle_under_threshold_          = false;
         throttle_mass_estimate_first_time_ = ros::Time(0);

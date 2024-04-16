@@ -505,6 +505,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
     param_loader.addYamlFile(platform_config);
   }
 
+  double mass;
   double arm_length;
   double body_height;
   double force_constant;
@@ -512,24 +513,32 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   double prop_radius;
   double rpm_min;
   double rpm_max;
-  double mass;
 
-  param_loader.loadParam("uav_mass", mass);
+  bool detailed_loaded = true;
 
-  param_loader.loadParam("model_params/arm_length", arm_length);
-  param_loader.loadParam("model_params/body_height", body_height);
+  detailed_loaded *= param_loader.loadParam("uav_mass", mass, 0.0);
 
-  param_loader.loadParam("model_params/propulsion/force_constant", force_constant);
-  param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant);
-  param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius);
-  param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min);
-  param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max);
+  detailed_loaded *= param_loader.loadParam("model_params/arm_length", arm_length, 0.0);
+  detailed_loaded *= param_loader.loadParam("model_params/body_height", body_height, 0.0);
 
-  Eigen::MatrixXd allocation_matrix = param_loader.loadMatrixDynamic2("model_params/propulsion/allocation_matrix", 4, -1);
+  detailed_loaded *= param_loader.loadParam("model_params/propulsion/force_constant", force_constant, 0.0);
+  detailed_loaded *= param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant, 0.0);
+  detailed_loaded *= param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius, 0.0);
+  detailed_loaded *= param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min, 0.0);
+  detailed_loaded *= param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max, 0.0);
 
-  if (!param_loader.loadedSuccessfully()) {
-    ROS_INFO("[%s]: detailed model params not loaded, missing some info", node_name.c_str());
+  Eigen::MatrixXd allocation_matrix;
+
+  detailed_loaded *= param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
+
+  if (!detailed_loaded) {
+    ROS_WARN(
+        "[%s]: detailed UAV model params not loaded, missing some parameters. This will not permit operations when ACTUATORS or CONTROL_GROUP control "
+        "outputs would be possible.",
+        node_name.c_str());
     return {};
+  } else {
+    ROS_INFO("[%s]: detailed UAV model params successfully loaded.", node_name.c_str());
   }
 
   int n_motors = allocation_matrix.cols();
@@ -540,15 +549,19 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   model_params.body_height = body_height;
   model_params.prop_radius = prop_radius;
 
-  Eigen::MatrixXd inertia_matrix = param_loader.loadMatrixDynamic2("model_params/inertia_matrix", 3, 3);
+  Eigen::Matrix3d inertia_matrix;
 
-  if (param_loader.loadedSuccessfully()) {
+  bool inertia_loaded = param_loader.loadMatrixStatic("model_params/inertia_matrix", inertia_matrix, Eigen::Matrix3d::Identity());
+
+  if (inertia_loaded) {
 
     model_params.inertia = inertia_matrix;
-    ROS_INFO("[%s]: inertia loaded from config file:", node_name.c_str());
+    ROS_INFO("[%s]: inertia matrix loaded from config file:", node_name.c_str());
     ROS_INFO_STREAM(model_params.inertia);
 
   } else {
+
+    ROS_INFO("[%s]: inertia matrix missing in the config file, computing it from the other params.", node_name.c_str());
 
     // create the inertia matrix
     model_params.inertia       = Eigen::Matrix3d::Zero();
@@ -596,8 +609,6 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(ros::NodeHandle&
   for (int i = 0; i < n_motors; i++) {
     alloc_tmp(i, 3) = 1.0;
   }
-
-  std::cout << "Control group mixer: " << std::endl << alloc_tmp << std::endl;
 
   model_params.control_group_mixer = alloc_tmp;
 
