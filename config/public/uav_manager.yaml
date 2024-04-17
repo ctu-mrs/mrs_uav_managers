@@ -35,8 +35,6 @@ mrs_uav_managers:
         controller: "MpcController"
         tracker: "MpcTracker"
 
-        pirouette: false
-
       takeoff_height: 1.5
 
     landing:
