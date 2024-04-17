@@ -1,3 +1,5 @@
 add_subdirectory(set_constraints_should_succeed)
 
 add_subdirectory(set_constraints_should_fail)
+
+add_subdirectory(constraints_override)
