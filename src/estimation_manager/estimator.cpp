@@ -87,8 +87,13 @@ std::string Estimator::getCurrentSmStateString(void) const {
 /*//}*/
 
 /*//{ isMitigatingJump() */
-bool Estimator::isMitigatingJump(void) const {
-  return is_mitigating_jump_;
+bool Estimator::isMitigatingJump(void) {
+  if (is_mitigating_jump_) {
+    is_mitigating_jump_ = false;
+    return true;
+  } else {
+    return false;
+  }
 }
 /*//}*/
 

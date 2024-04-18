@@ -86,7 +86,7 @@ public:
 
   void setCurrentSmState(const SMStates_t &new_state);
 
-  bool isMitigatingJump() const;
+  bool isMitigatingJump();
 
   // state machine methods
   bool changeState(SMStates_t new_state);
