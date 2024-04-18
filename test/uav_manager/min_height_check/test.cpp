@@ -11,9 +11,15 @@ public:
 
   double _min_height_offset_;
   double _min_height_;
+
+  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_min_height_check_;
+
+  bool toggleMinHeightCheck(const bool in);
 };
 
 Tester::Tester() : mrs_uav_testing::TestGeneric() {
+
+  sch_min_height_check_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "/" + _uav_name_ + "/uav_manager/enable_min_height_check");
 }
 
 bool Tester::test() {
@@ -45,6 +51,63 @@ bool Tester::test() {
     if (!success) {
       ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
+    }
+  }
+
+  // | -------------- disable the min-height check -------------- |
+
+  {
+    bool success = toggleMinHeightCheck(false);
+
+    if (!success) {
+      ROS_ERROR("[%s]: failed to disable the min-height check", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  sleep(0.1);
+
+  // | --------------- goto to violate min height --------------- |
+
+  {
+    auto [success, message] = uh->gotoAbs(0, 0, 0.1, 0);
+
+    if (!success) {
+      ROS_ERROR("[%s]: failed to descend", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  // | --------------- enable the min-height check -------------- |
+
+  {
+    bool success = toggleMinHeightCheck(true);
+
+    if (!success) {
+      ROS_ERROR("[%s]: failed to enable the min-height check", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  sleep(0.5);
+
+  // | ------------- check if we are flying normally ------------ |
+
+  if (uh->isFlyingNormally()) {
+    ROS_ERROR("[%s]: we are still flying normally", ros::this_node::getName().c_str());
+    return false;
+  }
+
+  // | --------- wait till we are flying normally again --------- |
+
+  while (true) {
+
+    if (!ros::ok()) {
+      return false;
+    }
+
+    if (uh->isFlyingNormally()) {
+      break;
     }
   }
 
@@ -85,6 +148,20 @@ bool Tester::test() {
   return false;
 }
 
+bool Tester::toggleMinHeightCheck(const bool in) {
+
+  std_srvs::SetBool srv;
+  srv.request.data = in;
+
+  bool service_call = sch_min_height_check_.call(srv);
+
+  if (!service_call || !srv.response.success) {
+    ROS_ERROR("[%s]: failed to call the service for min height check", ros::this_node::getName().c_str());
+    return false;
+  } else {
+    return true;
+  }
+}
 
 TEST(TESTSuite, test) {
 
@@ -107,3 +184,4 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
 
   return RUN_ALL_TESTS();
 }
+
