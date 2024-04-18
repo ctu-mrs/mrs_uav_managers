@@ -1,0 +1,6 @@
+preflight_check:
+
+  # takeoff not allowed if UAV's height sensor exceeds <max_height>
+  height_check:
+
+    enabled: false

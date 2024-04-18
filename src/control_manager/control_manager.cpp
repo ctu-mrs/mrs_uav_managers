@@ -12,6 +12,7 @@
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/Float64Stamped.h>
+#include <mrs_msgs/Float64StampedSrv.h>
 #include <mrs_msgs/ObstacleSectors.h>
 #include <mrs_msgs/BoolStamped.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
@@ -158,9 +159,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char* state_names[2] = {
-
-    "IDLING", "LANDING"};
+const char* state_names[2] = {"IDLING", "LANDING"};
 
 // state machine
 typedef enum
@@ -444,6 +443,7 @@ private:
   ros::ServiceServer service_server_pirouette_;
   ros::ServiceServer service_server_eland_;
   ros::ServiceServer service_server_parachute_;
+  ros::ServiceServer service_server_set_min_z_;
 
   // human callbable services for references
   ros::ServiceServer service_server_goto_;
@@ -491,7 +491,6 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_parachute_;
 
   // safety area min z servers
-  ros::ServiceServer service_server_set_min_z_;
   ros::ServiceServer service_server_get_min_z_;
 
   // | --------- trackers' and controllers' last results -------- |
@@ -575,7 +574,8 @@ private:
   std::string _safety_area_horizontal_frame_;
   std::string _safety_area_vertical_frame_;
 
-  double _safety_area_min_z_ = 0;
+  std::atomic<double> _safety_area_min_z_ = 0;
+
   double _safety_area_max_z_ = 0;
 
   // safety area routines
@@ -630,6 +630,7 @@ private:
   bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackSetMinZ(mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res);
   bool callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -1002,8 +1003,14 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
 
   param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
-  param_loader.loadParam("safety_area/vertical/min_z", _safety_area_min_z_);
   param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
+
+  {
+    double temp;
+    param_loader.loadParam("safety_area/vertical/min_z", temp);
+
+    _safety_area_min_z_ = temp;
+  }
 
   if (use_safety_area_) {
 
@@ -1829,6 +1836,7 @@ void ControlManager::initialize(void) {
   service_server_use_safety_area_            = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
   service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
+  service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
@@ -1984,7 +1992,6 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto yaw_error             = mrs_lib::get_mutexed(mutex_attitude_error_, yaw_error_);
   auto position_error        = mrs_lib::get_mutexed(mutex_position_error_, position_error_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
@@ -2549,31 +2556,28 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   {
-    // TODO this whole scope is very clumsy
+    Eigen::Vector3d position_error = Eigen::Vector3d::Zero();
 
-    position_error_ = {};
+    bool position_error_set = false;
 
     if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
+      position_error[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
-
-      position_error_.value()[0] = last_tracker_cmd->position.x - uav_state.pose.position.x;
-      position_error_.value()[1] = last_tracker_cmd->position.y - uav_state.pose.position.y;
+      position_error_set = true;
     }
 
     if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
-      std::scoped_lock lock(mutex_position_error_);
+      position_error[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
 
-      if (!position_error_) {
-        position_error_ = Eigen::Vector3d::Zero(3);
-      }
+      position_error_set = true;
+    }
 
-      position_error_.value()[2] = last_tracker_cmd->position.z - uav_state.pose.position.z;
+    if (position_error_set) {
+
+      mrs_lib::set_mutexed(mutex_position_error_, {position_error}, position_error_);
     }
   }
 
@@ -4390,6 +4394,45 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
 //}
 
+/* //{ callbackSetMinZ() */
+
+bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  if (!use_safety_area_) {
+    res.success = true;
+    res.message = "safety area is disabled";
+    return true;
+  }
+
+  // | -------- transform min_z to the safety area frame -------- |
+
+  mrs_msgs::ReferenceStamped point;
+  point.header               = req.header;
+  point.reference.position.z = req.value;
+
+  auto result = transformer_->transformSingle(point, _safety_area_vertical_frame_);
+
+  if (result) {
+
+    _safety_area_min_z_ = result.value().reference.position.z;
+
+    res.success = true;
+    res.message = "safety area's min z updated";
+
+  } else {
+
+    res.success = false;
+    res.message = "could not transform the value to safety area's vertical frame";
+  }
+
+  return true;
+}
+
+//}
+
 /* //{ callbackToggleOutput() */
 
 bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
@@ -5803,8 +5846,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
     const mrs_msgs::TrajectoryReference trajectory_in) {
 
-  auto uav_state        = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-  auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
+  auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   std::stringstream ss;
 
@@ -6613,6 +6655,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
 /* //{ isPathToPointInSafetyArea2d() */
 
 bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
+
   if (!use_safety_area_) {
     return true;
   }
@@ -7124,7 +7167,6 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   // copy the member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (active_tracker_idx == _null_tracker_idx_) {
@@ -7192,7 +7234,6 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
 
   // copy member variables
-  auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
   auto active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -7277,7 +7318,6 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
@@ -8067,12 +8107,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 /* switchController() //{ */
 
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
-  auto last_tracker_cmd      = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
   std::stringstream ss;
@@ -8290,9 +8330,6 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
   // the trackers are not running
   if (!last_tracker_cmd) {
 
-    ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: tracker command is empty, giving controllers just the uav_state");
-
-    // give the controllers current uav state
     {
       std::scoped_lock lock(mutex_controller_list_);
 
@@ -8695,15 +8732,23 @@ void ControlManager::initializeControlOutput(void) {
 
   Controller::ControlOutput controller_output;
 
-  controller_output.diagnostics.total_mass       = _uav_mass_;
-  controller_output.diagnostics.mass_difference  = 0.0;
+  controller_output.diagnostics.total_mass      = _uav_mass_;
+  controller_output.diagnostics.mass_difference = 0.0;
+
   controller_output.diagnostics.disturbance_bx_b = _initial_body_disturbance_x_;
   controller_output.diagnostics.disturbance_by_b = _initial_body_disturbance_y_;
+
+  if (std::abs(_initial_body_disturbance_x_) > 0.001 || std::abs(_initial_body_disturbance_y_) > 0.001) {
+    controller_output.diagnostics.disturbance_estimator = true;
+  }
+
   controller_output.diagnostics.disturbance_wx_w = 0.0;
   controller_output.diagnostics.disturbance_wy_w = 0.0;
+
   controller_output.diagnostics.disturbance_bx_w = 0.0;
   controller_output.diagnostics.disturbance_by_w = 0.0;
-  controller_output.diagnostics.controller       = "none";
+
+  controller_output.diagnostics.controller = "none";
 
   mrs_lib::set_mutexed(mutex_last_control_output_, controller_output, last_control_output_);
 }

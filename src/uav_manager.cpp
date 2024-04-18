@@ -135,6 +135,7 @@ public:
   ros::ServiceServer service_server_land_home_;
   ros::ServiceServer service_server_land_there_;
   ros::ServiceServer service_server_midair_activation_;
+  ros::ServiceServer service_server_min_height_check_;
 
   // service callbacks
   bool callbackTakeoff(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
@@ -152,7 +153,6 @@ public:
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_control_callbacks_;
   mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> sch_emergency_reference_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_arm_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_pirouette_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_odometry_callbacks_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_ungrip_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_toggle_control_output_;
@@ -171,7 +171,6 @@ public:
   void setControlCallbacksSrv(const bool& input);
   void ungripSrv(void);
   bool toggleControlOutput(const bool& input);
-  void pirouetteSrv(void);
   bool offboardSrv(const bool in);
 
   ros::Timer timer_takeoff_;
@@ -202,7 +201,7 @@ public:
   std::atomic<bool> fixing_max_height_ = false;
 
   // min height checking
-  bool              _min_height_enabled_ = false;
+  std::atomic<bool> min_height_check_ = false;
   double            _min_height_checking_rate_;
   double            _min_height_offset_;
   double            _min_height_;
@@ -249,7 +248,6 @@ public:
   std::string _after_takeoff_controller_name_;
   std::string _takeoff_tracker_name_;
   std::string _takeoff_controller_name_;
-  bool        _after_takeoff_pirouette_ = false;
 
   // Landing timer
   std::string _landing_tracker_name_;
@@ -299,6 +297,8 @@ public:
   void      timerMidairActivation(const ros::TimerEvent& event);
   bool      callbackMidairActivation(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::Time midair_activation_started_;
+
+  bool callbackMinHeightCheck(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
 
   double      _midair_activation_timer_rate_;
   std::string _midair_activation_during_controller_;
@@ -392,7 +392,6 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "takeoff/rate", _takeoff_timer_rate_);
   param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
-  param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/controller", _takeoff_controller_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/takeoff_height", _takeoff_height_);
@@ -422,7 +421,14 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "max_height_checking/rate", _max_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "max_height_checking/safety_height_offset", _max_height_offset_);
 
-  param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", _min_height_enabled_);
+  {
+    bool tmp;
+
+    param_loader.loadParam(yaml_prefix + "min_height_checking/enabled", tmp);
+
+    min_height_check_ = tmp;
+  }
+
   param_loader.loadParam(yaml_prefix + "min_height_checking/rate", _min_height_checking_rate_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/safety_height_offset", _min_height_offset_);
   param_loader.loadParam(yaml_prefix + "min_height_checking/min_height", _min_height_);
@@ -495,6 +501,7 @@ void UavManager::initialize() {
   service_server_land_home_         = nh_.advertiseService("land_home_in", &UavManager::callbackLandHome, this);
   service_server_land_there_        = nh_.advertiseService("land_there_in", &UavManager::callbackLandThere, this);
   service_server_midair_activation_ = nh_.advertiseService("midair_activation_in", &UavManager::callbackMidairActivation, this);
+  service_server_min_height_check_  = nh_.advertiseService("enable_min_height_check_in", &UavManager::callbackMinHeightCheck, this);
 
   // | --------------------- service clients -------------------- |
 
@@ -507,7 +514,6 @@ void UavManager::initialize() {
   sch_emergency_reference_   = mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv>(nh_, "emergency_reference_out");
   sch_control_callbacks_     = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "enable_callbacks_out");
   sch_arm_                   = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "arm_out");
-  sch_pirouette_             = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "pirouette_out");
   sch_odometry_callbacks_    = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
   sch_ungrip_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
   sch_toggle_control_output_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "toggle_control_output_out");
@@ -531,7 +537,7 @@ void UavManager::initialize() {
   timer_max_height_        = nh_.createTimer(ros::Rate(_max_height_checking_rate_), &UavManager::timerMaxHeight, this, false,
                                       _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
   timer_min_height_        = nh_.createTimer(ros::Rate(_min_height_checking_rate_), &UavManager::timerMinHeight, this, false,
-                                      _min_height_enabled_ && hw_api_capabilities_.produces_distance_sensor);
+                                      min_height_check_ && hw_api_capabilities_.produces_distance_sensor);
 
   bool should_check_throttle = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
                                hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
@@ -855,11 +861,6 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
       switchControllerSrv(_after_takeoff_controller_name_);
 
       setOdometryCallbacksSrv(true);
-
-      if (_after_takeoff_pirouette_) {
-
-        pirouetteSrv();
-      }
 
       timer_takeoff_.stop();
     }
@@ -1741,6 +1742,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] std_srvs::Trigger::Request& r
     reference_out.header.frame_id = land_there_reference_.header.frame_id;
     reference_out.header.stamp    = ros::Time::now();
     reference_out.reference       = land_there_reference_.reference;
+
+    land_there_reference_ = reference_out;
   }
 
   bool service_success = emergencyReferenceSrv(reference_out);
@@ -2018,6 +2021,35 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] std_srvs::Trigger::Re
 
   res.message = message;
   res.success = success;
+
+  return true;
+}
+
+//}
+
+/* //{ callbackMinHeightCheck() */
+
+bool UavManager::callbackMinHeightCheck([[maybe_unused]] std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+
+  if (!is_initialized_)
+    return false;
+
+  min_height_check_ = req.data;
+
+  std::stringstream ss;
+
+  ss << "min height check " << (min_height_check_ ? "enabled" : "disabled");
+
+  if (min_height_check_) {
+    timer_min_height_.start();
+  } else {
+    timer_min_height_.stop();
+  }
+
+  ROS_INFO_STREAM("[UavManager]: " << ss.str());
+
+  res.message = ss.str();
+  res.success = true;
 
   return true;
 }
@@ -2409,27 +2441,6 @@ bool UavManager::offboardSrv(const bool in) {
     } else {
       return true;
     }
-  }
-}
-
-//}
-
-/* pirouetteSrv() //{ */
-
-void UavManager::pirouetteSrv(void) {
-
-  std_srvs::Trigger srv;
-
-  bool res = sch_pirouette_.call(srv);
-
-  if (res) {
-
-    if (!srv.response.success) {
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: service call for pirouette returned: %s.", srv.response.message.c_str());
-    }
-
-  } else {
-    ROS_ERROR_THROTTLE(1.0, "[UavManager]: service call for pirouette failed!");
   }
 }
 
