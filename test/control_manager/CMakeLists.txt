@@ -15,3 +15,5 @@ add_subdirectory(escalating_failsafe_rc)
 add_subdirectory(rc_remote_control)
 
 add_subdirectory(bumper)
+
+add_subdirectory(trajectory_topic)
