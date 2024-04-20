@@ -700,7 +700,9 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   }
 
   if (sm_->isInState(StateMachine::FLYING_STATE)) {
-    if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
+    if (!sh_control_input_.hasMsg()) {
+      ROS_WARN_THROTTLE(1.0, "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
+    } else if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
       ROS_WARN_THROTTLE(1.0, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable", getName().c_str(),
                         (ros::Time::now() - sh_control_input_.lastMsgTime()).toSec());
     }
