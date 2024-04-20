@@ -43,7 +43,7 @@ std::tuple<bool, std::string> TrajectoryTrackingTest::checkTrajectoryFlythrough(
       return {false, "terminated form outside"};
     }
 
-    if (uh_->isAtPosition(points[current_idx][0], points[current_idx][1], points[current_idx][2], points[current_idx][3], tolerance)) {
+    if (uh_->isAtPosition(points.at(current_idx)(0), points.at(current_idx)(1), points.at(current_idx)(2), points.at(current_idx)(3), tolerance)) {
       current_idx++;
     }
 
@@ -76,7 +76,7 @@ std::vector<Eigen::Vector4d> TrajectoryTrackingTest::sampleTrajectory(const Eige
 
   std::vector<Eigen::Vector4d> trajectory;
 
-  const double heading_dist = sradians::dist(from[3], to[3]);
+  const double heading_dist = sradians::dist(from(3), to(3));
 
   trajectory.push_back(from);
 
@@ -87,7 +87,7 @@ std::vector<Eigen::Vector4d> TrajectoryTrackingTest::sampleTrajectory(const Eige
   for (int i = 1; i < n_points; i++) {
 
     current_point.head(3) += dir_to * step_size;
-    current_point[3] += heading_step;
+    current_point(3) += heading_step;
 
     trajectory.push_back(current_point);
   }

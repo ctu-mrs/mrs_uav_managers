@@ -66,10 +66,10 @@ bool Tester::test() {
 
       mrs_msgs::Reference traj_point;
 
-      traj_point.position.x = point[0];
-      traj_point.position.y = point[1];
-      traj_point.position.z = point[2];
-      traj_point.heading    = point[3];
+      traj_point.position.x = point(0);
+      traj_point.position.y = point(1);
+      traj_point.position.z = point(2);
+      traj_point.heading    = point(3);
 
       msg_out.points.push_back(traj_point);
     }
