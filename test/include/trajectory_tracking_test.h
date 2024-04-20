@@ -33,6 +33,10 @@ std::tuple<bool, std::string> TrajectoryTrackingTest::checkTrajectoryFlythrough(
 
   unsigned long current_idx = 0;
 
+  if (points.size() == 0) {
+    return {false, "trajectory is empty"};
+  }
+
   while (true) {
 
     if (!ros::ok()) {
@@ -58,8 +62,8 @@ std::tuple<bool, std::string> TrajectoryTrackingTest::checkTrajectoryFlythrough(
 std::vector<Eigen::Vector4d> TrajectoryTrackingTest::sampleTrajectory(const Eigen::Vector4d from, const Eigen::Vector4d to, const double dt,
                                                                       const double speed) {
 
-  const Eigen::Vector3d from_pos = from.block(0, 0, 1, 3);
-  const Eigen::Vector3d to_pos   = to.block(0, 0, 1, 3);
+  const Eigen::Vector3d from_pos = from.head(3);
+  const Eigen::Vector3d to_pos   = to.head(3);
 
   const Eigen::Vector3d vec_to = to_pos - from_pos;
 
@@ -82,7 +86,7 @@ std::vector<Eigen::Vector4d> TrajectoryTrackingTest::sampleTrajectory(const Eige
 
   for (int i = 1; i < n_points; i++) {
 
-    current_point.block(0, 0, 1, 3) += dir_to * step_size;
+    current_point.head(3) += dir_to * step_size;
     current_point[3] += heading_step;
 
     trajectory.push_back(current_point);

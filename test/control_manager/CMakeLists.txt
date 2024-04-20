@@ -16,5 +16,4 @@ add_subdirectory(rc_remote_control)
 
 add_subdirectory(bumper)
 
-# flaky
-# add_subdirectory(trajectory_topic)
+add_subdirectory(trajectory_topic)
