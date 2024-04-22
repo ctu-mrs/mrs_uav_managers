@@ -90,6 +90,12 @@ public:
            current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
   }
 
+  bool isInSwitchableState() const {
+    const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
+    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+           current_state == LANDING_STATE;
+  }
+
   bool isInTheAir() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
     return current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE || current_state == LANDING_STATE;
@@ -658,7 +664,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   }
 
   // active estimator is in faulty state, we need to switch to healthy estimator
-  if (sm_->isInTheAir() && active_estimator_->isError()) {
+  if (sm_->isInSwitchableState() && active_estimator_->isError()) {
     sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
   }
 
