@@ -141,19 +141,19 @@ public:
       }
 
       case READY_FOR_FLIGHT_STATE: {
-        if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+        if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
                              getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
-                             getStateAsString(LANDED_STATE).c_str());
+                             getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case TAKING_OFF_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
-                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str());
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
+                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -170,19 +170,19 @@ public:
       }
 
       case HOVER_STATE: {
-        if (current_state_ != FLYING_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
-                             getStateAsString(FLYING_STATE).c_str());
+        if (current_state_ != FLYING_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case ESTIMATOR_SWITCHING_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
-                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
-                             getStateAsString(HOVER_STATE).c_str());
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE  && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE && current_state_ != LANDING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
+                             getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str());
           return false;
         }
         pre_switch_state_ = current_state_;
@@ -190,9 +190,9 @@ public:
       }
 
       case LANDING_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
-                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
+        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
