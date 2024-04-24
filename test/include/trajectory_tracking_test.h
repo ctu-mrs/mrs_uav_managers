@@ -18,14 +18,9 @@ public:
   std::vector<Eigen::Vector4d> sampleTrajectory(const Eigen::Vector4d from, const Eigen::Vector4d to, const double dt, const double speed);
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
-
-  mrs_lib::PublisherHandler<mrs_msgs::TrajectoryReference> ph_trajectory_;
 };
 
-TrajectoryTrackingTest::TrajectoryTrackingTest() : mrs_uav_testing::TestGeneric() {
-
-  ph_trajectory_ = mrs_lib::PublisherHandler<mrs_msgs::TrajectoryReference>(nh_, "/" + _uav_name_ + "/control_manager/trajectory_reference");
-};
+TrajectoryTrackingTest::TrajectoryTrackingTest() : mrs_uav_testing::TestGeneric(){};
 
 /* checkTrajectoryFlythrough() //{ */
 

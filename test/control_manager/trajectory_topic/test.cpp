@@ -74,7 +74,7 @@ bool Tester::test() {
       msg_out.points.push_back(traj_point);
     }
 
-    ph_trajectory_.publish(msg_out);
+    uh_->ph_trajectory_.publish(msg_out);
   }
 
   // | ------------- check following the trajectory ------------- |
