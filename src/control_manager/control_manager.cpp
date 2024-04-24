@@ -4098,7 +4098,8 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
     }
   }
 
-  // | ------------------------ rc eland ------------------------ |
+  // | ----------------- RC escalating failsafe ----------------- |
+
   if (_rc_escalating_failsafe_enabled_) {
 
     if (_rc_escalating_failsafe_channel_ >= int(rc->channels.size())) {
@@ -8006,6 +8007,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
     return std::tuple(false, ss.str());
   }
 
+  if (rc_goto_active_) {
+    ss << "can not switch tracker, the RC joystick is active";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
   auto new_tracker_idx = idxInVector(tracker_name, _tracker_names_);
 
   // check if the tracker exists
@@ -8137,6 +8144,12 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
+    return std::tuple(false, ss.str());
+  }
+
+  if (rc_goto_active_) {
+    ss << "can not switch controller, the RC joystick is active";
+    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 

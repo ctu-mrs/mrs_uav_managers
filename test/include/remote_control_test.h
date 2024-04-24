@@ -566,6 +566,61 @@ bool RemoteControlTest::test() {
 
   deactivate();
 
+  // | ------- test switching of controllers and trackers ------- |
+
+  activate();
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  {
+    auto [success, message] = uh_->switchController("Se3Controller");
+
+    if (success) {
+      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      return false;
+    }
+  }
+
+  sleep(2.0);
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  {
+    auto [success, message] = uh_->switchController("MpcController");
+
+    if (success) {
+      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      return false;
+    }
+  }
+
+  sleep(2.0);
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  deactivate();
+
   // | ------------- activate the remote controller ------------- |
 
   return true;
