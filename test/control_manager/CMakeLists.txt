@@ -19,3 +19,5 @@ add_subdirectory(bumper)
 add_subdirectory(trajectory_topic)
 
 add_subdirectory(trajectory_start_stop_resume)
+
+add_subdirectory(velocity_reference_topic)

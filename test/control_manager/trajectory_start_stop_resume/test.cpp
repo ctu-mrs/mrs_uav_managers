@@ -125,7 +125,9 @@ bool Tester::test() {
       ROS_ERROR("[%s]: stopped from outside", ros::this_node::getName().c_str());
     }
 
-    if (uh_->sh_speed_.hasMsg() && uh_->sh_speed_.getMsg()->value < 0.3) {
+    std::optional<double> speed = uh_->getSpeed();
+
+    if (speed && speed.value() < 0.3) {
       break;
     }
   }
