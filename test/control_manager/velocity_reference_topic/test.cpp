@@ -32,6 +32,8 @@ bool Tester::test() {
     }
   }
 
+  std::string desired_frame_id = uh->sh_uav_state_.getMsg()->header.frame_id;
+
   while (true) {
 
     if (!ros::ok()) {
@@ -42,6 +44,8 @@ bool Tester::test() {
     // | ------------------ publish the reference ----------------- |
 
     mrs_msgs::VelocityReferenceStamped msg;
+
+    msg.header.frame_id = desired_frame_id;
 
     msg.reference.velocity.x = 1.2;
     msg.reference.velocity.y = 1.5;
@@ -54,7 +58,7 @@ bool Tester::test() {
     Eigen::Vector3d vel;
 
     {
-      auto opt_vel = uh->getVelocity("");
+      auto opt_vel = uh->getVelocity(desired_frame_id);
 
       if (!opt_vel) {
         ROS_ERROR("[%s]: could not obtain UAV velocity", ros::this_node::getName().c_str());
