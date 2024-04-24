@@ -40,7 +40,7 @@ Eigen::Vector3d Tester::getBodyVelocity() {
   vel.header = uav_state->header;
   vel.vector = uav_state->velocity.linear;
 
-  auto result = this->transformer_->transformSingle(vel, "fcu_untilted");
+  auto result = this->transformer_->transformSingle(vel, _uav_name_ + "/fcu_untilted");
 
   if (result) {
     return Eigen::Vector3d(result->vector.x, result->vector.y, result->vector.z);

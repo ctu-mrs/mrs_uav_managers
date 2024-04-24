@@ -64,7 +64,7 @@ Eigen::Vector3d RemoteControlTest::getFcuUntiltedVelocity() {
   vel_world.header = uav_state->header;
   vel_world.vector = uav_state->velocity.linear;
 
-  auto vel_fcu_untilted = transformer_->transformSingle(vel_world, "fcu_untilted");
+  auto vel_fcu_untilted = transformer_->transformSingle(vel_world, _uav_name_ + "/fcu_untilted");
 
   if (vel_fcu_untilted) {
     return Eigen::Vector3d(vel_fcu_untilted->vector.x, vel_fcu_untilted->vector.y, vel_fcu_untilted->vector.z);
