@@ -66,6 +66,8 @@ bool Tester::test() {
     uh_->ph_trajectory_.publish(msg_out);
   }
 
+  this->sleep(0.5);
+
   // | --------------- start the trajectory check --------------- |
 
   ROS_INFO("[%s]: pes", ros::this_node::getName().c_str());
