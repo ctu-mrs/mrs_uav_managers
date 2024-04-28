@@ -25,3 +25,5 @@ add_subdirectory(velocity_reference_topic)
 add_subdirectory(set_heading_service)
 
 add_subdirectory(set_heading_relative_service)
+
+add_subdirectory(goto_altitude_service)
