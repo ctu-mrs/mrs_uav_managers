@@ -5674,6 +5674,10 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
+    ROS_INFO("[ControlManager]: setting reference to x=%.2f, y=%.2f, z=%.2f, hdg=%.2f (expressed in '%s')", reference_request.reference.position.x,
+             reference_request.reference.position.y, reference_request.reference.position.z, reference_request.reference.heading,
+             transformed_reference.header.frame_id.c_str());
+
     tracker_response = tracker_list_.at(active_tracker_idx_)
                            ->setReference(mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(reference_request)));
 
