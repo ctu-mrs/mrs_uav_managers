@@ -27,3 +27,5 @@ add_subdirectory(set_heading_service)
 add_subdirectory(set_heading_relative_service)
 
 add_subdirectory(goto_altitude_service)
+
+add_subdirectory(hover_service)
