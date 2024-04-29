@@ -33,10 +33,10 @@ bool Tester::test() {
   }
 
   {
-    auto [success, message] = uh->gotoAbs(0, 0, 2.0, 0);
+    auto [success, message] = uh->gotoReference(3.2, -1.3, 1.2, -2.3, _uav_name_ + "/local_origin");
 
     if (!success) {
-      ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      ROS_ERROR("[%s]: goto reference failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
     }
   }

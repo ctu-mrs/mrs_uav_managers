@@ -1,5 +1,7 @@
 add_subdirectory(goto_service)
 
+add_subdirectory(goto_relative_service)
+
 add_subdirectory(eland_control_error)
 
 add_subdirectory(eland_innovation)
@@ -29,3 +31,9 @@ add_subdirectory(set_heading_relative_service)
 add_subdirectory(goto_altitude_service)
 
 add_subdirectory(hover_service)
+
+add_subdirectory(reference_service)
+
+add_subdirectory(reference_service_local_origin)
+
+add_subdirectory(reference_topic)

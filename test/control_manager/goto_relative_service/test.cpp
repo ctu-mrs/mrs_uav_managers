@@ -33,10 +33,10 @@ bool Tester::test() {
   }
 
   {
-    auto [success, message] = uh->gotoAbs(0, 0, 2.0, 0);
+    auto [success, message] = uh->gotoRel(5, 10, 2.0, 1.2);
 
     if (!success) {
-      ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      ROS_ERROR("[%s]: goto relative failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
     }
   }
