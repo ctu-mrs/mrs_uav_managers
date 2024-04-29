@@ -1983,8 +1983,9 @@ void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
 void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
@@ -2490,8 +2491,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   mrs_lib::AtomicScopeFlag unset_running(running_safety_timer_);
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerSafety", scope_timer_logger_, scope_timer_enabled_);
@@ -2877,8 +2879,9 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
 void ControlManager::timerEland(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerEland", _elanding_timer_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerEland", scope_timer_logger_, scope_timer_enabled_);
@@ -3258,8 +3261,9 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
 void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
@@ -3302,8 +3306,9 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
 void ControlManager::timerPirouette(const ros::TimerEvent& event) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPirouette", _pirouette_timer_rate_, 0.01, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerPirouette", scope_timer_logger_, scope_timer_enabled_);
@@ -3375,8 +3380,9 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
 
 void ControlManager::asyncControl(void) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::AtomicScopeFlag unset_running(running_async_control_);
 
@@ -3471,8 +3477,9 @@ void ControlManager::asyncControl(void) {
 
 void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
@@ -3633,8 +3640,9 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
 void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
@@ -3813,8 +3821,9 @@ void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
 void ControlManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGNSS");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
@@ -3828,8 +3837,9 @@ void ControlManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
 void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackJoystick");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
@@ -3949,8 +3959,9 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
 void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiStatus");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
@@ -3997,8 +4008,9 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr m
 
 void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
@@ -4152,8 +4164,9 @@ void ControlManager::timeoutUavState(const double& missing_for) {
 
 bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (failsafe_triggered_ || eland_triggered_) {
 
@@ -4182,8 +4195,9 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
 
 bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (failsafe_triggered_ || eland_triggered_) {
 
@@ -4212,8 +4226,9 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
 
 bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   std::stringstream message;
 
@@ -4258,8 +4273,9 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigg
 
 bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (failsafe_triggered_ || eland_triggered_) {
 
@@ -4290,8 +4306,9 @@ bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request&
 
 bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (failsafe_triggered_) {
 
@@ -4322,8 +4339,9 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
 
 bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (_service_escalating_failsafe_enabled_) {
 
@@ -4354,8 +4372,9 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
 
 bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   ROS_WARN_THROTTLE(1.0, "[ControlManager]: eland triggered by callback");
 
@@ -4373,8 +4392,9 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& 
 
 bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (!_parachute_enabled_) {
 
@@ -4401,8 +4421,9 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
 bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   if (!use_safety_area_) {
     res.success = true;
@@ -4440,8 +4461,9 @@ bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSr
 
 bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   ROS_INFO("[ControlManager]: toggling output by service");
 
@@ -4505,8 +4527,9 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
 
 bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   ROS_INFO("[ControlManager]: arming by service");
 
@@ -4559,8 +4582,9 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
 bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   setCallbacks(req.data);
 
@@ -4621,8 +4645,9 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Re
 
 bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -4698,8 +4723,9 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
 
 bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -4817,8 +4843,9 @@ bool ControlManager::callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Req
 
 bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto [success, message] = hover();
 
@@ -4834,8 +4861,9 @@ bool ControlManager::callbackHover([[maybe_unused]] std_srvs::Trigger::Request& 
 
 bool ControlManager::callbackStartTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto [success, message] = startTrajectoryTracking();
 
@@ -4851,8 +4879,9 @@ bool ControlManager::callbackStartTrajectoryTracking([[maybe_unused]] std_srvs::
 
 bool ControlManager::callbackStopTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto [success, message] = stopTrajectoryTracking();
 
@@ -4868,8 +4897,9 @@ bool ControlManager::callbackStopTrajectoryTracking([[maybe_unused]] std_srvs::T
 
 bool ControlManager::callbackResumeTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto [success, message] = resumeTrajectoryTracking();
 
@@ -4885,8 +4915,9 @@ bool ControlManager::callbackResumeTrajectoryTracking([[maybe_unused]] std_srvs:
 
 bool ControlManager::callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   auto [success, message] = gotoTrajectoryStart();
 
@@ -4902,8 +4933,9 @@ bool ControlManager::callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trig
 
 bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   // transform the reference to the current frame
   mrs_msgs::ReferenceStamped transformed_reference = req.reference;
@@ -4931,8 +4963,9 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   // transform the reference to the current frame
   geometry_msgs::PoseStamped transformed_pose = req.pose;
@@ -4960,8 +4993,9 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
 
 bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   // transform the reference to the current frame
   geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
@@ -4989,8 +5023,9 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
 
 bool ControlManager::callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   bumper_enabled_ = req.data;
 
@@ -5012,8 +5047,9 @@ bool ControlManager::callbackEnableBumper(std_srvs::SetBool::Request& req, std_s
 
 bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return false;
+  }
 
   use_safety_area_ = req.data;
 
@@ -5287,8 +5323,9 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
 void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStamped::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
@@ -5329,8 +5366,9 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenc
 
 void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStamped::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
@@ -5374,8 +5412,9 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
 void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReference::ConstPtr msg) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return;
+  }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackTrajectoryReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
@@ -7132,14 +7171,18 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 /* hover() //{ */
 
 std::tuple<bool, std::string> ControlManager::hover(void) {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
-  if (eland_triggered_)
+  if (eland_triggered_) {
     return std::tuple(false, "cannot hover, eland already triggered");
+  }
 
-  if (failsafe_triggered_)
+  if (failsafe_triggered_) {
     return std::tuple(false, "cannot hover, failsafe already triggered");
+  }
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -7169,14 +7212,17 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
 
 std::tuple<bool, std::string> ControlManager::ehover(void) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
-  if (eland_triggered_)
+  if (eland_triggered_) {
     return std::tuple(false, "cannot ehover, eland already triggered");
+  }
 
-  if (failsafe_triggered_)
+  if (failsafe_triggered_) {
     return std::tuple(false, "cannot ehover, failsafe already triggered");
+  }
 
   // copy the member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -7237,14 +7283,17 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
 std::tuple<bool, std::string> ControlManager::eland(void) {
 
-  if (!is_initialized_)
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
-  if (eland_triggered_)
+  if (eland_triggered_) {
     return std::tuple(false, "cannot eland, eland already triggered");
+  }
 
-  if (failsafe_triggered_)
+  if (failsafe_triggered_) {
     return std::tuple(false, "cannot eland, failsafe already triggered");
+  }
 
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -7440,6 +7489,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 /* escalatingFailsafe() //{ */
 
 std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
+
   std::stringstream ss;
 
   if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
@@ -7560,6 +7610,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 /* getNextEscFailsafeState() //{ */
 
 EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
+
   EscalatingFailsafeStates_t current_state = state_escalating_failsafe_;
 
   switch (current_state) {
@@ -7630,8 +7681,10 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
 /* startTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -7661,8 +7714,10 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
 /* stopTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -7692,8 +7747,10 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
 /* resumeTrajectoryTracking() //{ */
 
 std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -7723,8 +7780,10 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
 /* gotoTrajectoryStart() //{ */
 
 std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return std::tuple(false, "the ControlManager is not initialized");
+  }
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -7756,6 +7815,7 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 /* arming() //{ */
 
 std::tuple<bool, std::string> ControlManager::arming(const bool input) {
+
   std::stringstream ss;
 
   if (input) {
@@ -7823,6 +7883,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 /* odometryCallbacksSrv() //{ */
 
 void ControlManager::odometryCallbacksSrv(const bool input) {
+
   ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
@@ -7847,6 +7908,7 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 /* elandSrv() //{ */
 
 bool ControlManager::elandSrv(void) {
+
   ROS_INFO("[ControlManager]: calling for eland");
 
   std_srvs::Trigger srv;
@@ -7874,6 +7936,7 @@ bool ControlManager::elandSrv(void) {
 /* parachuteSrv() //{ */
 
 bool ControlManager::parachuteSrv(void) {
+
   ROS_INFO("[ControlManager]: calling for parachute deployment");
 
   std_srvs::Trigger srv;
@@ -7901,6 +7964,7 @@ bool ControlManager::parachuteSrv(void) {
 /* ungripSrv() //{ */
 
 void ControlManager::ungripSrv(void) {
+
   std_srvs::Trigger srv;
 
   bool res = sch_ungrip_.call(srv);
@@ -8586,6 +8650,7 @@ void ControlManager::publish(void) {
 /* deployParachute() //{ */
 
 std::tuple<bool, std::string> ControlManager::deployParachute(void) {
+
   // if not enabled, return false
   if (!_parachute_enabled_) {
 
@@ -8679,6 +8744,7 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
                                                  [[maybe_unused]] const Controller::ControlOutput&               control_output) {
+
   if (!tracker_command || !control_output.control_output) {
     return;
   }
