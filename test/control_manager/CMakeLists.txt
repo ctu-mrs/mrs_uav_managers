@@ -39,3 +39,5 @@ add_subdirectory(reference_service_local_origin)
 add_subdirectory(reference_topic)
 
 add_subdirectory(validate_reference_service)
+
+add_subdirectory(validate_reference_list_service)
