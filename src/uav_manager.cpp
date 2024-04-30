@@ -153,7 +153,6 @@ public:
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_control_callbacks_;
   mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> sch_emergency_reference_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_arm_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_pirouette_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_odometry_callbacks_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger>             sch_ungrip_;
   mrs_lib::ServiceClientHandler<std_srvs::SetBool>             sch_toggle_control_output_;
@@ -172,7 +171,6 @@ public:
   void setControlCallbacksSrv(const bool& input);
   void ungripSrv(void);
   bool toggleControlOutput(const bool& input);
-  void pirouetteSrv(void);
   bool offboardSrv(const bool in);
 
   ros::Timer timer_takeoff_;
@@ -250,7 +248,6 @@ public:
   std::string _after_takeoff_controller_name_;
   std::string _takeoff_tracker_name_;
   std::string _takeoff_controller_name_;
-  bool        _after_takeoff_pirouette_ = false;
 
   // Landing timer
   std::string _landing_tracker_name_;
@@ -395,7 +392,6 @@ void UavManager::initialize() {
   param_loader.loadParam(yaml_prefix + "takeoff/rate", _takeoff_timer_rate_);
   param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/tracker", _after_takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/controller", _after_takeoff_controller_name_);
-  param_loader.loadParam(yaml_prefix + "takeoff/after_takeoff/pirouette", _after_takeoff_pirouette_);
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/controller", _takeoff_controller_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/during_takeoff/tracker", _takeoff_tracker_name_);
   param_loader.loadParam(yaml_prefix + "takeoff/takeoff_height", _takeoff_height_);
@@ -518,7 +514,6 @@ void UavManager::initialize() {
   sch_emergency_reference_   = mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv>(nh_, "emergency_reference_out");
   sch_control_callbacks_     = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "enable_callbacks_out");
   sch_arm_                   = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "arm_out");
-  sch_pirouette_             = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "pirouette_out");
   sch_odometry_callbacks_    = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
   sch_ungrip_                = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
   sch_toggle_control_output_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "toggle_control_output_out");
@@ -866,11 +861,6 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
       switchControllerSrv(_after_takeoff_controller_name_);
 
       setOdometryCallbacksSrv(true);
-
-      if (_after_takeoff_pirouette_) {
-
-        pirouetteSrv();
-      }
 
       timer_takeoff_.stop();
     }
@@ -2451,27 +2441,6 @@ bool UavManager::offboardSrv(const bool in) {
     } else {
       return true;
     }
-  }
-}
-
-//}
-
-/* pirouetteSrv() //{ */
-
-void UavManager::pirouetteSrv(void) {
-
-  std_srvs::Trigger srv;
-
-  bool res = sch_pirouette_.call(srv);
-
-  if (res) {
-
-    if (!srv.response.success) {
-      ROS_WARN_THROTTLE(1.0, "[UavManager]: service call for pirouette returned: %s.", srv.response.message.c_str());
-    }
-
-  } else {
-    ROS_ERROR_THROTTLE(1.0, "[UavManager]: service call for pirouette failed!");
   }
 }
 

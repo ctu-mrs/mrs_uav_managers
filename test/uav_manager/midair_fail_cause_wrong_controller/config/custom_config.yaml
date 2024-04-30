@@ -1,0 +1,8 @@
+mrs_uav_managers:
+
+  uav_manager:
+
+    midair_activation:
+
+      after_activation:
+        controller: "WrongController"

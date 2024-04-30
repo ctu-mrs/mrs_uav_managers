@@ -8,6 +8,10 @@ add_subdirectory(midair_fail_cause_enabling_output)
 
 add_subdirectory(midair_fail_cause_enabling_offboard)
 
+add_subdirectory(midair_fail_cause_wrong_tracker)
+
+add_subdirectory(midair_fail_cause_wrong_controller)
+
 add_subdirectory(landing)
 
 add_subdirectory(land_home)
