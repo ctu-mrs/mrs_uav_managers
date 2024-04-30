@@ -67,6 +67,8 @@ private:
   ros::ServiceServer service_server_path_in_safety_area_2d_;
   ros::ServiceServer service_server_save_world_config_;
   ros::ServiceServer service_server_load_world_config_;
+  ros::ServiceServer service_server_set_world_config_;
+  ros::ServiceServer service_server_get_world_config_;
   ros::ServiceServer service_server_use_safety_area_;
   ros::ServiceServer service_server_add_obstacle_;
   ros::ServiceServer service_server_get_max_z_;
@@ -95,7 +97,9 @@ private:
   bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
   bool getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res);
   bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool getWorldConfig( [[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  bool setWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
   bool addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
   bool getMaxZ( [[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);

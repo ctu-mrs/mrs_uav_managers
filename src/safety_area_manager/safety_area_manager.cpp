@@ -132,6 +132,8 @@ void SafetyAreaManager::initialize() {
   service_server_path_in_safety_area_2d_    = nh_.advertiseService("path_in_safety_area_2d_in",    &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
   service_server_save_world_config_         = nh_.advertiseService("save_world_config_in",         &SafetyAreaManager::saveWorldConfig, this);
   service_server_load_world_config_         = nh_.advertiseService("load_world_config_in",         &SafetyAreaManager::loadWorldConfig, this);
+  service_server_set_world_config_          = nh_.advertiseService("set_world_config_in",          &SafetyAreaManager::setWorldConfig, this);
+  service_server_get_world_config_          = nh_.advertiseService("get_world_config_in",          &SafetyAreaManager::getWorldConfig, this);
   service_server_use_safety_area_           = nh_.advertiseService("set_use_safety_area_in",       &SafetyAreaManager::setUseSafetyArea, this);
   service_server_add_obstacle_              = nh_.advertiseService("add_obstacle_in",              &SafetyAreaManager::addObstacle, this);
   service_server_get_max_z_                 = nh_.advertiseService("get_max_z_in",                 &SafetyAreaManager::getMaxZ, this);
@@ -395,6 +397,26 @@ bool SafetyAreaManager::loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs
   return true;
 }
 
+bool SafetyAreaManager::setWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+  std::string filename = "/tmp/cur_world_config.yaml";
+  std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
+  if (!ofs.is_open()) {
+    ROS_ERROR("[SafetyAreaManager]: Could not open file %s", filename.c_str());
+    res.success = false;
+    res.message = "Could not open file " + filename;
+    return true;
+  }
+
+  ofs << req.value;
+  ofs.close();
+
+  mrs_msgs::String load_config_srv;
+  load_config_srv.request.value = filename;
+  loadWorldConfig(load_config_srv.request, load_config_srv.response);
+  res = load_config_srv.response;
+  return true;
+}
+
 bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
   mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, 
                             safety_area_horizontal_frame_, safety_area_vertical_frame_, 
@@ -409,10 +431,36 @@ bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs
   }
 
   std::ofstream ofs(req.value, std::ofstream::out | std::ofstream::trunc);
+  if (!ofs.is_open()) {
+    ROS_ERROR("[SafetyAreaManager]: Could not open file %s", req.value.c_str());
+    res.success = false;
+    res.message = "Could not open file " + req.value;
+    return true;
+  }
+
   ofs << visitor.getResult();
   ofs.close();
   res.success = true;
   ROS_INFO("[SafetyAreaManager]: world config has been saved to %s", req.value.c_str());
+  return true;
+}
+
+bool SafetyAreaManager::getWorldConfig( [[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+  mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, 
+                            safety_area_horizontal_frame_, safety_area_vertical_frame_, 
+                            world_origin_units_, origin_x_, origin_y_);
+
+  safety_zone_->accept(visitor);
+
+  if(!visitor.isSuccessful()){
+    res.message = "Something went wrong during exporting parameters";
+    res.success = false;
+    return true;
+  }
+
+  res.success = true;
+  res.message = visitor.getResult();
+  ROS_INFO("[SafetyAreaManager]: world config has been extracted");
   return true;
 }
 
