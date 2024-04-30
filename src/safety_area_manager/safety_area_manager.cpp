@@ -154,8 +154,8 @@ void SafetyAreaManager::initialize() {
 
 mrs_lib::Prism* SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z) {
   std::vector<mrs_lib::Point2d> points = std::vector<mrs_lib::Point2d>();
-  for(int i=0; i<matrix.cols(); i++){
-    points.push_back(mrs_lib::Point2d{matrix(0, i), matrix(1, i)});
+  for(int i=0; i<matrix.rows(); i++){
+    points.push_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
   }
 
   return new mrs_lib::Prism(points, max_z, min_z);
@@ -174,7 +174,7 @@ bool SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader,
   param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
 
   // Make border prism
-  Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", 2, -1);
+  Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
   double max_z = param_loader.loadParam2("safety_area/border/max_z", max_z);
   double min_z = param_loader.loadParam2("safety_area/border/min_z", min_z);
   max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
@@ -194,12 +194,19 @@ bool SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader,
   if(is_obstacle_present){
     // Read parameters for obstacles
     std::vector<Eigen::MatrixXd> obstacles_mat;
-    param_loader.loadMatrixArray("safety_area/obstacles", obstacles_mat);
-
     Eigen::MatrixXd max_z_mat;
     Eigen::MatrixXd min_z_mat;
     param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
     param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
+
+    Eigen::MatrixXd current_mat = param_loader.loadMatrixDynamic2("safety_area/obstacles/data", -1, 2);
+    Eigen::MatrixXd rows = param_loader.loadMatrixDynamic2("safety_area/obstacles/rows", -1, 1);
+    for(int i=0; i<rows.rows(); i++){
+      int row_num = (int) rows(i, 0);
+      Eigen::MatrixXd obstacle_mat = current_mat.topRows(row_num);
+      current_mat = current_mat.block(row_num, 0, current_mat.rows() - row_num, current_mat.cols());
+      obstacles_mat.push_back(obstacle_mat);
+    }
 
     if(!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == (long int)obstacles_mat.size())){
       ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
