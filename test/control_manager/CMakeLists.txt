@@ -1,5 +1,7 @@
 add_subdirectory(goto_service)
 
+add_subdirectory(goto_fcu_service)
+
 add_subdirectory(goto_relative_service)
 
 add_subdirectory(eland_control_error)
