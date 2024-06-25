@@ -345,6 +345,9 @@ private:
   bool               callbackChangeEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   int                estimator_switch_count_ = 0;
 
+  ros::ServiceServer srvs_reset_estimator_;
+  bool               callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+
 
   ros::ServiceServer srvs_toggle_callbacks_;
   bool               callbackToggleServiceCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -1042,6 +1045,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   /*//{ initialize service servers */
   srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
+  srvs_reset_estimator_ = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
   srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
@@ -1126,6 +1130,74 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 
   // allow service calllbacks after switch again
   callbacks_enabled_ = true;
+
+  return true;
+}
+/*//}*/
+
+/*//{ callbackResetEstimator() */
+bool EstimationManager::callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+
+  if (!sm_->isInitialized()) {
+    return false;
+  }
+
+  if (!callbacks_enabled_) {
+    res.success = false;
+    res.message = ("Service callbacks are disabled");
+    ROS_WARN("[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    return true;
+  }
+
+
+  bool                                                target_estimator_found = false;
+  boost::shared_ptr<mrs_uav_managers::StateEstimator> target_estimator;
+  for (auto estimator : estimator_list_) {
+    if (estimator->getName() == req.value) {
+      target_estimator       = estimator;
+      target_estimator_found = true;
+      break;
+    }
+  }
+
+  if (target_estimator_found) {
+
+
+    if (target_estimator->getName() == active_estimator_->getName()) {
+      res.success = false;
+      res.message = ("Cannot reset active estimator");
+      ROS_WARN("[%s]: Ignoring service call. Cannot reset active estimator.", getName().c_str());
+      return true;
+    }
+
+      target_estimator->reset();
+      ROS_INFO("[EstimationManager]: Estimator %s reset", target_estimator->getName().c_str());
+
+      double t_wait_left = 5;
+      while (t_wait_left > 0) {
+        ROS_INFO("[EstimationManager]: Attempting starting %s estimator", target_estimator->getName().c_str());
+        target_estimator->start();
+
+        if (target_estimator->isRunning()) {
+          ROS_INFO("[EstimationManager]: Reset of %s estimator successful", target_estimator->getName().c_str());
+          break;
+        } 
+        
+        const double start_period = 1.0;
+        ros::Duration(start_period).sleep();
+        t_wait_left -= start_period;
+
+      }
+
+  } else {
+    ROS_WARN("[%s]: Reset of invalid estimator %s requested", getName().c_str(), req.value.c_str());
+    res.success = false;
+    res.message = ("Not a valid estimator type");
+    return true;
+  }
+
+  res.success = true;
+  res.message = "Estimator reset successful";
 
   return true;
 }
