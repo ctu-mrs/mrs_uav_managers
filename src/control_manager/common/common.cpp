@@ -1073,7 +1073,7 @@ Controller::HwApiOutputVariant initializeDefaultOutput(const ControlOutputModali
   std::visit(HwApiInitializeVisitor(), output, uav_state_var, min_throttle_var, n_motors_var);
 
   return output;
-}  // namespace mrs_uav_managers
+}
 
 //}
 
