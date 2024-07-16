@@ -514,6 +514,8 @@ bool RemoteControlTest::test() {
     }
   }
 
+  sleep(1.0);
+
   deactivate();
 
   // | -------- wait for indication from the diagnostics -------- |
