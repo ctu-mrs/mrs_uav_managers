@@ -54,7 +54,7 @@
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="body_frame" type="string" value="$(arg body_frame)" />
       <param name="g" value="$(arg g)" />
-      <param name="run_type" type="string" default="$(arg RUN_TYPE)" />
+      <param name="run_type" type="string" value="$(arg RUN_TYPE)" />
       <param if="$(eval arg('RUN_TYPE') == 'realworld')" name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="body_disturbance_x" value="$(arg BODY_DISTURBANCE_X)" />
       <param name="body_disturbance_y" value="$(arg BODY_DISTURBANCE_Y)" />
