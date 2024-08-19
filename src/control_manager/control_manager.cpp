@@ -49,6 +49,8 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
+#include <mrs_errorgraph/error_publisher.h>
+
 #include <mrs_msgs/HwApiCapabilities.h>
 #include <mrs_msgs/HwApiStatus.h>
 #include <mrs_msgs/HwApiRcChannels.h>
@@ -245,6 +247,8 @@ private:
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
   std::string       _body_frame_;
+
+  std::unique_ptr<mrs_errorgraph::ErrorPublisher> error_publisher_;
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -913,6 +917,8 @@ void ControlManager::preinitialize(void) {
 
   ros::Time::waitForValid();
 
+  error_publisher_ = std::make_unique<mrs_errorgraph::ErrorPublisher>(nh_, "ControlManager", "main");
+
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
   shopts.node_name          = "ControlManager";
@@ -1026,11 +1032,13 @@ void ControlManager::initialize(void) {
 
     catch (mrs_lib::SafetyZone::BorderError& e) {
       ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
-      ros::shutdown();
+      error_publisher_->addOneshotError("Bad safety area.");
+      error_publisher_->flushAndShutdown();
     }
     catch (...) {
       ROS_ERROR("[ControlManager]: SafetyArea: unhandled exception!");
-      ros::shutdown();
+      error_publisher_->addOneshotError("Safety area exception.");
+      error_publisher_->flushAndShutdown();
     }
 
     ROS_INFO("[ControlManager]: safety area initialized");
@@ -1042,7 +1050,8 @@ void ControlManager::initialize(void) {
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad state_input value.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
@@ -1071,7 +1080,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad tilt safety limit configuration.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
@@ -1081,7 +1091,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad tilt safety limit configuration.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
@@ -1091,7 +1102,8 @@ void ControlManager::initialize(void) {
 
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad yaw safety limit configuration.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("status_timer_rate", _status_timer_rate_);
@@ -1110,7 +1122,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
     ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad tilt safety limit configuration.");
+    error_publisher_->flushAndShutdown();
   }
 
   // default constraints
@@ -1204,7 +1217,8 @@ void ControlManager::initialize(void) {
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
     ROS_ERROR("[ControlManager]: the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
               EHOVER_STR);
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad tracker_error value.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
@@ -1305,12 +1319,14 @@ void ControlManager::initialize(void) {
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for the tracker '%s'", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for the tracker '%s'", new_tracker.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1358,7 +1374,8 @@ void ControlManager::initialize(void) {
 
     if (!success) {
       ROS_ERROR("[ControlManager]: failed to initialize the tracker '%s'", it->second.address.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Failed to initialize tracker.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1378,7 +1395,8 @@ void ControlManager::initialize(void) {
       _ehover_tracker_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the safety/hover_tracker (%s) is not within the loaded trackers", _ehover_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing hover_tracker.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1391,7 +1409,8 @@ void ControlManager::initialize(void) {
       _landoff_tracker_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the landoff tracker (%s) is not within the loaded trackers", _landoff_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing landoff.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1404,7 +1423,8 @@ void ControlManager::initialize(void) {
       _null_tracker_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the null tracker (%s) is not within the loaded trackers", _null_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing null.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1420,7 +1440,8 @@ void ControlManager::initialize(void) {
       _joystick_tracker_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", _joystick_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing joystick tracker.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1430,7 +1451,8 @@ void ControlManager::initialize(void) {
 
     if (!idx) {
       ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing bumper tracker.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1441,7 +1463,8 @@ void ControlManager::initialize(void) {
       _joystick_fallback_tracker_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the joystick fallback tracker (%s) is not within the loaded trackers", _joystick_fallback_tracker_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing joystick fallback tracker.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1545,13 +1568,15 @@ void ControlManager::initialize(void) {
           ROS_ERROR("[ControlManager]: - position");
         }
 
-        ros::shutdown();
+        error_publisher_->addOneshotError("Bad controller configuration.");
+        error_publisher_->flushAndShutdown();
       }
 
       if ((_hw_api_inputs_.actuators || _hw_api_inputs_.control_group) && !common_handlers_->detailed_model_params) {
         ROS_ERROR(
             "[ControlManager]: the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
-        ros::shutdown();
+        error_publisher_->addOneshotError("Failed to load detailed model params.");
+        error_publisher_->flushAndShutdown();
       }
     }
 
@@ -1605,12 +1630,14 @@ void ControlManager::initialize(void) {
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[ControlManager]: CreateClassException for the controller '%s'", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[ControlManager]: PluginlibException for the controller '%s'", new_controller.address.c_str());
       ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1659,7 +1686,8 @@ void ControlManager::initialize(void) {
 
     if (!success) {
       ROS_ERROR("[ControlManager]: failed to initialize the controller '%s'", it->second.address.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Failed to initialize controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1672,7 +1700,8 @@ void ControlManager::initialize(void) {
       _failsafe_controller_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", _failsafe_controller_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing failsafe controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1683,7 +1712,8 @@ void ControlManager::initialize(void) {
       _eland_controller_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the eland controller (%s) is not within the loaded controllers", _eland_controller_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing eland controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1694,7 +1724,8 @@ void ControlManager::initialize(void) {
       _joystick_controller_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing joystick controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1704,7 +1735,8 @@ void ControlManager::initialize(void) {
 
     if (!idx) {
       ROS_ERROR("[ControlManager]: the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing bumper controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1715,7 +1747,8 @@ void ControlManager::initialize(void) {
       _joystick_fallback_controller_idx_ = idx.value();
     } else {
       ROS_ERROR("[ControlManager]: the joystick fallback controller (%s) is not within the loaded controllers", _joystick_fallback_controller_name_.c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Missing joystick fallback controller.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1897,7 +1930,8 @@ void ControlManager::initialize(void) {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ControlManager]: could not load all parameters!");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   is_initialized_ = true;
@@ -1920,6 +1954,7 @@ void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
+    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
     return;
   }
 

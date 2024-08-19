@@ -176,6 +176,8 @@
       <remap from="~parachute_out" to="parachute_driver/fire_parachute" />
       <remap from="~parachute_in" to="~parachute" />
 
+      <remap from="~errors" to="errors" />
+
     </node>
 
   </group>
