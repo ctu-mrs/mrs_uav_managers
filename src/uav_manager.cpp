@@ -614,7 +614,7 @@ void UavManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[UavManager]: waiting for HW API capabilities");
-    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return;
   }
 
@@ -855,7 +855,7 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
     } else {
 
       ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from the ControlManager");
-      error_publisher_->addWaitingForNodeError("ControlManager", "main");
+      error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
       return;
     }
   }

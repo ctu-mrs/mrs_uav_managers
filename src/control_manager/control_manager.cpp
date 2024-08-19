@@ -1971,7 +1971,7 @@ void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
-    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return;
   }
 
@@ -4016,6 +4016,7 @@ void ControlManager::timeoutUavState(const double& missing_for) {
     // in place of the callbackUavState/callbackOdometry().
 
     ROS_ERROR_THROTTLE(0.1, "[ControlManager]: not receiving uav_state/odometry for %.3f s, initiating failsafe land", missing_for);
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
 
     failsafe();
   }

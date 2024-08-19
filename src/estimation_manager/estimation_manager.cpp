@@ -887,7 +887,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   while (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO("[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
              sh_hw_api_capabilities_.topicName().c_str());
-    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     ros::Duration(1.0).sleep();
   }
 
