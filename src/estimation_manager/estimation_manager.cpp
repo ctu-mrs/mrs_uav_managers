@@ -315,9 +315,9 @@ private:
   // | ----------------------- errorgraph ----------------------- |
   enum class error_type_t : uint16_t
   {
-    placeholder
+    invalid_state,
+    nans_detected,
   };
-
   std::unique_ptr<mrs_errorgraph::ErrorPublisher> error_publisher_;
 
   std::shared_ptr<CommonHandlers_t> ch_;
@@ -478,11 +478,13 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
 
   if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
     ROS_WARN("[%s]: Not publishing during estimator switching.", getName().c_str());
+    error_publisher_->addGeneralError(error_type_t::invalid_state, "Non-publishable state.");
     return;
   }
 
   if (!sm_->isInPublishableState()) {
     ROS_WARN_THROTTLE(1.0, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
+    error_publisher_->addGeneralError(error_type_t::invalid_state, "Non-publishable state.");
     return;
   }
 
@@ -492,11 +494,13 @@ void EstimationManager::timerPublish([[maybe_unused]] const ros::TimerEvent& eve
     uav_state = ret.value();
   } else {
     ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getName()});
     return;
   }
 
   if (!Support::noNans(uav_state.pose.orientation)) {
     ROS_ERROR("[%s]: nan in uav state orientation", getName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_detected, "NaNs detected in UAV state.");
     return;
   }
 
@@ -566,6 +570,7 @@ void EstimationManager::timerPublishDiagnostics([[maybe_unused]] const ros::Time
     uav_state = ret.value();
   } else {
     ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "StateEstimator"});
     return;
   }
 
@@ -706,6 +711,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       } else {
         ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(),
                           est_alt_agl_->getName().c_str());
+        error_publisher_->addWaitingForNodeError({"EstimationManager", "agl"});
       }
     }
   }
@@ -899,6 +905,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   while (!sh_control_manager_diag_.hasMsg()) {
     ROS_INFO("[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
              sh_control_manager_diag_.topicName().c_str());
+    error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
     ros::Duration(1.0).sleep();
   }
 
