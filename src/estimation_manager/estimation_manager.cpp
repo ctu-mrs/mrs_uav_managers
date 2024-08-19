@@ -699,19 +699,27 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
 
   // TODO fuj if, zmenit na switch
   // activate initial estimator
-  if (sm_->isInState(StateMachine::INITIALIZED_STATE) && initial_estimator_->isRunning()) {
-    std::scoped_lock lock(mutex_active_estimator_);
-    ROS_INFO_THROTTLE(1.0, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
-    active_estimator_ = initial_estimator_;
-    if (active_estimator_->getName() == "dummy") {
-      sm_->changeState(StateMachine::DUMMY_STATE);
-    } else {
-      if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
-        sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
+  if (sm_->isInState(StateMachine::INITIALIZED_STATE))
+  { 
+    if (!initial_estimator_->isRunning())
+    {
+      error_publisher_->addWaitingForNodeError({"EstimationManager", initial_estimator_->getName()});
+    }
+    else
+    {
+      std::scoped_lock lock(mutex_active_estimator_);
+      ROS_INFO_THROTTLE(1.0, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
+      active_estimator_ = initial_estimator_;
+      if (active_estimator_->getName() == "dummy") {
+        sm_->changeState(StateMachine::DUMMY_STATE);
       } else {
-        ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(),
-                          est_alt_agl_->getName().c_str());
-        error_publisher_->addWaitingForNodeError({"EstimationManager", "agl"});
+        if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
+          sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
+        } else {
+          ROS_INFO_THROTTLE(1.0, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(),
+                            est_alt_agl_->getName().c_str());
+          error_publisher_->addWaitingForNodeError({"EstimationManager", est_alt_agl_->getName()});
+        }
       }
     }
   }
