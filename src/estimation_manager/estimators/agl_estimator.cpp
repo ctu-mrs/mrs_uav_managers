@@ -43,7 +43,8 @@ bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstP
 
   if (!ph_->param_loader->loadedSuccessfully()) {
     ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-    ros::shutdown();
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (requires_gnss && !hw_api_capabilities->produces_gnss) {

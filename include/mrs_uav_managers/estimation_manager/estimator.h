@@ -20,6 +20,7 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 
+#include <mrs_errorgraph/error_publisher.h>
 
 #include <mrs_uav_managers/estimation_manager/types.h>
 #include <mrs_uav_managers/estimation_manager/support.h>
@@ -39,6 +40,7 @@ class Estimator {
 
 protected:
   mutable mrs_lib::PublisherHandler<mrs_msgs::EstimatorDiagnostics> ph_diagnostics_;
+  std::unique_ptr<mrs_errorgraph::ErrorPublisher> error_publisher_;
 
   const std::string type_;
   const std::string name_;

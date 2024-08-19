@@ -53,10 +53,10 @@ protected:
 public:
   AglEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name)
       : Estimator(agl::type, name, frame_id), package_name_(package_name) {
+    error_publisher_ = std::make_unique<mrs_errorgraph::ErrorPublisher>(nh_, "EstimationManager", name_);
   }
 
-  virtual ~AglEstimator(void) {
-  }
+  virtual ~AglEstimator(void) = default;
 
   // virtual methods
   virtual mrs_msgs::Float64Stamped getUavAglHeight() const     = 0;
