@@ -44,6 +44,8 @@
 #include <mrs_lib/geometry/misc.h>
 #include <mrs_lib/quadratic_throttle_model.h>
 
+#include <mrs_errorgraph/error_publisher.h>
+
 //}
 
 /* using //{ */
@@ -84,6 +86,8 @@ private:
   ros::NodeHandle nh_;
   bool            is_initialized_ = false;
   std::string     _uav_name_;
+
+  std::unique_ptr<mrs_errorgraph::ErrorPublisher> error_publisher_;
 
 public:
   std::shared_ptr<mrs_lib::Transformer> transformer_;
@@ -327,6 +331,8 @@ void UavManager::preinitialize(void) {
 
   ros::Time::waitForValid();
 
+  error_publisher_ = std::make_unique<mrs_errorgraph::ErrorPublisher>(nh_, "UavManager", "main");
+
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh_;
   shopts.node_name          = "UavManager";
@@ -398,7 +404,8 @@ void UavManager::initialize() {
 
   if (_takeoff_height_ < 0.5 || _takeoff_height_ > 10.0) {
     ROS_ERROR("[UavManager]: the takeoff height (%.2f m) has to be between 0.5 and 10 meters", _takeoff_height_);
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad takeoff height.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam(yaml_prefix + "landing/rate", _landing_timer_rate_);
@@ -456,7 +463,8 @@ void UavManager::initialize() {
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[UavManager]: Could not load all parameters!");
-    ros::shutdown();
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   // | --------------------- tf transformer --------------------- |
@@ -606,6 +614,7 @@ void UavManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[UavManager]: waiting for HW API capabilities");
+    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
     return;
   }
 
@@ -846,6 +855,7 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
     } else {
 
       ROS_WARN_THROTTLE(1.0, "[UavManager]: waiting for takeoff confirmation from the ControlManager");
+      error_publisher_->addWaitingForNodeError("ControlManager", "main");
       return;
     }
   }

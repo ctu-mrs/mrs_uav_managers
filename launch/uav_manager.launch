@@ -104,6 +104,8 @@
       <remap from="~ungrip_out" to="gripper/ungrip" />
       <remap from="~offboard_out" to="hw_api/offboard" />
 
+      <remap from="~errors" to="errors" />
+
     </node>
 
   </group>

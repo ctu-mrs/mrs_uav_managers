@@ -30,6 +30,7 @@
 #include <mrs_lib/scope_timer.h>
 /* #include <mrs_lib/profiler.h> */
 
+#include <mrs_errorgraph/error_publisher.h>
 
 #include <mrs_uav_managers/state_estimator.h>
 #include <mrs_uav_managers/agl_estimator.h>
@@ -293,6 +294,7 @@ private:
   "ERROR_STATE"
   };
   // clang-format on
+
 };
 /*//}*/
 
@@ -309,6 +311,14 @@ private:
   std::string _custom_config_;
   std::string _platform_config_;
   std::string _world_config_;
+
+  // | ----------------------- errorgraph ----------------------- |
+  enum class error_type_t : uint16_t
+  {
+    placeholder
+  };
+
+  std::unique_ptr<mrs_errorgraph::ErrorPublisher> error_publisher_;
 
   std::shared_ptr<CommonHandlers_t> ch_;
 
@@ -413,6 +423,8 @@ void EstimationManager::onInit() {
   ros::Time::waitForValid();
 
   ROS_INFO("[%s]: initializing", getName().c_str());
+
+  error_publisher_ = std::make_unique<mrs_errorgraph::ErrorPublisher>(nh_, "EstimationManager", "main");
 
   sm_ = std::make_shared<StateMachine>(nodelet_name_);
 
@@ -651,7 +663,9 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
       }
       catch (std::runtime_error& ex) {
         ROS_ERROR("[%s]: exception caught during estimator starting: '%s'", getName().c_str(), ex.what());
-        ros::shutdown();
+      error_publisher_->addOneshotError("Estimator start error: runtime exception.");
+      error_publisher_->flushAndShutdown();
+      return;
       }
     }
 
@@ -802,7 +816,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   } else {
     ROS_ERROR("[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", getName().c_str(), world_origin_units.c_str());
-    ros::shutdown();
+    error_publisher_->addOneshotError("Wrong world_origin_units value.");
+    error_publisher_->flushAndShutdown();
+    return;
   }
 
   ch_->world_origin.x = world_origin_x;
@@ -810,7 +826,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   if (!is_origin_param_ok) {
     ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getName().c_str());
-    ros::shutdown();
+    error_publisher_->addOneshotError("Bad world file.");
+    error_publisher_->flushAndShutdown();
+    return;
   }
   /*//}*/
 
@@ -869,6 +887,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   while (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO("[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
              sh_hw_api_capabilities_.topicName().c_str());
+    error_publisher_->addWaitingForNodeError("HwApiManager", "main");
     ros::Duration(1.0).sleep();
   }
 
@@ -916,12 +935,16 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
   }
 
@@ -946,12 +969,16 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     catch (pluginlib::CreateClassException& ex1) {
       ROS_ERROR("[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex1.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
     catch (pluginlib::PluginlibException& ex) {
       ROS_ERROR("[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
       ROS_ERROR("[%s]: Error: %s", getName().c_str(), ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: plugin exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
   }
   /*//}*/
@@ -972,7 +999,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   if (!initial_estimator_found) {
     ROS_ERROR("[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(), initial_estimator_name_.c_str());
-    ros::shutdown();
+    error_publisher_->addOneshotError("Initial estimator not found.");
+    error_publisher_->flushAndShutdown();
+    return;
   }
   /*//}*/
 
@@ -1003,12 +1032,16 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: runtime exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
 
     if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
       ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator->getName().c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: estimator not compatible with HW API.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
   }
 
@@ -1038,12 +1071,16 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     }
     catch (std::runtime_error& ex) {
       ROS_ERROR("[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: runtime exception.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
 
     if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
       ROS_ERROR("[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
-      ros::shutdown();
+      error_publisher_->addOneshotError("Initialization error: estimator not compatible with HW API.");
+      error_publisher_->flushAndShutdown();
+      return;
     }
   }
 
@@ -1090,7 +1127,9 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getName().c_str());
-    ros::shutdown();
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
+    return;
   }
 
   sm_->changeState(StateMachine::INITIALIZED_STATE);

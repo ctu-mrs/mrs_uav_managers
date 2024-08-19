@@ -78,6 +78,8 @@
 
       <remap from="~failsafe_out" to="control_manager/failsafe" />
 
+      <remap from="~errors" to="errors" />
+
     </node>
 
   </group>
