@@ -14,7 +14,7 @@ typedef boost::function<bool(const std::string)> loadConfigFile_t;
 
 struct PrivateHandlers_t
 {
-  std::shared_ptr<mrs_lib::ParamLoader> param_loader;
+  std::unique_ptr<mrs_lib::ParamLoader> param_loader;
   loadConfigFile_t                      loadConfigFile;
 };
 

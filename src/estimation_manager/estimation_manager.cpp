@@ -951,7 +951,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
-    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, estimator->getName()), "EstimationManager/" + estimator->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, estimator->getName()), "EstimationManager/" + estimator->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -986,7 +986,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
-    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -1076,14 +1076,16 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
     return false;
   }
 
-  if (!callbacks_enabled_) {
+  // enable switching out from vins_kickoff estimator during takeoff
+  if (!callbacks_enabled_ && active_estimator_->getName() != "vins_kickoff") {
     res.success = false;
     res.message = ("Service callbacks are disabled");
     ROS_WARN("[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
     return true;
   }
 
-  if (req.value == "dummy" || req.value == "ground_truth") {
+  // switching into these estimators during flight is dangerous with realhw, so we don't allow it 
+  if (req.value == "dummy" || req.value == "ground_truth" || req.value == "vins_kickoff") {
     res.success = false;
     std::stringstream ss;
     ss << "Switching to " << req.value << " estimator is not allowed.";
