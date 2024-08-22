@@ -6950,6 +6950,8 @@ void ControlManager::bumperPushFromObstacle(void) {
 
     if (!bumper_repulsing_) {
 
+      bumper_repulsing_ = true;
+
       if (_bumper_switch_tracker_) {
 
         auto        active_tracker_idx  = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -6978,8 +6980,6 @@ void ControlManager::bumperPushFromObstacle(void) {
         }
       }
     }
-
-    bumper_repulsing_ = true;
 
     callbacks_enabled_ = false;
 
@@ -8075,7 +8075,9 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
     return std::tuple(false, ss.str());
   }
 
-  if (rc_goto_active_) {
+  if (rc_goto_active_ && tracker_name != _ehover_tracker_name_ && tracker_name != _landoff_tracker_name_ && tracker_name != _null_tracker_name_ &&
+      !bumper_repulsing_) {
+
     ss << "can not switch tracker, the RC joystick is active";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
@@ -8215,7 +8217,9 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
     return std::tuple(false, ss.str());
   }
 
-  if (rc_goto_active_) {
+  if (rc_goto_active_ && controller_name != _failsafe_controller_name_ && controller_name != _eland_controller_name_ &&
+      controller_name != _bumper_controller_name_ && !bumper_repulsing_) {
+
     ss << "can not switch controller, the RC joystick is active";
     ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
