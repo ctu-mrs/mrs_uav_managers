@@ -854,6 +854,27 @@ void UavManager::timerTakeoff(const ros::TimerEvent& event) {
 
     if (control_manager_diagnostics->active_tracker != _takeoff_tracker_name_ || !control_manager_diagnostics->tracker_status.have_goal) {
 
+      auto [odom_x, odom_y, odom_z] = mrs_lib::getPosition(sh_odometry_.getMsg());
+
+      double odom_heading;
+      try {
+        odom_heading = mrs_lib::getHeading(sh_odometry_.getMsg());
+      }
+      catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+        ROS_ERROR_THROTTLE(1.0, "[UavManager]: exception caught: '%s'", e.what());
+        return;
+      }
+      // this is needed for land_home to work with vins_kickoff estimator
+      // if there are any problems with this, it shoud be sufficient to only overwrite the frame_id, without the position and heading here
+      {
+        std::scoped_lock lock(mutex_land_there_reference_);
+        land_there_reference_.header               = sh_odometry_.getMsg()->header;
+        land_there_reference_.reference.position.x = odom_x;
+        land_there_reference_.reference.position.y = odom_y;
+        land_there_reference_.reference.position.z = odom_z;
+        land_there_reference_.reference.heading    = odom_heading;
+      }
+
       ROS_INFO("[UavManager]: take off finished, switching to %s", _after_takeoff_tracker_name_.c_str());
 
       switchTrackerSrv(_after_takeoff_tracker_name_);
