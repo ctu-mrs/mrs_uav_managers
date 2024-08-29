@@ -4181,6 +4181,19 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
     return true;
   }
 
+  if (rc_goto_active_) {
+
+    std::stringstream ss;
+    ss << "can not switch tracker, RC joystick is active";
+
+    res.message = ss.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << ss.str());
+
+    return true;
+  }
+
   auto [success, response] = switchTracker(req.value);
 
   res.success = success;
@@ -4203,6 +4216,19 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
+
+    res.message = ss.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << ss.str());
+
+    return true;
+  }
+
+  if (rc_goto_active_) {
+
+    std::stringstream ss;
+    ss << "can not switch controller, RC joystick is active";
 
     res.message = ss.str();
     res.success = false;
@@ -8075,12 +8101,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
     return std::tuple(false, ss.str());
   }
 
-  if (rc_goto_active_) {
-    ss << "can not switch tracker, the RC joystick is active";
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
   auto new_tracker_idx = idxInVector(tracker_name, _tracker_names_);
 
   // check if the tracker exists
@@ -8212,12 +8232,6 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (rc_goto_active_) {
-    ss << "can not switch controller, the RC joystick is active";
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 
