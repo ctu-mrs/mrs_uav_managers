@@ -4990,6 +4990,8 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
   return true;
 }
 
+//}
+
 /* //{ callbackTransformReferenceList() */
 
 bool ControlManager::callbackTransformReferenceList(mrs_msgs::TransformReferenceListSrv::Request& req, mrs_msgs::TransformReferenceListSrv::Response& res) {
