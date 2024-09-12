@@ -20,7 +20,7 @@
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
-#include <mrs_msgs/ValidateReferenceList.h>
+#include <mrs_msgs/ValidateReferenceArray.h>
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/EstimatorInput.h>
 
@@ -78,7 +78,7 @@
 
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
-#include <mrs_msgs/ReferenceList.h>
+#include <mrs_msgs/ReferenceArray.h>
 #include <mrs_msgs/TrajectoryReference.h>
 
 #include <mrs_msgs/ReferenceStampedSrv.h>
@@ -93,9 +93,9 @@
 #include <mrs_msgs/TransformReferenceSrvRequest.h>
 #include <mrs_msgs/TransformReferenceSrvResponse.h>
 
-#include <mrs_msgs/TransformReferenceListSrv.h>
-#include <mrs_msgs/TransformReferenceListSrvRequest.h>
-#include <mrs_msgs/TransformReferenceListSrvResponse.h>
+#include <mrs_msgs/TransformReferenceArraySrv.h>
+#include <mrs_msgs/TransformReferenceArraySrvRequest.h>
+#include <mrs_msgs/TransformReferenceArraySrvResponse.h>
 
 #include <mrs_msgs/TransformPoseSrv.h>
 #include <mrs_msgs/TransformPoseSrvRequest.h>
@@ -646,11 +646,11 @@ private:
 
   bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
   bool callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
-  bool callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res);
+  bool callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
-  bool callbackTransformReferenceList(mrs_msgs::TransformReferenceListSrv::Request& req, mrs_msgs::TransformReferenceListSrv::Response& res);
+  bool callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res);
   bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res);
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
@@ -1844,14 +1844,14 @@ void ControlManager::initialize(void) {
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_reference_list_   = nh_.advertiseService("transform_reference_list_in", &ControlManager::callbackTransformReferenceList, this);
+  service_server_transform_reference_list_   = nh_.advertiseService("transform_reference_list_in", &ControlManager::callbackTransformReferenceArray, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
+  service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceArray, this);
   service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
   service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
@@ -4992,28 +4992,36 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 //}
 
-/* //{ callbackTransformReferenceList() */
+/* //{ callbackTransformReferenceArray() */
 
-bool ControlManager::callbackTransformReferenceList(mrs_msgs::TransformReferenceListSrv::Request& req, mrs_msgs::TransformReferenceListSrv::Response& res) {
+bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res) {
 
   if (!is_initialized_) {
     return false;
   }
 
   // transform the reference list to the current frame
-  mrs_msgs::ReferenceStamped transformed_reference; 
-  mrs_msgs::ReferenceList original_reference_list = req.list; 
-  mrs_msgs::ReferenceList transformed_reference_list;
+  const auto tf_opt = transformer_->getTransform(req.array.header.frame_id, req.to_frame_id, req.array.header.stamp);
+  if (!tf_opt.has_value()) {
+    res.message = "The reference list could not be transformed";
+    res.success = false;
+    return true;
+  }
+  const auto tf = tf_opt.value();
 
-  for (size_t i=0; i < original_reference_list.list.size(); i++) {
+  res.array.header.stamp = req.array.header.stamp;
+  res.array.header.frame_id = req.to_frame_id;
+  res.array.array.reserve(req.array.array.size());
 
-    transformed_reference.header = original_reference_list.header;
-    transformed_reference.reference = original_reference_list.list.at(i);
+  for (const auto& ref : req.array.array) {
 
-    if (auto ret = transformer_->transformSingle(transformed_reference, req.frame_id)) {
+    mrs_msgs::ReferenceStamped ref_stamped; 
+    ref_stamped.header = req.array.header;
+    ref_stamped.reference = ref;
 
-      transformed_reference_list.list.push_back(ret.value().reference);
-      transformed_reference_list.header = ret.value().header;
+    if (auto ret = transformer_->transform(ref_stamped, tf)) {
+
+      res.array.array.push_back(ret.value().reference);
 
     } else {
 
@@ -5024,7 +5032,6 @@ bool ControlManager::callbackTransformReferenceList(mrs_msgs::TransformReference
 
   }
 
-  res.list = transformed_reference_list;
   res.message   = "transformation successful";
   res.success   = true;
   return true;
@@ -5294,9 +5301,9 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
 
 //}
 
-/* //{ callbackValidateReferenceList() */
+/* //{ callbackValidateReferenceArray() */
 
-bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res) {
+bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5308,7 +5315,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // get the transformer
-  auto ret = transformer_->getTransform(uav_state.header.frame_id, req.list.header.frame_id, req.list.header.stamp);
+  auto ret = transformer_->getTransform(uav_state.header.frame_id, req.array.header.frame_id, req.array.header.stamp);
 
   if (!ret) {
 
@@ -5319,15 +5326,15 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
 
   geometry_msgs::TransformStamped tf = ret.value();
 
-  for (int i = 0; i < int(req.list.list.size()); i++) {
+  for (int i = 0; i < int(req.array.array.size()); i++) {
 
     res.success.push_back(true);
 
     mrs_msgs::ReferenceStamped original_reference;
-    original_reference.header    = req.list.header;
-    original_reference.reference = req.list.list.at(i);
+    original_reference.header    = req.array.header;
+    original_reference.reference = req.array.array.at(i);
 
-    res.success.at(i) = validateReference(original_reference.reference, "ControlManager", "reference_list");
+    res.success.at(i) = validateReference(original_reference.reference, "ControlManager", "reference_array");
 
     auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
