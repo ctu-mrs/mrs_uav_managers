@@ -93,6 +93,10 @@
 #include <mrs_msgs/TransformReferenceSrvRequest.h>
 #include <mrs_msgs/TransformReferenceSrvResponse.h>
 
+#include <mrs_msgs/TransformReferenceListSrv.h>
+#include <mrs_msgs/TransformReferenceListSrvRequest.h>
+#include <mrs_msgs/TransformReferenceListSrvResponse.h>
+
 #include <mrs_msgs/TransformPoseSrv.h>
 #include <mrs_msgs/TransformPoseSrvRequest.h>
 #include <mrs_msgs/TransformPoseSrvResponse.h>
@@ -471,6 +475,7 @@ private:
 
   // transform service servers
   ros::ServiceServer service_server_transform_reference_;
+  ros::ServiceServer service_server_transform_reference_list_;
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
@@ -645,6 +650,7 @@ private:
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
+  bool callbackTransformReferenceList(mrs_msgs::TransformReferenceListSrv::Request& req, mrs_msgs::TransformReferenceListSrv::Response& res);
   bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res);
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
@@ -1838,6 +1844,7 @@ void ControlManager::initialize(void) {
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_reference_list_   = nh_.advertiseService("transform_reference_list_in", &ControlManager::callbackTransformReferenceList, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
@@ -4980,6 +4987,46 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
     return true;
   }
 
+  return true;
+}
+
+//}
+
+/* //{ callbackTransformReferenceList() */
+
+bool ControlManager::callbackTransformReferenceList(mrs_msgs::TransformReferenceListSrv::Request& req, mrs_msgs::TransformReferenceListSrv::Response& res) {
+
+  if (!is_initialized_) {
+    return false;
+  }
+
+  // transform the reference list to the current frame
+  mrs_msgs::ReferenceStamped transformed_reference; 
+  mrs_msgs::ReferenceList original_reference_list = req.list; 
+  mrs_msgs::ReferenceList transformed_reference_list;
+
+  for (size_t i=0; i < original_reference_list.list.size(); i++) {
+
+    transformed_reference.header = original_reference_list.header;
+    transformed_reference.reference = original_reference_list.list.at(i);
+
+    if (auto ret = transformer_->transformSingle(transformed_reference, req.frame_id)) {
+
+      transformed_reference_list.list.push_back(ret.value().reference);
+      transformed_reference_list.header = ret.value().header;
+
+    } else {
+
+      res.message = "The reference list could not be transformed";
+      res.success = false;
+      return true;
+    }
+
+  }
+
+  res.list = transformed_reference_list;
+  res.message   = "transformation successful";
+  res.success   = true;
   return true;
 }
 
