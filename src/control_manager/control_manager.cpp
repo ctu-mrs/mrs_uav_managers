@@ -475,14 +475,14 @@ private:
 
   // transform service servers
   ros::ServiceServer service_server_transform_reference_;
-  ros::ServiceServer service_server_transform_reference_list_;
+  ros::ServiceServer service_server_transform_reference_array_;
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
   // safety area services
   ros::ServiceServer service_server_validate_reference_;
   ros::ServiceServer service_server_validate_reference_2d_;
-  ros::ServiceServer service_server_validate_reference_list_;
+  ros::ServiceServer service_server_validate_reference_array_;
 
   // bumper service servers
   ros::ServiceServer service_server_bumper_enabler_;
@@ -1844,14 +1844,14 @@ void ControlManager::initialize(void) {
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_reference_list_   = nh_.advertiseService("transform_reference_list_in", &ControlManager::callbackTransformReferenceArray, this);
+  service_server_transform_reference_array_   = nh_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceArray, this);
+  service_server_validate_reference_array_    = nh_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
   service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
   service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
@@ -5000,10 +5000,10 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
     return false;
   }
 
-  // transform the reference list to the current frame
+  // transform the reference array to the current frame
   const auto tf_opt = transformer_->getTransform(req.array.header.frame_id, req.to_frame_id, req.array.header.stamp);
   if (!tf_opt.has_value()) {
-    res.message = "The reference list could not be transformed";
+    res.message = "The reference array could not be transformed";
     res.success = false;
     return true;
   }
@@ -5025,7 +5025,7 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
 
     } else {
 
-      res.message = "The reference list could not be transformed";
+      res.message = "The reference array could not be transformed";
       res.success = false;
       return true;
     }

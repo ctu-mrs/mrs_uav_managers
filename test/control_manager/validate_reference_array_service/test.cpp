@@ -32,7 +32,7 @@ bool Tester::test() {
     }
   }
 
-  mrs_msgs::ValidateReferenceListRequest req;
+  mrs_msgs::ValidateReferenceArrayRequest req;
 
   req.list.header.frame_id = _uav_name_ + "/world_origin";
 
@@ -81,11 +81,11 @@ bool Tester::test() {
   }
 
   {
-    auto [success, response] = uh->validateReferenceList(req);
+    auto [success, response] = uh->validateReferenceArray(req);
 
     if (!success) {
 
-      ROS_ERROR("[%s]: reference list validation service call failed: '%s'", ros::this_node::getName().c_str(), response->message.c_str());
+      ROS_ERROR("[%s]: reference array validation service call failed: '%s'", ros::this_node::getName().c_str(), response->message.c_str());
       return false;
 
     } else {
@@ -117,11 +117,11 @@ bool Tester::test() {
   {
     req.list.header.frame_id = "frame_that_does_not_exist";
 
-    auto [success, response] = uh->validateReferenceList(req);
+    auto [success, response] = uh->validateReferenceArray(req);
 
     if (success) {
 
-      ROS_ERROR("[%s]: reference list validation service call succeeded but it should not have", ros::this_node::getName().c_str());
+      ROS_ERROR("[%s]: reference array validation service call succeeded but it should not have", ros::this_node::getName().c_str());
       return false;
     }
   }
