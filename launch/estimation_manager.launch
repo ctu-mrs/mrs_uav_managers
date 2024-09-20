@@ -60,6 +60,8 @@
       <remap from="~imu_in" to="hw_api/imu" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~control_reference_in" to="control_manager/control_reference" />
+      <remap from="~controller_diagnostics_in" to="control_manager/controller_diagnostics" />
 
       <remap from="~profiler" to="profiler" />
       <remap from="~odom_main_out" to="~odom_main" />
@@ -70,6 +72,7 @@
       <remap from="~height_agl_out" to="~height_agl" />
 
       <remap from="~change_estimator_in" to="~change_estimator" />
+      <remap from="~reset_estimator_in" to="~reset_estimator" />
       <remap from="~toggle_service_callbacks_in" to="~toggle_service_callbacks" />
 
       <remap from="~failsafe_out" to="control_manager/failsafe" />

@@ -15,8 +15,8 @@ namespace control_manager
 
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea3d_t;
 typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea2d_t;
-typedef boost::function<double(const std::string &frame_id)>          getMaxZ_t;
-typedef boost::function<double(const std::string &frame_id)>          getMinZ_t;
+typedef boost::function<double(const std::string &frame_id)>           getMaxZ_t;
+typedef boost::function<double(const std::string &frame_id)>           getMinZ_t;
 
 struct SafetyArea_t
 {

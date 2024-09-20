@@ -64,7 +64,7 @@ Eigen::Vector3d RemoteControlTest::getFcuUntiltedVelocity() {
   vel_world.header = uav_state->header;
   vel_world.vector = uav_state->velocity.linear;
 
-  auto vel_fcu_untilted = transformer_->transformSingle(vel_world, "fcu_untilted");
+  auto vel_fcu_untilted = transformer_->transformSingle(vel_world, _uav_name_ + "/fcu_untilted");
 
   if (vel_fcu_untilted) {
     return Eigen::Vector3d(vel_fcu_untilted->vector.x, vel_fcu_untilted->vector.y, vel_fcu_untilted->vector.z);
@@ -91,7 +91,7 @@ bool RemoteControlTest::testMoveForward() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (velocity[0] > 0.8 * _horizontal_speed_ && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
+    if (velocity(0) > 0.8 * _horizontal_speed_ && abs(velocity(1)) < 0.1 && abs(velocity(2)) < 0.1) {
       return true;
     }
 
@@ -121,7 +121,7 @@ bool RemoteControlTest::testMoveBackward() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (velocity[0] < -0.8 * _horizontal_speed_ && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1) {
+    if (velocity(0) < -0.8 * _horizontal_speed_ && abs(velocity(1)) < 0.1 && abs(velocity(2)) < 0.1) {
       return true;
     }
 
@@ -151,7 +151,7 @@ bool RemoteControlTest::testMoveLeft() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && velocity[1] > 0.8 * _horizontal_speed_ && abs(velocity[2]) < 0.1) {
+    if (abs(velocity(0)) < 0.1 && velocity(1) > 0.8 * _horizontal_speed_ && abs(velocity(2)) < 0.1) {
       return true;
     }
 
@@ -181,7 +181,7 @@ bool RemoteControlTest::testMoveRight() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && velocity[1] < -0.8 * _horizontal_speed_ && abs(velocity[2]) < 0.1) {
+    if (abs(velocity(0)) < 0.1 && velocity(1) < -0.8 * _horizontal_speed_ && abs(velocity(2)) < 0.1) {
       return true;
     }
 
@@ -211,7 +211,7 @@ bool RemoteControlTest::testMoveUp() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] > 0.8 * _vertical_speed_) {
+    if (abs(velocity(0)) < 0.1 && abs(velocity(1)) < 0.1 && velocity(2) > 0.8 * _vertical_speed_) {
       return true;
     }
 
@@ -241,7 +241,7 @@ bool RemoteControlTest::testMoveDown() {
 
     auto velocity = getFcuUntiltedVelocity();
 
-    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && velocity[2] < -0.8 * _vertical_speed_) {
+    if (abs(velocity(0)) < 0.1 && abs(velocity(1)) < 0.1 && velocity(2) < -0.8 * _vertical_speed_) {
       return true;
     }
 
@@ -332,7 +332,7 @@ bool RemoteControlTest::testStop() {
     auto velocity  = getFcuUntiltedVelocity();
     auto uav_state = uh_->sh_uav_state_.getMsg();
 
-    if (abs(velocity[0]) < 0.1 && abs(velocity[1]) < 0.1 && abs(velocity[2]) < 0.1 && abs(uav_state->velocity.angular.z) < 0.1) {
+    if (abs(velocity(0)) < 0.1 && abs(velocity(1)) < 0.1 && abs(velocity(2)) < 0.1 && abs(uav_state->velocity.angular.z) < 0.1) {
       return true;
     }
 
@@ -352,10 +352,10 @@ bool RemoteControlTest::setGotoReference() {
 
   mrs_msgs::Vec4 srv;
 
-  srv.request.goal[0] = 1000;
-  srv.request.goal[1] = 0;
-  srv.request.goal[2] = 5;
-  srv.request.goal[3] = 0;
+  srv.request.goal.at(0) = 1000;
+  srv.request.goal.at(1) = 0;
+  srv.request.goal.at(2) = 5;
+  srv.request.goal.at(3) = 0;
 
   {
     bool service_call = uh_->sch_goto_relative_.call(srv);
@@ -514,6 +514,8 @@ bool RemoteControlTest::test() {
     }
   }
 
+  sleep(1.0);
+
   deactivate();
 
   // | -------- wait for indication from the diagnostics -------- |
@@ -560,6 +562,61 @@ bool RemoteControlTest::test() {
 
     if (!success) {
       ROS_ERROR("[%s]: stop motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  deactivate();
+
+  // | ------- test switching of controllers and trackers ------- |
+
+  activate();
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  {
+    auto [success, message] = uh_->switchController("Se3Controller");
+
+    if (success) {
+      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      return false;
+    }
+  }
+
+  sleep(2.0);
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      return false;
+    }
+  }
+
+  {
+    auto [success, message] = uh_->switchController("MpcController");
+
+    if (success) {
+      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      return false;
+    }
+  }
+
+  sleep(2.0);
+
+  {
+    bool success = testMoveForward();
+
+    if (!success) {
+      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
       return false;
     }
   }

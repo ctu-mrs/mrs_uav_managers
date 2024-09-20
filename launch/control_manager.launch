@@ -54,6 +54,7 @@
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
       <param name="body_frame" type="string" value="$(arg body_frame)" />
       <param name="g" value="$(arg g)" />
+      <param name="run_type" type="string" value="$(arg RUN_TYPE)" />
       <param if="$(eval arg('RUN_TYPE') == 'realworld')" name="uav_mass" value="$(arg UAV_MASS)" />
       <param name="body_disturbance_x" value="$(arg BODY_DISTURBANCE_X)" />
       <param name="body_disturbance_y" value="$(arg BODY_DISTURBANCE_Y)" />
@@ -100,11 +101,12 @@
       <remap from="~set_heading_in" to="~set_heading" />
       <remap from="~set_heading_relative_in" to="~set_heading_relative" />
       <remap from="~transform_reference_in" to="~transform_reference" />
+      <remap from="~transform_reference_array_in" to="~transform_reference_array" />
       <remap from="~transform_pose_in" to="~transform_pose" />
       <remap from="~transform_vector3_in" to="~transform_vector3" />
       <remap from="~validate_reference_in" to="~validate_reference" />
       <remap from="~validate_reference_2d_in" to="~validate_reference_2d" />
-      <remap from="~validate_reference_list_in" to="~validate_reference_list" />
+      <remap from="~validate_reference_array_in" to="~validate_reference_array" />
       <remap from="~set_min_z_in" to="~set_min_z" />
 
       <!-- Publishers -->

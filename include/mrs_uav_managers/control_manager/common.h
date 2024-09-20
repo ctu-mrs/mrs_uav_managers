@@ -87,7 +87,7 @@ struct HwApiCmdExtractThrottleVisitor
     double throttle = 0;
 
     for (size_t i = 0; i < msg.motors.size(); i++) {
-      throttle += msg.motors[i];
+      throttle += msg.motors.at(i);
     };
 
     throttle /= msg.motors.size();

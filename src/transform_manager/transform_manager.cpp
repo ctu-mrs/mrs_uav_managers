@@ -82,7 +82,7 @@ private:
   std::string         ns_fixed_origin_parent_frame_id_;
   std::string         ns_fixed_origin_child_frame_id_;
   bool                publish_fixed_origin_tf_;
-  geometry_msgs::Pose pose_first_;
+  geometry_msgs::PoseStamped pose_first_;
   geometry_msgs::Pose pose_fixed_;
   geometry_msgs::Pose pose_fixed_diff_;
 
@@ -449,10 +449,14 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     first_frame_id_                = msg->header.frame_id;
     last_frame_id_                 = msg->header.frame_id;
     pose_fixed_                    = msg->pose;
-    pose_first_                    = msg->pose;
+    pose_first_.pose               = msg->pose;
+    pose_first_.header             = msg->header;
     pose_fixed_diff_.orientation.w = 1;
 
-    is_first_frame_id_set_ = true;
+    // we don't want vins_kickoff to be our first estimator
+    if (msg->header.frame_id != ch_->uav_name + "/vins_kickoff_origin") {
+      is_first_frame_id_set_ = true;
+    }
   }
 
   // publish static tf from fixed_origin to local_origin based on the first message
@@ -862,12 +866,12 @@ void TransformManager::publishLocalTf() {
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   geometry_msgs::TransformStamped tf_msg;
-  tf_msg.header.stamp = ros::Time::now();
+  tf_msg.header.stamp = pose_first_.header.stamp;
 
   tf_msg.header.frame_id       = ns_fixed_origin_child_frame_id_;
   tf_msg.child_frame_id        = ns_local_origin_child_frame_id_;
-  tf_msg.transform.translation = Support::pointToVector3(pose_first_.position);
-  tf_msg.transform.rotation    = pose_first_.orientation;
+  tf_msg.transform.translation = Support::pointToVector3(pose_first_.pose.position);
+  tf_msg.transform.rotation    = pose_first_.pose.orientation;
 
   if (Support::noNans(tf_msg)) {
 

@@ -51,7 +51,6 @@ bool Tester::test() {
   }
 }
 
-
 TEST(TESTSuite, test) {
 
   Tester tester;

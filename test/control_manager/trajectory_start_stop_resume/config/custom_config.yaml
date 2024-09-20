@@ -1,0 +1,16 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    state_estimators: [
+      "gps_baro",
+    ]
+
+    initial_state_estimator: "gps_baro"
+
+  uav_manager:
+
+    takeoff:
+
+      after_takeoff:
+        controller: "Se3Controller"

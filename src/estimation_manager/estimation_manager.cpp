@@ -90,6 +90,12 @@ public:
            current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
   }
 
+  bool isInSwitchableState() const {
+    const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
+    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+           current_state == LANDING_STATE;
+  }
+
   bool isInTheAir() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
     return current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE || current_state == LANDING_STATE;
@@ -135,19 +141,19 @@ public:
       }
 
       case READY_FOR_FLIGHT_STATE: {
-        if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+        if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
                              getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
-                             getStateAsString(LANDED_STATE).c_str());
+                             getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case TAKING_OFF_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
-                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str());
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(),
+                             getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -164,19 +170,19 @@ public:
       }
 
       case HOVER_STATE: {
-        if (current_state_ != FLYING_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
-                             getStateAsString(FLYING_STATE).c_str());
+        if (current_state_ != FLYING_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(),
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case ESTIMATOR_SWITCHING_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
-                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
-                             getStateAsString(HOVER_STATE).c_str());
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE  && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE && current_state_ != LANDING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
+                             getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str());
           return false;
         }
         pre_switch_state_ = current_state_;
@@ -184,9 +190,9 @@ public:
       }
 
       case LANDING_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE) {
-          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
-                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str());
+        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -338,6 +344,9 @@ private:
   ros::ServiceServer srvs_change_estimator_;
   bool               callbackChangeEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
   int                estimator_switch_count_ = 0;
+
+  ros::ServiceServer srvs_reset_estimator_;
+  bool               callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
 
   ros::ServiceServer srvs_toggle_callbacks_;
@@ -658,7 +667,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   }
 
   // active estimator is in faulty state, we need to switch to healthy estimator
-  if (sm_->isInTheAir() && active_estimator_->isError()) {
+  if (sm_->isInSwitchableState() && active_estimator_->isError()) {
     sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
   }
 
@@ -700,7 +709,9 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
   }
 
   if (sm_->isInState(StateMachine::FLYING_STATE)) {
-    if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
+    if (!sh_control_input_.hasMsg()) {
+      ROS_WARN_THROTTLE(1.0, "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
+    } else if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
       ROS_WARN_THROTTLE(1.0, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable", getName().c_str(),
                         (ros::Time::now() - sh_control_input_.lastMsgTime()).toSec());
     }
@@ -940,7 +951,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
-    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, estimator->getName()), "EstimationManager/" + estimator->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, estimator->getName()), "EstimationManager/" + estimator->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -975,7 +986,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = boost::bind(&EstimationManager::loadConfigFile, this, _1);
-    ph->param_loader   = std::make_shared<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -1034,6 +1045,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   /*//{ initialize service servers */
   srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
+  srvs_reset_estimator_ = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
   srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
@@ -1064,14 +1076,16 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
     return false;
   }
 
-  if (!callbacks_enabled_) {
+  // enable switching out from vins_kickoff estimator during takeoff
+  if (!callbacks_enabled_ && active_estimator_->getName() != "vins_kickoff") {
     res.success = false;
     res.message = ("Service callbacks are disabled");
     ROS_WARN("[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
     return true;
   }
 
-  if (req.value == "dummy" || req.value == "ground_truth") {
+  // switching into these estimators during flight is dangerous with realhw, so we don't allow it 
+  if (req.value == "dummy" || req.value == "ground_truth" || req.value == "vins_kickoff") {
     res.success = false;
     std::stringstream ss;
     ss << "Switching to " << req.value << " estimator is not allowed.";
@@ -1118,6 +1132,74 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 
   // allow service calllbacks after switch again
   callbacks_enabled_ = true;
+
+  return true;
+}
+/*//}*/
+
+/*//{ callbackResetEstimator() */
+bool EstimationManager::callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+
+  if (!sm_->isInitialized()) {
+    return false;
+  }
+
+  if (!callbacks_enabled_) {
+    res.success = false;
+    res.message = ("Service callbacks are disabled");
+    ROS_WARN("[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    return true;
+  }
+
+
+  bool                                                target_estimator_found = false;
+  boost::shared_ptr<mrs_uav_managers::StateEstimator> target_estimator;
+  for (auto estimator : estimator_list_) {
+    if (estimator->getName() == req.value) {
+      target_estimator       = estimator;
+      target_estimator_found = true;
+      break;
+    }
+  }
+
+  if (target_estimator_found) {
+
+
+    if (target_estimator->getName() == active_estimator_->getName()) {
+      res.success = false;
+      res.message = ("Cannot reset active estimator");
+      ROS_WARN("[%s]: Ignoring service call. Cannot reset active estimator.", getName().c_str());
+      return true;
+    }
+
+      target_estimator->reset();
+      ROS_INFO("[EstimationManager]: Estimator %s reset", target_estimator->getName().c_str());
+
+      double t_wait_left = 5;
+      while (t_wait_left > 0) {
+        ROS_INFO("[EstimationManager]: Attempting starting %s estimator", target_estimator->getName().c_str());
+        target_estimator->start();
+
+        if (target_estimator->isRunning()) {
+          ROS_INFO("[EstimationManager]: Reset of %s estimator successful", target_estimator->getName().c_str());
+          break;
+        } 
+        
+        const double start_period = 1.0;
+        ros::Duration(start_period).sleep();
+        t_wait_left -= start_period;
+
+      }
+
+  } else {
+    ROS_WARN("[%s]: Reset of invalid estimator %s requested", getName().c_str(), req.value.c_str());
+    res.success = false;
+    res.message = ("Not a valid estimator type");
+    return true;
+  }
+
+  res.success = true;
+  res.message = "Estimator reset successful";
 
   return true;
 }

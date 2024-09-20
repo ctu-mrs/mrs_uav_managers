@@ -24,7 +24,7 @@ public:
 
 Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
-  sh_hw_api_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
+  sh_hw_api_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
 
   ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "/" + _uav_name_ + "/hw_api/odometry");
 }
