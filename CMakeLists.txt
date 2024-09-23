@@ -52,10 +52,6 @@ catkin_package(
   )
 
 include_directories(
-  # Todo: this must not be here
-  /home/azat/mrs_workspace/devel/include
-  /home/azat/mrs_workspace/src/mrs_lib/include
-
   include 
   test/include
   ${catkin_INCLUDE_DIRS}
@@ -182,8 +178,6 @@ add_dependencies(MrsUavManagers_SafetyAreaManager
   )
 
 target_link_libraries(MrsUavManagers_SafetyAreaManager
-  # TODO: it must not be here    
-  # /home/azat/mrs_workspace/devel/lib/libMrsLib_SafetyZone.so
   ${catkin_LIBRARIES}
   )
 
