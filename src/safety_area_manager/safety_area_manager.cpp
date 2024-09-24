@@ -20,15 +20,15 @@ namespace mrs_uav_managers
   namespace safety_area_manager
   {
 
-/* onInit() //{ */
+    /* onInit() //{ */
     void SafetyAreaManager::onInit()
     {
       preinitialize();
     }
     //}
-    
-/* Destructor //{ */
-    
+
+    /* Destructor //{ */
+
     SafetyAreaManager::~SafetyAreaManager()
     {
       delete safety_zone_;
@@ -53,10 +53,10 @@ namespace mrs_uav_managers
         delete bounds_[i];
       }
     }
-//}
+    //}
 
- /* preinitialize() //{ */
- 
+    /* preinitialize() //{ */
+
     void SafetyAreaManager::preinitialize()
     {
       nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
@@ -77,10 +77,10 @@ namespace mrs_uav_managers
       timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
     }
 
- 
- //}
 
-/* timerHwApiCapabilities() //{ */
+    //}
+
+    /* timerHwApiCapabilities() //{ */
 
     void SafetyAreaManager::timerHwApiCapabilities([[maybe_unused]] const ros::TimerEvent& event)
     {
@@ -98,9 +98,9 @@ namespace mrs_uav_managers
       initialize();
       timer_hw_api_capabilities_.stop();
     }
-//}
+    //}
 
-/* initialize() //{ */
+    /* initialize() //{ */
 
     void SafetyAreaManager::initialize()
     {
@@ -185,9 +185,9 @@ namespace mrs_uav_managers
       ROS_INFO("[SafetyAreaManager]: initialized");
     }
 
-//}
+    //}
 
-/* makePrism() //{ */
+    /* makePrism() //{ */
 
     mrs_lib::Prism* SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z)
     {
@@ -200,9 +200,9 @@ namespace mrs_uav_managers
       return new mrs_lib::Prism(points, max_z, min_z);
     }
 
-//}
+    //}
 
-/* initializeSafetyZone() //{ */
+    /* initializeSafetyZone() //{ */
 
     bool SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename)
     {
@@ -294,10 +294,10 @@ namespace mrs_uav_managers
       return param_loader.loadedSuccessfully();
     }
 
-//}
+    //}
 
-   /* transformZ //{ */
-   
+    /* transformZ //{ */
+
     double SafetyAreaManager::transformZ(std::string from, std::string to, double z)
     {
       geometry_msgs::Point point;
@@ -314,15 +314,15 @@ namespace mrs_uav_managers
 
       return res.value().z;
     }
-   
-   //}
+
+    //}
 
     // --------------------------------------------------------------
     // |                          services                          |
     // --------------------------------------------------------------
 
-  /* addObstacle() //{ */
-  
+    /* addObstacle() //{ */
+
     bool SafetyAreaManager::addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
     {
       mrs_msgs::ReferenceStamped point;
@@ -358,11 +358,11 @@ namespace mrs_uav_managers
 
       return true;
     }
-  
-  //}
 
-  /* setUseSafetyArea() //{ */
-  
+    //}
+
+    /* setUseSafetyArea() //{ */
+
     bool SafetyAreaManager::setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
     {
       use_safety_area_ = req.data;
@@ -370,10 +370,10 @@ namespace mrs_uav_managers
       ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (use_safety_area_ ? "on" : "off"));
       return true;
     }
-  
-  //}
 
-/* loadWorldConfig() //{ */
+    //}
+
+    /* loadWorldConfig() //{ */
 
     bool SafetyAreaManager::loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
@@ -482,9 +482,9 @@ namespace mrs_uav_managers
       return true;
     }
 
-//}
+    //}
 
-/* setWorldConfig() //{ */
+    /* setWorldConfig() //{ */
 
     bool SafetyAreaManager::setWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
@@ -508,9 +508,9 @@ namespace mrs_uav_managers
       return true;
     }
 
-//}
+    //}
 
-/* saveWorldConfig() //{ */
+    /* saveWorldConfig() //{ */
 
     bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
@@ -542,10 +542,10 @@ namespace mrs_uav_managers
       return true;
     }
 
-//}
+    //}
 
-   /* getWorldConfig() //{ */
-   
+    /* getWorldConfig() //{ */
+
     bool SafetyAreaManager::getWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, safety_area_horizontal_frame_, safety_area_vertical_frame_,
@@ -565,8 +565,8 @@ namespace mrs_uav_managers
       ROS_INFO("[SafetyAreaManager]: world config has been extracted");
       return true;
     }
-   
-   //}
+
+    //}
 
     /* isPointInSafetyArea3d() //{ */
 
@@ -605,7 +605,7 @@ namespace mrs_uav_managers
 
     //}
 
-/* isPointInSafetyArea2d() //{ */
+    /* isPointInSafetyArea2d() //{ */
 
     bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
     {
@@ -640,9 +640,9 @@ namespace mrs_uav_managers
       return true;
     }
 
-//}
+    //}
 
-/* isPathToPointInSafetyArea3d() //{ */
+    /* isPathToPointInSafetyArea3d() //{ */
 
     bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
     {
@@ -706,10 +706,10 @@ namespace mrs_uav_managers
       return true;
     }
 
-//}
+    //}
 
-   /* isPathToPointInSafetyArea2d() //{ */
-   
+    /* isPathToPointInSafetyArea2d() //{ */
+
     bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
     {
       if (!use_safety_area_)
@@ -769,11 +769,11 @@ namespace mrs_uav_managers
       res.success = true;
       return true;
     }
-   
-   //}
+
+    //}
 
     /* getSafeZoneAtHeight() //{ */
-    
+
     bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res)
     {
       // Transform height to the current frame
@@ -822,11 +822,11 @@ namespace mrs_uav_managers
 
       return true;
     }
-    
+
     //}
 
     /* getMaxZ() //{ */
-    
+
     bool SafetyAreaManager::getMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
     {
       res.result.header.frame_id = safety_area_horizontal_frame_;
@@ -843,11 +843,11 @@ namespace mrs_uav_managers
       res.success = true;
       return true;
     }
-    
+
     //}
 
-   /* getMinZ() //{ */
-   
+    /* getMinZ() //{ */
+
     bool SafetyAreaManager::getMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
     {
       res.result.header.frame_id = safety_area_horizontal_frame_;
@@ -864,17 +864,17 @@ namespace mrs_uav_managers
       res.success = true;
       return true;
     }
-   
-   //}
+
+    //}
 
     /* getUse() //{ */
-    
+
     bool SafetyAreaManager::getUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res)
     {
       res.result = use_safety_area_;
       return true;
     }
-    
+
     //}
 
   }  // namespace safety_area_manager
