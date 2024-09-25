@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <memory>
 
 #include <boost/geometry.hpp>
 
@@ -189,15 +190,22 @@ namespace mrs_uav_managers
 
     /* makePrism() //{ */
 
-    mrs_lib::Prism* SafetyAreaManager::makePrism(Eigen::MatrixXd matrix, double max_z, double min_z)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, double max_z, double min_z) const
     {
-      std::vector<mrs_lib::Point2d> points = std::vector<mrs_lib::Point2d>();
-      for (int i = 0; i < matrix.rows(); i++)
-      {
-        points.push_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
+
+      if (matrix.rows() < 3) {
+        ROS_ERROR_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(matrix.rows()));
       }
 
-      return new mrs_lib::Prism(points, max_z, min_z);
+      std::vector<mrs_lib::Point2d> points;
+      points.reserve(matrix.rows());
+
+      for (int i = 0; i < matrix.rows() ; i++) {
+        points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
+        
+      }
+
+      return std::make_unique<mrs_lib::Prism>(points, max_z, min_z);
     }
 
     //}
@@ -225,9 +233,7 @@ namespace mrs_uav_managers
       max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
       min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
-      mrs_lib::Prism* tmp = makePrism(border_points, max_z, min_z);
-      mrs_lib::Prism border = *tmp;
-      delete tmp;
+      auto border = makePrism(border_points, max_z, min_z);
 
       // Making obstacle prisms
       std::vector<mrs_lib::Prism*> obstacles;
@@ -235,6 +241,7 @@ namespace mrs_uav_managers
       bool is_obstacle_present = false;
       param_loader.loadParam("safety_area/obstacles/present", is_obstacle_present, is_obstacle_present);
 
+      //Missing to refactor
       // If any is present, fill obstacles
       if (is_obstacle_present)
       {
@@ -247,9 +254,12 @@ namespace mrs_uav_managers
 
         Eigen::MatrixXd current_mat = param_loader.loadMatrixDynamic2("safety_area/obstacles/data", -1, 2);
         Eigen::MatrixXd rows = param_loader.loadMatrixDynamic2("safety_area/obstacles/rows", -1, 1);
+
+        obstacles.reserve(current_mat.size());
+
         for (int i = 0; i < rows.rows(); i++)
         {
-          int row_num = (int)rows(i, 0);
+          int row_num = static_cast<int>(rows(i, 0));
           Eigen::MatrixXd obstacle_mat = current_mat.topRows(row_num);
           current_mat = current_mat.block(row_num, 0, current_mat.rows() - row_num, current_mat.cols());
           obstacles_mat.push_back(obstacle_mat);
@@ -272,7 +282,8 @@ namespace mrs_uav_managers
         }
       }
 
-      // Initialize safety_zone_
+      //Missing to refactor
+
       safety_zone_ = new mrs_lib::SafetyZone(border, obstacles);
 
       // Add visualizations
