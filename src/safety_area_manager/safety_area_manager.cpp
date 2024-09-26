@@ -190,7 +190,7 @@ namespace mrs_uav_managers
 
     /* makePrism() //{ */
 
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, double max_z, double min_z) const
+    mrs_lib::Prism* SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, double max_z, double min_z) 
     {
 
       if (matrix.rows() < 3) {
@@ -205,7 +205,7 @@ namespace mrs_uav_managers
         
       }
 
-      return std::make_unique<mrs_lib::Prism>(points, max_z, min_z);
+      return new mrs_lib::Prism(points, max_z, min_z);
     }
 
     //}
@@ -233,7 +233,9 @@ namespace mrs_uav_managers
       max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
       min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
-      auto border = makePrism(border_points, max_z, min_z);
+      mrs_lib::Prism* tmp = makePrism(border_points, max_z, min_z);
+      mrs_lib::Prism border = *tmp;
+      delete tmp;
 
       // Making obstacle prisms
       std::vector<mrs_lib::Prism*> obstacles;

@@ -78,7 +78,7 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
   // Tools for convenience
-  std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, double max_z, double min_z) const;
+  mrs_lib::Prism* makePrism(const Eigen::MatrixXd matrix, double max_z, double min_z);
   double transformZ(std::string from, std::string to, double z);
   bool initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename);
 
