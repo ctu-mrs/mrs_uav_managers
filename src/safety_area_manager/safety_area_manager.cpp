@@ -307,7 +307,7 @@ namespace mrs_uav_managers
 
       if (matrix.rows() < 3)
       {
-        ROS_ERROR_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(matrix.rows()));
+        ROS_WARN_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(matrix.rows()));
       }
 
       std::vector<mrs_lib::Point2d> points;
@@ -381,7 +381,7 @@ namespace mrs_uav_managers
 
           if (row_num < 0 || start_row + row_num > current_mat.rows())
           {
-            ROS_ERROR("[SafetyAreaManager]: Invalid rows!, check your config file");
+            ROS_WARN("[SafetyAreaManager]: Invalid obstacle rows!, check your config file");
             return false;
           }
 
@@ -451,7 +451,7 @@ namespace mrs_uav_managers
       auto res = transformer_->transformSingle(from, point, to);
       if (!res)
       {
-        ROS_ERROR("[SafetyAreaManager]: Could not transform point from %s to %s.", from.c_str(), to.c_str());
+        ROS_WARN("[SafetyAreaManager]: Could not transform point from %s to %s.", from.c_str(), to.c_str());
         return 0;
       }
 
@@ -475,7 +475,7 @@ namespace mrs_uav_managers
 
       if (!tfed_horizontal)
       {
-        ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
         res.message = "Could not transform the point to the safety area horizontal frame";
         res.success = false;
         return true;
@@ -635,7 +635,7 @@ namespace mrs_uav_managers
       std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
       if (!ofs.is_open())
       {
-        ROS_ERROR("[SafetyAreaManager]: Could not open file %s", filename.c_str());
+        ROS_WARN("[SafetyAreaManager]: Could not open file %s", filename.c_str());
         res.success = false;
         res.message = "Could not open file " + filename;
         return true;
@@ -672,7 +672,7 @@ namespace mrs_uav_managers
       std::ofstream ofs(req.value, std::ofstream::out | std::ofstream::trunc);
       if (!ofs.is_open())
       {
-        ROS_ERROR("[SafetyAreaManager]: Could not open file %s", req.value.c_str());
+        ROS_WARN("[SafetyAreaManager]: Could not open file %s", req.value.c_str());
         res.success = false;
         res.message = "Could not open file " + req.value;
         return true;
@@ -730,7 +730,7 @@ namespace mrs_uav_managers
 
       if (!tfed_horizontal)
       {
-        ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
         res.message = "Could not transform the point to the safety area horizontal frame";
         res.success = false;
         return true;
@@ -767,7 +767,7 @@ namespace mrs_uav_managers
 
       if (!tfed_horizontal)
       {
-        ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
         res.message = "Could not transform the point to the safety area horizontal frame";
         res.success = false;
         return true;
@@ -807,7 +807,7 @@ namespace mrs_uav_managers
 
         if (!ret)
         {
-          ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           res.success = false;
           return true;
@@ -821,7 +821,7 @@ namespace mrs_uav_managers
 
         if (!ret)
         {
-          ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           return true;
         }
@@ -873,7 +873,7 @@ namespace mrs_uav_managers
 
         if (!ret)
         {
-          ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           res.success = false;
           return true;
@@ -887,7 +887,7 @@ namespace mrs_uav_managers
 
         if (!ret)
         {
-          ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           return true;
         }
