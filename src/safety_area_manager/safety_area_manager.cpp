@@ -97,7 +97,7 @@ namespace mrs_uav_managers
 
       // Tools for convenience
       mrs_lib::Prism* makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
-      double transformZ(const std::string from, const std::string to, const double z);
+      double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
       bool initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename);
 
       // this timer will check till we already got the hardware api diagnostics
@@ -109,20 +109,20 @@ namespace mrs_uav_managers
       void initialize();
 
       // Services
-      bool isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
-      bool isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
-      bool getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res);
-      bool saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool getWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool setWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-      bool addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool getMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
-      bool getMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
-      bool getUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res);
+      bool callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+      bool callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+      bool callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
+      bool callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
+      bool callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res);
+      bool callbackSaveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+      bool callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+      bool callbackLoadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+      bool callbackSetWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+      bool callbackToggleSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+      bool callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+      bool callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
+      bool callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
+      bool callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res);
 
     public:
       virtual void onInit();
@@ -268,20 +268,20 @@ namespace mrs_uav_managers
 
       // | ------------------------ services ------------------------ |
 
-      service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::getSafeZoneAtHeight, this);
-      service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::isPointInSafetyArea3d, this);
-      service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::isPointInSafetyArea2d, this);
-      service_server_path_in_safety_area_3d_ = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::isPathToPointInSafetyArea3d, this);
-      service_server_path_in_safety_area_2d_ = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::isPathToPointInSafetyArea2d, this);
-      service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::saveWorldConfig, this);
-      service_server_load_world_config_ = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::loadWorldConfig, this);
-      service_server_set_world_config_ = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::setWorldConfig, this);
-      service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::getWorldConfig, this);
-      service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::setUseSafetyArea, this);
-      service_server_add_obstacle_ = nh_.advertiseService("add_obstacle_in", &SafetyAreaManager::addObstacle, this);
-      service_server_get_max_z_ = nh_.advertiseService("get_max_z_in", &SafetyAreaManager::getMaxZ, this);
-      service_server_get_min_z_ = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::getMinZ, this);
-      service_server_get_use_ = nh_.advertiseService("get_use_in", &SafetyAreaManager::getUse, this);
+      service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::callbackGetSafeZoneAtHeight, this);
+      service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePoint3d, this);
+      service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePoint2d, this);
+      service_server_path_in_safety_area_3d_ = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePathToPoint3d, this);
+      service_server_path_in_safety_area_2d_ = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePathToPoint2d, this);
+      service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::callbackSaveWorldConfig, this);
+      service_server_load_world_config_ = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::callbackLoadWorldConfig, this);
+      service_server_set_world_config_ = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::callbackSetWorldConfig, this);
+      service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
+      service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
+      service_server_add_obstacle_ = nh_.advertiseService("add_obstacle_in", &SafetyAreaManager::callbackAddObstacle, this);
+      service_server_get_max_z_ = nh_.advertiseService("get_max_z_in", &SafetyAreaManager::callbackGetMaxZ, this);
+      service_server_get_min_z_ = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::callbackGetMinZ, this);
+      service_server_get_use_ = nh_.advertiseService("get_use_in", &SafetyAreaManager::callbackGetUse, this);
 
       // | ------------------------ profiler ------------------------ |
 
@@ -441,17 +441,17 @@ namespace mrs_uav_managers
 
     /* transformZ //{ */
 
-    double SafetyAreaManager::transformZ(const std::string from, const std::string to, const double z)
+    double SafetyAreaManager::transformZ(const std::string& current_frame, const std::string& target_frame, const double z)
     {
       geometry_msgs::Point point;
       point.x = 0;
       point.y = 0;
       point.z = z;
 
-      auto res = transformer_->transformSingle(from, point, to);
+      const auto res = transformer_->transformSingle(current_frame, point, target_frame);
       if (!res)
       {
-        ROS_WARN("[SafetyAreaManager]: Could not transform point from %s to %s.", from.c_str(), to.c_str());
+        ROS_WARN("[SafetyAreaManager]: Could not transform point from %s to %s.", current_frame.c_str(), target_frame.c_str());
         return 0;
       }
 
@@ -464,9 +464,9 @@ namespace mrs_uav_managers
     // |                          services                          |
     // --------------------------------------------------------------
 
-    /* addObstacle() //{ */
+    /* callbackAddObstacle() //{ */
 
-    bool SafetyAreaManager::addObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
+    bool SafetyAreaManager::callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
     {
       mrs_msgs::ReferenceStamped point;
       point.header = req.header;
@@ -504,9 +504,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* setUseSafetyArea() //{ */
+    /* callbackToggleSafetyArea() //{ */
 
-    bool SafetyAreaManager::setUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
+    bool SafetyAreaManager::callbackToggleSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
     {
       use_safety_area_ = req.data;
       res.success = true;
@@ -516,9 +516,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* loadWorldConfig() //{ */
+    /* callbackLoadWorldConfig() //{ */
 
-    bool SafetyAreaManager::loadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
+    bool SafetyAreaManager::callbackLoadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       // Backup
       mrs_lib::SafetyZone* old_safety_zone = safety_zone_;
@@ -627,9 +627,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* setWorldConfig() //{ */
+    /* callbackSetWorldConfig() //{ */
 
-    bool SafetyAreaManager::setWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
+    bool SafetyAreaManager::callbackSetWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       std::string filename = "/tmp/cur_world_config.yaml";
       std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
@@ -646,16 +646,16 @@ namespace mrs_uav_managers
 
       mrs_msgs::String load_config_srv;
       load_config_srv.request.value = filename;
-      loadWorldConfig(load_config_srv.request, load_config_srv.response);
+      callbackLoadWorldConfig(load_config_srv.request, load_config_srv.response);
       res = load_config_srv.response;
       return true;
     }
 
     //}
 
-    /* saveWorldConfig() //{ */
+    /* callbackSaveWorldConfig() //{ */
 
-    bool SafetyAreaManager::saveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
+    bool SafetyAreaManager::callbackSaveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, safety_area_horizontal_frame_, safety_area_vertical_frame_,
                                          world_origin_units_, origin_x_, origin_y_);
@@ -687,9 +687,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* getWorldConfig() //{ */
+    /* callbackGetWorldConfig() //{ */
 
-    bool SafetyAreaManager::getWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
+    bool SafetyAreaManager::callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       mrs_lib::YamlExportVisitor visitor(uav_name_, safety_area_horizontal_frame_, safety_area_horizontal_frame_, safety_area_vertical_frame_,
                                          world_origin_units_, origin_x_, origin_y_);
@@ -711,9 +711,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* isPointInSafetyArea3d() //{ */
+    /* callbackValidatePoint3d() //{ */
 
-    bool SafetyAreaManager::isPointInSafetyArea3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
+    bool SafetyAreaManager::callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
     {
       if (!use_safety_area_)
       {
@@ -748,9 +748,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* isPointInSafetyArea2d() //{ */
+    /* callbackValidatePoint2d() //{ */
 
-    bool SafetyAreaManager::isPointInSafetyArea2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
+    bool SafetyAreaManager::callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
     {
       if (!use_safety_area_)
       {
@@ -785,9 +785,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* isPathToPointInSafetyArea3d() //{ */
+    /* callbackValidatePathtoPoint3d() //{ */
 
-    bool SafetyAreaManager::isPathToPointInSafetyArea3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
+    bool SafetyAreaManager::callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
     {
       if (!use_safety_area_)
       {
@@ -803,9 +803,9 @@ namespace mrs_uav_managers
       geometry_msgs::PointStamped start_transformed, end_transformed;
 
       {
-        auto ret = transformer_->transformSingle(start, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(start, safety_area_horizontal_frame_);
 
-        if (!ret)
+        if (!resp)
         {
           ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
@@ -813,20 +813,20 @@ namespace mrs_uav_managers
           return true;
         }
 
-        start_transformed = ret.value();
+        start_transformed = resp.value();
       }
 
       {
-        auto ret = transformer_->transformSingle(end, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(end, safety_area_horizontal_frame_);
 
-        if (!ret)
+        if (!resp)
         {
           ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           return true;
         }
 
-        end_transformed = ret.value();
+        end_transformed = resp.value();
       }
 
       // verify the whole path
@@ -851,9 +851,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* isPathToPointInSafetyArea2d() //{ */
+    /* callbackValidatePathtoPoint2d() //{ */
 
-    bool SafetyAreaManager::isPathToPointInSafetyArea2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
+    bool SafetyAreaManager::callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
     {
       if (!use_safety_area_)
       {
@@ -869,9 +869,9 @@ namespace mrs_uav_managers
       geometry_msgs::PointStamped start_transformed, end_transformed;
 
       {
-        auto ret = transformer_->transformSingle(start, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(start, safety_area_horizontal_frame_);
 
-        if (!ret)
+        if (!resp)
         {
           ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
@@ -879,20 +879,20 @@ namespace mrs_uav_managers
           return true;
         }
 
-        start_transformed = ret.value();
+        start_transformed = resp.value();
       }
 
       {
-        auto ret = transformer_->transformSingle(end, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(end, safety_area_horizontal_frame_);
 
-        if (!ret)
+        if (!resp)
         {
           ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
           res.message = "Could not transform the first point in the path";
           return true;
         }
 
-        end_transformed = ret.value();
+        end_transformed = resp.value();
       }
 
       // verify the whole path
@@ -915,9 +915,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* getSafeZoneAtHeight() //{ */
+    /* callbackGetSafeZoneAtHeight() //{ */
 
-    bool SafetyAreaManager::getSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res)
+    bool SafetyAreaManager::callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res)
     {
       // Transform height to the current frame
       double height = transformZ(req.header.frame_id, safety_area_horizontal_frame_, req.height);
@@ -968,9 +968,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* getMaxZ() //{ */
+    /* callbackGetMaxZ() //{ */
 
-    bool SafetyAreaManager::getMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
+    bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
     {
       res.result.header.frame_id = safety_area_horizontal_frame_;
       res.result.point.x = 0;
@@ -989,9 +989,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* getMinZ() //{ */
+    /* callbackGetMinZ() //{ */
 
-    bool SafetyAreaManager::getMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
+    bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
     {
       res.result.header.frame_id = safety_area_horizontal_frame_;
       res.result.point.x = 0;
@@ -1010,9 +1010,9 @@ namespace mrs_uav_managers
 
     //}
 
-    /* getUse() //{ */
+    /* callbackGetUse() //{ */
 
-    bool SafetyAreaManager::getUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res)
+    bool SafetyAreaManager::callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res)
     {
       res.result = use_safety_area_;
       return true;
