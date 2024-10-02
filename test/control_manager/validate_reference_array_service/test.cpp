@@ -34,7 +34,7 @@ bool Tester::test() {
 
   mrs_msgs::ValidateReferenceArrayRequest req;
 
-  req.list.header.frame_id = _uav_name_ + "/world_origin";
+  req.array.header.frame_id = _uav_name_ + "/world_origin";
 
   {
     mrs_msgs::Reference msg;
@@ -44,7 +44,7 @@ bool Tester::test() {
     msg.position.z = 2;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -55,7 +55,7 @@ bool Tester::test() {
     msg.position.z = 2;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -66,7 +66,7 @@ bool Tester::test() {
     msg.position.z = -100;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -77,7 +77,7 @@ bool Tester::test() {
     msg.position.z = 3;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -115,7 +115,7 @@ bool Tester::test() {
   // | ---------------- now try with bad frame id --------------- |
 
   {
-    req.list.header.frame_id = "frame_that_does_not_exist";
+    req.array.header.frame_id = "frame_that_does_not_exist";
 
     auto [success, response] = uh->validateReferenceArray(req);
 
