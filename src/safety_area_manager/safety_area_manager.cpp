@@ -149,7 +149,7 @@ namespace mrs_uav_managers
       // Safety area building
       std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
-      bool initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename);
+      bool initializationFromFile(mrs_lib::ParamLoader& param_loader, std::string filename);
 
       // Reference validation
       // those are passed to trackers using the common_handlers object  TODO
@@ -234,7 +234,7 @@ namespace mrs_uav_managers
       bool safety_zone_inited = false;
       try
       {
-        safety_zone_inited = initializeSafetyZone(param_loader, world_config);
+        safety_zone_inited = initializationFromFile(param_loader, world_config);
       }
       catch (std::invalid_argument& e)
       {
@@ -282,7 +282,7 @@ namespace mrs_uav_managers
 
       // | ------------------- scope timer logger ------------------- |
 
-      param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
+      param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
       const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
       scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
@@ -439,7 +439,7 @@ namespace mrs_uav_managers
       auto old_use_safety_area = use_safety_area_;
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
-      bool success = initializeSafetyZone(param_loader, req.value);
+      bool success = initializationFromFile(param_loader, req.value);
 
       res.success = true;
       if (!param_loader.loadedSuccessfully())
@@ -956,9 +956,9 @@ namespace mrs_uav_managers
 
     // | -------------------- service callbacks ------------------- |
 
-    /* initializeSafetyZone() //{ */
+    /* initializationFromFile() //{ */
 
-    bool SafetyAreaManager::initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename)
+    bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader& param_loader, std::string filename)
     {
       if (!param_loader.addYamlFile(filename))
       {

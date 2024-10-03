@@ -3,3 +3,9 @@ mrs_uav_managers:
   safety_area_manager:
   
     status_timer_rate: 10
+    
+    scope_timer:
+
+      enabled: false
+      log_filename: "" # if empty, scope timers output to terminal; otherwise log to file
+
