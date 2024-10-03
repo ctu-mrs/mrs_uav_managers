@@ -53,7 +53,7 @@ namespace mrs_uav_managers
     {
     private:
       std::shared_ptr<mrs_lib::Transformer> transformer_;
-      mrs_lib::SafetyZone* safety_zone_;
+      std::unique_ptr<mrs_lib::SafetyZone> safety_zone_;
       ros::NodeHandle nh_;
 
       // Wolrd config parameters
@@ -66,11 +66,11 @@ namespace mrs_uav_managers
       bool use_safety_area_;
 
       // Visualization objects
-      std::vector<mrs_lib::StaticEdgesVisualization*> static_edges_;
-      std::vector<mrs_lib::IntEdgesVisualization*> int_edges_;
-      std::vector<mrs_lib::VertexControl*> vertices_;
-      std::vector<mrs_lib::CenterControl*> centers_;
-      std::vector<mrs_lib::BoundsControl*> bounds_;
+      std::vector<std::unique_ptr<mrs_lib::StaticEdgesVisualization>> static_edges_;
+      std::vector<std::unique_ptr<mrs_lib::IntEdgesVisualization>> int_edges_;
+      std::vector<std::unique_ptr<mrs_lib::VertexControl>> vertices_;
+      std::vector<std::unique_ptr<mrs_lib::CenterControl>> centers_;
+      std::vector<std::unique_ptr<mrs_lib::BoundsControl>> bounds_;
 
       // profiling
       mrs_lib::Profiler profiler_;
@@ -96,7 +96,7 @@ namespace mrs_uav_managers
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
 
       // Tools for convenience
-      mrs_lib::Prism* makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
+      std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
       bool initializeSafetyZone(mrs_lib::ParamLoader& param_loader, std::string filename);
 
@@ -127,7 +127,7 @@ namespace mrs_uav_managers
     public:
       virtual void onInit();
 
-      ~SafetyAreaManager();
+      ~SafetyAreaManager() = default;
 
     };  // class SafetyAreaManager
 
@@ -137,34 +137,6 @@ namespace mrs_uav_managers
     void SafetyAreaManager::onInit()
     {
       preinitialize();
-    }
-    //}
-
-    /* Destructor //{ */
-
-    SafetyAreaManager::~SafetyAreaManager()
-    {
-      delete safety_zone_;
-      for (size_t i = 0; i < static_edges_.size(); i++)
-      {
-        delete static_edges_[i];
-      }
-      for (size_t i = 0; i < int_edges_.size(); i++)
-      {
-        delete int_edges_[i];
-      }
-      for (size_t i = 0; i < vertices_.size(); i++)
-      {
-        delete vertices_[i];
-      }
-      for (size_t i = 0; i < centers_.size(); i++)
-      {
-        delete centers_[i];
-      }
-      for (size_t i = 0; i < bounds_.size(); i++)
-      {
-        delete bounds_[i];
-      }
     }
     //}
 
@@ -302,7 +274,7 @@ namespace mrs_uav_managers
 
     /* makePrism() //{ */
 
-    mrs_lib::Prism* SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z)
     {
 
       if (matrix.rows() < 3)
@@ -318,7 +290,7 @@ namespace mrs_uav_managers
         points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
       }
 
-      return new mrs_lib::Prism(points, max_z, min_z);
+      return std::make_unique<mrs_lib::Prism>(points, max_z, min_z);
     }
 
     //}
@@ -346,11 +318,10 @@ namespace mrs_uav_managers
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
       const auto transformed_min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
-      std::unique_ptr<mrs_lib::Prism> tmp(makePrism(border_points, transformed_max_z, transformed_min_z));
-      mrs_lib::Prism border = *tmp;
+      auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
 
       // Making obstacle prisms
-      std::vector<mrs_lib::Prism*> obstacles;
+      std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles;
 
       bool obstacles_present;
       param_loader.loadParam("safety_area/obstacles/present", obstacles_present);
@@ -373,7 +344,7 @@ namespace mrs_uav_managers
         int start_row = 0;
         obstacles_mat.reserve(rows.rows());
 
-        //Iterate over obstacles matrix and extract points based on rows matrix
+        // Iterate over obstacles matrix and extract points based on rows matrix
         //"rows" matrix define the points for every obstacle
         for (int i = 0; i < rows.rows(); i++)
         {
@@ -409,29 +380,38 @@ namespace mrs_uav_managers
           const auto obs_min_z = min_z_mat(i, 0);
           const auto transformed_obs_max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, obs_max_z);
           const auto transformed_obs_min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, obs_min_z);
-          obstacles.push_back(makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z));
+          auto prism = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z);
+          if (prism)
+          {
+            obstacles.push_back(std::move(prism));
+          } else
+          {
+            ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
+          }
         }
       }
 
-      safety_zone_ = new mrs_lib::SafetyZone(border, obstacles);
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacles));
 
       // Add visualizations
 
       // Safety area
-      static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
-      int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      centers_.push_back(new mrs_lib::CenterControl(safety_zone_, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      static_edges_.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+      int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
 
       // Obstacles, overloading for obstacles
       for (auto it = safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++)
       {
-        static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
-        int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        centers_.push_back(new mrs_lib::CenterControl(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        static_edges_.push_back(
+            std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+        int_edges_.push_back(
+            std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), it->first, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
       }
 
       return param_loader.loadedSuccessfully();
@@ -491,13 +471,14 @@ namespace mrs_uav_managers
           mrs_lib::Point2d{-2.5 + offset_x, 2.5 + offset_y},
       };
 
-      int id = safety_zone_->addObstacle(new mrs_lib::Prism(points, 5, 0));
+      int id = safety_zone_->addObstacle(std::make_unique<mrs_lib::Prism>(points, 5, 0));
 
-      static_edges_.push_back(new mrs_lib::StaticEdgesVisualization(safety_zone_, id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
-      int_edges_.push_back(new mrs_lib::IntEdgesVisualization(safety_zone_, id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      vertices_.push_back(new mrs_lib::VertexControl(safety_zone_, id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      centers_.push_back(new mrs_lib::CenterControl(safety_zone_, id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-      bounds_.push_back(new mrs_lib::BoundsControl(safety_zone_, id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      static_edges_.push_back(
+          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+      int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
 
       return true;
     }
@@ -521,24 +502,18 @@ namespace mrs_uav_managers
     bool SafetyAreaManager::callbackLoadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
     {
       // Backup
-      mrs_lib::SafetyZone* old_safety_zone = safety_zone_;
-      std::vector<mrs_lib::StaticEdgesVisualization*> old_static_edges = static_edges_;
-      std::vector<mrs_lib::IntEdgesVisualization*> old_int_edges = int_edges_;
-      std::vector<mrs_lib::VertexControl*> old_vertices = vertices_;
-      std::vector<mrs_lib::CenterControl*> old_centers = centers_;
-      std::vector<mrs_lib::BoundsControl*> old_bounds = bounds_;
-      std::string old_world_origin_units = world_origin_units_;
-      std::string old_safety_area_horizontal_frame = safety_area_horizontal_frame_;
-      std::string old_safety_area_vertical_frame = safety_area_vertical_frame_;
-      double old_origin_y = origin_y_;
-      double old_origin_x = origin_x_;
-      bool old_use_safety_area = use_safety_area_;
-      safety_zone_ = nullptr;
-      static_edges_.clear();
-      int_edges_.clear();
-      vertices_.clear();
-      centers_.clear();
-      bounds_.clear();
+      auto old_safety_zone = std::move(safety_zone_);
+      auto old_static_edges = std::move(static_edges_);
+      auto old_int_edges = std::move(int_edges_);
+      auto old_vertices = std::move(vertices_);
+      auto old_centers = std::move(centers_);
+      auto old_bounds = std::move(bounds_);
+      auto old_world_origin_units = world_origin_units_;
+      auto old_safety_area_horizontal_frame = safety_area_horizontal_frame_;
+      auto old_safety_area_vertical_frame = safety_area_vertical_frame_;
+      auto old_origin_y = origin_y_;
+      auto old_origin_x = origin_x_;
+      auto old_use_safety_area = use_safety_area_;
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializeSafetyZone(param_loader, req.value);
@@ -557,70 +532,24 @@ namespace mrs_uav_managers
         res.success = false;
       }
 
-      // In case of success, clean the backup
-      if (res.success)
-      {
-        delete old_safety_zone;
-        for (size_t i = 0; i < old_static_edges.size(); i++)
-        {
-          delete old_static_edges[i];
-        }
-        for (size_t i = 0; i < old_int_edges.size(); i++)
-        {
-          delete old_int_edges[i];
-        }
-        for (size_t i = 0; i < old_vertices.size(); i++)
-        {
-          delete old_vertices[i];
-        }
-        for (size_t i = 0; i < old_centers.size(); i++)
-        {
-          delete old_centers[i];
-        }
-        for (size_t i = 0; i < old_bounds.size(); i++)
-        {
-          delete old_bounds[i];
-        }
-      }
-      // If smth went wrong, restore from backup
-      else
+      // If smth went wrong, restore from backup, if successful no need to delete the backups as they will get destroyed automatically
+      if (!res.success)
       {
         if (safety_zone_)
         {
-          delete safety_zone_;
+          safety_zone_ = std::move(old_safety_zone);
+          static_edges_ = std::move(old_static_edges);
+          int_edges_ = std::move(old_int_edges);
+          vertices_ = std::move(old_vertices);
+          centers_ = std::move(old_centers);
+          bounds_ = std::move(old_bounds);
+          world_origin_units_ = old_world_origin_units;
+          safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
+          safety_area_vertical_frame_ = old_safety_area_vertical_frame;
+          origin_y_ = old_origin_y;
+          origin_x_ = old_origin_x;
+          use_safety_area_ = old_use_safety_area;
         }
-        for (size_t i = 0; i < static_edges_.size(); i++)
-        {
-          delete static_edges_[i];
-        }
-        for (size_t i = 0; i < int_edges_.size(); i++)
-        {
-          delete int_edges_[i];
-        }
-        for (size_t i = 0; i < vertices_.size(); i++)
-        {
-          delete vertices_[i];
-        }
-        for (size_t i = 0; i < centers_.size(); i++)
-        {
-          delete centers_[i];
-        }
-        for (size_t i = 0; i < bounds_.size(); i++)
-        {
-          delete bounds_[i];
-        }
-        safety_zone_ = old_safety_zone;
-        static_edges_ = old_static_edges;
-        int_edges_ = old_int_edges;
-        vertices_ = old_vertices;
-        centers_ = old_centers;
-        bounds_ = old_bounds;
-        world_origin_units_ = old_world_origin_units;
-        safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
-        safety_area_vertical_frame_ = old_safety_area_vertical_frame;
-        origin_y_ = old_origin_y;
-        origin_x_ = old_origin_x;
-        use_safety_area_ = old_use_safety_area;
       }
       return true;
     }
