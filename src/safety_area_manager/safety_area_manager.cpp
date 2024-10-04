@@ -87,6 +87,11 @@ namespace mrs_uav_managers
       bool profiler_enabled_ = false;
       int status_timer_rate_ = 0;
 
+
+      // diagnostics publishing
+      void publishDiagnostics(void);
+      std::mutex mutex_diagnostics_;
+
       void preinitialize();
       void initialize();
 
@@ -337,6 +342,9 @@ namespace mrs_uav_managers
 
       mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", status_timer_rate_, 0.1, event);
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+
+
+      publishDiagnostics();
     }
 
     //}
@@ -1298,6 +1306,24 @@ namespace mrs_uav_managers
 
     //}
 
+    /* publishDiagnostics() //{ */
+
+    void SafetyAreaManager::publishDiagnostics(void)
+    {
+
+      if (!is_initialized_)
+      {
+        return;
+      }
+
+      mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+
+      std::scoped_lock lock(mutex_diagnostics_);
+    }
+
+    //}
+    
   }  // namespace safety_area_manager
 
 }  // namespace mrs_uav_managers
