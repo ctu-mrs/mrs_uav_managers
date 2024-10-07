@@ -48,9 +48,10 @@
     <!-- Subscribers -->
     <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
 
-    <remap from="chatter" to="chatter_remapped" />
+    <!-- Publishers -->
+    <remap from="~diagnostics_out" to="~diagnostics" />
 
-    <!-- Service servers -->
+    <!-- Services -->
     <remap from="~get_safety_zone_at_height_in" to="~get_safety_zone_at_height"/>
     <remap from="~point_in_safety_area_3d_in" to="~point_in_safety_area_3d"/>
     <remap from="~point_in_safety_area_2d_in" to="~point_in_safety_area_2d"/>
