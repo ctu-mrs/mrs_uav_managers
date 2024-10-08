@@ -4,6 +4,7 @@
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
 
+/* #include <mrs_uav_managers/control_manager/common.h> */
 #include <mrs_msgs/ReferenceStamped.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/PathToPointInSafetyArea.h>
@@ -13,6 +14,7 @@
 #include <mrs_msgs/GetPointStamped.h>
 #include <mrs_msgs/GetBool.h>
 #include <mrs_msgs/GetSafeZoneAtHeight.h>
+#include <mrs_msgs/UavState.h>
 #include <std_srvs/SetBool.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/utils.h>
@@ -22,6 +24,8 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/publisher_handler.h>
+
+#include <nav_msgs/Odometry.h>
 
 #include <mrs_lib/safety_zone/safety_zone.h>
 #include <mrs_lib/safety_zone/static_edges_visualization.h>
@@ -39,7 +43,6 @@
 #include <limits>
 #include <memory>
 #include <boost/geometry.hpp>
-
 
 //}
 
@@ -75,11 +78,11 @@ namespace mrs_uav_managers
       double origin_y_;
       std::string safety_area_horizontal_frame_;
       std::string safety_area_vertical_frame_;
-      std::vector<geometry_msgs::Point> safety_border_points_;
+      std::vector<mrs_msgs::Point2D> safety_border_points_;
       double safety_border_max_z_;
       double safety_border_min_z_;
       bool obstacles_present_;
-      std::vector<geometry_msgs::Point> obstacles_points_;
+      std::vector<mrs_msgs::Point2D> obstacles_points_;
       std::vector<int> obstacles_rows_;
       std::vector<double> obstacles_max_z_;
       std::vector<double> obstacles_min_z_;
@@ -102,10 +105,22 @@ namespace mrs_uav_managers
       void publishDiagnostics(void);
       std::mutex mutex_diagnostics_;
 
-      bool isPositionValid(void);
+      bool isPositionValid(mrs_msgs::UavState);
 
       void preinitialize();
       void initialize();
+
+      // | -------------- uav_state/odometry subscriber ------------- |
+
+      mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
+      mrs_msgs::UavState uav_state_;
+      std::mutex mutex_uav_state_;
+
+      // odometry hiccup detection
+      double uav_state_avg_dt_ = 1;
+      double uav_state_hiccup_factor_ = 1;
+      int uav_state_count_ = 0;
+
 
       // | --------------------- service servers -------------------- |
 
@@ -146,6 +161,8 @@ namespace mrs_uav_managers
       void timerStatus(const ros::TimerEvent& event);
 
       // | ----------------------- callbacks ----------------------- |
+      // topic callbacks
+      void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
 
       // services
       bool callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
@@ -277,7 +294,20 @@ namespace mrs_uav_managers
       // | ----------------------- publishers ----------------------- |
 
       // TODO we need to specify a rate?
-      /* ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics>(nh_, "diagnostics_out", 1, true); */
+      ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics>(nh_, "diagnostics_out", 1, true);
+
+
+      mrs_lib::SubscribeHandlerOptions shopts;
+      shopts.nh = nh_;
+      shopts.node_name = "SafetyAreaManager";
+      shopts.no_message_timeout = mrs_lib::no_timeout;
+      shopts.threadsafe = true;
+      shopts.autostart = true;
+      shopts.queue_size = 10;
+      shopts.transport_hints = ros::TransportHints().tcpNoDelay();
+
+
+      sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
 
       // | ------------------------ services ------------------------ |
 
@@ -299,7 +329,7 @@ namespace mrs_uav_managers
 
       // | ------------------------- timers ------------------------- |
 
-      /* timer_status_ = nh_.createTimer(ros::Rate(status_timer_rate_), &SafetyAreaManager::timerStatus, this); */
+      timer_status_ = nh_.createTimer(ros::Rate(status_timer_rate_), &SafetyAreaManager::timerStatus, this);
 
       // | ------------------------ profiler ------------------------ |
 
@@ -361,10 +391,19 @@ namespace mrs_uav_managers
       }
 
       mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", status_timer_rate_, 0.1, event);
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
+      bool got_odom = sh_odometry_.hasMsg();
 
-      /* publishDiagnostics(); */
+      if (!got_odom)
+      {
+        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: Odometry=%s", got_odom ? "true" : "FALSE");
+        return;
+      }
+
+      /* ROS_INFO("[SafetyAreaManager]: I am doing something"); */
+
+      publishDiagnostics();
     }
 
     //}
@@ -372,6 +411,47 @@ namespace mrs_uav_managers
     // --------------------------------------------------------------
     // |                          callbacks                          |
     // --------------------------------------------------------------
+    // | --------------------- topic callbacks -------------------- |
+
+    /* //{ callbackOdometry() */
+
+    void SafetyAreaManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg)
+    {
+
+      if (!is_initialized_)
+      {
+        return;
+      }
+
+      mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
+
+      nav_msgs::OdometryConstPtr odom = msg;
+
+      // | ------------------ check for time stamp ------------------ |
+
+      {
+        std::scoped_lock lock(mutex_uav_state_);
+
+        if (uav_state_.header.stamp == odom->header.stamp)
+        {
+          return;
+        }
+      }
+
+      // | ----------- copy the odometry to the uav_state ----------- |
+
+      {
+        std::scoped_lock lock(mutex_uav_state_);
+
+        uav_state_ = mrs_msgs::UavState();
+        uav_state_.header = odom->header;
+        uav_state_.pose = odom->pose.pose;
+        uav_state_.velocity.angular = odom->twist.twist.angular;
+      }
+    }
+
+    //}
 
     // | -------------------- service callbacks ------------------- |
 
@@ -1003,7 +1083,7 @@ namespace mrs_uav_managers
         return false;
       }
 
-      /* std::scoped_lock lock(mutex_safety_area_); */
+      std::scoped_lock lock(mutex_safety_area_);
 
       param_loader.loadParam("world_origin/units", world_origin_units_);
       param_loader.loadParam("world_origin/origin_x", origin_x_);
@@ -1019,19 +1099,21 @@ namespace mrs_uav_managers
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
       const auto transformed_min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
 
-      /* // Saving max and min values for diagnostics msg */
-      /* safety_border_max_z_ = transformed_max_z; */
-      /* safety_border_min_z_ = transformed_min_z; */
+      // Saving max and min values for diagnostics msg
+      safety_border_max_z_ = transformed_max_z;
+      safety_border_min_z_ = transformed_min_z;
 
-      /* // Saving border points into member variable for diagnostics msg */
-      /* /1* safety_border_points_.reserve(border_points.rows()); *1/ */
+      // Saving border points into member variable for diagnostics msg
+      safety_border_points_.reserve(border_points.rows());
 
-      /* for (int i = 0; i < border_points.rows(); i++) */
-      /* { */
-      /*   safety_border_points_.at(i).x = border_points(i, 0); */
-      /*   safety_border_points_.at(i).y = border_points(i, 1); */
-      /*   // Unused z-value */
-      /* } */
+      mrs_msgs::Point2D point;
+
+      for (int i = 0; i < border_points.rows(); i++)
+      {
+        point.x = border_points(i, 0);
+        point.y = border_points(i, 1);
+        safety_border_points_.push_back(point);
+      }
 
       auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
 
@@ -1070,8 +1152,8 @@ namespace mrs_uav_managers
             return false;
           }
 
-          /* // Saving for diagnostics msg */
-          /* obstacles_rows_.push_back(row_num); */
+          // Saving for diagnostics msg
+          obstacles_rows_.push_back(row_num);
 
           Eigen::MatrixXd obstacle_mat = current_mat.block(start_row, 0, row_num, current_mat.cols());
           obstacles_mat.push_back(obstacle_mat);
@@ -1103,20 +1185,22 @@ namespace mrs_uav_managers
           {
             obstacles.push_back(std::move(prism));
 
-            /* // Saving obstacle for diagnostics msg */
-            /* obstacles_points_.at(i).x = obstacles_mat.at(i)(i, 0); */
-            /* obstacles_points_.at(i).y = obstacles_mat.at(i)(i, 1); */
-            /* // Unused z-value */
+            // Saving obstacle for diagnostics msg
+            point.x = obstacles_mat.at(i)(i, 0);
+            point.y = obstacles_mat.at(i)(i, 1);
+            obstacles_points_.push_back(point);
 
-            /* // Saving obstacles max and min z for diagnostics msg */
-            /* obstacles_max_z_.at(i) = max_z_mat(i, 0); */
-            /* obstacles_min_z_.at(i) = min_z_mat(i, 0); */
+            // Saving obstacles max and min z for diagnostics msg
+            obstacles_max_z_.push_back(transformed_obs_max_z);
+            obstacles_min_z_.push_back(transformed_obs_min_z);
 
           } else
           {
             ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
           }
         }
+
+        // Here we process diagnostics data
       }
 
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacles));
@@ -1242,8 +1326,6 @@ namespace mrs_uav_managers
       {
         return false;
       }
-
-      return true;
 
       return true;
     }
@@ -1385,6 +1467,7 @@ namespace mrs_uav_managers
 
       // copy member variables
       auto uav_name = mrs_lib::get_mutexed(mutex_safety_area_, _uav_name_);
+      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
       auto use_safety_area = mrs_lib::get_mutexed(mutex_safety_area_, use_safety_area_);
       auto world_origin_units = mrs_lib::get_mutexed(mutex_safety_area_, world_origin_units_);
       auto origin_x = mrs_lib::get_mutexed(mutex_safety_area_, origin_x_);
@@ -1405,7 +1488,7 @@ namespace mrs_uav_managers
       diagnostics_msg.stamp = ros::Time::now();
       diagnostics_msg.uav_name = uav_name;
       diagnostics_msg.safety_area_enabled = use_safety_area;
-      diagnostics_msg.position_valid = isPositionValid();
+      diagnostics_msg.position_valid = isPositionValid(uav_state);
 
       // Fill world origin
       diagnostics_msg.safety_area.units = world_origin_units;
@@ -1435,8 +1518,26 @@ namespace mrs_uav_managers
 
     /* isPositionValid() //{ */
 
-    bool isPositionValid(void)
+    bool SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
     {
+
+      if (!is_initialized_)
+      {
+        return false;
+      }
+
+      mrs_msgs::ReferenceStamped current_position;
+
+      current_position.header.frame_id = uav_state.header.frame_id;
+      current_position.reference.position = uav_state.pose.position;
+
+      ROS_INFO_STREAM("[SafetyAreaManager]: Current frame:   " << current_position.header.frame_id);
+      ROS_INFO_STREAM("[SafetyAreaManager]: Current x position:   " << current_position.reference.position.x);
+
+      if (!isPointInSafetyArea3d(current_position))
+      {
+        return false;
+      }
 
       return true;
     }
