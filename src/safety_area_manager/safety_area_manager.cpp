@@ -103,6 +103,7 @@ namespace mrs_uav_managers
 
       // diagnostics publishing
       void publishDiagnostics(void);
+      void getSafetyZoneData(void);
       std::mutex mutex_diagnostics_;
 
       bool isPositionValid(mrs_msgs::UavState);
@@ -401,8 +402,10 @@ namespace mrs_uav_managers
         return;
       }
 
-      /* ROS_INFO("[SafetyAreaManager]: I am doing something"); */
+      // Get the current SafetyZone data
+      getSafetyZoneData();
 
+      // Publishing
       publishDiagnostics();
     }
 
@@ -1103,18 +1106,6 @@ namespace mrs_uav_managers
       safety_border_max_z_ = transformed_max_z;
       safety_border_min_z_ = transformed_min_z;
 
-      // Saving border points into member variable for diagnostics msg
-      safety_border_points_.reserve(border_points.rows());
-
-      mrs_msgs::Point2D point;
-
-      for (int i = 0; i < border_points.rows(); i++)
-      {
-        point.x = border_points(i, 0);
-        point.y = border_points(i, 1);
-        safety_border_points_.push_back(point);
-      }
-
       auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
 
       // Making obstacle prisms
@@ -1152,9 +1143,6 @@ namespace mrs_uav_managers
             return false;
           }
 
-          // Saving for diagnostics msg
-          obstacles_rows_.push_back(row_num);
-
           Eigen::MatrixXd obstacle_mat = current_mat.block(start_row, 0, row_num, current_mat.cols());
           obstacles_mat.push_back(obstacle_mat);
           start_row += row_num;
@@ -1184,23 +1172,11 @@ namespace mrs_uav_managers
           if (prism)
           {
             obstacles.push_back(std::move(prism));
-
-            // Saving obstacle for diagnostics msg
-            point.x = obstacles_mat.at(i)(i, 0);
-            point.y = obstacles_mat.at(i)(i, 1);
-            obstacles_points_.push_back(point);
-
-            // Saving obstacles max and min z for diagnostics msg
-            obstacles_max_z_.push_back(transformed_obs_max_z);
-            obstacles_min_z_.push_back(transformed_obs_min_z);
-
           } else
           {
             ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
           }
         }
-
-        // Here we process diagnostics data
       }
 
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacles));
@@ -1474,10 +1450,11 @@ namespace mrs_uav_managers
       auto origin_y = mrs_lib::get_mutexed(mutex_safety_area_, origin_y_);
       auto safety_area_horizontal_frame = mrs_lib::get_mutexed(mutex_safety_area_, safety_area_horizontal_frame_);
       auto safety_area_vertical_frame = mrs_lib::get_mutexed(mutex_safety_area_, safety_area_vertical_frame_);
+      auto obstacles_present = mrs_lib::get_mutexed(mutex_safety_area_, obstacles_present_);
+
       auto safety_border_points = mrs_lib::get_mutexed(mutex_safety_area_, safety_border_points_);
       auto safety_border_max_z = mrs_lib::get_mutexed(mutex_safety_area_, safety_border_max_z_);
       auto safety_border_min_z = mrs_lib::get_mutexed(mutex_safety_area_, safety_border_min_z_);
-      auto obstacles_present = mrs_lib::get_mutexed(mutex_safety_area_, obstacles_present_);
       auto obstacles_points = mrs_lib::get_mutexed(mutex_safety_area_, obstacles_points_);
       auto obstacles_rows = mrs_lib::get_mutexed(mutex_safety_area_, obstacles_rows_);
       auto obstacles_max_z = mrs_lib::get_mutexed(mutex_safety_area_, obstacles_max_z_);
@@ -1516,6 +1493,77 @@ namespace mrs_uav_managers
 
     //}
 
+    /* getSafetyZoneData() //{ */
+
+    void SafetyAreaManager::getSafetyZoneData(void)
+    {
+      if (!is_initialized_)
+      {
+        return;
+      }
+
+      std::scoped_lock lock(mutex_safety_area_);
+      {
+
+        const auto safety_border = safety_zone_->getBorder();
+        const auto border_points = safety_border->getPoints();
+
+        // Clearing to store the new points
+        safety_border_points_.clear();
+        obstacles_points_.clear();
+        obstacles_rows_.clear();
+        obstacles_max_z_.clear();
+        obstacles_min_z_.clear();
+
+        safety_border_points_.reserve(border_points.size());
+        mrs_msgs::Point2D tmp_point;
+
+        // Get safety borderf points
+        for (const auto& point : border_points)
+        {
+          tmp_point.x = boost::geometry::get<0>(point);
+          tmp_point.y = boost::geometry::get<1>(point);
+          safety_border_points_.push_back(tmp_point);
+        }
+
+        // Get safety_border max and min z
+        safety_border_max_z_ = safety_border->getMaxZ();
+        safety_border_min_z_ = safety_border->getMinZ();
+
+        // getObstacles return a vector with the obstacle ptr's
+        const auto& obstacles = safety_zone_->getObstacles();
+
+        if (obstacles.size() == 0)
+        {
+          obstacles_present_ = false;
+        }
+
+        // Saving the obstacle rows vector
+        obstacles_rows_.reserve(obstacles.size());
+
+
+        // Extracting the points for each obstacle
+        for (const auto& [key, obstaclePtr] : obstacles)
+        {
+          const auto& obstacle = obstaclePtr->getPoints();
+
+          // Saving the data per obstacle
+          obstacles_rows_.push_back(obstacle.size());
+          obstacles_max_z_.push_back(obstaclePtr->getMaxZ());
+          obstacles_min_z_.push_back(obstaclePtr->getMinZ());
+
+          for (const auto& point : obstacle)
+          {
+            tmp_point.x = boost::geometry::get<0>(point);
+            tmp_point.y = boost::geometry::get<1>(point);
+            obstacles_points_.push_back(tmp_point);
+          }
+        }
+      }
+    }
+
+    //}
+
     /* isPositionValid() //{ */
 
     bool SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
@@ -1530,9 +1578,6 @@ namespace mrs_uav_managers
 
       current_position.header.frame_id = uav_state.header.frame_id;
       current_position.reference.position = uav_state.pose.position;
-
-      ROS_INFO_STREAM("[SafetyAreaManager]: Current frame:   " << current_position.header.frame_id);
-      ROS_INFO_STREAM("[SafetyAreaManager]: Current x position:   " << current_position.reference.position.x);
 
       if (!isPointInSafetyArea3d(current_position))
       {
