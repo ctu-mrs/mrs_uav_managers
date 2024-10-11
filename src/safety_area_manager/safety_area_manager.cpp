@@ -147,6 +147,7 @@ namespace mrs_uav_managers
       ros::ServiceServer service_server_path_in_safety_area_2d_;
       ros::ServiceServer service_server_save_world_config_;
       ros::ServiceServer service_server_load_world_config_;
+      ros::ServiceServer service_server_set_safety_area_;
       ros::ServiceServer service_server_set_world_config_;
       ros::ServiceServer service_server_get_world_config_;
       ros::ServiceServer service_server_use_safety_area_;
@@ -337,6 +338,7 @@ namespace mrs_uav_managers
       service_server_path_in_safety_area_2d_ = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePathToPoint2d, this);
       service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::callbackSaveWorldConfig, this);
       service_server_load_world_config_ = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::callbackLoadWorldConfig, this);
+      service_server_set_safety_area_ = nh_.advertiseService("set_safety_area_in", &SafetyAreaManager::callbackSetSafetyArea, this);
       service_server_set_world_config_ = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::callbackSetWorldConfig, this);
       service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
       service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
@@ -575,7 +577,6 @@ namespace mrs_uav_managers
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializationFromFile(param_loader, req.value);
 
-      res.success = true;
       if (!param_loader.loadedSuccessfully())
       {
         ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
@@ -587,11 +588,8 @@ namespace mrs_uav_managers
         ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
         res.message = "Could not load world config. Please, check the config file.";
         res.success = false;
-      }
 
-      // If smth went wrong, restore from backup, if successful no need to delete the backups as they will get destroyed automatically
-      if (!res.success)
-      {
+        // Restore from backup, if successful no need to delete the backups as they will get destroyed automatically
         if (safety_zone_)
         {
           safety_zone_ = std::move(old_safety_zone);
@@ -608,6 +606,9 @@ namespace mrs_uav_managers
           use_safety_area_ = old_use_safety_area;
         }
       }
+
+      res.message = "Successfully loaded world config.";
+      res.success = true;
       return true;
     }
 
@@ -642,6 +643,34 @@ namespace mrs_uav_managers
       auto old_use_safety_area = use_safety_area_;
 
       bool success = initializationFromMsg(req.safety_area);
+
+      if (!success)
+      {
+        ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
+        res.message = "Could not load world config. Please, check the config file.";
+        res.success = false;
+
+        // Restore from backup, if successful no need to delete the backups as they will get destroyed automatically
+        if (safety_zone_)
+        {
+          safety_zone_ = std::move(old_safety_zone);
+          static_edges_ = std::move(old_static_edges);
+          int_edges_ = std::move(old_int_edges);
+          vertices_ = std::move(old_vertices);
+          centers_ = std::move(old_centers);
+          bounds_ = std::move(old_bounds);
+          world_origin_units_ = old_world_origin_units;
+          safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
+          safety_area_vertical_frame_ = old_safety_area_vertical_frame;
+          origin_y_ = old_origin_y;
+          origin_x_ = old_origin_x;
+          use_safety_area_ = old_use_safety_area;
+        }
+      }
+
+      res.message = "Succesfully loaded safety area msg.";
+      res.success = true;
+      return true;
     }
 
     //}
@@ -1370,33 +1399,33 @@ namespace mrs_uav_managers
             ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
           }
         }
-
-        safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacle_prisms));
-
-        // Add visualizations
-
-        // Safety area
-        static_edges_.push_back(
-            std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
-        int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-
-        // Obstacles, overloading for obstacles
-        for (auto it = safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++)
-        {
-          static_edges_.push_back(
-              std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
-          int_edges_.push_back(
-              std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-          vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-          centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-          bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
-        }
-
-        return true;
       }
+
+      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacle_prisms));
+
+      // Add visualizations
+
+      // Safety area
+      static_edges_.push_back(
+          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+      int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+
+      // Obstacles, overloading for obstacles
+      for (auto it = safety_zone_->getObstaclesBegin(); it != safety_zone_->getObstaclesEnd(); it++)
+      {
+        static_edges_.push_back(
+            std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+        int_edges_.push_back(
+            std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+        bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), it->first, _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
+      }
+
+      return true;
     }
 
     //}
