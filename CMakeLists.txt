@@ -193,6 +193,21 @@ if(CATKIN_ENABLE_TESTING AND MRS_ENABLE_TESTING)
 
 endif()
 
+## | ---------------------- test example ---------------------- |
+
+add_executable(safety_area_manager_test_client 
+  src/safety_area_manager/safety_area_manager_test_client.cpp
+  )
+
+add_dependencies(safety_area_manager_test_client 
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+  )
+
+target_link_libraries(safety_area_manager_test_client 
+  ${catkin_LIBRARIES} 
+  )
+
 ## --------------------------------------------------------------
 ## |                           Install                          |
 ## --------------------------------------------------------------

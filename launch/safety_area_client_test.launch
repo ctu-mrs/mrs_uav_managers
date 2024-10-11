@@ -1,0 +1,24 @@
+<launch>
+
+  <!-- defines name of the namespace -->
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav1)" />
+
+  <arg name="custom_config" default="" />
+
+  <!-- will it run using GNU debugger? -->
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix_debug" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix_debug" value="debug_roslaunch"/>
+
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node name="safety_area_manager_test_client" pkg="mrs_uav_managers" type="safety_area_manager_test_client" launch-prefix="$(arg launch_prefix_debug)" output="screen">
+
+      <!-- action server remap -->
+      <remap from="~svc/set_safety_area" to="safety_area_manager/set_safety_area" />
+    </node>
+
+  </group>
+
+</launch>
