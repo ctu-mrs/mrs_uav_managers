@@ -29,7 +29,7 @@
 
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
-#include <mrs_msgs/SetSafetyAreaResponse.h>
+#include <mrs_msgs/SetSafetyAreaSrvResponse.h>
 
 #include <mrs_lib/safety_zone/safety_zone.h>
 #include <mrs_lib/safety_zone/static_edges_visualization.h>
