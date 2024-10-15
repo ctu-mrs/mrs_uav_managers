@@ -206,6 +206,7 @@ namespace mrs_uav_managers
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
       bool initializationFromFile(mrs_lib::ParamLoader& param_loader, const std::string& filename);
       bool initializationFromMsg(const mrs_msgs::SafetyArea& safety_area_msg);
+      std::tuple<bool, std::string> validateMsg(const mrs_msgs::SafetyArea& safety_area_msg);
 
       // Reference validation
       // those are passed to trackers using the common_handlers object  TODO
@@ -577,31 +578,24 @@ namespace mrs_uav_managers
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializationFromFile(param_loader, req.value);
 
-      if (!param_loader.loadedSuccessfully())
+      if (!success)
       {
         ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
         res.message = "Could not read the file. Probably data format is not correct.";
         res.success = false;
-      }
-      if (!success)
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
-        res.message = "Could not load world config. Please, check the config file.";
-        res.success = false;
-
         // Restore from backup, if successful no need to delete the backups as they will get destroyed automatically
-          safety_zone_ = std::move(old_safety_zone);
-          static_edges_ = std::move(old_static_edges);
-          int_edges_ = std::move(old_int_edges);
-          vertices_ = std::move(old_vertices);
-          centers_ = std::move(old_centers);
-          bounds_ = std::move(old_bounds);
-          world_origin_units_ = old_world_origin_units;
-          safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
-          safety_area_vertical_frame_ = old_safety_area_vertical_frame;
-          origin_y_ = old_origin_y;
-          origin_x_ = old_origin_x;
-          use_safety_area_ = old_use_safety_area;
+        safety_zone_ = std::move(old_safety_zone);
+        static_edges_ = std::move(old_static_edges);
+        int_edges_ = std::move(old_int_edges);
+        vertices_ = std::move(old_vertices);
+        centers_ = std::move(old_centers);
+        bounds_ = std::move(old_bounds);
+        world_origin_units_ = old_world_origin_units;
+        safety_area_horizontal_frame_ = old_safety_area_horizontal_frame;
+        safety_area_vertical_frame_ = old_safety_area_vertical_frame;
+        origin_y_ = old_origin_y;
+        origin_x_ = old_origin_x;
+        use_safety_area_ = old_use_safety_area;
       }
 
       res.message = "Successfully loaded world config.";
@@ -646,10 +640,7 @@ namespace mrs_uav_managers
         ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
         res.message = "Could not load world config. Please, check the config file.";
         res.success = false;
-      }
 
-      if (!res.success)
-      {
         // Restore from backup, if successful no need to delete the backups as they will get destroyed automatically
         safety_zone_ = std::move(old_safety_zone);
         static_edges_ = std::move(old_static_edges);
@@ -1293,34 +1284,11 @@ namespace mrs_uav_managers
     bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::SafetyArea& safety_area_msg)
     {
 
+      auto [res, message] = validateMsg(safety_area_msg);
 
-      if (safety_area_msg.units.empty())
+      if (!res)
       {
-        return false;
-      }
-
-      if (safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
-      {
-        return false;
-      }
-
-      if (safety_area_msg.border.points.empty())
-      {
-        return false;
-      }
-
-      if (safety_area_msg.border.horizontal_frame.empty() || safety_area_msg.border.vertical_frame.empty())
-      {
-        return false;
-      }
-
-      if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.data.empty())
-      {
-        return false;
-      }
-
-      if (safety_area_msg.obstacles.rows.empty())
-      {
+        ROS_WARN_STREAM("[SafetyAreaManager]: Message not valid, error message: " << message);
         return false;
       }
 
@@ -1454,6 +1422,47 @@ namespace mrs_uav_managers
       }
 
       return true;
+    }
+
+    //}
+
+    /* validateMsg() //{ */
+
+    std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyArea& safety_area_msg)
+    {
+
+      if (safety_area_msg.units.empty())
+      {
+        return std::make_tuple(false, "Units are empty");
+      }
+
+      if (safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
+      {
+
+        return std::make_tuple(false, "Origin not defined ");
+      }
+
+      if (safety_area_msg.border.points.empty())
+      {
+        return std::make_tuple(false, "Border points are empty");
+      }
+
+      if (safety_area_msg.border.horizontal_frame.empty() || safety_area_msg.border.vertical_frame.empty())
+      {
+        return std::make_tuple(false, "Frame units (horizontal_frame and vertical_frame) are empty");
+      }
+
+      if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.data.empty())
+      {
+        return std::make_tuple(false, "Obstacles present is true but obstacles data are empty");
+      }
+
+      if (safety_area_msg.obstacles.rows.empty())
+      {
+        return std::make_tuple(false, "Obstacles row are empty");
+      }
+
+      return std::make_tuple(true, "Valid message");
     }
 
     //}
