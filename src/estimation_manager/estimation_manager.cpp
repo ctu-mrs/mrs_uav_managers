@@ -570,7 +570,7 @@ void EstimationManager::timerPublishDiagnostics([[maybe_unused]] const ros::Time
     uav_state = ret.value();
   } else {
     ROS_ERROR_THROTTLE(1.0, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
-    error_publisher_->addWaitingForNodeError({"EstimationManager", "StateEstimator"});
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getName()});
     return;
   }
 
