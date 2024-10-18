@@ -32,9 +32,9 @@ bool Tester::test() {
     }
   }
 
-  mrs_msgs::ValidateReferenceListRequest req;
+  mrs_msgs::ValidateReferenceArrayRequest req;
 
-  req.list.header.frame_id = _uav_name_ + "/world_origin";
+  req.array.header.frame_id = _uav_name_ + "/world_origin";
 
   {
     mrs_msgs::Reference msg;
@@ -44,7 +44,7 @@ bool Tester::test() {
     msg.position.z = 2;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -55,7 +55,7 @@ bool Tester::test() {
     msg.position.z = 2;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -66,7 +66,7 @@ bool Tester::test() {
     msg.position.z = -100;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
@@ -77,15 +77,15 @@ bool Tester::test() {
     msg.position.z = 3;
     msg.heading    = 0;
 
-    req.list.list.push_back(msg);
+    req.array.array.push_back(msg);
   }
 
   {
-    auto [success, response] = uh->validateReferenceList(req);
+    auto [success, response] = uh->validateReferenceArray(req);
 
     if (!success) {
 
-      ROS_ERROR("[%s]: reference list validation service call failed: '%s'", ros::this_node::getName().c_str(), response->message.c_str());
+      ROS_ERROR("[%s]: reference array validation service call failed: '%s'", ros::this_node::getName().c_str(), response->message.c_str());
       return false;
 
     } else {
@@ -115,13 +115,13 @@ bool Tester::test() {
   // | ---------------- now try with bad frame id --------------- |
 
   {
-    req.list.header.frame_id = "frame_that_does_not_exist";
+    req.array.header.frame_id = "frame_that_does_not_exist";
 
-    auto [success, response] = uh->validateReferenceList(req);
+    auto [success, response] = uh->validateReferenceArray(req);
 
     if (success) {
 
-      ROS_ERROR("[%s]: reference list validation service call succeeded but it should not have", ros::this_node::getName().c_str());
+      ROS_ERROR("[%s]: reference array validation service call succeeded but it should not have", ros::this_node::getName().c_str());
       return false;
     }
   }

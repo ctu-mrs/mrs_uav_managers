@@ -55,6 +55,10 @@ public:
       if (custom_frame_id_enabled_) {
         param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
       }
+      param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/enabled", custom_child_frame_id_enabled_, false);
+      if (custom_child_frame_id_enabled_) {
+        param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/frame_id", custom_child_frame_id_);
+      }
       param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
       if (tf_from_attitude_enabled_) {
         param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
@@ -231,6 +235,9 @@ private:
   bool        custom_frame_id_enabled_;
   std::string custom_frame_id_;
 
+  bool        custom_child_frame_id_enabled_;
+  std::string custom_child_frame_id_;
+
   std::atomic_bool is_initialized_               = false;
   std::atomic_bool is_local_static_tf_published_ = false;
   std::atomic_bool is_utm_static_tf_published_   = false;
@@ -314,16 +321,17 @@ private:
     geometry_msgs::TransformStamped tf_msg;
     tf_msg.header.stamp         = odom->header.stamp;
     std::string origin_frame_id = custom_frame_id_enabled_ ? ch_->uav_name + "/" + custom_frame_id_ : odom->header.frame_id;
+    std::string child_frame_id = custom_child_frame_id_enabled_ ? ch_->uav_name + "/" + custom_child_frame_id_ : ch_->frames.ns_fcu;
     if (is_inverted_) {
 
-      tf_msg.header.frame_id       = ch_->frames.ns_fcu;
+      tf_msg.header.frame_id       = child_frame_id;
       tf_msg.child_frame_id        = origin_frame_id;
       tf_msg.transform.translation = Support::pointToVector3(pose_inv.position);
       tf_msg.transform.rotation    = pose_inv.orientation;
 
     } else {
       tf_msg.header.frame_id       = origin_frame_id;
-      tf_msg.child_frame_id        = ch_->frames.ns_fcu;
+      tf_msg.child_frame_id        = child_frame_id;
       tf_msg.transform.translation = Support::pointToVector3(odom->pose.pose.position);
       tf_msg.transform.rotation    = odom->pose.pose.orientation;
     }

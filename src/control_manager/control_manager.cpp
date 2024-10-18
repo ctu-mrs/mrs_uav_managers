@@ -20,7 +20,7 @@
 #include <mrs_msgs/ControlError.h>
 #include <mrs_msgs/GetFloat64.h>
 #include <mrs_msgs/ValidateReference.h>
-#include <mrs_msgs/ValidateReferenceList.h>
+#include <mrs_msgs/ValidateReferenceArray.h>
 #include <mrs_msgs/TrackerCommand.h>
 #include <mrs_msgs/EstimatorInput.h>
 
@@ -80,7 +80,7 @@
 
 #include <mrs_msgs/Reference.h>
 #include <mrs_msgs/ReferenceStamped.h>
-#include <mrs_msgs/ReferenceList.h>
+#include <mrs_msgs/ReferenceArray.h>
 #include <mrs_msgs/TrajectoryReference.h>
 
 #include <mrs_msgs/ReferenceStampedSrv.h>
@@ -94,6 +94,10 @@
 #include <mrs_msgs/TransformReferenceSrv.h>
 #include <mrs_msgs/TransformReferenceSrvRequest.h>
 #include <mrs_msgs/TransformReferenceSrvResponse.h>
+
+#include <mrs_msgs/TransformReferenceArraySrv.h>
+#include <mrs_msgs/TransformReferenceArraySrvRequest.h>
+#include <mrs_msgs/TransformReferenceArraySrvResponse.h>
 
 #include <mrs_msgs/TransformPoseSrv.h>
 #include <mrs_msgs/TransformPoseSrvRequest.h>
@@ -475,13 +479,14 @@ private:
 
   // transform service servers
   ros::ServiceServer service_server_transform_reference_;
+  ros::ServiceServer service_server_transform_reference_array_;
   ros::ServiceServer service_server_transform_pose_;
   ros::ServiceServer service_server_transform_vector3_;
 
   // safety area services
   ros::ServiceServer service_server_validate_reference_;
   ros::ServiceServer service_server_validate_reference_2d_;
-  ros::ServiceServer service_server_validate_reference_list_;
+  ros::ServiceServer service_server_validate_reference_array_;
 
   // bumper service servers
   ros::ServiceServer service_server_bumper_enabler_;
@@ -645,10 +650,11 @@ private:
 
   bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
   bool callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
-  bool callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res);
+  bool callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res);
 
   // transformation callbacks
   bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
+  bool callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res);
   bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res);
   bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
 
@@ -1871,13 +1877,14 @@ void ControlManager::initialize(void) {
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_reference_array_   = nh_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_list_    = nh_.advertiseService("validate_reference_list_in", &ControlManager::callbackValidateReferenceList, this);
+  service_server_validate_reference_array_    = nh_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
   service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
   service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
@@ -4217,6 +4224,19 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
     return true;
   }
 
+  if (rc_goto_active_) {
+
+    std::stringstream ss;
+    ss << "can not switch tracker, RC joystick is active";
+
+    res.message = ss.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << ss.str());
+
+    return true;
+  }
+
   auto [success, response] = switchTracker(req.value);
 
   res.success = success;
@@ -4239,6 +4259,19 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
 
     std::stringstream ss;
     ss << "can not switch controller, eland or failsafe active";
+
+    res.message = ss.str();
+    res.success = false;
+
+    ROS_WARN_STREAM("[ControlManager]: " << ss.str());
+
+    return true;
+  }
+
+  if (rc_goto_active_) {
+
+    std::stringstream ss;
+    ss << "can not switch controller, RC joystick is active";
 
     res.message = ss.str();
     res.success = false;
@@ -4995,6 +5028,53 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 //}
 
+/* //{ callbackTransformReferenceArray() */
+
+bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res) {
+
+  if (!is_initialized_) {
+    return false;
+  }
+
+  // transform the reference array to the current frame
+  const auto tf_opt = transformer_->getTransform(req.array.header.frame_id, req.to_frame_id, req.array.header.stamp);
+  if (!tf_opt.has_value()) {
+    res.message = "The reference array could not be transformed";
+    res.success = false;
+    return true;
+  }
+  const auto tf = tf_opt.value();
+
+  res.array.header.stamp = req.array.header.stamp;
+  res.array.header.frame_id = req.to_frame_id;
+  res.array.array.reserve(req.array.array.size());
+
+  for (const auto& ref : req.array.array) {
+
+    mrs_msgs::ReferenceStamped ref_stamped; 
+    ref_stamped.header = req.array.header;
+    ref_stamped.reference = ref;
+
+    if (auto ret = transformer_->transform(ref_stamped, tf)) {
+
+      res.array.array.push_back(ret.value().reference);
+
+    } else {
+
+      res.message = "The reference array could not be transformed";
+      res.success = false;
+      return true;
+    }
+
+  }
+
+  res.message   = "transformation successful";
+  res.success   = true;
+  return true;
+}
+
+//}
+
 /* //{ callbackTransformPose() */
 
 bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
@@ -5257,9 +5337,9 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
 
 //}
 
-/* //{ callbackValidateReferenceList() */
+/* //{ callbackValidateReferenceArray() */
 
-bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceList::Request& req, mrs_msgs::ValidateReferenceList::Response& res) {
+bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5271,7 +5351,7 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // get the transformer
-  auto ret = transformer_->getTransform(uav_state.header.frame_id, req.list.header.frame_id, req.list.header.stamp);
+  auto ret = transformer_->getTransform(uav_state.header.frame_id, req.array.header.frame_id, req.array.header.stamp);
 
   if (!ret) {
 
@@ -5282,15 +5362,15 @@ bool ControlManager::callbackValidateReferenceList(mrs_msgs::ValidateReferenceLi
 
   geometry_msgs::TransformStamped tf = ret.value();
 
-  for (int i = 0; i < int(req.list.list.size()); i++) {
+  for (int i = 0; i < int(req.array.array.size()); i++) {
 
     res.success.push_back(true);
 
     mrs_msgs::ReferenceStamped original_reference;
-    original_reference.header    = req.list.header;
-    original_reference.reference = req.list.list.at(i);
+    original_reference.header    = req.array.header;
+    original_reference.reference = req.array.array.at(i);
 
-    res.success.at(i) = validateReference(original_reference.reference, "ControlManager", "reference_list");
+    res.success.at(i) = validateReference(original_reference.reference, "ControlManager", "reference_array");
 
     auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
 
@@ -8111,12 +8191,6 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
     return std::tuple(false, ss.str());
   }
 
-  if (rc_goto_active_) {
-    ss << "can not switch tracker, the RC joystick is active";
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
   auto new_tracker_idx = idxInVector(tracker_name, _tracker_names_);
 
   // check if the tracker exists
@@ -8248,12 +8322,6 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     ss << "can not switch controller, missing odometry innovation!";
     ROS_ERROR_STREAM("[ControlManager]: " << ss.str());
-    return std::tuple(false, ss.str());
-  }
-
-  if (rc_goto_active_) {
-    ss << "can not switch controller, the RC joystick is active";
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ControlManager]: " << ss.str());
     return std::tuple(false, ss.str());
   }
 

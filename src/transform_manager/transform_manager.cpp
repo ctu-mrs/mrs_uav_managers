@@ -453,7 +453,10 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     pose_first_.header             = msg->header;
     pose_fixed_diff_.orientation.w = 1;
 
-    is_first_frame_id_set_ = true;
+    // we don't want vins_kickoff to be our first estimator
+    if (msg->header.frame_id != ch_->uav_name + "/vins_kickoff_origin") {
+      is_first_frame_id_set_ = true;
+    }
   }
 
   // publish static tf from fixed_origin to local_origin based on the first message
