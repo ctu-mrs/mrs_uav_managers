@@ -35,35 +35,35 @@ mrs_uav_managers:
     default_constraints:
 
       horizontal:
-        speed: 1.0
-        acceleration: 1.0
-        jerk: 20.0
-        snap: 20.0
+        speed: 1.0        # [m/s]
+        acceleration: 1.0 # [m/s^2]
+        jerk: 20.0        # [m/s^3]
+        snap: 20.0        # [m/s^4]
 
       vertical:
 
         ascending:
-          speed: 1.0
-          acceleration: 1.0
-          jerk: 20.0
-          snap: 20.0
+          speed: 1.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 20.0        # [m/s^3]
+          snap: 20.0        # [m/s^4]
 
         descending:
-          speed: 1.0
-          acceleration: 1.0
-          jerk: 20.0
-          snap: 20.0
+          speed: 1.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 20.0        # [m/s^3]
+          snap: 20.0        # [m/s^4]
 
       heading:
-        speed: 1.0
-        acceleration: 1.0
-        jerk: 10.0
-        snap: 10.0
+        speed: 1.0        # [rad/s]
+        acceleration: 1.0 # [rad/s^2]
+        jerk: 10.0        # [rad/s^3]
+        snap: 10.0        # [rad/s^4]
 
       angular_speed:
-        roll: 20.0
-        pitch: 20.0
-        yaw: 10.0
+        roll: 20.0  # [rad/s]
+        pitch: 20.0 # [rad/s]
+        yaw: 10.0   # [rad/s]
 
       tilt: 60.0 # [deg]
 

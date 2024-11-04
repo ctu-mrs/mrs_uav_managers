@@ -5,104 +5,104 @@ mrs_uav_managers:
     slow:
 
       horizontal:
-        speed: 1.0
-        acceleration: 1.0
-        jerk: 20.0
-        snap: 20.0
+        speed: 1.0        # [m/s]
+        acceleration: 1.0 # [m/s^2]
+        jerk: 20.0        # [m/s^3]
+        snap: 20.0        # [m/s^4]
 
       vertical:
 
         ascending:
-          speed: 1.0
-          acceleration: 1.0
-          jerk: 20.0
-          snap: 20.0
+          speed: 1.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 20.0        # [m/s^3]
+          snap: 20.0        # [m/s^4]
 
         descending:
-          speed: 1.0
-          acceleration: 1.0
-          jerk: 20.0
-          snap: 20.0
+          speed: 1.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 20.0        # [m/s^3]
+          snap: 20.0        # [m/s^4]
 
       heading:
-        speed: 0.5
-        acceleration: 1.0
-        jerk: 10.0
-        snap: 10.0
+        speed: 0.5        # [rad/s]
+        acceleration: 1.0 # [rad/s^2]
+        jerk: 10.0        # [rad/s^3]
+        snap: 10.0        # [rad/s^4]
 
       angular_speed:
-        roll: 60.0
-        pitch: 60.0
-        yaw: 10.0
+        roll: 60.0  # [rad/s]
+        pitch: 60.0 # [rad/s]
+        yaw: 10.0   # [rad/s]
 
       tilt: 60.0 # [deg]
 
     medium:
 
       horizontal:
-        speed: 4.0
-        acceleration: 2.0
-        jerk: 40.0
-        snap: 40.0
+        speed: 4.0        # [m/s]
+        acceleration: 2.0 # [m/s^2]
+        jerk: 40.0        # [m/s^3]
+        snap: 40.0        # [m/s^4]
 
       vertical:
 
         ascending:
-          speed: 2.0
-          acceleration: 1.0
-          jerk: 40.0
-          snap: 40.0
+          speed: 2.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 40.0        # [m/s^3]
+          snap: 40.0        # [m/s^4]
 
         descending:
-          speed: 2.0
-          acceleration: 1.0
-          jerk: 40.0
-          snap: 40.0
+          speed: 2.0        # [m/s]
+          acceleration: 1.0 # [m/s^2]
+          jerk: 40.0        # [m/s^3]
+          snap: 40.0        # [m/s^4]
 
       heading:
-        speed: 1.0
-        acceleration: 1.0
-        jerk: 20.0
-        snap: 20.0
+        speed: 1.0        # [rad/s]
+        acceleration: 1.0 # [rad/s^2]
+        jerk: 20.0        # [rad/s^3]
+        snap: 20.0        # [rad/s^4]
 
       angular_speed:
-        roll: 60.0
-        pitch: 60.0
-        yaw: 10.0
+        roll: 60.0  # [rad/s]
+        pitch: 60.0 # [rad/s]
+        yaw: 10.0   # [rad/s]
 
       tilt: 60.0 # [deg]
 
     fast:
 
       horizontal:
-        speed: 8.0
-        acceleration: 4.0
-        jerk: 60.0
-        snap: 60.0
+        speed: 8.0        # [m/s]
+        acceleration: 4.0 # [m/s^2]
+        jerk: 60.0        # [m/s^3]
+        snap: 60.0        # [m/s^4]
 
       vertical:
 
         ascending:
-          speed: 4.0
-          acceleration: 2.0
-          jerk: 60.0
-          snap: 60.0
+          speed: 4.0        # [m/s]
+          acceleration: 2.0 # [m/s^2]
+          jerk: 60.0        # [m/s^3]
+          snap: 60.0        # [m/s^4]
 
         descending:
-          speed: 4.0
-          acceleration: 2.0
-          jerk: 60.0
-          snap: 60.0
+          speed: 4.0        # [m/s]
+          acceleration: 2.0 # [m/s^2]
+          jerk: 60.0        # [m/s^3]
+          snap: 60.0        # [m/s^4]
 
       heading:
-        speed: 2.0
-        acceleration: 2.0
-        jerk: 40.0
-        snap: 40.0
+        speed: 2.0        # [rad/s]
+        acceleration: 2.0 # [rad/s^2]
+        jerk: 40.0        # [rad/s^3]
+        snap: 40.0        # [rad/s^4]
 
       angular_speed:
-        roll: 60.0
-        pitch: 60.0
-        yaw: 10.0
+        roll: 60.0  # [rad/s]
+        pitch: 60.0 # [rad/s]
+        yaw: 10.0   # [rad/s]
 
       tilt: 60.0 # [deg]
