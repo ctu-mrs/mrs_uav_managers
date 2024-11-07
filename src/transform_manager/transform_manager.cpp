@@ -431,6 +431,24 @@ void TransformManager::onInit() {
     ros::shutdown();
   }
 
+  // Check if the RTK antenna static tf is defined
+  bool got_rtk_antenna_tf = false;
+  for (int i = 0; i < 10; i++) {
+    auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, ros::Time::now());
+    if (res_tf_rtk) {
+      ROS_INFO("[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
+      got_rtk_antenna_tf = true;
+      break;
+    }
+    ROS_INFO_THROTTLE(1.0, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    ros::Duration(0.5).sleep();
+  }
+
+  if (!got_rtk_antenna_tf) {
+    ROS_ERROR("[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
+    ros::shutdown();
+  }
+
   is_initialized_ = true;
   ROS_INFO("[%s]: initialized", getPrintName().c_str());
 }
@@ -895,14 +913,6 @@ void TransformManager::publishLocalTf() {
 
 /*//{ transformRtkToFcu() */
 std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const {
-
-  // Check if the RTK antenna static tf is defined
-  auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, ros::Time::now());
-  if (!res_tf_rtk) {
-    ROS_ERROR("[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
-    ros::shutdown();
-    return {};
-  }
 
   geometry_msgs::PoseStamped pose_tmp = pose_in;
 
