@@ -2,7 +2,7 @@
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SafetyAreaManagerDiagnostics.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
-#include <mrs_msgs/SetSafetyAreaResponse.h>
+#include <mrs_msgs/SetSafetyAreaSrvResponse.h>
 
 
 int main(int argc, char** argv)
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     obstacle_data.push_back(obstacle_point);
   }
 
-  /* obstacles.data = obstacle_data; */
+  obstacles.data = obstacle_data;
 
   // Define rows, max_z, and min_z for obstacles
   obstacles.rows = std::vector<int>{4, 4, 4};
