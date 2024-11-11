@@ -23,10 +23,12 @@ typedef enum
 
   POSITION,
   VELOCITY,
-  ACCELERATION
+  ACCELERATION,
+  ACCELERATION_BIAS,
+  ACCELERATION_UNBIASED
 
 } StateId_t;
-const int n_StateId_t = 3;
+const int n_StateId_t = 5;
 
 typedef enum
 {
