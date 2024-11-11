@@ -295,22 +295,19 @@ namespace mrs_uav_managers
       }
       catch (std::invalid_argument& e)
       {
-        ROS_ERROR("[SafetyAreaManager]: wrong configruation for the safety zone polygons. %s", e.what());
+        ROS_ERROR("[SafetyAreaManager]: Wrong configuration for the safety zone polygons. %s", e.what());
         ros::shutdown();
       }
       catch (XmlRpc::XmlRpcException& e)
       {
-        ROS_ERROR("[SafetyAreaManager]: error during parsing parameters. Please make sure parameters are written correctly");
+        ROS_ERROR("[SafetyAreaManager]: Error during parsing parameters. Please make sure parameters are written correctly");
         ros::shutdown();
       }
       catch (...)
       {
-        ROS_ERROR("[SafetyAreaManager]: unhandled exception!");
+        ROS_ERROR("[SafetyAreaManager]: Unhandled exception!");
         ros::shutdown();
       }
-
-      ROS_INFO("[SafetyAreaManager]: safety area initialized");
-
 
       // | ----------------------- publishers ----------------------- |
 
@@ -372,7 +369,8 @@ namespace mrs_uav_managers
       }
 
       is_initialized_ = true;
-      ROS_INFO("[SafetyAreaManager]: initialized");
+
+      ROS_INFO("[SafetyAreaManager]: Safety area initialized");
     }
 
     //}
@@ -1549,7 +1547,7 @@ namespace mrs_uav_managers
 
       if (!tfed_horizontal)
       {
-        ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
         return false;
       }
 
@@ -1577,7 +1575,7 @@ namespace mrs_uav_managers
 
       if (!tfed_horizontal)
       {
-        ROS_ERROR_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
         return false;
       }
 
@@ -1614,7 +1612,7 @@ namespace mrs_uav_managers
         if (!ret)
         {
 
-          ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
           return false;
         }
@@ -1628,7 +1626,7 @@ namespace mrs_uav_managers
         if (!ret)
         {
 
-          ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
           return false;
         }
@@ -1671,7 +1669,7 @@ namespace mrs_uav_managers
         if (!ret)
         {
 
-          ROS_ERROR("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
+          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
           return false;
         }
@@ -1685,7 +1683,7 @@ namespace mrs_uav_managers
         if (!ret)
         {
 
-          ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+          ROS_WARN("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
           return false;
         }
