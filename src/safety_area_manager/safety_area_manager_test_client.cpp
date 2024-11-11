@@ -25,8 +25,8 @@ int main(int argc, char** argv)
 
   // Set basic information
   safety_area.units = "LATLON";
-  safety_area.origin_x = 47.397743;
-  safety_area.origin_y = 8.545594;
+  safety_area.origin_x = 47.387743;
+  safety_area.origin_y = 8.535594;
 
   // Define the safety border
   mrs_msgs::SafetyBorder border;
