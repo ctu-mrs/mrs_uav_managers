@@ -26,7 +26,7 @@
 #include <mrs_lib/publisher_handler.h>
 
 #include <nav_msgs/Odometry.h>
-
+#include <sensor_msgs/NavSatFix.h>
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
 #include <mrs_msgs/SetSafetyAreaSrvResponse.h>
@@ -67,6 +67,7 @@ namespace mrs_uav_managers
       std::shared_ptr<mrs_lib::SafetyZone> safety_zone_;
       ros::NodeHandle nh_;
       std::atomic<bool> is_initialized_ = false;
+      std::atomic<bool> set_latlon_set_ = false;
 
       // | ------------------- scope timer logger ------------------- |
 
@@ -86,6 +87,8 @@ namespace mrs_uav_managers
 
       // World config parameters
       std::string _uav_name_;
+      std::string _world_config_;
+      std::string _yaml_prefix_;
       bool use_safety_area_;
       std::string world_origin_units_;
       double origin_x_;
@@ -103,6 +106,7 @@ namespace mrs_uav_managers
       std::mutex mutex_safety_area_;
 
       // Visualization objects
+      geometry_msgs::TransformStamped tf_viz_;
       std::vector<std::unique_ptr<mrs_lib::StaticEdgesVisualization>> static_edges_;
       std::vector<std::unique_ptr<mrs_lib::IntEdgesVisualization>> int_edges_;
       std::vector<std::unique_ptr<mrs_lib::VertexControl>> vertices_;
@@ -135,6 +139,9 @@ namespace mrs_uav_managers
       double uav_state_avg_dt_ = 1;
       double uav_state_hiccup_factor_ = 1;
       int uav_state_count_ = 0;
+
+
+      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
 
 
       // | --------------------- service servers -------------------- |
@@ -179,6 +186,7 @@ namespace mrs_uav_managers
       // | ----------------------- callbacks ----------------------- |
       // topic callbacks
       void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
+      void callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg);
 
       // services
       bool callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
@@ -202,6 +210,7 @@ namespace mrs_uav_managers
       // Safety area building
       std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
       std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z);
+      std::vector<mrs_lib::Point2d> transformPointsToLocal(const std::vector<mrs_lib::Point2d>& points);
 
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
       bool initializationFromFile(mrs_lib::ParamLoader& param_loader, const std::string& filename);
@@ -250,9 +259,54 @@ namespace mrs_uav_managers
       shopts.queue_size = 10;
       shopts.transport_hints = ros::TransportHints().tcpNoDelay();
 
-      sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+      mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+      param_loader.loadParam("world_config", _world_config_);
+      param_loader.addYamlFile(_world_config_);
 
+      param_loader.loadParam("world_origin/units", world_origin_units_);
+      param_loader.loadParam("world_origin/origin_x", origin_x_);
+      param_loader.loadParam("world_origin/origin_y", origin_y_);
+      param_loader.loadParam("safety_area/enabled", use_safety_area_);
+      param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
+      param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
+
+      param_loader.addYamlFileFromParam("private_config");
+      param_loader.addYamlFileFromParam("public_config");
+
+      param_loader.loadParam("uav_name", _uav_name_);
+      param_loader.loadParam("enable_profiler", profiler_enabled_);
+
+      _yaml_prefix_ = "mrs_uav_managers/safety_area_manager/";
+      param_loader.loadParam(_yaml_prefix_ + "status_timer_rate", status_timer_rate_);
+
+      // | ---------------------- transformer ----------------------- |
+
+      transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
+      transformer_->setDefaultPrefix(_uav_name_);
+
+      // | ----------------------- Subscribers ----------------------- |
+      sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+      sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
+
+      // | ------------------------- timers ------------------------- |
       timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
+
+      // | ------------------------ profiler ------------------------ |
+
+      profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
+
+      // | ------------------- scope timer logger ------------------- |
+
+      const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+      scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+
+      // | ----------------------- finish init ---------------------- |
+
+      if (!param_loader.loadedSuccessfully())
+      {
+        ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
+        ros::shutdown();
+      }
     }
 
 
@@ -268,30 +322,13 @@ namespace mrs_uav_managers
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
 
-      std::string world_config;
-      param_loader.loadParam("world_config", world_config);
-
-      param_loader.addYamlFileFromParam("private_config");
-      param_loader.addYamlFileFromParam("public_config");
-
-      param_loader.loadParam("uav_name", _uav_name_);
-      param_loader.loadParam("enable_profiler", profiler_enabled_);
-
-      const std::string yaml_prefix = "mrs_uav_managers/safety_area_manager/";
-      param_loader.loadParam(yaml_prefix + "status_timer_rate", status_timer_rate_);
-
-      // | ---------------------- transformer ----------------------- |
-
-      transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
-      transformer_->setDefaultPrefix(_uav_name_);
-
       // | ---------------------- safety zone ----------------------- |
       // Note: safety_zone is initialized even if the use_safety_area_ is false
       // The manager will just always return true untill it's turned on
       bool safety_zone_inited = false;
       try
       {
-        safety_zone_inited = initializationFromFile(param_loader, world_config);
+        safety_zone_inited = initializationFromFile(param_loader, _world_config_);
       }
       catch (std::invalid_argument& e)
       {
@@ -325,6 +362,8 @@ namespace mrs_uav_managers
       shopts.transport_hints = ros::TransportHints().tcpNoDelay();
 
 
+      // | ----------------------- Subscribers ----------------------- |
+
       sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
 
       // | ------------------------ services ------------------------ |
@@ -350,27 +389,17 @@ namespace mrs_uav_managers
 
       timer_status_ = nh_.createTimer(ros::Rate(status_timer_rate_), &SafetyAreaManager::timerStatus, this);
 
-      // | ------------------------ profiler ------------------------ |
-
-      profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
-
-      // | ------------------- scope timer logger ------------------- |
-
-      param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
-      const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
-      scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
-
       // | ----------------------- finish init ---------------------- |
 
-      if (!param_loader.loadedSuccessfully() || !safety_zone_inited)
+      if (!safety_zone_inited)
       {
-        ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
+        ROS_ERROR("[SafetyAreaManager]: Failed to initialize safety area.");
         ros::shutdown();
       }
 
       is_initialized_ = true;
 
-      ROS_INFO("[SafetyAreaManager]: Safety area initialized");
+      ROS_INFO("[SafetyAreaManager]: Safety area initialized.");
     }
 
     //}
@@ -390,6 +419,24 @@ namespace mrs_uav_managers
       {
         ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
         ROS_INFO("[SafetyAreaManager]: waiting for HW API capabilities");
+        return;
+      }
+
+      auto ret = transformer_->getTransform(safety_area_horizontal_frame_, "local_origin", ros::Time(0));
+      if (ret)
+      {
+        ROS_INFO_ONCE("[SafetyAreaManager]: got TFs, can publish safety area markers");
+        tf_viz_ = ret.value();
+      } else
+      {
+        ROS_INFO_ONCE("[SafetyAreaManager]: Did not got TFs, cant publish safety area markers");
+        return;
+      }
+
+      // We need to have the UTM zone established to be able to transform 'latlon_origin' input points
+      if (!set_latlon_set_)
+      {
+        ROS_INFO_ONCE("[SafetyAreaManager]: Waiting for UTM Zone.");
         return;
       }
 
@@ -471,6 +518,25 @@ namespace mrs_uav_managers
         uav_state_.pose = odom->pose.pose;
         uav_state_.velocity.angular = odom->twist.twist.angular;
       }
+    }
+
+    //}
+
+    /* //{ callbackGNSS() */
+
+    void SafetyAreaManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg)
+    {
+
+      /* if (!is_initialized_) */
+      /* { */
+      /*   return; */
+      /* } */
+
+      mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGNSS");
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
+
+      transformer_->setLatLon(msg->latitude, msg->longitude);
+      set_latlon_set_ = true;
     }
 
     //}
@@ -1157,13 +1223,6 @@ namespace mrs_uav_managers
 
       std::scoped_lock lock(mutex_safety_area_);
 
-      param_loader.loadParam("world_origin/units", world_origin_units_);
-      param_loader.loadParam("world_origin/origin_x", origin_x_);
-      param_loader.loadParam("world_origin/origin_y", origin_y_);
-      param_loader.loadParam("safety_area/enabled", use_safety_area_);
-      param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
-      param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
-
       // Make border prism
       const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
       const auto max_z = param_loader.loadParam2<double>("safety_area/border/max_z");
@@ -1252,9 +1311,11 @@ namespace mrs_uav_managers
 
       // Add visualizations
 
+      // TODO Here to use the transformation for viz
+
       // Safety area
       static_edges_.push_back(
-          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2, transformer_));
       int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
       vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
@@ -1401,7 +1462,7 @@ namespace mrs_uav_managers
 
       // Safety area
       static_edges_.push_back(
-          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2));
+          std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_, 2, transformer_));
       int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
       vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), _uav_name_ + "/" + safety_area_horizontal_frame_, nh_));
@@ -1465,7 +1526,7 @@ namespace mrs_uav_managers
 
     //}
 
-    /* makePrism() //{ */
+    /* makePrism(matrix) //{ */
 
     std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z)
     {
@@ -1483,12 +1544,14 @@ namespace mrs_uav_managers
         points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
       }
 
-      return std::make_unique<mrs_lib::Prism>(points, max_z, min_z);
+      auto transformed_points = transformPointsToLocal(points);
+
+      return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
     }
 
     //}
 
-    /* makePrism() //{ */
+    /* makePrism(points) //{ */
 
     std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z)
     {
@@ -1507,7 +1570,48 @@ namespace mrs_uav_managers
         tmp_points.emplace_back(mrs_lib::Point2d{point.x, point.y});
       }
 
-      return std::make_unique<mrs_lib::Prism>(tmp_points, max_z, min_z);
+      auto transformed_points = transformPointsToLocal(tmp_points);
+      return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
+    }
+
+    //}
+
+    /* transformPoints() //{ */
+
+    std::vector<mrs_lib::Point2d> SafetyAreaManager::transformPointsToLocal(const std::vector<mrs_lib::Point2d>& points)
+    {
+
+      // Transforming into local origin for visualization
+
+      std::vector<mrs_lib::Point2d> transformed_points;
+      mrs_msgs::ReferenceStamped temp_ref;
+
+      for (const auto& point : points)
+      {
+        temp_ref.header.frame_id = safety_area_horizontal_frame_;
+        temp_ref.header.stamp = ros::Time(0);
+        temp_ref.reference.position.x = boost::geometry::get<0>(point);
+        temp_ref.reference.position.y = boost::geometry::get<1>(point);
+        temp_ref.reference.position.z = 0;
+
+        ROS_INFO_STREAM("[SafetyAreaManager]:  Original point x: " << boost::geometry::get<0>(point) << " y: " << boost::geometry::get<1>(point));
+
+        auto ret = transformer_->getTransform(safety_area_horizontal_frame_, "local_origin", ros::Time(0));
+        if (ret)
+        {
+          ROS_INFO_ONCE("[SafetyAreaManager]: got TFs, can publish safety area markers");
+          tf_viz_ = ret.value();
+        }
+
+        if (auto ret = transformer_->transform(temp_ref, tf_viz_))
+        {
+          temp_ref = ret.value();
+          ROS_INFO_STREAM("[SafetyAreaManager]: Transformed point x: " << temp_ref.reference.position.x << " y: " << temp_ref.reference.position.y);
+          transformed_points.emplace_back(mrs_lib::Point2d{temp_ref.reference.position.x, temp_ref.reference.position.y});
+        }
+      }
+
+      return transformed_points;
     }
 
     //}
@@ -1573,6 +1677,10 @@ namespace mrs_uav_managers
 
       auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
 
+      ROS_INFO_STREAM_ONCE("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed point x: " << tfed_horizontal->reference.position.x
+                                                                                              << " y: " << tfed_horizontal->reference.position.y
+                                                                                              << " z: " << tfed_horizontal->reference.position.z);
+
       if (!tfed_horizontal)
       {
         ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
@@ -1581,6 +1689,7 @@ namespace mrs_uav_managers
 
       if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
       {
+        ROS_INFO_ONCE("[SafetyAreaManager]: Point is not valid!");
         return false;
       }
 
@@ -1859,6 +1968,10 @@ namespace mrs_uav_managers
 
       current_position.header.frame_id = uav_state.header.frame_id;
       current_position.reference.position = uav_state.pose.position;
+
+      ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Current position x:  " << current_position.reference.position.x
+                                                                        << " y: " << current_position.reference.position.y
+                                                                        << " z: " << current_position.reference.position.z);
 
       if (!isPointInSafetyArea3d(current_position))
       {
