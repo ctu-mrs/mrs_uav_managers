@@ -744,6 +744,7 @@ namespace mrs_uav_managers
         use_safety_area_ = old_use_safety_area;
       }
 
+      ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
       res.message = "Succesfully loaded safety area msg.";
       res.success = true;
       return true;
@@ -795,10 +796,10 @@ namespace mrs_uav_managers
         return true;
       }
 
-      std::scoped_lock lock(mutex_safety_area_);
+      /* std::scoped_lock lock(mutex_safety_area_); */
 
       mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_area_horizontal_frame_, safety_area_horizontal_frame_, safety_area_vertical_frame_,
-                                         world_origin_units_, origin_x_, origin_y_);
+                                         world_origin_units_, origin_x_, origin_y_, transformer_);
 
       safety_zone_->accept(visitor);
 
@@ -843,7 +844,7 @@ namespace mrs_uav_managers
       std::scoped_lock lock(mutex_safety_area_);
 
       mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_area_horizontal_frame_, safety_area_horizontal_frame_, safety_area_vertical_frame_,
-                                         world_origin_units_, origin_x_, origin_y_);
+                                         world_origin_units_, origin_x_, origin_y_, transformer_);
 
       safety_zone_->accept(visitor);
 
@@ -1243,7 +1244,13 @@ namespace mrs_uav_managers
         return false;
       }
 
-      std::scoped_lock lock(mutex_safety_area_);
+      //Reload parameters for every call, it can be called multiple times if using the Rviz plugin and loading different world configurations
+      param_loader.loadParam("world_origin/units", world_origin_units_);
+      param_loader.loadParam("world_origin/origin_x", origin_x_);
+      param_loader.loadParam("world_origin/origin_y", origin_y_);
+      param_loader.loadParam("safety_area/enabled", use_safety_area_);
+      param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
+      param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
 
       // Make border prism
       const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
@@ -1332,9 +1339,6 @@ namespace mrs_uav_managers
 
       // Add visualizations
 
-      // TODO, add the transformer into the viz ptrs, so that they can handle internally the transformation for visualization and not modyfing the original
-      // points :)
-
       // Safety area
       static_edges_.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), _uav_name_, safety_area_horizontal_frame_, nh_, 2));
       int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), _uav_name_, safety_area_horizontal_frame_, nh_));
@@ -1380,7 +1384,7 @@ namespace mrs_uav_managers
       const auto safety_border = safety_area_msg.border;
       use_safety_area_ = safety_border.enabled;
       safety_area_horizontal_frame_ = safety_border.horizontal_frame;
-      safety_area_horizontal_frame_ = safety_border.vertical_frame;
+      safety_area_vertical_frame_ = safety_border.vertical_frame;
 
       // Make border prism
       std::vector<mrs_msgs::Point2D> border_points = safety_border.points;
@@ -1388,8 +1392,8 @@ namespace mrs_uav_managers
       ROS_INFO("[SafetyAreaManager]: Border points size %d", static_cast<int>(border_points.size()));
       const auto max_z = safety_border.max_z;
       const auto min_z = safety_border.min_z;
-      const auto transformed_max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, max_z);
-      const auto transformed_min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, min_z);
+      const auto transformed_max_z = transformZ(safety_area_vertical_frame_, "world_origin", max_z);
+      const auto transformed_min_z = transformZ(safety_area_vertical_frame_, "world_origin", min_z);
 
       auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
 
@@ -1458,8 +1462,8 @@ namespace mrs_uav_managers
         // Make obstacle prism
         for (const auto& obstacle : obstacles)
         {
-          const auto transformed_obs_max_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, obstacle.max_z);
-          const auto transformed_obs_min_z = transformZ(safety_area_vertical_frame_, safety_area_horizontal_frame_, obstacle.min_z);
+          const auto transformed_obs_max_z = transformZ(safety_area_vertical_frame_, "world_origin", obstacle.max_z);
+          const auto transformed_obs_min_z = transformZ(safety_area_vertical_frame_, "world_origin", obstacle.min_z);
           auto prism = makePrism(obstacle.data, transformed_obs_max_z, transformed_obs_min_z);
 
           if (prism)
