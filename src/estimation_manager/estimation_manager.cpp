@@ -19,6 +19,7 @@
 #include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiCapabilities.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
+#include <mrs_msgs/SafetyAreaManagerDiagnostics.h>
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
@@ -27,6 +28,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/gps_conversions.h>
 #include <mrs_lib/scope_timer.h>
+/* #include <mrs_lib/profiler.h> */
 
 
 #include <mrs_uav_managers/state_estimator.h>
@@ -302,6 +304,7 @@ private:
   const std::string package_name_ = "mrs_uav_managers";
 
   ros::NodeHandle nh_;
+  std::atomic<bool> is_initialized_ = false;
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -314,8 +317,12 @@ private:
   std::string after_midair_activation_tracker_name_;
   std::string takeoff_tracker_name_;
 
-  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
-  mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>            sh_control_input_;
+  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>    sh_control_manager_diag_;
+
+  mrs_lib::SubscribeHandler<mrs_msgs::SafetyAreaManagerDiagnostics> sh_safety_area_manager_diag;
+  void callbackSafetyAreaManagerDiagnostics(const mrs_msgs::SafetyAreaManagerDiagnostics::ConstPtr msg); 
+
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>               sh_control_input_;
 
   mrs_lib::PublisherHandler<mrs_msgs::EstimationDiagnostics> ph_diagnostics_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>        ph_max_flight_z_;
@@ -422,6 +429,29 @@ void EstimationManager::onInit() {
 // --------------------------------------------------------------
 // |                          callbacks                         |
 // --------------------------------------------------------------
+
+// | --------------------- topic callbacks -------------------- |
+
+/* //{ callbackSafetyAreaManagerDiagnostics() */
+
+void EstimationManager::callbackSafetyAreaManagerDiagnostics(const mrs_msgs::SafetyAreaManagerDiagnostics::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  //Do we need the profiler?
+  /* mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSafetyAreaManagerDiagnostics"); */
+  /* mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("EstimationManager::callbackSafetyAreaManagerDiagnostics", scope_timer_logger_, scope_timer_enabled_); */
+
+  mrs_msgs::SafetyAreaManagerDiagnosticsConstPtr safety_area = msg;
+
+  ch_->world_origin.x = safety_area->safety_area.origin_x; 
+  ch_->world_origin.y = safety_area->safety_area.origin_y; 
+
+}
+
+//}
 
 // | --------------------- timer callbacks -------------------- |
 
@@ -862,6 +892,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   sh_control_input_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimatorInput>(shopts, "control_input_in");
 
+  sh_safety_area_manager_diag = mrs_lib::SubscribeHandler<mrs_msgs::SafetyAreaManagerDiagnostics>(shopts, "safety_area_manager_diagnostics_in", &EstimationManager::callbackSafetyAreaManagerDiagnostics, this);
+
   /*//}*/
 
   /*//{ load state estimator plugins */
@@ -1064,6 +1096,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   sm_->changeState(StateMachine::INITIALIZED_STATE);
 
   ROS_INFO("[%s]: initialized", getName().c_str());
+  is_initialized_ = true;
 }
 /*//}*/
 

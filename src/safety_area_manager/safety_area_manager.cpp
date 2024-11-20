@@ -125,7 +125,7 @@ namespace mrs_uav_managers
       void getSafetyZoneData(void);
       std::mutex mutex_diagnostics_;
 
-      bool isPositionValid(mrs_msgs::UavState);
+      std::tuple<bool,bool> isPositionValid(mrs_msgs::UavState);
 
       void preinitialize();
       void initialize();
@@ -1874,7 +1874,9 @@ namespace mrs_uav_managers
       diagnostics_msg.stamp = ros::Time::now();
       diagnostics_msg.uav_name = uav_name;
       diagnostics_msg.safety_area_enabled = use_safety_area;
-      diagnostics_msg.position_valid = isPositionValid(uav_state);
+      auto [position_valid_2d, position_valid_3d] = isPositionValid(uav_state);
+      diagnostics_msg.position_valid_2d = position_valid_2d; 
+      diagnostics_msg.position_valid_3d = position_valid_3d; 
 
       // Fill world origin
       diagnostics_msg.safety_area.units = world_origin_units;
@@ -1998,13 +2000,16 @@ namespace mrs_uav_managers
 
     /* isPositionValid() //{ */
 
-    bool SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
+    std::tuple<bool,bool> SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
     {
 
       if (!is_initialized_)
       {
-        return false;
+        return std::make_tuple(false, false);
       }
+
+      bool position_valid_2d = false;
+      bool position_valid_3d = false;
 
       mrs_msgs::ReferenceStamped current_position;
 
@@ -2015,12 +2020,17 @@ namespace mrs_uav_managers
                                                                         << " y: " << current_position.reference.position.y
                                                                         << " z: " << current_position.reference.position.z);
 
-      if (!isPointInSafetyArea3d(current_position))
+      if (isPointInSafetyArea2d(current_position))
       {
-        return false;
+       position_valid_2d = true; 
       }
 
-      return true;
+      if (isPointInSafetyArea3d(current_position))
+      {
+       position_valid_3d = true; 
+      }
+
+      return std::make_tuple(position_valid_2d, position_valid_3d);
     }
 
     //}

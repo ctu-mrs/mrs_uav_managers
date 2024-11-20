@@ -60,6 +60,7 @@
       <remap from="~imu_in" to="hw_api/imu" />
       <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~safety_area_manager_diagnostics_in" to="safety_area_manager/diagnostics" />
       <remap from="~control_reference_in" to="control_manager/control_reference" />
       <remap from="~controller_diagnostics_in" to="control_manager/controller_diagnostics" />
 

@@ -728,6 +728,8 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
+    /* world_origin_.x = ch_->world_origin.x; */
+    /* world_origin_.y = ch_->world_origin.y; */
     tf_sources_[i]->setWorldOrigin(world_origin_);
   }
   got_utm_offset_ = true;
@@ -811,6 +813,8 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
+    /* world_origin_.x = ch_->world_origin.x; */
+    /* world_origin_.y = ch_->world_origin.y; */
     tf_sources_[i]->setWorldOrigin(world_origin_);
   }
   got_utm_offset_ = true;
