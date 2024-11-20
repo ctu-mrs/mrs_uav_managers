@@ -742,6 +742,7 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
+        return false;
       }
 
       ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
@@ -1534,7 +1535,7 @@ namespace mrs_uav_managers
         return std::make_tuple(false, "Obstacles present is true but obstacles data are empty");
       }
 
-      if (safety_area_msg.obstacles.rows.empty())
+      if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.rows.empty())
       {
         return std::make_tuple(false, "Obstacles row are empty");
       }
