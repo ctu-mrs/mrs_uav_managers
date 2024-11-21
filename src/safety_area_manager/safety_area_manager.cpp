@@ -32,6 +32,10 @@
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
 #include <mrs_msgs/SetSafetyAreaSrvResponse.h>
 
+#include <mrs_msgs/SetObstacleSrv.h>
+#include <mrs_msgs/SetObstacleSrvRequest.h>
+#include <mrs_msgs/SetObstacleSrvResponse.h>
+
 #include <mrs_lib/safety_zone/safety_zone.h>
 #include <mrs_lib/safety_zone/static_edges_visualization.h>
 #include <mrs_lib/safety_zone/int_edges_visualization.h>
@@ -160,6 +164,7 @@ namespace mrs_uav_managers
       ros::ServiceServer service_server_get_world_config_;
       ros::ServiceServer service_server_use_safety_area_;
       ros::ServiceServer service_server_add_obstacle_;
+      ros::ServiceServer service_server_set_obstacle_;
       ros::ServiceServer service_server_get_max_z_;
       ros::ServiceServer service_server_get_min_z_;
       ros::ServiceServer service_server_get_use_;
@@ -205,6 +210,7 @@ namespace mrs_uav_managers
       bool callbackSetWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
       bool callbackToggleSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
       bool callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+      bool callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request& req, mrs_msgs::SetObstacleSrv::Response& res);
       bool callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
       bool callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
       bool callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res);
@@ -405,6 +411,7 @@ namespace mrs_uav_managers
       service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
       service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
       service_server_add_obstacle_ = nh_.advertiseService("add_obstacle_in", &SafetyAreaManager::callbackAddObstacle, this);
+      service_server_set_obstacle_ = nh_.advertiseService("set_obstacle_in", &SafetyAreaManager::callbackSetObstacle, this);
       service_server_get_max_z_ = nh_.advertiseService("get_max_z_in", &SafetyAreaManager::callbackGetMaxZ, this);
       service_server_get_min_z_ = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::callbackGetMinZ, this);
       service_server_get_use_ = nh_.advertiseService("get_use_in", &SafetyAreaManager::callbackGetUse, this);
@@ -613,6 +620,38 @@ namespace mrs_uav_managers
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
 
+      return true;
+    }
+
+    //}
+    
+    /* callbackSetObstacle() //{ */
+
+    bool SafetyAreaManager::callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request& req, mrs_msgs::SetObstacleSrv::Response& res)
+    {
+
+      if (!is_initialized_)
+      {
+        res.message = "not initialized";
+        res.success = false;
+        return true;
+      }
+
+      std::scoped_lock lock(mutex_safety_area_);
+
+      std::string vertical_frame = req.vertical_frame.empty() ? safety_area_vertical_frame_ : req.vertical_frame;
+
+      const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", req.max_z);
+      const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", req.min_z);
+
+      int id = safety_zone_->addObstacle(makePrism(req.points, transformed_obs_max_z , transformed_obs_min_z));
+
+      static_edges_.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_, 2));
+      int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
+      vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
+      centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
+      bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
+      
       return true;
     }
 
@@ -1966,10 +2005,7 @@ namespace mrs_uav_managers
         // getObstacles return a vector with the obstacle ptr's
         const auto& obstacles_ptrs = safety_zone_->getObstacles();
 
-        if (obstacles_ptrs.size() == 0)
-        {
-          obstacles_present_ = false;
-        }
+        obstacles_present_= obstacles_ptrs.size() == 0 ? false : true ;   
 
         // Saving the obstacle rows vector
         obstacles_rows_.reserve(obstacles_ptrs.size());
