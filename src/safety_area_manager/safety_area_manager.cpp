@@ -218,8 +218,8 @@ namespace mrs_uav_managers
       // | ----------------------- routines ----------------------- |
 
       // Safety area building
-      std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z);
-      std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z);
+      std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string& horizontal_frame);
+      std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z, const std::string& horizontal_frame);
       std::vector<mrs_lib::Point2d> transformPoints(const std::vector<mrs_lib::Point2d>& points, const std::string& from_frame, const std::string& to_frame);
 
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
@@ -644,7 +644,7 @@ namespace mrs_uav_managers
       const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", req.max_z);
       const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", req.min_z);
 
-      int id = safety_zone_->addObstacle(makePrism(req.points, transformed_obs_max_z , transformed_obs_min_z));
+      int id = safety_zone_->addObstacle(makePrism(req.points, transformed_obs_max_z , transformed_obs_min_z, req.horizontal_frame));
 
       static_edges_.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_, 2));
       int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
@@ -1299,7 +1299,7 @@ namespace mrs_uav_managers
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, "world_origin", max_z);
       const auto transformed_min_z = transformZ(safety_area_vertical_frame_, "world_origin", min_z);
 
-      auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
+      auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_area_horizontal_frame_);
 
       // Making obstacle prisms
       std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles;
@@ -1360,7 +1360,7 @@ namespace mrs_uav_managers
           const auto obs_min_z = min_z_mat(i, 0);
           const auto transformed_obs_max_z = transformZ(safety_area_vertical_frame_, "world_origin", obs_max_z);
           const auto transformed_obs_min_z = transformZ(safety_area_vertical_frame_, "world_origin", obs_min_z);
-          auto prism = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z);
+          auto prism = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z, safety_area_horizontal_frame_);
 
           if (prism)
           {
@@ -1435,7 +1435,7 @@ namespace mrs_uav_managers
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, "world_origin", max_z);
       const auto transformed_min_z = transformZ(safety_area_vertical_frame_, "world_origin", min_z);
 
-      auto border = makePrism(border_points, transformed_max_z, transformed_min_z);
+      auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_border.horizontal_frame);
 
       // Making obstacle prisms
       std::vector<std::unique_ptr<mrs_lib::Prism>> obstacle_prisms;
@@ -1504,7 +1504,7 @@ namespace mrs_uav_managers
         {
           const auto transformed_obs_max_z = transformZ(safety_area_vertical_frame_, "world_origin", obstacle.max_z);
           const auto transformed_obs_min_z = transformZ(safety_area_vertical_frame_, "world_origin", obstacle.min_z);
-          auto prism = makePrism(obstacle.data, transformed_obs_max_z, transformed_obs_min_z);
+          auto prism = makePrism(obstacle.data, transformed_obs_max_z, transformed_obs_min_z, safety_border.horizontal_frame);
 
           if (prism)
           {
@@ -1586,7 +1586,7 @@ namespace mrs_uav_managers
 
     /* makePrism(matrix) //{ */
 
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string& horizontal_frame)
     {
 
       if (matrix.rows() < 3)
@@ -1602,7 +1602,7 @@ namespace mrs_uav_managers
         points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
       }
 
-      auto transformed_points = transformPoints(points, safety_area_horizontal_frame_, "world_origin");
+      auto transformed_points = transformPoints(points, horizontal_frame, "world_origin");
 
       return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
     }
@@ -1611,7 +1611,7 @@ namespace mrs_uav_managers
 
     /* makePrism(points) //{ */
 
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z, const std::string& horizontal_frame)
     {
 
       if (points.size() < 3)
@@ -1628,7 +1628,7 @@ namespace mrs_uav_managers
         tmp_points.emplace_back(mrs_lib::Point2d{point.x, point.y});
       }
 
-      auto transformed_points = transformPoints(tmp_points, safety_area_horizontal_frame_, "world_origin");
+      auto transformed_points = transformPoints(tmp_points, horizontal_frame, "world_origin");
       return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
     }
 
