@@ -1415,12 +1415,20 @@ namespace mrs_uav_managers
         return false;
       }
 
+
+      //If world origin not defined take the current origin values 
+      if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0 )
+      {
+        ROS_INFO("[SafetyAreaManager]: World origin not defined, using current saved value.");
+      }
+      else 
+      {
+        world_origin_units_ = safety_area_msg.units;
+        origin_x_ = safety_area_msg.origin_x;
+        origin_y_ = safety_area_msg.origin_y;
+      }
+  
       // Update safety area configuration
-
-      world_origin_units_ = safety_area_msg.units;
-      origin_x_ = safety_area_msg.origin_x;
-      origin_y_ = safety_area_msg.origin_y;
-
       const auto safety_border = safety_area_msg.border;
       use_safety_area_ = safety_border.enabled;
       safety_area_horizontal_frame_ = safety_border.horizontal_frame;
@@ -1547,17 +1555,6 @@ namespace mrs_uav_managers
 
     std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyArea& safety_area_msg)
     {
-
-      if (safety_area_msg.units.empty())
-      {
-        return std::make_tuple(false, "Units are empty");
-      }
-
-      if (safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
-      {
-
-        return std::make_tuple(false, "Origin not defined ");
-      }
 
       if (safety_area_msg.border.points.empty())
       {
