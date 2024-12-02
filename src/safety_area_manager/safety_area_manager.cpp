@@ -28,6 +28,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
 #include <mrs_msgs/SetSafetyAreaSrvResponse.h>
@@ -129,7 +130,7 @@ namespace mrs_uav_managers
       void getSafetyZoneData(void);
       std::mutex mutex_diagnostics_;
 
-      std::tuple<bool,bool> isPositionValid(mrs_msgs::UavState);
+      std::tuple<bool, bool> isPositionValid(mrs_msgs::UavState);
 
       void preinitialize();
       void initialize();
@@ -172,6 +173,7 @@ namespace mrs_uav_managers
       // | ----------------------- subscribers ----------------------- |
 
       mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+      mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
 
       // | ----------------------- publishers ----------------------- |
 
@@ -219,7 +221,8 @@ namespace mrs_uav_managers
 
       // Safety area building
       std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string& horizontal_frame);
-      std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z, const std::string& horizontal_frame);
+      std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z,
+                                                const std::string& horizontal_frame);
       std::vector<mrs_lib::Point2d> transformPoints(const std::vector<mrs_lib::Point2d>& points, const std::string& from_frame, const std::string& to_frame);
 
       double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
@@ -396,6 +399,7 @@ namespace mrs_uav_managers
       // | ----------------------- Subscribers ----------------------- |
 
       sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
+      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
 
       // | ------------------------ services ------------------------ |
 
@@ -447,10 +451,13 @@ namespace mrs_uav_managers
       mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
-      if (!sh_hw_api_capabilities_.hasMsg())
+      bool got_hw_api_capabilities = sh_hw_api_capabilities_.hasMsg();
+      bool got_control_manager_diag = sh_control_manager_diag_.hasMsg();
+
+      if (!got_hw_api_capabilities || !got_control_manager_diag)
       {
-        ROS_INFO_THROTTLE(1.0, "[SafetyAreaManager]: waiting for HW API capabilities");
-        ROS_INFO("[SafetyAreaManager]: waiting for HW API capabilities");
+        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: ControlManager=%s, HW Api=%s", got_control_manager_diag ? "true" : "FALSE",
+                          got_hw_api_capabilities ? "true" : "FALSE");
         return;
       }
 
@@ -461,7 +468,7 @@ namespace mrs_uav_managers
         tf_viz_ = ret.value();
       } else
       {
-        ROS_INFO_ONCE("[SafetyAreaManager]: Did not got TFs, cant publish safety area markers");
+        ROS_INFO_ONCE("[SafetyAreaManager]: Did not got TFs, can't publish safety area markers");
         return;
       }
 
@@ -624,7 +631,7 @@ namespace mrs_uav_managers
     }
 
     //}
-    
+
     /* callbackSetObstacle() //{ */
 
     bool SafetyAreaManager::callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request& req, mrs_msgs::SetObstacleSrv::Response& res)
@@ -644,14 +651,14 @@ namespace mrs_uav_managers
       const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", req.max_z);
       const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", req.min_z);
 
-      int id = safety_zone_->addObstacle(makePrism(req.points, transformed_obs_max_z , transformed_obs_min_z, req.horizontal_frame));
+      int id = safety_zone_->addObstacle(makePrism(req.points, transformed_obs_max_z, transformed_obs_min_z, req.horizontal_frame));
 
       static_edges_.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_, 2));
       int_edges_.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
-      
+
       return true;
     }
 
@@ -682,6 +689,16 @@ namespace mrs_uav_managers
       if (!is_initialized_)
       {
         res.message = "not initialized";
+        res.success = false;
+        return true;
+      }
+
+
+      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+      if (control_manager_diagnostics->tracker_status.have_goal)
+      {
+        res.message = "Can only modify safety area in IDLE state.";
         res.success = false;
         return true;
       }
@@ -740,6 +757,15 @@ namespace mrs_uav_managers
       if (!is_initialized_)
       {
         res.message = "not initialized";
+        res.success = false;
+        return true;
+      }
+
+      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+      if (control_manager_diagnostics->tracker_status.have_goal)
+      {
+        res.message = "Can only modify safety area in IDLE state.";
         res.success = false;
         return true;
       }
@@ -803,6 +829,16 @@ namespace mrs_uav_managers
         res.success = false;
         return true;
       }
+
+      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+      if (control_manager_diagnostics->tracker_status.have_goal)
+      {
+        res.message = "Can only modify safety area in IDLE state.";
+        res.success = false;
+        return true;
+      }
+
       std::string filename = "/tmp/cur_world_config.yaml";
       std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
       if (!ofs.is_open())
@@ -1284,7 +1320,7 @@ namespace mrs_uav_managers
         return false;
       }
 
-      //Reload parameters for every call, it can be called multiple times if using the Rviz plugin and loading different world configurations
+      // Reload parameters for every call, it can be called multiple times if using the Rviz plugin and loading different world configurations
       param_loader.loadParam("world_origin/units", world_origin_units_);
       param_loader.loadParam("world_origin/origin_x", origin_x_);
       param_loader.loadParam("world_origin/origin_y", origin_y_);
@@ -1416,18 +1452,17 @@ namespace mrs_uav_managers
       }
 
 
-      //If world origin not defined take the current origin values 
-      if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0 )
+      // If world origin not defined take the current origin values
+      if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
       {
         ROS_INFO("[SafetyAreaManager]: World origin not defined, using current saved value.");
-      }
-      else 
+      } else
       {
         world_origin_units_ = safety_area_msg.units;
         origin_x_ = safety_area_msg.origin_x;
         origin_y_ = safety_area_msg.origin_y;
       }
-  
+
       // Update safety area configuration
       const auto safety_border = safety_area_msg.border;
       use_safety_area_ = safety_border.enabled;
@@ -1583,7 +1618,8 @@ namespace mrs_uav_managers
 
     /* makePrism(matrix) //{ */
 
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string& horizontal_frame)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z,
+                                                                 const std::string& horizontal_frame)
     {
 
       if (matrix.rows() < 3)
@@ -1608,7 +1644,8 @@ namespace mrs_uav_managers
 
     /* makePrism(points) //{ */
 
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z, const std::string& horizontal_frame)
+    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z,
+                                                                 const std::string& horizontal_frame)
     {
 
       if (points.size() < 3)
@@ -1912,8 +1949,8 @@ namespace mrs_uav_managers
       diagnostics_msg.uav_name = uav_name;
       diagnostics_msg.safety_area_enabled = use_safety_area;
       auto [position_valid_2d, position_valid_3d] = isPositionValid(uav_state);
-      diagnostics_msg.position_valid_2d = position_valid_2d; 
-      diagnostics_msg.position_valid_3d = position_valid_3d; 
+      diagnostics_msg.position_valid_2d = position_valid_2d;
+      diagnostics_msg.position_valid_3d = position_valid_3d;
 
       // Fill world origin
       diagnostics_msg.safety_area.units = world_origin_units;
@@ -2002,7 +2039,7 @@ namespace mrs_uav_managers
         // getObstacles return a vector with the obstacle ptr's
         const auto& obstacles_ptrs = safety_zone_->getObstacles();
 
-        obstacles_present_= obstacles_ptrs.size() == 0 ? false : true ;   
+        obstacles_present_ = obstacles_ptrs.size() == 0 ? false : true;
 
         // Saving the obstacle rows vector
         obstacles_rows_.reserve(obstacles_ptrs.size());
@@ -2034,7 +2071,7 @@ namespace mrs_uav_managers
 
     /* isPositionValid() //{ */
 
-    std::tuple<bool,bool> SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
+    std::tuple<bool, bool> SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
     {
 
       if (!is_initialized_)
@@ -2056,12 +2093,12 @@ namespace mrs_uav_managers
 
       if (isPointInSafetyArea2d(current_position))
       {
-       position_valid_2d = true; 
+        position_valid_2d = true;
       }
 
       if (isPointInSafetyArea3d(current_position))
       {
-       position_valid_3d = true; 
+        position_valid_3d = true;
       }
 
       return std::make_tuple(position_valid_2d, position_valid_3d);
