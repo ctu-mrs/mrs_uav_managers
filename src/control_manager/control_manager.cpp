@@ -6457,7 +6457,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& poi
   srv.request.reference = point.reference;
 
   if(!service_client_point_in_safety_area_3d_.call(srv)){
-    ROS_WARN("[ControlManager]: Could not call service isPointInSafetyArea2d");
+    ROS_WARN("[ControlManager]: Could not call service isPointInSafetyArea3d");
     return false;
   }
 

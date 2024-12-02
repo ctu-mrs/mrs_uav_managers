@@ -307,6 +307,7 @@ namespace mrs_uav_managers
       // | ----------------------- Subscribers ----------------------- |
       sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
       sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
+      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
 
       // | ------------------------- timers ------------------------- |
       timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
@@ -399,7 +400,6 @@ namespace mrs_uav_managers
       // | ----------------------- Subscribers ----------------------- |
 
       sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
-      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
 
       // | ------------------------ services ------------------------ |
 
@@ -698,6 +698,8 @@ namespace mrs_uav_managers
 
       if (control_manager_diagnostics->tracker_status.have_goal)
       {
+
+        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
         res.message = "Can only modify safety area in IDLE state.";
         res.success = false;
         return true;
@@ -765,6 +767,8 @@ namespace mrs_uav_managers
 
       if (control_manager_diagnostics->tracker_status.have_goal)
       {
+
+        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
         res.message = "Can only modify safety area in IDLE state.";
         res.success = false;
         return true;
@@ -834,6 +838,7 @@ namespace mrs_uav_managers
 
       if (control_manager_diagnostics->tracker_status.have_goal)
       {
+        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
         res.message = "Can only modify safety area in IDLE state.";
         res.success = false;
         return true;
@@ -962,7 +967,9 @@ namespace mrs_uav_managers
       point.header = req.header;
       point.reference = req.reference;
 
-      auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+
 
       if (!tfed_horizontal)
       {
@@ -971,6 +978,12 @@ namespace mrs_uav_managers
         res.success = false;
         return true;
       }
+
+      //As the vertical frame can be different from horizontal frame
+      /* auto transformed_pos_z = transformZ(safety_area_horizontal_frame_, safety_area_vertical_frame_, tfed_horizontal->reference.position.z); */
+
+      /* ROS_INFO_STREAM("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed z value : " << transformed_pos_z); */
+
 
       if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
       {
@@ -1006,7 +1019,8 @@ namespace mrs_uav_managers
       point.reference = req.reference;
       point.header = req.header;
 
-      auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
       if (!tfed_horizontal)
       {
@@ -1054,7 +1068,7 @@ namespace mrs_uav_managers
       geometry_msgs::PointStamped start_transformed, end_transformed;
 
       {
-        auto resp = transformer_->transformSingle(start, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(start, "world_origin");
 
         if (!resp)
         {
@@ -1068,7 +1082,7 @@ namespace mrs_uav_managers
       }
 
       {
-        auto resp = transformer_->transformSingle(end, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(end, "world_origin");
 
         if (!resp)
         {
@@ -1128,7 +1142,7 @@ namespace mrs_uav_managers
       geometry_msgs::PointStamped start_transformed, end_transformed;
 
       {
-        auto resp = transformer_->transformSingle(start, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(start, "world_origin");
 
         if (!resp)
         {
@@ -1142,7 +1156,7 @@ namespace mrs_uav_managers
       }
 
       {
-        auto resp = transformer_->transformSingle(end, safety_area_horizontal_frame_);
+        auto resp = transformer_->transformSingle(end, "world_origin");
 
         if (!resp)
         {
@@ -1740,7 +1754,8 @@ namespace mrs_uav_managers
         return true;
       }
 
-      auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
       if (!tfed_horizontal)
       {
@@ -1768,11 +1783,9 @@ namespace mrs_uav_managers
         return true;
       }
 
-      auto tfed_horizontal = transformer_->transformSingle(point, safety_area_horizontal_frame_);
+      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
-      ROS_INFO_STREAM_ONCE("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed point x: " << tfed_horizontal->reference.position.x
-                                                                                              << " y: " << tfed_horizontal->reference.position.y
-                                                                                              << " z: " << tfed_horizontal->reference.position.z);
 
       if (!tfed_horizontal)
       {
@@ -1782,7 +1795,7 @@ namespace mrs_uav_managers
 
       if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
       {
-        ROS_INFO_ONCE("[SafetyAreaManager]: Point is not valid!");
+        ROS_INFO("[SafetyAreaManager]: Point is not valid!");
         return false;
       }
 

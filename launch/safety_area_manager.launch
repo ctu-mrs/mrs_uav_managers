@@ -48,6 +48,7 @@
     <!-- Subscribers -->
     <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
     <remap from="~odometry_in" to="estimation_manager/odom_main" />
+    <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
     <remap from="~gnss_in" to="hw_api/gnss" />
 
     <!-- Publishers -->
