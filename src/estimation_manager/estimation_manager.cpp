@@ -446,8 +446,8 @@ void EstimationManager::callbackSafetyAreaManagerDiagnostics(const mrs_msgs::Saf
 
   mrs_msgs::SafetyAreaManagerDiagnosticsConstPtr safety_area = msg;
 
-  ch_->world_origin.x = safety_area->safety_area.origin_x; 
-  ch_->world_origin.y = safety_area->safety_area.origin_y; 
+  /* ch_->world_origin.x = safety_area->safety_area.origin_x; */ 
+  /* ch_->world_origin.y = safety_area->safety_area.origin_y; */ 
 
 }
 
