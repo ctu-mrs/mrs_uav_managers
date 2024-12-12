@@ -1012,45 +1012,6 @@ void ControlManager::initialize(void) {
   // safety area usage
   bool use_safety_area;
   param_loader.loadParam("safety_area/enabled", use_safety_area);
-  use_safety_area_ = use_safety_area;
-
-  param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
-
-  param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
-  param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
-
-  {
-    double temp;
-    param_loader.loadParam("safety_area/vertical/min_z", temp);
-
-    _safety_area_min_z_ = temp;
-  }
-
-  if (use_safety_area_) {
-
-    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
-
-    try {
-
-      std::vector<Eigen::MatrixXd> polygon_obstacle_points;
-      std::vector<Eigen::MatrixXd> point_obstacle_points;
-
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(border_points);
-    }
-
-    catch (mrs_lib::SafetyZone::BorderError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
-      error_publisher_->addOneshotError("Bad safety area.");
-      error_publisher_->flushAndShutdown();
-    }
-    catch (...) {
-      ROS_ERROR("[ControlManager]: SafetyArea: unhandled exception!");
-      error_publisher_->addOneshotError("Safety area exception.");
-      error_publisher_->flushAndShutdown();
-    }
-
-    ROS_INFO("[ControlManager]: safety area initialized");
-  }
 
   // remaining parameters TODO: change the comment
   param_loader.setPrefix("mrs_uav_managers/control_manager/");
