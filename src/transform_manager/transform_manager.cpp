@@ -79,12 +79,12 @@ private:
   std::string ns_stable_origin_child_frame_id_;
   bool        publish_stable_origin_tf_;
 
-  std::string         ns_fixed_origin_parent_frame_id_;
-  std::string         ns_fixed_origin_child_frame_id_;
-  bool                publish_fixed_origin_tf_;
+  std::string                ns_fixed_origin_parent_frame_id_;
+  std::string                ns_fixed_origin_child_frame_id_;
+  bool                       publish_fixed_origin_tf_;
   geometry_msgs::PoseStamped pose_first_;
-  geometry_msgs::Pose pose_fixed_;
-  geometry_msgs::Pose pose_fixed_diff_;
+  geometry_msgs::Pose        pose_fixed_;
+  geometry_msgs::Pose        pose_fixed_diff_;
 
   std::string ns_amsl_origin_parent_frame_id_;
   std::string ns_amsl_origin_child_frame_id_;
@@ -141,6 +141,8 @@ private:
   void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
 
   void publishLocalTf();
+
+  void publishAmslTf(const double altitude, const ros::Time& stamp);
 };
 /*//}*/
 
@@ -429,6 +431,24 @@ void TransformManager::onInit() {
     ros::shutdown();
   }
 
+  // Check if the RTK antenna static tf is defined
+  bool got_rtk_antenna_tf = false;
+  for (int i = 0; i < 10; i++) {
+    auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, ros::Time::now());
+    if (res_tf_rtk) {
+      ROS_INFO("[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
+      got_rtk_antenna_tf = true;
+      break;
+    }
+    ROS_INFO_THROTTLE(1.0, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    ros::Duration(0.5).sleep();
+  }
+
+  if (!got_rtk_antenna_tf) {
+    ROS_ERROR("[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
+    ros::shutdown();
+  }
+
   is_initialized_ = true;
   ROS_INFO("[%s]: initialized", getPrintName().c_str());
 }
@@ -637,24 +657,36 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPt
 }
 /*//}*/
 
-/*//{ callbackAltitudeAmsl() */
+/*//{ callbackAmslAltitude() */
 
-void TransformManager::callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg) {
+void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::HwApiAltitude::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackAltitudeAmsl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  // Currently not used. Not clear what this message from hw_api should be for. Transform manager publishes the AMSL altitude from RTK or GNSS messages.
 
+}
+/*//}*/
+
+/*//{ publishAmslTf() */
+
+void TransformManager::publishAmslTf(const double altitude, const ros::Time& stamp) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  // Currently not used. Not clear what this message should be for. Altitude data is taken eiter from RTK or GNSS.
   geometry_msgs::TransformStamped tf_msg;
-  tf_msg.header.stamp    = msg->stamp;
+  tf_msg.header.stamp    = stamp;
   tf_msg.header.frame_id = ch_->frames.ns_fcu_untilted;
   tf_msg.child_frame_id  = ch_->frames.ns_amsl;
 
   tf_msg.transform.translation.x = 0;
   tf_msg.transform.translation.y = 0;
-  tf_msg.transform.translation.z = -msg->amsl;
+  tf_msg.transform.translation.z = -altitude;
   tf_msg.transform.rotation.x    = 0;
   tf_msg.transform.rotation.y    = 0;
   tf_msg.transform.rotation.z    = 0;
@@ -673,6 +705,7 @@ void TransformManager::callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::Const
   }
   ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
                 tf_msg.child_frame_id.c_str());
+
 }
 /*//}*/
 
@@ -698,10 +731,6 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
     return;
   }
 
-  if (got_utm_offset_) {
-    return;
-  }
-
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   double out_x;
@@ -724,6 +753,12 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
   utm_origin.y = out_y;
   utm_origin.z = msg->altitude;
 
+  publishAmslTf(msg->altitude, msg->header.stamp);
+
+  if (got_utm_offset_) {
+    return;
+  }
+
   ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
@@ -741,14 +776,7 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
     return;
   }
 
-  if (got_utm_offset_) {
-    return;
-  }
-
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackRtkGps", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  double out_x;
-  double out_y;
 
   geometry_msgs::PoseStamped rtk_pos;
 
@@ -777,10 +805,6 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
   rtk_pos.pose.position.z  = msg->gps.altitude;
   rtk_pos.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
-  rtk_pos.pose.position.x -= ch_->world_origin.x;
-  rtk_pos.pose.position.y -= ch_->world_origin.y;
-
-
   // transform the RTK position from antenna to FCU
   auto res = transformRtkToFcu(rtk_pos);
   if (res) {
@@ -790,22 +814,16 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
     return;
   }
 
-  mrs_lib::UTM(msg->gps.latitude, msg->gps.longitude, &out_x, &out_y);
-
-  if (!std::isfinite(out_x)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
-    return;
-  }
-
-  if (!std::isfinite(out_y)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
-    return;
-  }
-
   geometry_msgs::Point utm_origin;
-  utm_origin.x = out_x;
-  utm_origin.y = out_y;
-  utm_origin.z = msg->gps.altitude;
+  utm_origin.x = rtk_pos.pose.position.x;
+  utm_origin.y = rtk_pos.pose.position.y;
+  utm_origin.z = rtk_pos.pose.position.z;
+
+  publishAmslTf(rtk_pos.pose.position.z, msg->header.stamp);
+
+  if (got_utm_offset_) {
+    return;
+  }
 
   ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
 
