@@ -3285,7 +3285,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!isFlyingNormally() && !rc_goto_active_ && !bumper_repulsing_) {
+  if (!isFlyingNormally() && !bumper_repulsing_) {
     return;
   }
 
@@ -5015,7 +5015,7 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
 
   for (const auto& ref : req.array.array) {
 
-    mrs_msgs::ReferenceStamped ref_stamped; 
+    mrs_msgs::ReferenceStamped ref_stamped;
     ref_stamped.header = req.array.header;
     ref_stamped.reference = ref;
 
