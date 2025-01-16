@@ -3285,7 +3285,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!isFlyingNormally() && !bumper_repulsing_) {
+  if (!isFlyingNormally() && !rc_goto_active_ && !bumper_repulsing_) {
     return;
   }
 
