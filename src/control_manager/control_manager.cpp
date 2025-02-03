@@ -1817,14 +1817,14 @@ void ControlManager::initialize(void) {
   service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
   // service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
   service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_reference_array_   = nh_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
+  service_server_transform_reference_array_  = nh_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
   service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
   service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
   service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
   service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
   service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
   service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_array_    = nh_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
+  service_server_validate_reference_array_   = nh_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
   service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
   service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
   service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
@@ -2954,7 +2954,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
-  if (rc_goto_active_ && last_tracker_cmd && sh_hw_api_rc_.hasMsg()) {
+  if (rc_goto_active_ && !bumper_repulsing_ && last_tracker_cmd && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
     mrs_msgs::VelocityReferenceStampedSrv::Request request;
@@ -3071,9 +3071,12 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if (!isFlyingNormally() && !bumper_repulsing_) {
-    return;
-  }
+  if (!isFlyingNormally()) {
+    if (!(bumper_repulsing_ || rc_goto_active_)) {
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: bumpper can not function, not flying 'normally'");
+      return;
+    }
+   }
 
   if (!got_uav_state_) {
     return;
@@ -4794,14 +4797,14 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
   }
   const auto tf = tf_opt.value();
 
-  res.array.header.stamp = req.array.header.stamp;
+  res.array.header.stamp    = req.array.header.stamp;
   res.array.header.frame_id = req.to_frame_id;
   res.array.array.reserve(req.array.array.size());
 
   for (const auto& ref : req.array.array) {
 
-    mrs_msgs::ReferenceStamped ref_stamped; 
-    ref_stamped.header = req.array.header;
+    mrs_msgs::ReferenceStamped ref_stamped;
+    ref_stamped.header    = req.array.header;
     ref_stamped.reference = ref;
 
     if (auto ret = transformer_->transform(ref_stamped, tf)) {
@@ -4814,11 +4817,10 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
       res.success = false;
       return true;
     }
-
   }
 
-  res.message   = "transformation successful";
-  res.success   = true;
+  res.message = "transformation successful";
+  res.success = true;
   return true;
 }
 
