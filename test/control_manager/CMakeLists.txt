@@ -20,6 +20,8 @@ add_subdirectory(rc_remote_control)
 
 add_subdirectory(bumper)
 
+add_subdirectory(bumper_with_rc_remote)
+
 add_subdirectory(trajectory_topic)
 
 add_subdirectory(trajectory_start_stop_resume)

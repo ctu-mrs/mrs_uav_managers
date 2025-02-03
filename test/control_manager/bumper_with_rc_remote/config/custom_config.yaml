@@ -1,0 +1,27 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    state_estimators: [
+    "gps_baro",
+    ]
+
+    initial_state_estimator: "gps_baro"
+
+  constraint_manager:
+
+    default_constraints:
+      gps_garmin: "medium"
+      gps_baro: "medium"
+
+  control_manager:
+
+    rc_joystick:
+
+      enabled: true
+      # activation channel
+      channel_number: 6 # indexed from 0
+
+      horizontal_speed: 4.00 # [m/s]
+      vertical_speed: 4.00 # [m/s]
+      heading_rate: 1.00 # [rad/s]
