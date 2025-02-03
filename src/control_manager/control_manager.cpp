@@ -309,6 +309,10 @@ private:
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
 
+  // | -------------------- safety-zone  -------------------- |
+  
+  std::shared_ptr<mrs_lib::SafetyZone> safety_zone_;
+
   // | ------------------- scope timer logger ------------------- |
 
   bool                                       scope_timer_enabled_ = false;

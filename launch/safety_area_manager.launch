@@ -6,7 +6,7 @@
   <arg name="LOGGER_DEBUG" default="$(optenv LOGGER_DEBUG false)" />
 
     <!-- other args -->
-  <arg name="debug" default="false" />
+  <arg name="debug" default="true" />
   <arg name="profile" default="true" />
   <arg name="body_frame" default="fcu" />
   <arg name="standalone" default="true" />

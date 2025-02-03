@@ -8,6 +8,7 @@
 *.swn
 
 .vscode
+.gitattributes
 
 # Runtime-python
 *.pyc

@@ -5,7 +5,7 @@
 #include <nodelet/nodelet.h>
 
 /* #include <mrs_uav_managers/control_manager/common.h> */
-/* #include <mrs_uav_managers/safety_area_manager/common_handlers.h> */
+#include <mrs_uav_managers/safety_area_manager/common_handlers.h>
 #include <mrs_msgs/ReferenceStamped.h>
 #include <mrs_msgs/ReferenceStampedSrv.h>
 #include <mrs_msgs/PathToPointInSafetyArea.h>
@@ -180,7 +180,7 @@ namespace mrs_uav_managers
       mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics> ph_diagnostics_;
 
       // contains handlers that are used with the safety area visualization/interactive tools
-      /* std::shared_ptr<mrs_uav_managers::safety_area_manager::CommonHandlers_t> common_handlers_; */
+      std::shared_ptr<mrs_uav_managers::safety_area_manager::CommonHandlers_t> common_handlers_;
 
       // | ----------------------- timers ----------------------- |
 
@@ -276,7 +276,7 @@ namespace mrs_uav_managers
       // |         common handler for visualization and control tools |
       // --------------------------------------------------------------
 
-      /* common_handlers_ = std::make_shared<mrs_uav_managers::safety_area_manager::CommonHandlers_t>(); */
+      common_handlers_ = std::make_shared<mrs_uav_managers::safety_area_manager::CommonHandlers_t>();
 
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
@@ -303,6 +303,7 @@ namespace mrs_uav_managers
 
       transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
       transformer_->setDefaultPrefix(_uav_name_);
+      transformer_->retryLookupNewest(true);
 
       // | ----------------------- Subscribers ----------------------- |
       sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
@@ -322,18 +323,18 @@ namespace mrs_uav_managers
       scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
 
       // binding of common handlers
-      /* common_handlers_->transformer = transformer_; */
-      /* common_handlers_->scope_timer.enabled = scope_timer_enabled_; */
-      /* common_handlers_->scope_timer.logger = scope_timer_logger_; */
+      common_handlers_->transformer = transformer_;
+      common_handlers_->scope_timer.enabled = scope_timer_enabled_;
+      common_handlers_->scope_timer.logger = scope_timer_logger_;
 
-      /* common_handlers_->safety_area.use_safety_area = use_safety_area_; */
-      /* common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&SafetyAreaManager::isPointInSafetyArea2d, this, _1); */
-      /* common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&SafetyAreaManager::isPointInSafetyArea3d, this, _1); */
+      common_handlers_->safety_area.use_safety_area = use_safety_area_;
+      common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&SafetyAreaManager::isPointInSafetyArea2d, this, _1);
+      common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&SafetyAreaManager::isPointInSafetyArea3d, this, _1);
       /* common_handlers_->safety_area.getMinZ = boost::bind(&SafetyAreaManager::getMinZ, this, _1); */
       /* common_handlers_->safety_area.getMaxZ = boost::bind(&SafetyAreaManager::getMaxZ, this, _1); */
 
-      /* common_handlers_->uav_name = _uav_name_; */
-      /* common_handlers_->parent_nh = nh_; */
+      common_handlers_->uav_name = _uav_name_;
+      common_handlers_->parent_nh = nh_;
 
       // | ----------------------- finish init ---------------------- |
 
@@ -434,6 +435,8 @@ namespace mrs_uav_managers
       }
 
       is_initialized_ = true;
+
+      /* common_handlers_->safety_zone = safety_zone_; */
 
       ROS_INFO("[SafetyAreaManager]: Safety area initialized.");
     }
@@ -674,6 +677,7 @@ namespace mrs_uav_managers
         return true;
       }
       use_safety_area_ = req.data;
+      safety_zone_->enableSafetyZone(req.data);
       res.success = true;
       ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (use_safety_area_ ? "on" : "off"));
       return true;
@@ -720,6 +724,7 @@ namespace mrs_uav_managers
       auto old_origin_y = origin_y_;
       auto old_origin_x = origin_x_;
       auto old_use_safety_area = use_safety_area_;
+      safety_zone_->enableSafetyZone(use_safety_area_);
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializationFromFile(param_loader, req.value);
@@ -742,6 +747,7 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
+        safety_zone_->enableSafetyZone(use_safety_area_);
       }
 
       res.message = "Successfully loaded world config.";
@@ -789,6 +795,7 @@ namespace mrs_uav_managers
       auto old_origin_y = origin_y_;
       auto old_origin_x = origin_x_;
       auto old_use_safety_area = use_safety_area_;
+      safety_zone_->enableSafetyZone(use_safety_area_);
 
       bool success = initializationFromMsg(req.safety_area);
 
@@ -811,6 +818,8 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
+        safety_zone_->enableSafetyZone(use_safety_area_);
+
         return false;
       }
 
@@ -967,7 +976,7 @@ namespace mrs_uav_managers
       point.header = req.header;
       point.reference = req.reference;
 
-      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
       auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
 
@@ -979,7 +988,7 @@ namespace mrs_uav_managers
         return true;
       }
 
-      //As the vertical frame can be different from horizontal frame
+      // As the vertical frame can be different from horizontal frame
       /* auto transformed_pos_z = transformZ(safety_area_horizontal_frame_, safety_area_vertical_frame_, tfed_horizontal->reference.position.z); */
 
       /* ROS_INFO_STREAM("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed z value : " << transformed_pos_z); */
@@ -1019,7 +1028,7 @@ namespace mrs_uav_managers
       point.reference = req.reference;
       point.header = req.header;
 
-      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
       auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
       if (!tfed_horizontal)
@@ -1422,10 +1431,10 @@ namespace mrs_uav_managers
         }
       }
 
-      safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacles));
-
+      safety_zone_ = std::make_shared<mrs_lib::SafetyZone>(*border, std::move(obstacles));
+      safety_zone_->enableSafetyZone(use_safety_area_);
       // Binding for the visualization and control tools
-      /* common_handlers_->safety_zone = safety_zone_; */
+      common_handlers_->safety_zone = safety_zone_;
 
       // Add visualizations
 
@@ -1480,6 +1489,7 @@ namespace mrs_uav_managers
       // Update safety area configuration
       const auto safety_border = safety_area_msg.border;
       use_safety_area_ = safety_border.enabled;
+      safety_zone_->enableSafetyZone(use_safety_area_);
       safety_area_horizontal_frame_ = safety_border.horizontal_frame;
       safety_area_vertical_frame_ = safety_border.vertical_frame;
 
@@ -1754,7 +1764,7 @@ namespace mrs_uav_managers
         return true;
       }
 
-      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
       auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
       if (!tfed_horizontal)
@@ -1783,7 +1793,7 @@ namespace mrs_uav_managers
         return true;
       }
 
-      //Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
       auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
 
 
