@@ -5,6 +5,7 @@
 #include <nodelet/nodelet.h>
 
 #include <mrs_uav_managers/control_manager/common.h>
+#include <mrs_uav_managers/safety_area_manager/common_handlers.h>
 #include <control_manager/output_publisher.h>
 
 #include <mrs_uav_managers/controller.h>
@@ -394,6 +395,8 @@ private:
 
   // contains handlers that are shared with trackers and controllers
   std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers_;
+
+  /* std::shared_ptr<mrs_uav_managers::safety_area_manager::CommonHandlers_t> safety_area_common_handlers_; */
 
   // | --------------- tracker and controller IDs --------------- |
 
@@ -959,6 +962,8 @@ void ControlManager::initialize(void) {
   // --------------------------------------------------------------
 
   common_handlers_ = std::make_shared<mrs_uav_managers::control_manager::CommonHandlers_t>();
+
+  /* safety_area_common_handlers_ = std::make_shared<mrs_uav_managers::safety_area_manager::CommonHandlers_t>(); */
 
   // --------------------------------------------------------------
   // |                           params                           |
@@ -6453,6 +6458,11 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
 //}
 
 // | ----------------------- safety area ---------------------- |
+//
+// | --------------------------------------------------------------------------------------------------------|
+//      Ideally we will replace this section with the safety area manager, keeping it temporarily on purpose, 
+//                       can be removed after some time to ensure a smooth feature merge. 
+// | --------------------------------------------------------------------------------------------------------|
 
 /* //{ isPointInSafetyArea3d() */
 

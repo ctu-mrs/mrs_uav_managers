@@ -28,6 +28,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
@@ -138,6 +139,7 @@ namespace mrs_uav_managers
       // | -------------- uav_state/odometry subscriber ------------- |
 
       mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
+      mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
       mrs_msgs::UavState uav_state_;
       std::mutex mutex_uav_state_;
 
@@ -236,9 +238,8 @@ namespace mrs_uav_managers
       bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point);
       bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
       bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
-      double getMinZ(const std::string& frame_id);
       double getMaxZ(const std::string& frame_id);
-
+      double getMinZ(const std::string& frame_id);
     public:
       virtual void onInit();
 
@@ -400,8 +401,8 @@ namespace mrs_uav_managers
 
       // | ----------------------- Subscribers ----------------------- |
 
-      sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
-
+      sh_odometry_  = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
+      sh_max_z_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
       // | ------------------------ services ------------------------ |
 
       service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::callbackGetSafeZoneAtHeight, this);
@@ -435,8 +436,6 @@ namespace mrs_uav_managers
       }
 
       is_initialized_ = true;
-
-      /* common_handlers_->safety_zone = safety_zone_; */
 
       ROS_INFO("[SafetyAreaManager]: Safety area initialized.");
     }
@@ -1929,6 +1928,89 @@ namespace mrs_uav_managers
     }
 
     //}
+
+/* //{ getMaxZ() */
+
+double SafetyAreaManager::getMaxZ(const std::string& frame_id) {
+
+  // | ---------- first, get max_z from the safety area --------- |
+
+  double safety_area_max_z = std::numeric_limits<float>::max();
+
+  geometry_msgs::PointStamped point;
+  point.header.frame_id = safety_area_horizontal_frame_;
+  point.point.x         = 0;
+  point.point.y         = 0;
+  point.point.z         = safety_zone_->getBorder()->getMaxZ();
+
+  auto ret = transformer_->transformSingle(point, frame_id);
+
+  if (!ret) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+  }
+  // | ------------ overwrite from estimation manager ----------- |
+
+  double estimation_manager_max_z = std::numeric_limits<float>::max();
+
+  {
+    // if possible, override it with max z from the estimation manager
+    if (sh_max_z_.hasMsg()) {
+
+      auto msg = sh_max_z_.getMsg();
+
+      // transform it into the safety area frame
+      geometry_msgs::PointStamped point;
+      point.header  = msg->header;
+      point.point.x = 0;
+      point.point.y = 0;
+      point.point.z = msg->value;
+
+      auto ret = transformer_->transformSingle(point, frame_id);
+
+      if (!ret) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
+      }
+
+      estimation_manager_max_z = ret->point.z;
+    }
+  }
+
+  if (estimation_manager_max_z < safety_area_max_z) {
+    return estimation_manager_max_z;
+  } else {
+    return safety_area_max_z;
+  }
+}
+
+//}
+
+/* //{ getMinZ() */
+
+double SafetyAreaManager::getMinZ(const std::string& frame_id) {
+
+  // | ---------- first, get max_z from the safety area --------- |
+
+  if (!safety_zone_->safetyZoneEnabled()) {
+    return std::numeric_limits<float>::lowest();
+  }
+
+  geometry_msgs::PointStamped point;
+  point.header.frame_id = safety_area_horizontal_frame_;
+  point.point.x         = 0;
+  point.point.y         = 0;
+  point.point.z         = safety_zone_->getBorder()->getMinZ();
+
+  auto ret = transformer_->transformSingle(point, frame_id);
+
+  if (!ret) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+    return std::numeric_limits<float>::lowest();
+  }
+
+  return ret->point.z;
+}
+
+//}
 
     /* publishDiagnostics() //{ */
 
