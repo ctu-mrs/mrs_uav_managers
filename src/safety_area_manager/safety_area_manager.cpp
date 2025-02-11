@@ -745,10 +745,8 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
-        safety_zone_->enableSafetyZone(use_safety_area_);
       }
 
-      safety_zone_->enableSafetyZone(use_safety_area_);
       res.message = "Successfully loaded world config.";
       res.success = true;
       return true;
@@ -816,12 +814,10 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
-        safety_zone_->enableSafetyZone(use_safety_area_);
 
         return false;
       }
 
-      safety_zone_->enableSafetyZone(use_safety_area_);
       ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
       res.message = "Succesfully loaded safety area msg.";
       res.success = true;
