@@ -21,4 +21,4 @@ mrs_uav_managers:
 
       during_takeoff:
         # some nonexisting tracker
-        tracker: "WrongTracker
+        tracker: "WrongTracker"

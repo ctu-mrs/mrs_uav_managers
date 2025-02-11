@@ -121,10 +121,6 @@ public:
         sh_tf_source_att_ = mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this);
       }
 
-      if (is_utm_source_) {
-        sh_altitude_amsl_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude>(shopts, "altitude_amsl_in");
-      }
-
     }
     /*//}*/
 
@@ -172,7 +168,6 @@ public:
       shopts.autostart          = true;
       shopts.queue_size         = 10;
       shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
-      sh_altitude_amsl_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude>(shopts, "altitude_amsl_in");
     }
     is_utm_source_ = is_utm_source;
   }
@@ -249,7 +244,6 @@ private:
 
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>               sh_tf_source_odom_;
   mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_tf_source_att_;
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude>          sh_altitude_amsl_;
   nav_msgs::OdometryConstPtr                                  first_msg_;
   bool                                                        got_first_msg_ = false;
 
@@ -372,12 +366,7 @@ private:
         geometry_msgs::Pose pose_utm = odom->pose.pose;
         pose_utm.position.x += utm_origin_.x - first_msg_->pose.pose.position.x;
         pose_utm.position.y += utm_origin_.y - first_msg_->pose.pose.position.y;
-
-        if (sh_altitude_amsl_.hasMsg()) {
-          pose_utm.position.z = sh_altitude_amsl_.getMsg()->amsl;
-        } else {
-          ROS_WARN_THROTTLE(5.0, "[%s]: AMSL altitude not available.", getPrintName().c_str());
-        }
+        pose_utm.position.z += utm_origin_.z - first_msg_->pose.pose.position.z;
 
         tf_utm_msg.header.stamp    = odom->header.stamp;
         tf_utm_msg.header.frame_id = ns_utm_origin_parent_frame_id_;
