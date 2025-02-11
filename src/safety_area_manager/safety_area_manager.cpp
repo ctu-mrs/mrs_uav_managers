@@ -723,7 +723,6 @@ namespace mrs_uav_managers
       auto old_origin_y = origin_y_;
       auto old_origin_x = origin_x_;
       auto old_use_safety_area = use_safety_area_;
-      safety_zone_->enableSafetyZone(use_safety_area_);
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializationFromFile(param_loader, req.value);
@@ -749,6 +748,7 @@ namespace mrs_uav_managers
         safety_zone_->enableSafetyZone(use_safety_area_);
       }
 
+      safety_zone_->enableSafetyZone(use_safety_area_);
       res.message = "Successfully loaded world config.";
       res.success = true;
       return true;
@@ -794,7 +794,6 @@ namespace mrs_uav_managers
       auto old_origin_y = origin_y_;
       auto old_origin_x = origin_x_;
       auto old_use_safety_area = use_safety_area_;
-      safety_zone_->enableSafetyZone(use_safety_area_);
 
       bool success = initializationFromMsg(req.safety_area);
 
@@ -822,6 +821,7 @@ namespace mrs_uav_managers
         return false;
       }
 
+      safety_zone_->enableSafetyZone(use_safety_area_);
       ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
       res.message = "Succesfully loaded safety area msg.";
       res.success = true;
@@ -1488,7 +1488,6 @@ namespace mrs_uav_managers
       // Update safety area configuration
       const auto safety_border = safety_area_msg.border;
       use_safety_area_ = safety_border.enabled;
-      safety_zone_->enableSafetyZone(use_safety_area_);
       safety_area_horizontal_frame_ = safety_border.horizontal_frame;
       safety_area_vertical_frame_ = safety_border.vertical_frame;
 
@@ -1583,7 +1582,7 @@ namespace mrs_uav_managers
       }
 
       safety_zone_ = std::make_unique<mrs_lib::SafetyZone>(*border, std::move(obstacle_prisms));
-
+      safety_zone_->enableSafetyZone(use_safety_area_);
       // Add visualizations
 
       // Safety area
