@@ -19,6 +19,7 @@
 #include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/HwApiCapabilities.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
+#include <mrs_msgs/ReferenceStampedSrv.h>
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
@@ -162,7 +163,8 @@ public:
       }
 
       case FLYING_STATE: {
-        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE &&
+            current_state_ != ESTIMATOR_SWITCHING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(),
                              getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
@@ -181,10 +183,12 @@ public:
       }
 
       case ESTIMATOR_SWITCHING_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE  && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE && current_state_ != LANDING_STATE) {
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE &&
+            current_state_ != LANDING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
-                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
-                             getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str());
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
+                             getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                             getStateAsString(FLYING_STATE).c_str());
           return false;
         }
         pre_switch_state_ = current_state_;
@@ -194,7 +198,8 @@ public:
       case LANDING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
           ROS_ERROR_THROTTLE(1.0, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(),
-                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+                             getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                             getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -360,6 +365,8 @@ private:
   ros::ServiceServer srvs_reset_estimator_;
   bool               callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
+  ros::ServiceServer srvs_set_origin_;
+  bool               callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   ros::ServiceServer srvs_toggle_callbacks_;
   bool               callbackToggleServiceCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -669,7 +676,6 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     callbacks_enabled_ = false;
   }
 
-  // TODO fuj if, zmenit na switch
   // activate initial estimator
   if (sm_->isInState(StateMachine::INITIALIZED_STATE))
   { 
@@ -740,7 +746,8 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
 
   if (sm_->isInState(StateMachine::FLYING_STATE)) {
     if (!sh_control_input_.hasMsg()) {
-      ROS_WARN_THROTTLE(1.0, "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
+      ROS_WARN_THROTTLE(1.0, "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable",
+                        getName().c_str());
     } else if ((ros::Time::now() - sh_control_input_.lastMsgTime()).toSec() > 0.1) {
       ROS_WARN_THROTTLE(1.0, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable", getName().c_str(),
                         (ros::Time::now() - sh_control_input_.lastMsgTime()).toSec());
@@ -1099,7 +1106,8 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
 
   /*//{ initialize service servers */
   srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
-  srvs_reset_estimator_ = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
+  srvs_reset_estimator_  = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
+  srvs_set_origin_       = nh_.advertiseService("set_origin_in", &EstimationManager::callbackSetOrigin, this);
   srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
@@ -1141,7 +1149,7 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
     return true;
   }
 
-  // switching into these estimators during flight is dangerous with realhw, so we don't allow it 
+  // switching into these estimators during flight is dangerous with realhw, so we don't allow it
   if (req.value == "dummy" || req.value == "ground_truth" || req.value == "vins_kickoff") {
     res.success = false;
     std::stringstream ss;
@@ -1194,6 +1202,74 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 }
 /*//}*/
 
+/*//{ callbackSetOrigin() */
+bool EstimationManager::callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+
+  if (!sm_->isInitialized()) {
+    return false;
+  }
+
+  if (!callbacks_enabled_) {
+    res.success = false;
+    res.message = ("Service callbacks are disabled");
+    ROS_WARN("[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    return true;
+  }
+
+  if (sm_->isInState(StateMachine::INITIALIZED_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+
+    double world_origin_x, world_origin_y;
+
+    if (req.header.frame_id.find("latlon_origin") != std::string::npos) {
+      const double lat = req.reference.position.x;
+      const double lon = req.reference.position.y;
+      mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+      ROS_INFO("[EstimationManager]: Setting world origin to lat: %.6f lon: %.6f", req.reference.position.x, req.reference.position.y);
+    } else if (req.header.frame_id.find("utm_origin") != std::string::npos) {
+      world_origin_x = req.reference.position.x;
+      world_origin_y = req.reference.position.y;
+      ROS_INFO("[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM", req.reference.position.x, req.reference.position.y);
+    } else {
+      ROS_ERROR("[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_origin service. Supported are: latlon_origin, utm_origin",
+                req.header.frame_id.c_str());
+      res.success = false;
+      res.message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
+      return true;
+    }
+
+    ch_->world_origin.x = world_origin_x;
+    ch_->world_origin.y = world_origin_y;
+  }
+
+  for (auto estimator : estimator_list_) {
+
+    estimator->reset();
+    ROS_INFO("[EstimationManager]: Estimator %s reset", estimator->getName().c_str());
+
+    double t_wait_left = 5;
+    while (t_wait_left > 0) {
+      ROS_INFO("[EstimationManager]: Attempting starting %s estimator", estimator->getName().c_str());
+      estimator->start();
+
+      if (estimator->isRunning()) {
+        ROS_INFO("[EstimationManager]: Reset of %s estimator successful", estimator->getName().c_str());
+        break;
+      }
+
+      const double start_period = 0.2;
+      ros::Duration(start_period).sleep();
+      t_wait_left -= start_period;
+    }
+  }
+
+
+  res.success = true;
+  res.message = "Origin set successfully";
+
+  return true;
+}
+/*//}*/
+
 /*//{ callbackResetEstimator() */
 bool EstimationManager::callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
 
@@ -1221,7 +1297,6 @@ bool EstimationManager::callbackResetEstimator(mrs_msgs::String::Request& req, m
 
   if (target_estimator_found) {
 
-
     if (target_estimator->getName() == active_estimator_->getName()) {
       res.success = false;
       res.message = ("Cannot reset active estimator");
@@ -1229,24 +1304,23 @@ bool EstimationManager::callbackResetEstimator(mrs_msgs::String::Request& req, m
       return true;
     }
 
-      target_estimator->reset();
-      ROS_INFO("[EstimationManager]: Estimator %s reset", target_estimator->getName().c_str());
+    target_estimator->reset();
+    ROS_INFO("[EstimationManager]: Estimator %s reset", target_estimator->getName().c_str());
 
-      double t_wait_left = 5;
-      while (t_wait_left > 0) {
-        ROS_INFO("[EstimationManager]: Attempting starting %s estimator", target_estimator->getName().c_str());
-        target_estimator->start();
+    double t_wait_left = 5;
+    while (t_wait_left > 0) {
+      ROS_INFO("[EstimationManager]: Attempting starting %s estimator", target_estimator->getName().c_str());
+      target_estimator->start();
 
-        if (target_estimator->isRunning()) {
-          ROS_INFO("[EstimationManager]: Reset of %s estimator successful", target_estimator->getName().c_str());
-          break;
-        } 
-        
-        const double start_period = 1.0;
-        ros::Duration(start_period).sleep();
-        t_wait_left -= start_period;
-
+      if (target_estimator->isRunning()) {
+        ROS_INFO("[EstimationManager]: Reset of %s estimator successful", target_estimator->getName().c_str());
+        break;
       }
+
+      const double start_period = 1.0;
+      ros::Duration(start_period).sleep();
+      t_wait_left -= start_period;
+    }
 
   } else {
     ROS_WARN("[%s]: Reset of invalid estimator %s requested", getName().c_str(), req.value.c_str());
