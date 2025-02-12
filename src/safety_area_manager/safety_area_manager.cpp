@@ -132,6 +132,8 @@ namespace mrs_uav_managers
       std::mutex mutex_diagnostics_;
 
       std::tuple<bool, bool> isPositionValid(mrs_msgs::UavState);
+      bool position_valid_2d_ = true;
+      bool position_valid_3d_ = true;
 
       void preinitialize();
       void initialize();
@@ -1799,7 +1801,6 @@ namespace mrs_uav_managers
 
       if (!safety_zone_->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
       {
-        ROS_INFO("[SafetyAreaManager]: Point is not valid!");
         return false;
       }
 
@@ -2048,9 +2049,11 @@ double SafetyAreaManager::getMinZ(const std::string& frame_id) {
       diagnostics_msg.stamp = ros::Time::now();
       diagnostics_msg.uav_name = uav_name;
       diagnostics_msg.safety_area_enabled = use_safety_area;
-      auto [position_valid_2d, position_valid_3d] = isPositionValid(uav_state);
-      diagnostics_msg.position_valid_2d = position_valid_2d;
-      diagnostics_msg.position_valid_3d = position_valid_3d;
+      auto [is_position_valid_2d, is_position_valid_3d] = isPositionValid(uav_state);
+      diagnostics_msg.position_valid_2d = is_position_valid_2d;
+      diagnostics_msg.position_valid_3d = is_position_valid_3d;
+      position_valid_2d_ = is_position_valid_2d;
+      position_valid_3d_ = is_position_valid_3d;
 
       // Fill world origin
       diagnostics_msg.safety_area.units = world_origin_units;
@@ -2179,29 +2182,25 @@ double SafetyAreaManager::getMinZ(const std::string& frame_id) {
         return std::make_tuple(false, false);
       }
 
-      bool position_valid_2d = false;
-      bool position_valid_3d = false;
-
       mrs_msgs::ReferenceStamped current_position;
 
       current_position.header.frame_id = uav_state.header.frame_id;
       current_position.reference.position = uav_state.pose.position;
 
-      ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Current position x:  " << current_position.reference.position.x
+      ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Initial current position x:  " << current_position.reference.position.x
                                                                         << " y: " << current_position.reference.position.y
                                                                         << " z: " << current_position.reference.position.z);
 
-      if (isPointInSafetyArea2d(current_position))
+      auto is_position_valid_2d = isPointInSafetyArea2d(current_position); 
+      auto is_position_valid_3d = isPointInSafetyArea3d(current_position); 
+
+      if (!is_position_valid_3d && position_valid_3d_)
       {
-        position_valid_2d = true;
+
+        ROS_WARN("[SafetyAreaManager]: UAV outside safety area (3D validation) "); 
       }
 
-      if (isPointInSafetyArea3d(current_position))
-      {
-        position_valid_3d = true;
-      }
-
-      return std::make_tuple(position_valid_2d, position_valid_3d);
+      return std::make_tuple(is_position_valid_2d, is_position_valid_3d);
     }
 
     //}
