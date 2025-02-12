@@ -49,6 +49,7 @@
     <remap from="~hw_api_capabilities_in" to="hw_api/capabilities" />
     <remap from="~odometry_in" to="estimation_manager/odom_main" />
     <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+    <remap from="~estimation_diagnostics_in" to="estimation_manager/diagnostics" />
     <remap from="~gnss_in" to="hw_api/gnss" />
 
     <!-- Publishers -->
@@ -71,6 +72,9 @@
     <remap from="~get_max_z_in" to="~get_max_z"/>
     <remap from="~get_min_z_in" to="~get_min_z"/>
     <remap from="~get_use_in" to="~get_use"/>
+
+    <!-- Service clients -->
+    <remap from="~set_world_origin" to="estimation_manager/set_origin" />
 
     </node>
   </group>

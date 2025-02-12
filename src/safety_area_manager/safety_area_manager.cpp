@@ -30,6 +30,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
+#include <mrs_msgs/EstimationDiagnostics.h>
 #include <mrs_msgs/SetSafetyAreaSrv.h>
 #include <mrs_msgs/SetSafetyAreaSrvRequest.h>
 #include <mrs_msgs/SetSafetyAreaSrvResponse.h>
@@ -145,12 +146,6 @@ namespace mrs_uav_managers
       mrs_msgs::UavState uav_state_;
       std::mutex mutex_uav_state_;
 
-      // odometry hiccup detection
-      double uav_state_avg_dt_ = 1;
-      double uav_state_hiccup_factor_ = 1;
-      int uav_state_count_ = 0;
-
-
       mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
 
 
@@ -174,10 +169,15 @@ namespace mrs_uav_managers
       ros::ServiceServer service_server_get_min_z_;
       ros::ServiceServer service_server_get_use_;
 
+      // | --------------------- service clients -------------------- |
+
+      ros::ServiceClient service_client_set_world_origin_;
+
       // | ----------------------- subscribers ----------------------- |
 
-      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>         sh_hw_api_capabilities_;
       mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
+      mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>     sh_estimation_diag_;
 
       // | ----------------------- publishers ----------------------- |
 
@@ -242,6 +242,7 @@ namespace mrs_uav_managers
       bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
       double getMaxZ(const std::string& frame_id);
       double getMinZ(const std::string& frame_id);
+
     public:
       virtual void onInit();
 
@@ -309,9 +310,10 @@ namespace mrs_uav_managers
       transformer_->retryLookupNewest(true);
 
       // | ----------------------- Subscribers ----------------------- |
-      sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
-      sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
+      sh_hw_api_capabilities_  = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+      sh_gnss_                 = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
       sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+      sh_estimation_diag_      = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
 
       // | ------------------------- timers ------------------------- |
       timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
@@ -403,8 +405,8 @@ namespace mrs_uav_managers
 
       // | ----------------------- Subscribers ----------------------- |
 
-      sh_odometry_  = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
-      sh_max_z_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
+      sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
+      sh_max_z_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
       // | ------------------------ services ------------------------ |
 
       service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::callbackGetSafeZoneAtHeight, this);
@@ -424,6 +426,10 @@ namespace mrs_uav_managers
       service_server_get_min_z_ = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::callbackGetMinZ, this);
       service_server_get_use_ = nh_.advertiseService("get_use_in", &SafetyAreaManager::callbackGetUse, this);
 
+      // | --------------------- service clients -------------------- |
+
+      // clients to communicate with SafetyAreaManager
+      service_client_set_world_origin_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("set_world_origin");
 
       // | ------------------------- timers ------------------------- |
 
@@ -455,13 +461,14 @@ namespace mrs_uav_managers
       mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
-      bool got_hw_api_capabilities = sh_hw_api_capabilities_.hasMsg();
+      bool got_hw_api_capabilities  = sh_hw_api_capabilities_.hasMsg();
       bool got_control_manager_diag = sh_control_manager_diag_.hasMsg();
+      bool got_estimation_diag      = sh_estimation_diag_.hasMsg();
 
-      if (!got_hw_api_capabilities || !got_control_manager_diag)
+      if (!got_hw_api_capabilities || !got_control_manager_diag || !got_estimation_diag)
       {
-        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: ControlManager=%s, HW Api=%s", got_control_manager_diag ? "true" : "FALSE",
-                          got_hw_api_capabilities ? "true" : "FALSE");
+        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: ControlManager=%s, HW Api=%s EstimationManager=%s", got_control_manager_diag ? "true" : "FALSE",
+                          got_hw_api_capabilities ? "true" : "FALSE", got_estimation_diag ? "true" : "FALSE");
         return;
       }
 
@@ -1348,6 +1355,24 @@ namespace mrs_uav_managers
       param_loader.loadParam("safety_area/horizontal_frame", safety_area_horizontal_frame_);
       param_loader.loadParam("safety_area/vertical_frame", safety_area_vertical_frame_);
 
+
+      //As this routine will be called pre-initialization to load safety area directly from world config
+      if (is_initialized_) 
+      {
+        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+        /* TODO: Support for UTM */
+        SetOriginSrv.request.header.frame_id = "latlon_origin";
+        SetOriginSrv.request.header.stamp = ros::Time::now();
+        SetOriginSrv.request.reference.position.x = origin_x_; 
+        SetOriginSrv.request.reference.position.y = origin_y_; 
+
+        if (!service_client_set_world_origin_.call(SetOriginSrv))
+        {
+          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+          return false;
+        }  
+      }
+
       // Make border prism
       const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
       const auto max_z = param_loader.loadParam2<double>("safety_area/border/max_z");
@@ -1471,13 +1496,36 @@ namespace mrs_uav_managers
         return false;
       }
 
-
-      // If world origin not defined take the current origin values
+      // If world origin not defined take the current origin values TODO
       if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
       {
         ROS_INFO("[SafetyAreaManager]: World origin not defined, using current saved value.");
+        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+        SetOriginSrv.request.header.frame_id = "latlon_origin";
+        SetOriginSrv.request.header.stamp = ros::Time::now();
+        SetOriginSrv.request.reference.position.x = origin_x_; 
+        SetOriginSrv.request.reference.position.y = origin_y_; 
+
+        if (!service_client_set_world_origin_.call(SetOriginSrv))
+        {
+          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+          return false;
+        }
+
       } else
       {
+        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+        SetOriginSrv.request.header.frame_id = "latlon_origin";
+        SetOriginSrv.request.header.stamp = ros::Time::now();
+        SetOriginSrv.request.reference.position.x = safety_area_msg.origin_x;
+        SetOriginSrv.request.reference.position.y = safety_area_msg.origin_y;
+
+        if (!service_client_set_world_origin_.call(SetOriginSrv))
+        {
+          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+          return false;
+        }
+
         world_origin_units_ = safety_area_msg.units;
         origin_x_ = safety_area_msg.origin_x;
         origin_y_ = safety_area_msg.origin_y;
@@ -1925,88 +1973,97 @@ namespace mrs_uav_managers
 
     //}
 
-/* //{ getMaxZ() */
+    /* //{ getMaxZ() */
 
-double SafetyAreaManager::getMaxZ(const std::string& frame_id) {
+    double SafetyAreaManager::getMaxZ(const std::string& frame_id)
+    {
 
-  // | ---------- first, get max_z from the safety area --------- |
+      // | ---------- first, get max_z from the safety area --------- |
 
-  double safety_area_max_z = std::numeric_limits<float>::max();
+      double safety_area_max_z = std::numeric_limits<float>::max();
 
-  geometry_msgs::PointStamped point;
-  point.header.frame_id = safety_area_horizontal_frame_;
-  point.point.x         = 0;
-  point.point.y         = 0;
-  point.point.z         = safety_zone_->getBorder()->getMaxZ();
-
-  auto ret = transformer_->transformSingle(point, frame_id);
-
-  if (!ret) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
-  }
-  // | ------------ overwrite from estimation manager ----------- |
-
-  double estimation_manager_max_z = std::numeric_limits<float>::max();
-
-  {
-    // if possible, override it with max z from the estimation manager
-    if (sh_max_z_.hasMsg()) {
-
-      auto msg = sh_max_z_.getMsg();
-
-      // transform it into the safety area frame
       geometry_msgs::PointStamped point;
-      point.header  = msg->header;
+      point.header.frame_id = safety_area_horizontal_frame_;
       point.point.x = 0;
       point.point.y = 0;
-      point.point.z = msg->value;
+      point.point.z = safety_zone_->getBorder()->getMaxZ();
 
       auto ret = transformer_->transformSingle(point, frame_id);
 
-      if (!ret) {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
+      if (!ret)
+      {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+      }
+      // | ------------ overwrite from estimation manager ----------- |
+
+      double estimation_manager_max_z = std::numeric_limits<float>::max();
+
+      {
+        // if possible, override it with max z from the estimation manager
+        if (sh_max_z_.hasMsg())
+        {
+
+          auto msg = sh_max_z_.getMsg();
+
+          // transform it into the safety area frame
+          geometry_msgs::PointStamped point;
+          point.header = msg->header;
+          point.point.x = 0;
+          point.point.y = 0;
+          point.point.z = msg->value;
+
+          auto ret = transformer_->transformSingle(point, frame_id);
+
+          if (!ret)
+          {
+            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
+          }
+
+          estimation_manager_max_z = ret->point.z;
+        }
       }
 
-      estimation_manager_max_z = ret->point.z;
+      if (estimation_manager_max_z < safety_area_max_z)
+      {
+        return estimation_manager_max_z;
+      } else
+      {
+        return safety_area_max_z;
+      }
     }
-  }
 
-  if (estimation_manager_max_z < safety_area_max_z) {
-    return estimation_manager_max_z;
-  } else {
-    return safety_area_max_z;
-  }
-}
+    //}
 
-//}
+    /* //{ getMinZ() */
 
-/* //{ getMinZ() */
+    double SafetyAreaManager::getMinZ(const std::string& frame_id)
+    {
 
-double SafetyAreaManager::getMinZ(const std::string& frame_id) {
+      // | ---------- first, get max_z from the safety area --------- |
 
-  // | ---------- first, get max_z from the safety area --------- |
+      if (!safety_zone_->safetyZoneEnabled())
+      {
+        return std::numeric_limits<float>::lowest();
+      }
 
-  if (!safety_zone_->safetyZoneEnabled()) {
-    return std::numeric_limits<float>::lowest();
-  }
+      geometry_msgs::PointStamped point;
+      point.header.frame_id = safety_area_horizontal_frame_;
+      point.point.x = 0;
+      point.point.y = 0;
+      point.point.z = safety_zone_->getBorder()->getMinZ();
 
-  geometry_msgs::PointStamped point;
-  point.header.frame_id = safety_area_horizontal_frame_;
-  point.point.x         = 0;
-  point.point.y         = 0;
-  point.point.z         = safety_zone_->getBorder()->getMinZ();
+      auto ret = transformer_->transformSingle(point, frame_id);
 
-  auto ret = transformer_->transformSingle(point, frame_id);
+      if (!ret)
+      {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+        return std::numeric_limits<float>::lowest();
+      }
 
-  if (!ret) {
-    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
-    return std::numeric_limits<float>::lowest();
-  }
+      return ret->point.z;
+    }
 
-  return ret->point.z;
-}
-
-//}
+    //}
 
     /* publishDiagnostics() //{ */
 
@@ -2095,6 +2152,7 @@ double SafetyAreaManager::getMinZ(const std::string& frame_id) {
 
         const auto safety_border = safety_zone_->getBorder();
         const auto border_points = safety_border->getPoints();
+        //TODO to be replaced, we will only change origin at startup
         const auto border_center = safety_border->getCenter();
 
         auto origin_x = boost::geometry::get<0>(border_center);
@@ -2188,16 +2246,16 @@ double SafetyAreaManager::getMinZ(const std::string& frame_id) {
       current_position.reference.position = uav_state.pose.position;
 
       ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Initial current position x:  " << current_position.reference.position.x
-                                                                        << " y: " << current_position.reference.position.y
-                                                                        << " z: " << current_position.reference.position.z);
+                                                                                << " y: " << current_position.reference.position.y
+                                                                                << " z: " << current_position.reference.position.z);
 
-      auto is_position_valid_2d = isPointInSafetyArea2d(current_position); 
-      auto is_position_valid_3d = isPointInSafetyArea3d(current_position); 
+      auto is_position_valid_2d = isPointInSafetyArea2d(current_position);
+      auto is_position_valid_3d = isPointInSafetyArea3d(current_position);
 
       if (!is_position_valid_3d && position_valid_3d_)
       {
 
-        ROS_WARN("[SafetyAreaManager]: UAV outside safety area (3D validation) "); 
+        ROS_WARN("[SafetyAreaManager]: UAV outside safety area (3D validation) ");
       }
 
       return std::make_tuple(is_position_valid_2d, is_position_valid_3d);
