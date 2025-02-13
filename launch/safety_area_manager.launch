@@ -64,6 +64,7 @@
     <remap from="~set_use_safety_area_in" to="~set_use_safety_area"/>
     <remap from="~save_world_config_in" to="~save_world_config"/>
     <remap from="~load_world_config_in" to="~load_world_config"/>
+    <remap from="~set_safety_border_in" to="~set_safety_border"/>
     <remap from="~set_safety_area_in" to="~set_safety_area"/>
     <remap from="~set_world_config_in" to="~set_world_config"/>
     <remap from="~get_world_config_in" to="~get_world_config"/>
