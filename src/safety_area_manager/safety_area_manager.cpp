@@ -2149,27 +2149,8 @@ namespace mrs_uav_managers
 
       std::scoped_lock lock(mutex_safety_area_);
       {
-
         const auto safety_border = safety_zone_->getBorder();
         const auto border_points = safety_border->getPoints();
-        //TODO to be replaced, we will only change origin at startup
-        const auto border_center = safety_border->getCenter();
-
-        auto origin_x = boost::geometry::get<0>(border_center);
-        auto origin_y = boost::geometry::get<1>(border_center);
-
-        geometry_msgs::Point point;
-        point.x = origin_x;
-        point.y = origin_y;
-        point.z = 0;
-
-        const auto res = transformer_->transformSingle("world_origin", point, "latlon_origin");
-        if (res)
-        {
-          origin_x_ = res.value().x;
-          origin_y_ = res.value().y;
-        }
-
 
         auto transformed_border_points = transformPoints(border_points, "world_origin", safety_area_horizontal_frame_);
 
