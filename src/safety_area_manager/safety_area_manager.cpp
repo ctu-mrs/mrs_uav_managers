@@ -161,6 +161,7 @@ namespace mrs_uav_managers
       ros::ServiceServer service_server_save_world_config_;
       ros::ServiceServer service_server_load_world_config_;
       ros::ServiceServer service_server_set_safety_area_;
+      ros::ServiceServer service_server_set_safety_border_;
       ros::ServiceServer service_server_set_world_config_;
       ros::ServiceServer service_server_get_world_config_;
       ros::ServiceServer service_server_use_safety_area_;
@@ -418,6 +419,7 @@ namespace mrs_uav_managers
       service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::callbackSaveWorldConfig, this);
       service_server_load_world_config_ = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::callbackLoadWorldConfig, this);
       service_server_set_safety_area_ = nh_.advertiseService("set_safety_area_in", &SafetyAreaManager::callbackSetSafetyArea, this);
+      service_server_set_safety_border_ = nh_.advertiseService("set_safety_border_in", &SafetyAreaManager::callbackSetSafetyBorder, this);
       service_server_set_world_config_ = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::callbackSetWorldConfig, this);
       service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
       service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
@@ -603,6 +605,7 @@ namespace mrs_uav_managers
       {
         res.message = "not initialized";
         res.success = false;
+        ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
         return true;
       }
 
@@ -639,6 +642,9 @@ namespace mrs_uav_managers
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
 
+
+      ROS_INFO("[SafetyAreaManager]: Obstacle loaded successfully");
+
       return true;
     }
 
@@ -653,6 +659,7 @@ namespace mrs_uav_managers
       {
         res.message = "not initialized";
         res.success = false;
+        ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
         return true;
       }
 
@@ -670,6 +677,8 @@ namespace mrs_uav_managers
       vertices_.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       centers_.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
       bounds_.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_.get(), id, _uav_name_, safety_area_horizontal_frame_, nh_));
+
+      ROS_INFO("[SafetyAreaManager]: Service request succesfully, obstacle loaded");
 
       res.message = "Succesfully added the obstacle";
       res.success = true;
@@ -830,7 +839,7 @@ namespace mrs_uav_managers
         return false;
       }
 
-      ROS_INFO("[SafetyAreaManager]: Succesfull service call, safety border loaded.");
+      ROS_INFO("[SafetyAreaManager]: Succesfull service request, safety border loaded.");
       res.message = "Succesfully loaded safety border msg.";
       res.success = true;
       return true;
@@ -1581,7 +1590,6 @@ namespace mrs_uav_managers
       // Make border prism
       std::vector<mrs_msgs::Point2D> border_points = safety_border_msg.points;
 
-      ROS_INFO("[SafetyAreaManager]: Border points size %d", static_cast<int>(border_points.size()));
       const auto max_z = safety_border_msg.max_z;
       const auto min_z = safety_border_msg.min_z;
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, "world_origin", max_z);
@@ -1662,7 +1670,6 @@ namespace mrs_uav_managers
       // Make border prism
       std::vector<mrs_msgs::Point2D> border_points = safety_border.points;
 
-      ROS_INFO("[SafetyAreaManager]: Border points size %d", static_cast<int>(border_points.size()));
       const auto max_z = safety_border.max_z;
       const auto min_z = safety_border.min_z;
       const auto transformed_max_z = transformZ(safety_area_vertical_frame_, "world_origin", max_z);
