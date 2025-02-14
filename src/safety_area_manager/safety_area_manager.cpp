@@ -102,6 +102,7 @@ namespace mrs_uav_managers
       std::string world_origin_units_;
       double origin_x_;
       double origin_y_;
+      geometry_msgs::TransformStamped tf_fcu_to_world_origin_;
       std::string safety_area_horizontal_frame_;
       std::string safety_area_vertical_frame_;
       std::vector<mrs_msgs::Point2D> safety_border_points_;
@@ -2294,6 +2295,30 @@ namespace mrs_uav_managers
       if (!is_initialized_)
       {
         return;
+      }
+
+      auto fcu_tf = transformer_->getTransform("fcu","world_origin", ros::Time(0));
+
+      //Check if the world origin changed, through the estimation Mgr service
+      if (fcu_tf.value().transform.translation != tf_fcu_to_world_origin_.transform.translation) {
+        ROS_INFO("[SafetyAreaManager]: The world origin changed, updating value");
+
+        auto world_tf = transformer_->getTransform("world_origin","latlon_origin", ros::Time(0));
+        mrs_msgs::ReferenceStamped temp_ref;
+
+        temp_ref.header.frame_id = "latlon_origin";
+        temp_ref.reference.position.x = 0;
+        temp_ref.reference.position.y = 0;
+
+        if (auto ret = transformer_->transform(temp_ref, world_tf.value()))
+        {
+          temp_ref = ret.value();
+          ROS_INFO_STREAM("[SafetyAreaManager]: Transformed point x: " << temp_ref.reference.position.x << " y: " << temp_ref.reference.position.y);
+          origin_x_ = temp_ref.reference.position.x;
+          origin_y_ = temp_ref.reference.position.y;
+        }
+
+        tf_fcu_to_world_origin_ = fcu_tf.value();
       }
 
       std::scoped_lock lock(mutex_safety_area_);
