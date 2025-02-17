@@ -68,6 +68,8 @@
       <remap from="~profiler" to="profiler" />
       <remap from="~map_delay_out" to="~map_delay" />
 
+      <remap from="~set_world_origin_in" to="~set_world_origin" />
+
     </node>
 
     <!-- RTK antenna to FCU TF (TODO: should be published by hw_api) -->

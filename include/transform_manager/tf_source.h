@@ -191,7 +191,7 @@ public:
   /*//{ setWorldOrigin() */
   void setWorldOrigin(const geometry_msgs::Point& pt) {
 
-    if (is_utm_based_ && !is_world_origin_set_) {
+    if (is_utm_based_) {
       world_origin_        = pt;
       is_world_origin_set_ = true;
     }

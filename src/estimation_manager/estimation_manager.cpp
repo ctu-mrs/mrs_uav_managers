@@ -365,11 +365,7 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> srvch_failsafe_;
   bool                                             failsafe_call_succeeded_ = false;
 
-  // TODO service clients
-  /* mrs_lib::ServiceClientHandler<std_srvs::Trigger> srvc_hover_; */
-  /* mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> srvc_reference_; */
-  /* mrs_lib::ServiceClientHandler<std_srvs::Trigger> srvc_ehover_; */
-  /* mrs_lib::ServiceClientHandler<std_srvs::SetBool> srvc_enable_callbacks_; */
+  mrs_lib::ServiceClientHandler<mrs_msgs::ReferenceStampedSrv> srvch_set_world_origin_;
 
   // | ------------- dynamic loading of estimators ------------- |
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
@@ -1047,13 +1043,14 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//{ initialize service clients */
 
   srvch_failsafe_.initialize(nh_, "failsafe_out");
+  srvch_set_world_origin_.initialize(nh_, "set_world_origin_out");
 
   /*//}*/
 
   /*//{ initialize service servers */
   srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
   srvs_reset_estimator_  = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
-  srvs_set_world_origin_ = nh_.advertiseService("set_origin_in", &EstimationManager::callbackSetWorldOrigin, this);
+  srvs_set_world_origin_ = nh_.advertiseService("set_world_origin_in", &EstimationManager::callbackSetWorldOrigin, this);
   srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
@@ -1167,11 +1164,11 @@ bool EstimationManager::callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Re
       const double lat = req.reference.position.x;
       const double lon = req.reference.position.y;
       mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-      ROS_INFO("[EstimationManager]: Setting world origin to lat: %.6f lon: %.6f", req.reference.position.x, req.reference.position.y);
+      ROS_INFO("[EstimationManager]: Setting world origin to lat: %.6f lon: %.6f by service callback", req.reference.position.x, req.reference.position.y);
     } else if (req.header.frame_id.find("utm_origin") != std::string::npos) {
       world_origin_x = req.reference.position.x;
       world_origin_y = req.reference.position.y;
-      ROS_INFO("[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM", req.reference.position.x, req.reference.position.y);
+      ROS_INFO("[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM by service callback", req.reference.position.x, req.reference.position.y);
     } else {
       ROS_ERROR("[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
                 req.header.frame_id.c_str());
@@ -1203,6 +1200,24 @@ bool EstimationManager::callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Re
         t_wait_left -= start_period;
       }
     }
+  
+  mrs_msgs::ReferenceStampedSrv srv_set_world_origin;
+  srv_set_world_origin.request = req;
+  const bool success = srvch_set_world_origin_.call(srv_set_world_origin);
+
+  if (!success) {
+    ROS_WARN("[EstimationManager]: Could not call TransformManager set_world_origin service.");
+    res.success = false;
+    res.message = "Could not call TransformManager set_world_origin service.";
+    return true;
+  }
+
+  if (!srv_set_world_origin.response.success) {
+    ROS_WARN("[EstimationManager]: TransformManager could not set world origin.");
+    res.success = false;
+    res.message = "TransformManager could not set world origin.";
+    return true;
+  }
 
   res.success = true;
   res.message = "World origin set successfully";

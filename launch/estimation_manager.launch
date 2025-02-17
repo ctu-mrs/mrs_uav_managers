@@ -72,11 +72,12 @@
       <remap from="~height_agl_out" to="~height_agl" />
 
       <remap from="~change_estimator_in" to="~change_estimator" />
-      <remap from="~set_origin_in" to="~set_origin" />
+      <remap from="~set_world_origin_in" to="~set_world_origin" />
       <remap from="~reset_estimator_in" to="~reset_estimator" />
       <remap from="~toggle_service_callbacks_in" to="~toggle_service_callbacks" />
 
       <remap from="~failsafe_out" to="control_manager/failsafe" />
+      <remap from="~set_world_origin_out" to="transform_manager/set_world_origin" />
 
     </node>
 

@@ -15,6 +15,7 @@
 #include <mrs_msgs/Float64Stamped.h>
 #include <mrs_msgs/HwApiAltitude.h>
 #include <mrs_msgs/RtkGps.h>
+#include <mrs_msgs/ReferenceStampedSrv.h>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -92,6 +93,9 @@ private:
 
   std::string          world_origin_units_;
   geometry_msgs::Point world_origin_;
+
+  ros::ServiceServer srvs_set_world_origin_;
+  bool               callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
@@ -423,6 +427,10 @@ void TransformManager::onInit() {
     sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
   }
   /*//}*/
+
+/*//{ initialize service servers*/
+  srvs_set_world_origin_ = nh_.advertiseService("set_world_origin_in", &TransformManager::callbackSetWorldOrigin, this);
+/*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
@@ -814,6 +822,47 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
     tf_sources_[i]->setWorldOrigin(world_origin_);
   }
   got_utm_offset_ = true;
+}
+/*//}*/
+
+/*//{ callbackSetWorldOrigin() */
+bool TransformManager::callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+
+  if (!is_initialized_) {
+    res.success = false;
+    res.message = "Could not set world origin";
+    return true;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackSetWorldOrigin", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  geometry_msgs::Point world_origin;
+
+  if (req.header.frame_id.find("latlon_origin") != std::string::npos) {
+    const double lat = req.reference.position.x;
+    const double lon = req.reference.position.y;
+    mrs_lib::UTM(lat, lon, &world_origin.x, &world_origin.y);
+    ROS_INFO("[TransformManager]: Setting world origin to lat: %.6f lon: %.6f", req.reference.position.x, req.reference.position.y);
+  } else if (req.header.frame_id.find("utm_origin") != std::string::npos) {
+    world_origin.x = req.reference.position.x;
+    world_origin.y = req.reference.position.y;
+    ROS_INFO("[TransformManager]: Setting world origin to x: %.2f y: %.2f UTM", req.reference.position.x, req.reference.position.y);
+  } else {
+    ROS_ERROR("[TransformManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+              req.header.frame_id.c_str());
+    res.success = false;
+    res.message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
+    return true;
+  }
+
+  for (size_t i = 0; i < tf_sources_.size(); i++) {
+    tf_sources_[i]->setWorldOrigin(world_origin);
+  }
+
+  res.success = true;
+  res.message = "World origin set successfully";
+
+  return true;
 }
 /*//}*/
 
