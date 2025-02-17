@@ -353,8 +353,8 @@ private:
   ros::ServiceServer srvs_reset_estimator_;
   bool               callbackResetEstimator(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
 
-  ros::ServiceServer srvs_set_origin_;
-  bool               callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  ros::ServiceServer srvs_set_world_origin_;
+  bool               callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
 
   ros::ServiceServer srvs_toggle_callbacks_;
   bool               callbackToggleServiceCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
@@ -1053,7 +1053,7 @@ void EstimationManager::timerInitialization([[maybe_unused]] const ros::TimerEve
   /*//{ initialize service servers */
   srvs_change_estimator_ = nh_.advertiseService("change_estimator_in", &EstimationManager::callbackChangeEstimator, this);
   srvs_reset_estimator_  = nh_.advertiseService("reset_estimator_in", &EstimationManager::callbackResetEstimator, this);
-  srvs_set_origin_       = nh_.advertiseService("set_origin_in", &EstimationManager::callbackSetOrigin, this);
+  srvs_set_world_origin_ = nh_.advertiseService("set_origin_in", &EstimationManager::callbackSetWorldOrigin, this);
   srvs_toggle_callbacks_ = nh_.advertiseService("toggle_service_callbacks_in", &EstimationManager::callbackToggleServiceCallbacks, this);
   /*//}*/
 
@@ -1145,8 +1145,8 @@ bool EstimationManager::callbackChangeEstimator(mrs_msgs::String::Request& req, 
 }
 /*//}*/
 
-/*//{ callbackSetOrigin() */
-bool EstimationManager::callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+/*//{ callbackSetWorldOrigin() */
+bool EstimationManager::callbackSetWorldOrigin(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
 
   if (!sm_->isInitialized()) {
     return false;
@@ -1173,7 +1173,7 @@ bool EstimationManager::callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request
       world_origin_y = req.reference.position.y;
       ROS_INFO("[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM", req.reference.position.x, req.reference.position.y);
     } else {
-      ROS_ERROR("[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_origin service. Supported are: latlon_origin, utm_origin",
+      ROS_ERROR("[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
                 req.header.frame_id.c_str());
       res.success = false;
       res.message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
@@ -1182,32 +1182,38 @@ bool EstimationManager::callbackSetOrigin(mrs_msgs::ReferenceStampedSrv::Request
 
     ch_->world_origin.x = world_origin_x;
     ch_->world_origin.y = world_origin_y;
-  }
 
-  for (auto estimator : estimator_list_) {
+    for (auto estimator : estimator_list_) {
 
-    estimator->reset();
-    ROS_INFO("[EstimationManager]: Estimator %s reset", estimator->getName().c_str());
+      estimator->reset();
+      ROS_INFO("[EstimationManager]: Estimator %s reset", estimator->getName().c_str());
 
-    double t_wait_left = 5;
-    while (t_wait_left > 0) {
-      ROS_INFO("[EstimationManager]: Attempting starting %s estimator", estimator->getName().c_str());
-      estimator->start();
+      double t_wait_left = 5;
+      while (t_wait_left > 0) {
+        ROS_INFO("[EstimationManager]: Attempting starting %s estimator", estimator->getName().c_str());
+        estimator->start();
 
-      if (estimator->isRunning()) {
-        ROS_INFO("[EstimationManager]: Reset of %s estimator successful", estimator->getName().c_str());
-        break;
+        if (estimator->isRunning()) {
+          ROS_INFO("[EstimationManager]: Reset of %s estimator successful", estimator->getName().c_str());
+          break;
+        }
+
+        const double start_period = 0.2;
+        ros::Duration(start_period).sleep();
+        t_wait_left -= start_period;
       }
-
-      const double start_period = 0.2;
-      ros::Duration(start_period).sleep();
-      t_wait_left -= start_period;
     }
-  }
-
 
   res.success = true;
-  res.message = "Origin set successfully";
+  res.message = "World origin set successfully";
+
+  } else {
+
+  res.success = false;
+  res.message = "Cannot set world origin while flying";
+
+  }
+
 
   return true;
 }
