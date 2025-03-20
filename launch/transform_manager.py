@@ -24,7 +24,7 @@ def generate_launch_description():
     pkg_name = "mrs_uav_managers"
 
     this_pkg_path = get_package_share_directory(pkg_name)
-    namespace='estimation_manager'
+    namespace='transform_manager'
 
     # #{ custom_config
 
@@ -127,10 +127,9 @@ def generate_launch_description():
                 name='estimation_manager',
                 parameters=[
                     {"uav_name": uav_name},
-                    {"topic_prefix": "/" + uav_name},
                     {"enable_profiler": False},
-                    {'private_config': this_pkg_path + '/config/private/estimation_manager/estimation_manager.yaml'},
-                    {'public_config': this_pkg_path + '/config/public/estimation_manager/estimation_manager.yaml'},
+                    {'private_config': this_pkg_path + '/config/private/transform_manager/transform_manager.yaml'},
+                    {'public_config': this_pkg_path + '/config/public/transform_manager/transform_manager.yaml'},
                     {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},
                     {'estimators_config': this_pkg_path + '/config/private/estimators.yaml'},
                     {'active_estimators_config': this_pkg_path + '/config/public/active_estimators.yaml'},

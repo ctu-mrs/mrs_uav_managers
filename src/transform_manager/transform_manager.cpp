@@ -1,28 +1,27 @@
 /* //{ includes */
 
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <mrs_lib/param_loader.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/transform_broadcaster.h>
 #include <mrs_lib/gps_conversions.h>
 
-#include <mrs_msgs/UavState.h>
-#include <mrs_msgs/Float64Stamped.h>
-#include <mrs_msgs/HwApiAltitude.h>
-#include <mrs_msgs/RtkGps.h>
+#include <mrs_msgs/msg/uav_state.hpp>
+#include <mrs_msgs/msg/float64_stamped.hpp>
+#include <mrs_msgs/msg/hw_api_altitude.hpp>
+#include <mrs_msgs/msg/rtk_gps.hpp>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
-#include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 
-#include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 
-#include <nav_msgs/Odometry.h>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <memory>
 #include <string>
@@ -32,7 +31,15 @@
 #include <transform_manager/tf_source.h>
 #include <transform_manager/tf_mapping_origin.h>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 /*//}*/
+
+/* using //{ */
+
+using namespace std::chrono_literals;
+
+//}
 
 namespace mrs_uav_managers
 {
@@ -41,17 +48,12 @@ namespace transform_manager
 {
 
 /*//{ class TransformManager */
-class TransformManager : public nodelet::Nodelet {
+class TransformManager : public rclcpp::Node {
 
   using Support = estimation_manager::Support;
 
 public:
-  TransformManager() {
-    ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
-
-    ch_->nodelet_name = nodelet_name_;
-    ch_->package_name = package_name_;
-  }
+  TransformManager(rclcpp::NodeOptions options);
 
   void onInit();
   bool is_initialized_ = false;
@@ -61,6 +63,12 @@ public:
   std::string getPrintName() const;
 
 private:
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::TimerBase::SharedPtr timer_initialization_;
+  void                         timerInitialization();
+
   std::string _custom_config_;
   std::string _platform_config_;
   std::string _world_config_;
@@ -79,19 +87,19 @@ private:
   std::string ns_stable_origin_child_frame_id_;
   bool        publish_stable_origin_tf_;
 
-  std::string                ns_fixed_origin_parent_frame_id_;
-  std::string                ns_fixed_origin_child_frame_id_;
-  bool                       publish_fixed_origin_tf_;
-  geometry_msgs::PoseStamped pose_first_;
-  geometry_msgs::Pose        pose_fixed_;
-  geometry_msgs::Pose        pose_fixed_diff_;
+  std::string                     ns_fixed_origin_parent_frame_id_;
+  std::string                     ns_fixed_origin_child_frame_id_;
+  bool                            publish_fixed_origin_tf_;
+  geometry_msgs::msg::PoseStamped pose_first_;
+  geometry_msgs::msg::Pose        pose_fixed_;
+  geometry_msgs::msg::Pose        pose_fixed_diff_;
 
   std::string ns_amsl_origin_parent_frame_id_;
   std::string ns_amsl_origin_child_frame_id_;
   bool        publish_amsl_origin_tf_;
 
-  std::string          world_origin_units_;
-  geometry_msgs::Point world_origin_;
+  std::string               world_origin_units_;
+  geometry_msgs::msg::Point world_origin_;
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
@@ -102,66 +110,76 @@ private:
   std::mutex mtx_broadcast_utm_origin_;
   std::mutex mtx_broadcast_world_origin_;
 
-  ros::NodeHandle nh_;
-
   std::shared_ptr<estimation_manager::CommonHandlers_t> ch_;
 
-  std::shared_ptr<mrs_lib::TransformBroadcaster> broadcaster_;
-  tf2_ros::StaticTransformBroadcaster            static_broadcaster_;
+  std::shared_ptr<mrs_lib::TransformBroadcaster>       broadcaster_;
+  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
 
   std::unique_ptr<TfMappingOrigin> tf_mapping_origin_;
 
-  void timeoutCallback(const std::string& topic, const ros::Time& last_msg);
+  void timeoutCallback(const std::string& topic, const rclcpp::Time& last_msg);
 
-  mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
-  void                                          callbackUavState(const mrs_msgs::UavState::ConstPtr msg);
-  std::string                                   first_frame_id_;
-  std::string                                   last_frame_id_;
-  bool                                          is_first_frame_id_set_        = false;
-  bool                                          is_local_static_tf_published_ = false;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState> sh_uav_state_;
+  void                                                callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
+  std::string                                         first_frame_id_;
+  std::string                                         last_frame_id_;
+  bool                                                is_first_frame_id_set_        = false;
+  bool                                                is_local_static_tf_published_ = false;
 
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_height_agl_;
-  void                                                callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg);
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_height_agl_;
+  void                                                      callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::ConstSharedPtr msg);
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude> sh_altitude_amsl_;
-  void                                               callbackAltitudeAmsl(const mrs_msgs::HwApiAltitude::ConstPtr msg);
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiAltitude> sh_altitude_amsl_;
+  void                                                     callbackAltitudeAmsl(const mrs_msgs::msg::HwApiAltitude::ConstSharedPtr msg);
 
-  mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped> sh_hw_api_orientation_;
-  void                                                        callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg);
+  mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped> sh_hw_api_orientation_;
+  void                                                              callbackHwApiOrientation(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
-  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
-  void                                              callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg);
-  std::atomic<bool>                                 got_utm_offset_ = false;
+  mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_gnss_;
+  void                                                    callbackGnss(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
+  std::atomic<bool>                                       got_utm_offset_ = false;
 
-  mrs_lib::SubscribeHandler<mrs_msgs::RtkGps> sh_rtk_gps_;
-  void                                        callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg);
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps> sh_rtk_gps_;
+  void                                              callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPtr msg);
 
-  std::optional<geometry_msgs::Pose> transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const;
+  std::optional<geometry_msgs::msg::Pose> transformRtkToFcu(const geometry_msgs::msg::PoseStamped& pose_in) const;
 
-  void publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg);
+  void publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
   void publishLocalTf();
 
-  void publishAmslTf(const double altitude, const ros::Time& stamp);
+  void publishAmslTf(const double altitude, const rclcpp::Time& stamp);
 };
 /*//}*/
 
+/*//{ TransformManager() */
+TransformManager::TransformManager(rclcpp::NodeOptions options) : Node("estimation_manager", options) {
+
+  RCLCPP_INFO(get_logger(), "[%s]: initializing", getName().c_str());
+
+  ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
+
+  ch_->nodelet_name = nodelet_name_;
+  ch_->package_name = package_name_;
+
+  timer_initialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&TransformManager::timerInitialization, this));
+}
+/*//}*/
 
 /*//{ onInit() */
-void TransformManager::onInit() {
+void TransformManager::timerInitialization() {
 
-  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  node_  = this->shared_from_this();
+  clock_ = node_->get_clock();
 
-  ros::Time::waitForValid();
-
-  ROS_INFO("[%s]: initializing", getPrintName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
   broadcaster_ = std::make_shared<mrs_lib::TransformBroadcaster>();
 
-  ch_->transformer = std::make_shared<mrs_lib::Transformer>(nh_, getPrintName());
+  ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
   ch_->transformer->retryLookupNewest(true);
 
-  mrs_lib::ParamLoader param_loader(nh_, getPrintName());
+  mrs_lib::ParamLoader param_loader(node_, getPrintName());
 
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);
@@ -190,8 +208,8 @@ void TransformManager::onInit() {
   /*//{ initialize scope timer */
   param_loader.loadParam(yaml_prefix + "scope_timer/enabled", ch_->scope_timer.enabled);
   std::string       filepath;
-  const std::string time_logger_filepath = ros::package::getPath(package_name_) + "/scope_timer/transform_manager_scope_timer.txt";
-  ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(time_logger_filepath, ch_->scope_timer.enabled);
+  const std::string time_logger_filepath = ament_index_cpp::get_package_share_directory(package_name_) + "/scope_timer/transform_manager_scope_timer.txt";
+  ch_->scope_timer.logger                = std::make_shared<mrs_lib::ScopeTimerLogger>(node_, time_logger_filepath, ch_->scope_timer.enabled);
   /*//}*/
 
   /*//{ load world_origin parameters */
@@ -204,14 +222,14 @@ void TransformManager::onInit() {
 
   if (Support::toLowercase(world_origin_units_) == "utm") {
 
-    ROS_INFO("[%s]: Loading world origin in UTM units.", getPrintName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in UTM units.", getPrintName().c_str());
 
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units_) == "latlon") {
 
-    ROS_INFO("[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
 
     double lat, lon;
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
@@ -219,11 +237,11 @@ void TransformManager::onInit() {
 
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
 
-    ROS_INFO("[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
+    RCLCPP_INFO(node_->get_logger(), "[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    ROS_ERROR("[%s]: world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
+    rclcpp::shutdown();
   }
 
   world_origin_.x = world_origin_x;
@@ -231,8 +249,8 @@ void TransformManager::onInit() {
   world_origin_.z = 0;
 
   if (!is_origin_param_ok) {
-    ROS_ERROR("[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
+    rclcpp::shutdown();
   }
 
   /*//}*/
@@ -308,7 +326,7 @@ void TransformManager::onInit() {
   param_loader.loadParam(yaml_prefix + "utm_source_priority", utm_source_priority_list_);
   for (auto utm_source : utm_source_priority_list_) {
     if (Support::isStringInVector(utm_source, estimator_names_)) {
-      ROS_INFO("[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
       utm_source_name_ = utm_source;
       break;
     }
@@ -320,9 +338,9 @@ void TransformManager::onInit() {
     const std::string tf_source_name = tf_source_names_[i];
     const bool        is_utm_source  = tf_source_name == utm_source_name_;
 
-    ROS_INFO("[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: loading tf source: %s", getPrintName().c_str(), tf_source_name.c_str());
 
-    auto source_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/" + tf_source_name);
+    auto source_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/" + tf_source_name);
 
     if (_custom_config_ != "") {
       source_param_loader->addYamlFile(_custom_config_);
@@ -340,7 +358,7 @@ void TransformManager::onInit() {
     source_param_loader->addYamlFileFromParam("public_config");
     source_param_loader->addYamlFileFromParam("estimators_config");
 
-    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, nh_, source_param_loader, broadcaster_, ch_, is_utm_source));
+    tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, node_, source_param_loader, broadcaster_, ch_, is_utm_source));
   }
 
   // additionally publish tf of all available estimators
@@ -348,9 +366,9 @@ void TransformManager::onInit() {
 
     const std::string estimator_name = estimator_names_[i];
     const bool        is_utm_source  = estimator_name == utm_source_name_;
-    ROS_INFO("[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
 
-    auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/" + estimator_name);
+    auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/" + estimator_name);
 
     if (_custom_config_ != "") {
       estimator_param_loader->addYamlFile(_custom_config_);
@@ -368,7 +386,7 @@ void TransformManager::onInit() {
     estimator_param_loader->addYamlFileFromParam("public_config");
     estimator_param_loader->addYamlFileFromParam("estimators_config");
 
-    tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, nh_, estimator_param_loader, broadcaster_, ch_, is_utm_source));
+    tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, node_, estimator_param_loader, broadcaster_, ch_, is_utm_source));
   }
 
   // initialize mapping_origin tf
@@ -377,7 +395,7 @@ void TransformManager::onInit() {
 
   if (mapping_origin_tf_enabled) {
 
-    auto mapping_param_loader = std::make_shared<mrs_lib::ParamLoader>(nh_, "TransformManager/mapping_origin_tf");
+    auto mapping_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/mapping_origin_tf");
 
     if (_custom_config_ != "") {
       mapping_param_loader->addYamlFile(_custom_config_);
@@ -395,74 +413,74 @@ void TransformManager::onInit() {
     mapping_param_loader->addYamlFileFromParam("public_config");
     mapping_param_loader->addYamlFileFromParam("estimators_config");
 
-    tf_mapping_origin_ = std::make_unique<TfMappingOrigin>(nh_, mapping_param_loader, broadcaster_, ch_);
+    tf_mapping_origin_ = std::make_unique<TfMappingOrigin>(node_, mapping_param_loader, broadcaster_, ch_);
   }
 
   //}
 
   /*//{ initialize subscribers */
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
+  mrs_lib::SubscriberHandlerOptions shopts;
+
+  shopts.node               = node_;
   shopts.node_name          = getPrintName();
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
+  sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
 
-  sh_height_agl_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_agl_in", &TransformManager::callbackHeightAgl, this);
+  sh_height_agl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "height_agl_in", &TransformManager::callbackHeightAgl, this);
 
-  sh_altitude_amsl_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiAltitude>(shopts, "altitude_amsl_in", &TransformManager::callbackAltitudeAmsl, this);
+  sh_altitude_amsl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiAltitude>(shopts, "altitude_amsl_in", &TransformManager::callbackAltitudeAmsl, this);
 
   sh_hw_api_orientation_ =
-      mrs_lib::SubscribeHandler<geometry_msgs::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
+      mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
   if (utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin") {
-    sh_rtk_gps_ = mrs_lib::SubscribeHandler<mrs_msgs::RtkGps>(shopts, "rtk_gps_in", &TransformManager::callbackRtkGps, this);
+    sh_rtk_gps_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps>(shopts, "rtk_gps_in", &TransformManager::callbackRtkGps, this);
   } else {
-    sh_gnss_ = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+    sh_gnss_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
   }
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
+    rclcpp::shutdown();
   }
 
   // Check if the RTK antenna static tf is defined
   bool got_rtk_antenna_tf = false;
   for (int i = 0; i < 10; i++) {
-    auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, ros::Time::now());
+    auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, clock_->now());
     if (res_tf_rtk) {
-      ROS_INFO("[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
+      RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
       got_rtk_antenna_tf = true;
       break;
     }
-    ROS_INFO_THROTTLE(1.0, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
-    ros::Duration(0.5).sleep();
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    clock_->sleep_for(0.5s);
   }
 
   if (!got_rtk_antenna_tf) {
-    ROS_ERROR("[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
+                 getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
+    rclcpp::shutdown();
   }
 
   is_initialized_ = true;
-  ROS_INFO("[%s]: initialized", getPrintName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
 }
 /*//}*/
 
 /*//{ callbackUavState() */
 
-void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
+void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   // obtain first frame_id
   if (!is_first_frame_id_set_) {
@@ -486,45 +504,46 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
   if (publish_stable_origin_tf_) {
     /*//{ publish stable_origin tf*/
-    geometry_msgs::TransformStamped tf_msg;
+    geometry_msgs::msg::TransformStamped tf_msg;
     tf_msg.header.stamp    = msg->header.stamp;
     tf_msg.header.frame_id = ns_stable_origin_parent_frame_id_;
     tf_msg.child_frame_id  = ns_stable_origin_child_frame_id_;
 
     // transform pose to first frame_id
-    geometry_msgs::PoseStamped pose;
+    geometry_msgs::msg::PoseStamped pose;
     pose.header = msg->header;
     pose.pose   = msg->pose;
     if (pose.pose.orientation.w == 0 && pose.pose.orientation.z == 0 && pose.pose.orientation.y == 0 && pose.pose.orientation.x == 0) {
-      ROS_WARN_ONCE("[%s]: Uninitialized quaternion detected during publishing stable_origin tf of %s. Setting w=1", getPrintName().c_str(),
-                    pose.header.frame_id.c_str());
+      RCLCPP_WARN_ONCE(node_->get_logger(), "[%s]: Uninitialized quaternion detected during publishing stable_origin tf of %s. Setting w=1",
+                       getPrintName().c_str(), pose.header.frame_id.c_str());
       pose.pose.orientation.w = 1.0;
     }
 
     auto res = ch_->transformer->transformSingle(pose, first_frame_id_);
 
     if (res) {
-      const tf2::Transform      tf       = Support::tf2FromPose(res->pose);
-      const tf2::Transform      tf_inv   = tf.inverse();
-      const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
-      tf_msg.transform.translation       = Support::pointToVector3(pose_inv.position);
-      tf_msg.transform.rotation          = pose_inv.orientation;
+      const tf2::Transform           tf       = Support::tf2FromPose(res->pose);
+      const tf2::Transform           tf_inv   = tf.inverse();
+      const geometry_msgs::msg::Pose pose_inv = Support::poseFromTf2(tf_inv);
+      tf_msg.transform.translation            = Support::pointToVector3(pose_inv.position);
+      tf_msg.transform.rotation               = pose_inv.orientation;
 
       if (Support::noNans(tf_msg)) {
         try {
           broadcaster_->sendTransform(tf_msg);
         }
         catch (...) {
-          ROS_ERROR("exception caught ");
+          RCLCPP_ERROR(node_->get_logger(), "exception caught ");
         }
       } else {
-        ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                          tf_msg.child_frame_id.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                             tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
       }
-      ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                    tf_msg.child_frame_id.c_str());
+      RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
+                       tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     } else {
-      ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform pose to %s. Not publishing stable_origin transform.", getPrintName().c_str(), first_frame_id_.c_str());
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform pose to %s. Not publishing stable_origin transform.",
+                            getPrintName().c_str(), first_frame_id_.c_str());
       return;
     }
     /*//}*/
@@ -533,8 +552,8 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
   if (publish_fixed_origin_tf_) {
     /*//{ publish fixed_origin tf*/
     if (msg->header.frame_id != last_frame_id_) {
-      ROS_WARN("[%s]: Detected estimator change from %s to %s. Updating offset for fixed origin.", getPrintName().c_str(), last_frame_id_.c_str(),
-               msg->header.frame_id.c_str());
+      RCLCPP_WARN(node_->get_logger(), "[%s]: Detected estimator change from %s to %s. Updating offset for fixed origin.", getPrintName().c_str(),
+                  last_frame_id_.c_str(), msg->header.frame_id.c_str());
 
       pose_fixed_diff_ = Support::getPoseDiff(msg->pose, pose_fixed_);
     }
@@ -542,30 +561,30 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
     pose_fixed_ = Support::applyPoseDiff(msg->pose, pose_fixed_diff_);
 
-    geometry_msgs::TransformStamped tf_msg;
+    geometry_msgs::msg::TransformStamped tf_msg;
     tf_msg.header.stamp    = msg->header.stamp;
     tf_msg.header.frame_id = ns_fixed_origin_parent_frame_id_;
     tf_msg.child_frame_id  = ns_fixed_origin_child_frame_id_;
 
-    const tf2::Transform      tf       = Support::tf2FromPose(pose_fixed_);
-    const tf2::Transform      tf_inv   = tf.inverse();
-    const geometry_msgs::Pose pose_inv = Support::poseFromTf2(tf_inv);
-    tf_msg.transform.translation       = Support::pointToVector3(pose_inv.position);
-    tf_msg.transform.rotation          = pose_inv.orientation;
+    const tf2::Transform           tf       = Support::tf2FromPose(pose_fixed_);
+    const tf2::Transform           tf_inv   = tf.inverse();
+    const geometry_msgs::msg::Pose pose_inv = Support::poseFromTf2(tf_inv);
+    tf_msg.transform.translation            = Support::pointToVector3(pose_inv.position);
+    tf_msg.transform.rotation               = pose_inv.orientation;
 
     if (Support::noNans(tf_msg)) {
       try {
         broadcaster_->sendTransform(tf_msg);
       }
       catch (...) {
-        ROS_ERROR("exception caught ");
+        RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                        tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                  tf_msg.child_frame_id.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
+                     tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     /*//}*/
   }
 
@@ -575,7 +594,8 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
     const std::string last_estimator_name    = Support::frameIdToEstimatorName(last_frame_id_);
     const std::string current_estimator_name = Support::frameIdToEstimatorName(msg->header.frame_id);
 
-    ROS_INFO("[%s]: Detected estimator switch: %s -> %s", getPrintName().c_str(), last_estimator_name.c_str(), current_estimator_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: Detected estimator switch: %s -> %s", getPrintName().c_str(), last_estimator_name.c_str(),
+                current_estimator_name.c_str());
 
     bool   valid_utm_source_found = false;
     size_t potential_utm_source_index;
@@ -604,12 +624,12 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
       for (size_t i = 0; i < tf_sources_.size(); i++) {
         if (tf_sources_.at(i)->getIsUtmSource()) {
           tf_sources_.at(i)->setIsUtmSource(false);
-          ROS_INFO("[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
+          RCLCPP_INFO(node_->get_logger(), "[%s]: setting is_utm_source of estimator %s to false", getPrintName().c_str(), last_estimator_name.c_str());
         }
       }
 
       tf_sources_.at(potential_utm_source_index)->setIsUtmSource(true);
-      ROS_INFO("[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[%s]: setting is_utm_source of estimator %s to true", getPrintName().c_str(), current_estimator_name.c_str());
     }
   }
   /*//}*/
@@ -620,15 +640,15 @@ void TransformManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) 
 
 /*//{ callbackHeightAgl() */
 
-void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPtr msg) {
+void TransformManager::callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackHeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::callbackHeightAgl", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-  geometry_msgs::TransformStamped tf_msg;
+  geometry_msgs::msg::TransformStamped tf_msg;
   tf_msg.header.stamp    = msg->header.stamp;
   tf_msg.header.frame_id = ch_->frames.ns_fcu_untilted;
   tf_msg.child_frame_id  = msg->header.frame_id;
@@ -646,40 +666,39 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::Float64Stamped::ConstPt
       broadcaster_->sendTransform(tf_msg);
     }
     catch (...) {
-      ROS_ERROR("exception caught ");
+      RCLCPP_ERROR(node_->get_logger(), "exception caught ");
     }
   } else {
-    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                      tf_msg.child_frame_id.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                         tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
   }
-  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                tf_msg.child_frame_id.c_str());
+  RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
+                   tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
 }
 /*//}*/
 
 /*//{ callbackAmslAltitude() */
 
-void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::HwApiAltitude::ConstPtr msg) {
+void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::msg::HwApiAltitude::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
   // Currently not used. Not clear what this message from hw_api should be for. Transform manager publishes the AMSL altitude from RTK or GNSS messages.
-
 }
 /*//}*/
 
 /*//{ publishAmslTf() */
 
-void TransformManager::publishAmslTf(const double altitude, const ros::Time& stamp) {
+void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time& stamp) {
 
   if (!is_initialized_) {
     return;
   }
 
   // Currently not used. Not clear what this message should be for. Altitude data is taken eiter from RTK or GNSS.
-  geometry_msgs::TransformStamped tf_msg;
+  geometry_msgs::msg::TransformStamped tf_msg;
   tf_msg.header.stamp    = stamp;
   tf_msg.header.frame_id = ch_->frames.ns_fcu_untilted;
   tf_msg.child_frame_id  = ch_->frames.ns_amsl;
@@ -697,26 +716,25 @@ void TransformManager::publishAmslTf(const double altitude, const ros::Time& sta
       broadcaster_->sendTransform(tf_msg);
     }
     catch (...) {
-      ROS_ERROR("exception caught ");
+      RCLCPP_ERROR(node_->get_logger(), "exception caught ");
     }
   } else {
-    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                      tf_msg.child_frame_id.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                         tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
   }
-  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                tf_msg.child_frame_id.c_str());
-
+  RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
+                   tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
 }
 /*//}*/
 
 /*//{ callbackHwApiOrientation() */
-void TransformManager::callbackHwApiOrientation(const geometry_msgs::QuaternionStamped::ConstPtr msg) {
+void TransformManager::callbackHwApiOrientation(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   if (publish_fcu_untilted_tf_) {
     publishFcuUntiltedTf(msg);
@@ -725,13 +743,13 @@ void TransformManager::callbackHwApiOrientation(const geometry_msgs::QuaternionS
 /*//}*/
 
 /*//{ callbackGnss() */
-void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) {
+void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::callbackGnss", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   double out_x;
   double out_y;
@@ -739,16 +757,16 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
   mrs_lib::UTM(msg->latitude, msg->longitude, &out_x, &out_y);
 
   if (!std::isfinite(out_x)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
     return;
   }
 
   if (!std::isfinite(out_y)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
     return;
   }
 
-  geometry_msgs::Point utm_origin;
+  geometry_msgs::msg::Point utm_origin;
   utm_origin.x = out_x;
   utm_origin.y = out_y;
   utm_origin.z = msg->altitude;
@@ -759,7 +777,8 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
     return;
   }
 
-  ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
+  RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x,
+              utm_origin.y, utm_origin.z);
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
@@ -770,33 +789,33 @@ void TransformManager::callbackGnss(const sensor_msgs::NavSatFix::ConstPtr msg) 
 /*//}*/
 
 /*//{ callbackRtkGps() */
-void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
+void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::callbackRtkGps", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::callbackRtkGps", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-  geometry_msgs::PoseStamped rtk_pos;
+  geometry_msgs::msg::PoseStamped rtk_pos;
 
   if (!std::isfinite(msg->gps.latitude)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->latitude\"!!!", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->latitude\"!!!", getPrintName().c_str());
     return;
   }
 
   if (!std::isfinite(msg->gps.longitude)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->longitude\"!!!", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->longitude\"!!!", getPrintName().c_str());
     return;
   }
 
   if (!std::isfinite(msg->gps.altitude)) {
-    ROS_ERROR_THROTTLE(1.0, "[%s] NaN detected in RTK variable \"msg->altitude\"!!!", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->altitude\"!!!", getPrintName().c_str());
     return;
   }
 
-  if (msg->fix_type.fix_type != mrs_msgs::RtkFixType::RTK_FIX) {
-    ROS_INFO_THROTTLE(1.0, "[%s] %s RTK FIX", getPrintName().c_str(), Support::waiting_for_string.c_str());
+  if (msg->fix_type.fix_type != mrs_msgs::msg::RtkFixType::RTK_FIX) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s RTK FIX", getPrintName().c_str(), Support::waiting_for_string.c_str());
     return;
   }
 
@@ -810,11 +829,11 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
   if (res) {
     rtk_pos.pose = res.value();
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: transform to fcu failed", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transform to fcu failed", getPrintName().c_str());
     return;
   }
 
-  geometry_msgs::Point utm_origin;
+  geometry_msgs::msg::Point utm_origin;
   utm_origin.x = rtk_pos.pose.position.x;
   utm_origin.y = rtk_pos.pose.position.y;
   utm_origin.z = rtk_pos.pose.position.z;
@@ -825,7 +844,8 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
     return;
   }
 
-  ROS_INFO("[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x, utm_origin.y, utm_origin.z);
+  RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x,
+              utm_origin.y, utm_origin.z);
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
@@ -836,9 +856,9 @@ void TransformManager::callbackRtkGps(const mrs_msgs::RtkGps::ConstPtr msg) {
 /*//}*/
 
 /*//{ publishFcuUntiltedTf() */
-void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStampedConstPtr& msg) {
+void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg) {
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer("TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
   double heading;
 
@@ -846,7 +866,7 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
     heading = mrs_lib::AttitudeConverter(msg->quaternion).getHeading();
   }
   catch (...) {
-    ROS_ERROR("[%s]: Exception caught during getting heading", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Exception caught during getting heading", getPrintName().c_str());
     return;
   }
   scope_timer.checkpoint("heading");
@@ -859,8 +879,8 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
 
   scope_timer.checkpoint("q inverse");
 
-  geometry_msgs::TransformStamped tf;
-  tf.header.stamp            = msg->header.stamp;  // TODO(petrlmat) ros::Time::now()?
+  geometry_msgs::msg::TransformStamped tf;
+  tf.header.stamp            = msg->header.stamp;  // TODO(petrlmat) rclcpp::Time::now()?
   tf.header.frame_id         = ch_->frames.ns_fcu;
   tf.child_frame_id          = ch_->frames.ns_fcu_untilted;
   tf.transform.translation.x = 0.0;
@@ -872,7 +892,7 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
   if (Support::noNans(tf)) {
     broadcaster_->sendTransform(tf);
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: NaN encountered in fcu_untilted tf", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN encountered in fcu_untilted tf", getPrintName().c_str());
   }
   scope_timer.checkpoint("tf pub");
 }
@@ -881,9 +901,9 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::QuaternionStamp
 /* publishLocalTf() //{*/
 void TransformManager::publishLocalTf() {
 
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
-  geometry_msgs::TransformStamped tf_msg;
+  geometry_msgs::msg::TransformStamped tf_msg;
   tf_msg.header.stamp = pose_first_.header.stamp;
 
   tf_msg.header.frame_id       = ns_fixed_origin_child_frame_id_;
@@ -894,47 +914,47 @@ void TransformManager::publishLocalTf() {
   if (Support::noNans(tf_msg)) {
 
     try {
-      static_broadcaster_.sendTransform(tf_msg);
+      static_broadcaster_->sendTransform(tf_msg);
     }
     catch (...) {
-      ROS_ERROR("[%s]: exception caught while publishing tf from %s to %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                tf_msg.child_frame_id.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught while publishing tf from %s to %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
+                   tf_msg.child_frame_id.c_str());
     }
 
   } else {
-    ROS_WARN_THROTTLE(1.0, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                      tf_msg.child_frame_id.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                         tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
   }
-  ROS_INFO_ONCE("[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(),
-                tf_msg.child_frame_id.c_str());
+  RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
+                   tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
   is_local_static_tf_published_ = true;
 }
 /*//}*/
 
 /*//{ transformRtkToFcu() */
-std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::PoseStamped& pose_in) const {
+std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::msg::PoseStamped& pose_in) const {
 
-  geometry_msgs::PoseStamped pose_tmp = pose_in;
+  geometry_msgs::msg::PoseStamped pose_tmp = pose_in;
 
   // inject current orientation into rtk pose
-  auto res1 = ch_->transformer->getTransform(ch_->frames.ns_fcu_untilted, ch_->frames.ns_fcu, ros::Time::now());
+  auto res1 = ch_->transformer->getTransform(ch_->frames.ns_fcu_untilted, ch_->frames.ns_fcu, clock_->now());
   if (res1) {
     pose_tmp.pose.orientation = res1.value().transform.rotation;
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(), ch_->frames.ns_fcu_untilted.c_str(),
-                       ch_->frames.ns_fcu.c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(),
+                          ch_->frames.ns_fcu_untilted.c_str(), ch_->frames.ns_fcu.c_str());
     return {};
   }
 
   // invert tf
-  tf2::Transform             tf_utm_to_antenna = Support::tf2FromPose(pose_tmp.pose);
-  geometry_msgs::PoseStamped utm_in_antenna;
+  tf2::Transform                  tf_utm_to_antenna = Support::tf2FromPose(pose_tmp.pose);
+  geometry_msgs::msg::PoseStamped utm_in_antenna;
   utm_in_antenna.pose            = Support::poseFromTf2(tf_utm_to_antenna.inverse());
   utm_in_antenna.header.stamp    = pose_in.header.stamp;
   utm_in_antenna.header.frame_id = ch_->frames.ns_rtk_antenna;
 
   // transform to fcu
-  geometry_msgs::PoseStamped utm_in_fcu;
+  geometry_msgs::msg::PoseStamped utm_in_fcu;
   utm_in_fcu.header.frame_id = ch_->frames.ns_fcu;
   utm_in_fcu.header.stamp    = pose_in.header.stamp;
   auto res2                  = ch_->transformer->transformSingle(utm_in_antenna, ch_->frames.ns_fcu);
@@ -942,14 +962,14 @@ std::optional<geometry_msgs::Pose> TransformManager::transformRtkToFcu(const geo
   if (res2) {
     utm_in_fcu = res2.value();
   } else {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(), utm_in_antenna.header.frame_id.c_str(),
-                       ch_->frames.ns_fcu.c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(),
+                          utm_in_antenna.header.frame_id.c_str(), ch_->frames.ns_fcu.c_str());
     return {};
   }
 
   // invert tf
-  tf2::Transform      tf_fcu_to_utm = Support::tf2FromPose(utm_in_fcu.pose);
-  geometry_msgs::Pose fcu_in_utm    = Support::poseFromTf2(tf_fcu_to_utm.inverse());
+  tf2::Transform           tf_fcu_to_utm = Support::tf2FromPose(utm_in_fcu.pose);
+  geometry_msgs::msg::Pose fcu_in_utm    = Support::poseFromTf2(tf_fcu_to_utm.inverse());
 
   return fcu_in_utm;
 }
@@ -971,5 +991,5 @@ std::string TransformManager::getPrintName() const {
 
 }  // namespace mrs_uav_managers
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::transform_manager::TransformManager, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::transform_manager::TransformManager)

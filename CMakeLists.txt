@@ -56,9 +56,10 @@ include_directories(
 
 set(LIBRARIES
   MrsUavManagers_EstimationManager
+  MrsUavManagers_TransformManager
   )
 
-# ROS Wrapper for the Multirotor UAV System + controllers
+# Estimation Manager
 
 add_library(MrsUavManagers_EstimationManager SHARED
   src/estimation_manager/estimation_manager.cpp
@@ -72,6 +73,18 @@ ament_target_dependencies(MrsUavManagers_EstimationManager
 )
 
 rclcpp_components_register_nodes(MrsUavManagers_EstimationManager PLUGIN "mrs_uav_managers::estimation_manager::EstimationManager" EXECUTABLE MrsUavManagers_EstimationManager)
+
+# Transform Manager
+
+add_library(MrsUavManagers_TransformManager SHARED
+  src/transform_manager/transform_manager.cpp
+)
+
+ament_target_dependencies(MrsUavManagers_TransformManager
+  ${DEPENDENCIES}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_TransformManager PLUGIN "mrs_uav_managers::transform_manager::TransformManager" EXECUTABLE MrsUavManagers_TransformManager)
 
 ## --------------------------------------------------------------
 ## |                           install                          |
