@@ -787,6 +787,7 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
     tf_sources_[i]->setUtmOrigin(utm_origin);
     tf_sources_[i]->setWorldOrigin(world_origin_);
   }
+
   got_utm_offset_ = true;
 }
 /*//}*/
@@ -854,6 +855,7 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
     tf_sources_[i]->setUtmOrigin(utm_origin);
     tf_sources_[i]->setWorldOrigin(world_origin_);
   }
+
   got_utm_offset_ = true;
 }
 /*//}*/

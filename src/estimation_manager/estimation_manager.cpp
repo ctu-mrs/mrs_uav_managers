@@ -1106,7 +1106,7 @@ void EstimationManager::timerInitialization() {
 
   /*//{ initialize service clients */
 
-  srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "failsafe_out");
+  srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out");
 
   /*//}*/
 
