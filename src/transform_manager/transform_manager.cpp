@@ -166,7 +166,7 @@ TransformManager::TransformManager(rclcpp::NodeOptions options) : Node("estimati
 }
 /*//}*/
 
-/*//{ onInit() */
+/*//{ timerInitialization() */
 void TransformManager::timerInitialization() {
 
   node_  = this->shared_from_this();
@@ -174,7 +174,8 @@ void TransformManager::timerInitialization() {
 
   RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
-  broadcaster_ = std::make_shared<mrs_lib::TransformBroadcaster>();
+  broadcaster_        = std::make_shared<mrs_lib::TransformBroadcaster>(node_);
+  static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(node_);
 
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
   ch_->transformer->retryLookupNewest(true);
@@ -427,19 +428,19 @@ void TransformManager::timerInitialization() {
   shopts.threadsafe         = true;
   shopts.autostart          = true;
 
-  sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "uav_state_in", &TransformManager::callbackUavState, this);
+  sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "~/uav_state_in", &TransformManager::callbackUavState, this);
 
-  sh_height_agl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "height_agl_in", &TransformManager::callbackHeightAgl, this);
+  sh_height_agl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_agl_in", &TransformManager::callbackHeightAgl, this);
 
-  sh_altitude_amsl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiAltitude>(shopts, "altitude_amsl_in", &TransformManager::callbackAltitudeAmsl, this);
+  sh_altitude_amsl_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiAltitude>(shopts, "~/altitude_amsl_in", &TransformManager::callbackAltitudeAmsl, this);
 
   sh_hw_api_orientation_ =
-      mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, "orientation_in", &TransformManager::callbackHwApiOrientation, this);
+      mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, "~/orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
   if (utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin") {
-    sh_rtk_gps_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps>(shopts, "rtk_gps_in", &TransformManager::callbackRtkGps, this);
+    sh_rtk_gps_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps>(shopts, "~/rtk_gps_in", &TransformManager::callbackRtkGps, this);
   } else {
-    sh_gnss_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "gnss_in", &TransformManager::callbackGnss, this);
+    sh_gnss_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &TransformManager::callbackGnss, this);
   }
   /*//}*/
 
@@ -469,6 +470,8 @@ void TransformManager::timerInitialization() {
 
   is_initialized_ = true;
   RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
+
+  timer_initialization_->cancel();
 }
 /*//}*/
 

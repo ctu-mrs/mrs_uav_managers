@@ -1068,12 +1068,12 @@ void EstimationManager::timerInitialization() {
   /*//}*/
 
   /*//{ initialize publishers */
-  ph_uav_state_    = mrs_lib::PublisherHandler<mrs_msgs::msg::UavState>(node_, "uav_state_out");
-  ph_odom_main_    = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "odom_main_out");
-  ph_innovation_   = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "innovation_out");
-  ph_diagnostics_  = mrs_lib::PublisherHandler<mrs_msgs::msg::EstimationDiagnostics>(node_, "diagnostics_out");
-  ph_max_flight_z_ = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "max_flight_z_agl_out");
-  ph_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "height_agl_out");
+  ph_uav_state_    = mrs_lib::PublisherHandler<mrs_msgs::msg::UavState>(node_, "~/uav_state_out");
+  ph_odom_main_    = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "~/odom_main_out");
+  ph_innovation_   = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "~/innovation_out");
+  ph_diagnostics_  = mrs_lib::PublisherHandler<mrs_msgs::msg::EstimationDiagnostics>(node_, "~/diagnostics_out");
+  ph_max_flight_z_ = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/max_flight_z_agl_out");
+  ph_altitude_agl_ = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/height_agl_out");
 
   /*//}*/
 

@@ -4,6 +4,7 @@ import launch
 import os
 import sys
 
+import launch_ros
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch.actions import DeclareLaunchArgument
@@ -122,17 +123,15 @@ def generate_launch_description():
             ComposableNode(
 
                 package=pkg_name,
-                plugin='mrs_uav_managers::estimation_manager::EstimationManager',
+                plugin='mrs_uav_managers::transform_manager::TransformManager',
                 namespace=uav_name,
-                name='estimation_manager',
+                name='transform_manager',
                 parameters=[
                     {"uav_name": uav_name},
                     {"enable_profiler": False},
                     {'private_config': this_pkg_path + '/config/private/transform_manager/transform_manager.yaml'},
                     {'public_config': this_pkg_path + '/config/public/transform_manager/transform_manager.yaml'},
-                    {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},
-                    {'estimators_config': this_pkg_path + '/config/private/estimators.yaml'},
-                    {'active_estimators_config': this_pkg_path + '/config/public/active_estimators.yaml'},
+                    {'estimators_config': this_pkg_path + '/config/public/active_estimators.yaml'},
                     {'platform_config': platform_config},
                     {'custom_config': custom_config},
                     {'world_config': world_config},
@@ -140,24 +139,31 @@ def generate_launch_description():
 
                 remappings=[
                     # subscribers
-                    ("~/control_input_in", "control_manager/estimator_input"),
-                    ("~/imu_in", "hw_api/imu"),
-                    ("~/hw_api_capabilities_in", "hw_api/capabilities"),
-                    ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
-                    ("~/control_reference_in", "control_manager/control_reference"),
-                    ("~/controller_diagnostics_in", "control_manager/controller_diagnostics"),
+                    ("~/uav_state_in", "estimation_manager/uav_state"),
+                    ("~/height_agl_in", "estimation_manager/height_agl"),
+                    ("~/orientation_in", "hw_api/orientation"),
+                    ("~/gnss_in", "hw_api/gnss"),
+                    ("~/rtk_gps_in", "hw_api/rtk"),
+                    ("~/altitude_amsl_in", "hw_api/altitude"),
                     # publishers
-                    ("~/odom_main_out", "~/odom_main"),
-                    ("~/innovation_out", "~/innovation"),
-                    ("~/uav_state_out", "~/uav_state"),
-                    ("~/diagnostics_out", "~/diagnostics"),
-                    ("~/max_flight_z_agl_out", "~/max_flight_z_agl"),
-                    ("~/height_agl_out", "~/height_agl"),
+                    ("~/profiler", "profiler"),
+                    ("~/map_delay_out", "~/map_delay"),
                 ],
             )
 
         ],
 
     ))
+
+    ld.add_action(
+        # Nodes under test
+        launch_ros.actions.Node(
+            package='tf2_ros',
+            namespace='',
+            executable='static_transform_publisher',
+            name='fcu_to_rtk_antenna',
+            arguments=["0.0", "0.0", "0.20", "0", "0", "0", uav_name+"/fcu", uav_name+"/rtk_antenna"],
+        )
+    )
 
     return ld
