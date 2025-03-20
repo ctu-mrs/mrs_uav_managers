@@ -1,5 +1,7 @@
 #include <mrs_uav_managers/agl_estimator.h>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 namespace mrs_uav_managers
 {
 
@@ -21,10 +23,10 @@ void AglEstimator::publishCovariance() const {
 /*//}*/
 
 /*//{ isCompatibleWithHwApi() */
-bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
+bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr& hw_api_capabilities) const {
 
-  ph_->param_loader->addYamlFile(ros::package::getPath(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
-  ph_->param_loader->addYamlFile(ros::package::getPath(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
+  ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
+  ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
 
   ph_->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
@@ -42,52 +44,52 @@ bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstP
   ph_->param_loader->loadParam("requires/angular_velocity", requires_angular_velocity);
 
   if (!ph_->param_loader->loadedSuccessfully()) {
-    ROS_ERROR("[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
+    rclcpp::shutdown();
   }
 
   if (requires_gnss && !hw_api_capabilities->produces_gnss) {
-    ROS_ERROR("[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_imu && !hw_api_capabilities->produces_imu) {
-    ROS_ERROR("[%s]: requires imu but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires imu but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_distance_sensor && !hw_api_capabilities->produces_distance_sensor) {
-    ROS_ERROR("[%s]: requires distance_sensor but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires distance_sensor but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_altitude && !hw_api_capabilities->produces_altitude) {
-    ROS_ERROR("[%s]: requires altitude but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires altitude but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_magnetometer_heading && !hw_api_capabilities->produces_magnetometer_heading) {
-    ROS_ERROR("[%s]: requires magnetometer_heading but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires magnetometer_heading but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_position && !hw_api_capabilities->produces_position) {
-    ROS_ERROR("[%s]: requires position but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires position but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_orientation && !hw_api_capabilities->produces_orientation) {
-    ROS_ERROR("[%s]: requires orientation but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires orientation but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_velocity && !hw_api_capabilities->produces_velocity) {
-    ROS_ERROR("[%s]: requires velocity but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires velocity but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_angular_velocity && !hw_api_capabilities->produces_angular_velocity) {
-    ROS_ERROR("[%s]: requires angular_velocity but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires angular_velocity but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 

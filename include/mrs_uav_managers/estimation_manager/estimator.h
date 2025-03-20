@@ -3,17 +3,17 @@
 
 /* includes //{ */
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Dense>
 
-#include <nav_msgs/Odometry.h>
+#include <nav_msgs/msg/odometry.hpp>
 
-#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/msg/imu.hpp>
 
-#include <mrs_msgs/UavState.h>
-#include <mrs_msgs/EstimatorInput.h>
-#include <mrs_msgs/EstimatorDiagnostics.h>
+#include <mrs_msgs/msg/uav_state.hpp>
+#include <mrs_msgs/msg/estimator_input.hpp>
+#include <mrs_msgs/msg/estimator_diagnostics.hpp>
 
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/attitude_converter.h>
@@ -38,7 +38,10 @@ using namespace mrs_uav_managers::estimation_manager;
 class Estimator {
 
 protected:
-  mutable mrs_lib::PublisherHandler<mrs_msgs::EstimatorDiagnostics> ph_diagnostics_;
+  mutable mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorDiagnostics> ph_diagnostics_;
+
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
 
   const std::string type_;
   const std::string name_;
@@ -60,7 +63,9 @@ private:
   mutable std::mutex mutex_current_state_;
 
 protected:
-  Estimator(const std::string &type, const std::string &name, const std::string &frame_id) : type_(type), name_(name), frame_id_(frame_id) {
+  Estimator(const rclcpp::Node::SharedPtr &node, const std::string &type, const std::string &name, const std::string &frame_id)
+      : node_(node), type_(type), name_(name), frame_id_(frame_id) {
+    clock_ = node_->get_clock();
   }
 
   virtual ~Estimator(void) {
@@ -68,10 +73,10 @@ protected:
 
 public:
   // virtual methods
-  virtual void initialize(ros::NodeHandle &nh, const std::shared_ptr<CommonHandlers_t> &ch, const std::shared_ptr<PrivateHandlers_t> &ph) = 0;
-  virtual bool start(void)                                                                                                                = 0;
-  virtual bool pause(void)                                                                                                                = 0;
-  virtual bool reset(void)                                                                                                                = 0;
+  virtual void initialize(const rclcpp::Node::SharedPtr &node, const std::shared_ptr<CommonHandlers_t> &ch, const std::shared_ptr<PrivateHandlers_t> &ph) = 0;
+  virtual bool start(void)                                                                                                                                = 0;
+  virtual bool pause(void)                                                                                                                                = 0;
+  virtual bool reset(void)                                                                                                                                = 0;
 
   // implemented methods
   // access methods
@@ -100,10 +105,10 @@ public:
 
   void publishDiagnostics() const;
 
-  tf2::Vector3          getAccGlobal(const sensor_msgs::Imu::ConstPtr &input_msg, const double hdg);
-  tf2::Vector3          getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr &input_msg, const double hdg);
-  tf2::Vector3          getAccGlobal(const geometry_msgs::Vector3Stamped &acc_stamped, const double hdg);
-  std::optional<double> getHeadingRate(const nav_msgs::OdometryConstPtr &odom_msg);
+  tf2::Vector3          getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr &input_msg, const double hdg);
+  tf2::Vector3          getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstSharedPtr &input_msg, const double hdg);
+  tf2::Vector3          getAccGlobal(const geometry_msgs::msg::Vector3Stamped &acc_stamped, const double hdg);
+  std::optional<double> getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg);
 };
 
 }  // namespace mrs_uav_managers

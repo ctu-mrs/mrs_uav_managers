@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>mrs_uav_managers</name>
+  <version>1.0.4</version>
+  <description>The mrs_uav_managers package</description>
+
+  <author email="tomas.baca@fel.cvut.cz">Tomas Baca</author>
+  <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
+
+  <license>BSD 3-Clause</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cmake_modules</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>nodelet</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>mrs_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>mrs_lib</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>rostest</depend>
+  <depend>mrs_uav_testing</depend>
+
+  <export>
+    <nodelet plugin="${prefix}/nodelets.xml" />
+    <mrs_uav_managers plugin="${prefix}/plugins.xml" />
+  </export>
+
+</package>

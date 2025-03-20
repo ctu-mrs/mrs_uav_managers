@@ -14,7 +14,8 @@ bool Estimator::changeState(SMStates_t new_state) {
   previous_sm_state_ = getCurrentSmState();
   setCurrentSmState(new_state);
 
-  ROS_INFO("[%s]: Switching sm state %s -> %s", getPrintName().c_str(), getSmStateString(previous_sm_state_).c_str(), getCurrentSmStateString().c_str());
+  RCLCPP_INFO(node_->get_logger(), "[%s]: Switching sm state %s -> %s", getPrintName().c_str(), getSmStateString(previous_sm_state_).c_str(),
+              getCurrentSmStateString().c_str());
   return true;
 }
 /*//}*/
@@ -134,8 +135,8 @@ void Estimator::publishDiagnostics() const {
     return;
   }
 
-  mrs_msgs::EstimatorDiagnostics msg;
-  msg.header.stamp       = ros::Time::now();
+  mrs_msgs::msg::EstimatorDiagnostics msg;
+  msg.header.stamp       = clock_->now();
   msg.header.frame_id    = getFrameId();
   msg.estimator_name     = getName();
   msg.estimator_type     = getType();
@@ -146,40 +147,41 @@ void Estimator::publishDiagnostics() const {
 /*//}*/
 
 /*//{ getAccGlobal() */
-tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::Imu::ConstPtr& input_msg, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr& input_msg, const double hdg) {
 
-  geometry_msgs::Vector3Stamped acc_stamped;
+  geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->linear_acceleration;
   acc_stamped.header = input_msg->header;
   return getAccGlobal(acc_stamped, hdg);
 }
 
-tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::EstimatorInput::ConstPtr& input_msg, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstSharedPtr& input_msg, const double hdg) {
 
-  geometry_msgs::Vector3Stamped acc_stamped;
+  geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->control_acceleration;
   acc_stamped.header = input_msg->header;
   return getAccGlobal(acc_stamped, hdg);
 }
 
-tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::Vector3Stamped& acc_stamped, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped& acc_stamped, const double hdg) {
 
   // untilt the desired acceleration vector
-  geometry_msgs::Vector3Stamped des_acc;
-  geometry_msgs::Vector3        des_acc_untilted;
+  geometry_msgs::msg::Vector3Stamped des_acc;
+  geometry_msgs::msg::Vector3        des_acc_untilted;
   des_acc.vector.x        = acc_stamped.vector.x;
   des_acc.vector.y        = acc_stamped.vector.y;
   des_acc.vector.z        = acc_stamped.vector.z;
   des_acc.header.frame_id = ch_->frames.ns_fcu;
   des_acc.header.stamp    = acc_stamped.header.stamp;
   auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);
+
   if (response_acc) {
     des_acc_untilted.x = response_acc.value().vector.x;
     des_acc_untilted.y = response_acc.value().vector.y;
     des_acc_untilted.z = response_acc.value().vector.z;
   } else {
-    ROS_WARN_THROTTLE(1.0, "[%s]: Transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
-                      ch_->frames.ns_fcu_untilted.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
+                         ch_->frames.ns_fcu_untilted.c_str());
   }
 
   // rotate the desired acceleration vector to global frame
@@ -190,14 +192,14 @@ tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::Vector3Stamped& acc_st
 /*//}*/
 
 /*//{ getHeadingRate() */
-std::optional<double> Estimator::getHeadingRate(const nav_msgs::OdometryConstPtr& odom_msg) {
+std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr& odom_msg) {
 
   double hdg_rate;
   try {
     hdg_rate = mrs_lib::AttitudeConverter(odom_msg->pose.pose.orientation).getHeadingRate(odom_msg->twist.twist.angular);
   }
   catch (...) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: failed getting heading rate", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: failed getting heading rate", getPrintName().c_str());
     return {};
   }
   return hdg_rate;

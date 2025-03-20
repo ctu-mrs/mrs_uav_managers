@@ -5,10 +5,10 @@ namespace mrs_uav_managers
 
 
 /*//{ getUavState() */
-std::optional<mrs_msgs::UavState> StateEstimator::getUavState() {
+std::optional<mrs_msgs::msg::UavState> StateEstimator::getUavState() {
 
   if (!isRunning()) {
-    ROS_ERROR_THROTTLE(1.0, "[%s]: getUavState() was called while estimator is not running", getPrintName().c_str());
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: getUavState() was called while estimator is not running", getPrintName().c_str());
     return {};
   }
 
@@ -17,7 +17,7 @@ std::optional<mrs_msgs::UavState> StateEstimator::getUavState() {
 /*//}*/
 
 /*//{ getInnovation() */
-nav_msgs::Odometry StateEstimator::getInnovation() const {
+nav_msgs::msg::Odometry StateEstimator::getInnovation() const {
   return mrs_lib::get_mutexed(mtx_innovation_, innovation_);
 }
 /*//}*/
@@ -81,7 +81,7 @@ void StateEstimator::publishInnovation() const {
 /*//}*/
 
 /*//{ rotateQuaternionByHeading() */
-std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeading(const geometry_msgs::Quaternion& q, const double hdg) const {
+std::optional<geometry_msgs::msg::Quaternion> StateEstimator::rotateQuaternionByHeading(const geometry_msgs::msg::Quaternion& q, const double hdg) const {
 
   try {
     tf2::Quaternion tf2_q = mrs_lib::AttitudeConverter(q);
@@ -94,18 +94,18 @@ std::optional<geometry_msgs::Quaternion> StateEstimator::rotateQuaternionByHeadi
     tf2::Matrix3x3 rot_mat = mrs_lib::AttitudeConverter(Eigen::AngleAxisd(hdg - q_hdg, Eigen::Vector3d::UnitZ()));
 
     // Transform the quaternion orientation by the rotation matrix
-    geometry_msgs::Quaternion q_new = mrs_lib::AttitudeConverter(tf2::Transform(rot_mat) * tf2_q);
+    geometry_msgs::msg::Quaternion q_new = mrs_lib::AttitudeConverter(tf2::Transform(rot_mat) * tf2_q);
     return q_new;
   }
   catch (...) {
-    ROS_WARN("[rotateQuaternionByHeading()]: failed to rotate quaternion by heading");
+    RCLCPP_WARN(node_->get_logger(), "[rotateQuaternionByHeading()]: failed to rotate quaternion by heading");
     return {};
   }
 }
 /*//}*/
 
 /*//{ isCompatibleWithHwApi() */
-bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesConstPtr& hw_api_capabilities) const {
+bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr& hw_api_capabilities) const {
 
   ph_->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/" + getName() + "/");
 
@@ -123,52 +123,52 @@ bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::HwApiCapabilitiesCons
   ph_->param_loader->loadParam("requires/angular_velocity", requires_angular_velocity);
 
   if (!ph_->param_loader->loadedSuccessfully()) {
-    ROS_ERROR("[%s]: Could not load all non-optional hw_api compatibility parameters. Shutting down.", getPrintName().c_str());
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional hw_api compatibility parameters. Shutting down.", getPrintName().c_str());
+    rclcpp::shutdown();
   }
 
   if (requires_gnss && !hw_api_capabilities->produces_gnss) {
-    ROS_ERROR("[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_imu && !hw_api_capabilities->produces_imu) {
-    ROS_ERROR("[%s]: requires imu but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires imu but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_distance_sensor && !hw_api_capabilities->produces_distance_sensor) {
-    ROS_ERROR("[%s]: requires distance_sensor but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires distance_sensor but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_altitude && !hw_api_capabilities->produces_altitude) {
-    ROS_ERROR("[%s]: requires altitude but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires altitude but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_magnetometer_heading && !hw_api_capabilities->produces_magnetometer_heading) {
-    ROS_ERROR("[%s]: requires magnetometer_heading but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires magnetometer_heading but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_position && !hw_api_capabilities->produces_position) {
-    ROS_ERROR("[%s]: requires position but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires position but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_orientation && !hw_api_capabilities->produces_orientation) {
-    ROS_ERROR("[%s]: requires orientation but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires orientation but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_velocity && !hw_api_capabilities->produces_velocity) {
-    ROS_ERROR("[%s]: requires velocity but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires velocity but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
   if (requires_angular_velocity && !hw_api_capabilities->produces_angular_velocity) {
-    ROS_ERROR("[%s]: requires angular_velocity but hw api does not provide it.", getPrintName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: requires angular_velocity but hw api does not provide it.", getPrintName().c_str());
     return false;
   }
 
