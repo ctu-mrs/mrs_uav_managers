@@ -56,8 +56,8 @@ protected:
   mutable mrs_lib::PublisherHandler<geometry_msgs::msg::QuaternionStamped> ph_attitude_;
 
 public:
-  StateEstimator(const rclcpp::Node::SharedPtr &node, const std::string &name, const std::string &frame_id, const std::string &package_name)
-      : Estimator(node, state::type, name, frame_id), package_name_(package_name) {
+  StateEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name)
+      : Estimator(state::type, name, frame_id), package_name_(package_name) {
   }
 
   virtual ~StateEstimator(void) {

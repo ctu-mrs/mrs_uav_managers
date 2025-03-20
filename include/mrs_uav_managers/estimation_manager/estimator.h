@@ -63,9 +63,7 @@ private:
   mutable std::mutex mutex_current_state_;
 
 protected:
-  Estimator(const rclcpp::Node::SharedPtr &node, const std::string &type, const std::string &name, const std::string &frame_id)
-      : node_(node), type_(type), name_(name), frame_id_(frame_id) {
-    clock_ = node_->get_clock();
+  Estimator(const std::string &type, const std::string &name, const std::string &frame_id) : type_(type), name_(name), frame_id_(frame_id) {
   }
 
   virtual ~Estimator(void) {

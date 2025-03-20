@@ -36,8 +36,6 @@ class AglEstimator : public Estimator {
 protected:
   const std::string package_name_ = "mrs_uav_state_estimators";
 
-  rclcpp::Node::SharedPtr node_;
-
   mrs_msgs::msg::Float64Stamped agl_height_;
   mrs_msgs::msg::Float64Stamped agl_height_init_;
   mutable std::mutex            mtx_agl_height_;
@@ -53,8 +51,8 @@ protected:
   mutable mrs_lib::PublisherHandler<mrs_msgs::msg::Float64ArrayStamped> ph_agl_height_cov_;
 
 public:
-  AglEstimator(rclcpp::Node::SharedPtr &node, const std::string &name, const std::string &frame_id, const std::string &package_name)
-      : Estimator(node, agl::type, name, frame_id), package_name_(package_name) {
+  AglEstimator(const std::string &name, const std::string &frame_id, const std::string &package_name)
+      : Estimator(agl::type, name, frame_id), package_name_(package_name) {
   }
 
   virtual ~AglEstimator(void) {

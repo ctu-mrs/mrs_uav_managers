@@ -3,18 +3,18 @@ mrs_uav_managers:
   estimation_manager:
 
     gps_garmin:
-      address: "mrs_uav_state_estimators/GpsGarmin"
+      address: "mrs_uav_state_estimators::GpsGarmin"
     gps_baro:
-      address: "mrs_uav_state_estimators/GpsBaro"
+      address: "mrs_uav_state_estimators::gps_baro::GpsBaro"
     rtk:
-      address: "mrs_uav_state_estimators/Rtk"
+      address: "mrs_uav_state_estimators::Rtk"
     rtk_garmin:
-      address: "mrs_uav_state_estimators/RtkGarmin"
+      address: "mrs_uav_state_estimators::RtkGarmin"
     passthrough:
-      address: "mrs_uav_state_estimators/Passthrough"
+      address: "mrs_uav_state_estimators::Passthrough"
     ground_truth:
-      address: "mrs_uav_state_estimators/GroundTruth"
+      address: "mrs_uav_state_estimators::GroundTruth"
     dummy:
-      address: "mrs_uav_state_estimators/Dummy"
+      address: "mrs_uav_state_estimators::Dummy"
     garmin_agl:
-      address: "mrs_uav_state_estimators/GarminAgl"
+      address: "mrs_uav_state_estimators::GarminAgl"

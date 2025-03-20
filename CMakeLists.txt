@@ -17,8 +17,11 @@ if(MRS_ENABLE_TESTING)
   add_definitions("-O0")
   add_definitions("-g")
 else()
-  add_definitions("-O2")
+  # add_definitions("-O2")
 endif()
+
+add_definitions("-O0")
+add_definitions("-g")
 
 if(COVERAGE)
   message(WARNING "building with --coverage, the performance might be limited")
@@ -74,30 +77,49 @@ rclcpp_components_register_nodes(MrsUavManagers_EstimationManager PLUGIN "mrs_ua
 ## |                           install                          |
 ## --------------------------------------------------------------
 
+ament_export_libraries(
+  ${LIBRARIES}
+)
+
 install(
   TARGETS ${LIBRARIES}
+  EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY include
+install(
+  DIRECTORY include
   DESTINATION .
 )
 
-install(DIRECTORY launch
+install(
+  DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(DIRECTORY config
+install(
+  DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(DIRECTORY scripts
+install(
+  DIRECTORY scripts
   USE_SOURCE_PERMISSIONS
   DESTINATION share/${PROJECT_NAME}
 )
 
-ament_export_include_directories(include)
+ament_export_include_directories(
+  include
+)
+
+ament_export_targets(
+  export_${PROJECT_NAME} HAS_LIBRARY_TARGET
+)
+
+ament_export_dependencies(
+  ${DEPENDENCIES}
+)
 
 ament_package()

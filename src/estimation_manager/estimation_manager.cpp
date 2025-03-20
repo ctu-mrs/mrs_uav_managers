@@ -315,6 +315,7 @@ private:
 /*//}*/
 
 /*//{ class EstimationManager */
+
 class EstimationManager : public rclcpp::Node {
 
 private:
@@ -323,6 +324,8 @@ private:
 
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_main_;
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -418,7 +421,7 @@ public:
 };
 /*//}*/
 
-/*//{ MultirotorSimulator() */
+/*//{ EstimationManager() */
 EstimationManager::EstimationManager(rclcpp::NodeOptions options) : Node("estimation_manager", options) {
 
   RCLCPP_INFO(get_logger(), "[%s]: initializing", getName().c_str());
@@ -732,8 +735,10 @@ void EstimationManager::timerCheckHealth() {
 /*//{ timerInitialization() */
 void EstimationManager::timerInitialization() {
 
-  node_->shared_from_this();
+  node_  = this->shared_from_this();
   clock_ = node_->get_clock();
+
+  cbkgrp_main_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   sm_ = std::make_shared<StateMachine>(node_, nodelet_name_);
 
@@ -845,41 +850,60 @@ void EstimationManager::timerInitialization() {
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
-  shopts.node               = node_;
-  shopts.node_name          = getName();
-  shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
+  shopts.node                                = node_;
+  shopts.node_name                           = getName();
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_main_;
 
   /*//{ wait for hw api message */
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_ =
-      mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+      mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
+
   while (!sh_hw_api_capabilities_.hasMsg()) {
     RCLCPP_INFO(node_->get_logger(), "[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
                 sh_hw_api_capabilities_.topicName().c_str());
+
     clock_->sleep_for(1s);
   }
 
   mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
+
   /*//}*/
 
   /*//{ wait for desired uav_state rate */
-  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-  while (!sh_control_manager_diag_.hasMsg()) {
+
+  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
+
+  for (int i = 0; i < 1; i++) {
+
     RCLCPP_INFO(node_->get_logger(), "[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
                 sh_control_manager_diag_.topicName().c_str());
+
+    if (sh_control_manager_diag_.hasMsg()) {
+
+      mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
+      ch_->desired_uav_state_rate                                                       = control_manager_diag_msg->desired_uav_state_rate;
+    }
+
     clock_->sleep_for(1s);
   }
 
-  mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
-  ch_->desired_uav_state_rate                                                       = control_manager_diag_msg->desired_uav_state_rate;
+  if (!sh_control_manager_diag_.hasMsg()) {
+
+    RCLCPP_WARN(node_->get_logger(), "Not received control_manager_diagnostics, setting fallback estimation rate");
+    ch_->desired_uav_state_rate = 100;
+  }
+
   RCLCPP_INFO(node_->get_logger(), "[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
+
   /*//}*/
 
   /*//{ initialize subscribers */
 
-  sh_control_input_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimatorInput>(shopts, "control_input_in");
+  sh_control_input_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimatorInput>(shopts, "~/control_input_in");
 
   /*//}*/
 
