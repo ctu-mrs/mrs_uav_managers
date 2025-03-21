@@ -17,11 +17,8 @@ if(MRS_ENABLE_TESTING)
   add_definitions("-O0")
   add_definitions("-g")
 else()
-  # add_definitions("-O2")
+  add_definitions("-O2")
 endif()
-
-add_definitions("-O0")
-add_definitions("-g")
 
 if(COVERAGE)
   message(WARNING "building with --coverage, the performance might be limited")
@@ -45,6 +42,11 @@ set(DEPENDENCIES
   Eigen3
 )
 
+set(LIBRARIES
+  MrsUavManagers_EstimationManager
+  MrsUavManagers_TransformManager
+  )
+
 foreach(DEP IN LISTS DEPENDENCIES)
   find_package(${DEP} REQUIRED)
 endforeach()
@@ -52,12 +54,8 @@ endforeach()
 include_directories(
   include
   ${rclcpp_INCLUDE_DIRS}
+  ${mrs_lib_INCLUDE_DIRS}
 )
-
-set(LIBRARIES
-  MrsUavManagers_EstimationManager
-  MrsUavManagers_TransformManager
-  )
 
 # Estimation Manager
 
