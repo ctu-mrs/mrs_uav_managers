@@ -27,7 +27,6 @@
 #include <mrs_lib/gps_conversions.h>
 #include <mrs_lib/scope_timer.h>
 
-
 #include <mrs_uav_managers/state_estimator.h>
 #include <mrs_uav_managers/agl_estimator.h>
 #include <mrs_uav_managers/estimation_manager/support.h>
@@ -41,6 +40,16 @@
 /* using //{ */
 
 using namespace std::chrono_literals;
+
+//}
+
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 //}
 
@@ -353,14 +362,14 @@ private:
 
   mrs_lib::PublisherHandler<geometry_msgs::msg::QuaternionStamped> ph_orientation_;
 
-  std::shared_ptr<mrs_lib::ROSTimer> timer_publish_;
-  void                               timerPublish();
+  std::shared_ptr<TimerType> timer_publish_;
+  void                       timerPublish();
 
-  std::shared_ptr<mrs_lib::ROSTimer> timer_publish_diagnostics_;
-  void                               timerPublishDiagnostics();
+  std::shared_ptr<TimerType> timer_publish_diagnostics_;
+  void                       timerPublishDiagnostics();
 
-  std::shared_ptr<mrs_lib::ROSTimer> timer_check_health_;
-  void                               timerCheckHealth();
+  std::shared_ptr<TimerType> timer_check_health_;
+  void                       timerCheckHealth();
 
   rclcpp::TimerBase::SharedPtr timer_initialization_;
   void                         timerInitialization();
@@ -1087,19 +1096,19 @@ void EstimationManager::timerInitialization() {
   {
     std::function<void()> callback_fcn = std::bind(&EstimationManager::timerPublish, this);
 
-    timer_publish_ = std::make_shared<mrs_lib::ROSTimer>(opts, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), callback_fcn);
+    timer_publish_ = std::make_shared<TimerType>(opts, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), callback_fcn);
   }
 
   {
     std::function<void()> callback_fcn = std::bind(&EstimationManager::timerPublishDiagnostics, this);
 
-    timer_publish_diagnostics_ = std::make_shared<mrs_lib::ROSTimer>(opts, rclcpp::Rate(ch_->desired_diagnostics_rate, clock_), callback_fcn);
+    timer_publish_diagnostics_ = std::make_shared<TimerType>(opts, rclcpp::Rate(ch_->desired_diagnostics_rate, clock_), callback_fcn);
   }
 
   {
     std::function<void()> callback_fcn = std::bind(&EstimationManager::timerCheckHealth, this);
 
-    timer_check_health_ = std::make_shared<mrs_lib::ROSTimer>(opts, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), callback_fcn);
+    timer_check_health_ = std::make_shared<TimerType>(opts, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), callback_fcn);
   }
 
   /*//}*/

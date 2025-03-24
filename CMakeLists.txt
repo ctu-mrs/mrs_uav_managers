@@ -5,7 +5,14 @@ project(mrs_uav_managers)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# 1 == use rclcpp::Timer implementation
+# 0 == use MRS's thread timer implementation
+set(USE_ROS_TIMER 0)
+
+if(${USE_ROS_TIMER})
+  MESSAGE(WARNING "[mrs_uav_managers]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
+endif()
 
 # set the compile options to show code warnings
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -16,8 +23,6 @@ if(MRS_ENABLE_TESTING)
   message(WARNING "Setting optimizaton levels for tests")
   add_definitions("-O0")
   add_definitions("-g")
-else()
-  add_definitions("-O2")
 endif()
 
 if(COVERAGE)
@@ -57,6 +62,10 @@ include_directories(
   ${mrs_lib_INCLUDE_DIRS}
 )
 
+## --------------------------------------------------------------
+## |                           Compile                          |
+## --------------------------------------------------------------
+
 # Estimation Manager
 
 add_library(MrsUavManagers_EstimationManager SHARED
@@ -72,6 +81,8 @@ ament_target_dependencies(MrsUavManagers_EstimationManager
 
 rclcpp_components_register_nodes(MrsUavManagers_EstimationManager PLUGIN "mrs_uav_managers::estimation_manager::EstimationManager" EXECUTABLE MrsUavManagers_EstimationManager)
 
+target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
 # Transform Manager
 
 add_library(MrsUavManagers_TransformManager SHARED
@@ -83,6 +94,8 @@ ament_target_dependencies(MrsUavManagers_TransformManager
 )
 
 rclcpp_components_register_nodes(MrsUavManagers_TransformManager PLUGIN "mrs_uav_managers::transform_manager::TransformManager" EXECUTABLE MrsUavManagers_TransformManager)
+
+target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                           install                          |
