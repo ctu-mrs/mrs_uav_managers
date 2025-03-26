@@ -175,8 +175,7 @@ typedef enum
 class ControllerParams {
 
 public:
-  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold,
-                   bool human_switchable);
+  ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold, bool human_switchable);
 
 public:
   double      failsafe_threshold;
@@ -187,8 +186,7 @@ public:
   bool        human_switchable;
 };
 
-ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold,
-                                   double odometry_innovation_threshold, bool human_switchable) {
+ControllerParams::ControllerParams(std::string address, std::string name_space, double eland_threshold, double failsafe_threshold, double odometry_innovation_threshold, bool human_switchable) {
 
   this->eland_threshold               = eland_threshold;
   this->odometry_innovation_threshold = odometry_innovation_threshold;
@@ -594,8 +592,7 @@ private:
   // switching controller and tracker services
   bool callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
   bool callbackSwitchController(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
-  bool callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                  const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // reference callbacks
   void callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg);
@@ -607,64 +604,45 @@ private:
   bool callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
   bool callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
   bool callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
-  bool callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
-                                        const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response);
-  bool callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
-                                          const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response);
-  bool callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                  const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response);
+  bool callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response);
+  bool callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   // safety callbacks
   bool callbackHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackStartTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackStopTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                      const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackResumeTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                        const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackGotoTrajectoryStart(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackStartTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackStopTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackResumeTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackGotoTrajectoryStart(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                  const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackSetMinZ(const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Request>  request,
-                       const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Response> response);
+  bool callbackSetMinZ(const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Response> response);
   bool callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
-  bool callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                               const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
   bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request, const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response);
 
-  bool callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
-  bool callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                   const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
-  bool callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
-                                      const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response);
+  bool callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response);
 
   // transformation callbacks
-  bool callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request>  request,
-                                  const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response);
-  bool callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request>  request,
-                                       const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response);
-  bool callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request>  request,
-                             const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response);
-  bool callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request>  request,
-                                const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response);
+  bool callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response);
+  bool callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response);
+  bool callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response);
+  bool callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response);
 
   // | ----------------------- constraints ---------------------- |
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>  request,
-                              const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response> response);
+  bool callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response> response);
 
   // constraints management
   bool              got_constraints_ = false;
@@ -674,8 +652,7 @@ private:
   void              setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
   std::atomic<bool> constraints_being_enforced_ = false;
 
-  std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> enforceControllersConstraints(
-      const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
+  std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> enforceControllersConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
 
   mrs_msgs::srv::DynamicsConstraintsSrv::Request current_constraints_;
   mrs_msgs::srv::DynamicsConstraintsSrv::Request sanitized_constraints_;
@@ -797,7 +774,7 @@ private:
   std::mutex mutex_pirouette_;
   double     pirouette_initial_heading_;
   double     pirouette_iterator_;
-  bool callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool       callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // | -------------------- joystick control -------------------- |
 
@@ -870,8 +847,7 @@ private:
   std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped& reference_in);
 
   // sets the reference trajectory to the active tracker
-  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
-      const mrs_msgs::msg::TrajectoryReference trajectory_in);
+  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in);
 
   // publishes
   void publish(void);
@@ -1210,8 +1186,7 @@ void ControlManager::initialize(void) {
 
   // check the values of tracker error action
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
-    RCLCPP_ERROR(node_->get_logger(), "the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
-                 EHOVER_STR);
+    RCLCPP_ERROR(node_->get_logger(), "the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR, EHOVER_STR);
     rclcpp::shutdown();
   }
 
@@ -1330,8 +1305,7 @@ void ControlManager::initialize(void) {
     it = trackers_.find(_tracker_names_.at(i));
 
     // create private handlers
-    std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers =
-        std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
+    std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
     private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
@@ -1509,13 +1483,11 @@ void ControlManager::initialize(void) {
       bool meets_velocity_hdg          = (_hw_api_inputs_.velocity_hdg && outputs.velocity_hdg);
       bool meets_position              = (_hw_api_inputs_.position && outputs.position);
 
-      bool meets_requirements = meets_actuators || meets_control_group || meets_attitude_rate || meets_attitude || meets_acceleration_hdg_rate ||
-                                meets_acceleration_hdg || meets_velocity_hdg_rate || meets_velocity_hdg || meets_position;
+      bool meets_requirements = meets_actuators || meets_control_group || meets_attitude_rate || meets_attitude || meets_acceleration_hdg_rate || meets_acceleration_hdg || meets_velocity_hdg_rate || meets_velocity_hdg || meets_position;
 
       if (!meets_requirements) {
 
-        RCLCPP_ERROR(node_->get_logger(), "the controller '%s' does not meet the control output requirements, which are some of the following",
-                     controller_name.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "the controller '%s' does not meet the control output requirements, which are some of the following", controller_name.c_str());
 
         if (_hw_api_inputs_.actuators) {
           RCLCPP_ERROR(node_->get_logger(), "- actuators");
@@ -1557,8 +1529,7 @@ void ControlManager::initialize(void) {
       }
 
       if ((_hw_api_inputs_.actuators || _hw_api_inputs_.control_group) && !common_handlers_->detailed_model_params) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
+        RCLCPP_ERROR(node_->get_logger(), "the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
         rclcpp::shutdown();
       }
     }
@@ -1630,8 +1601,7 @@ void ControlManager::initialize(void) {
     it = controllers_.find(_controller_names_.at(i));
 
     // create private handlers
-    std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers =
-        std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
+    std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
     private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
@@ -1722,8 +1692,7 @@ void ControlManager::initialize(void) {
     if (idx) {
       _joystick_fallback_controller_idx_ = idx.value();
     } else {
-      RCLCPP_ERROR(node_->get_logger(), "the joystick fallback controller (%s) is not within the loaded controllers",
-                   _joystick_fallback_controller_name_.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "the joystick fallback controller (%s) is not within the loaded controllers", _joystick_fallback_controller_name_.c_str());
       rclcpp::shutdown();
     }
   }
@@ -1890,77 +1859,119 @@ void ControlManager::initialize(void) {
   // | -------------------- general services -------------------- |
 
   service_server_switch_tracker_             = node_->create_service<mrs_msgs::srv::String>("switch_tracker_in", std::bind(&ControlManager::callbackSwitchTracker, this, std::placeholders::_1, std::placeholders::_2));
-  service_server_switch_controller_          = node_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_server_reset_tracker_              = node_.advertiseService("tracker_reset_static_in", &ControlManager::callbackTrackerResetStatic, this);
-  service_server_hover_                      = node_.advertiseService("hover_in", &ControlManager::callbackHover, this);
-  service_server_ehover_                     = node_.advertiseService("ehover_in", &ControlManager::callbackEHover, this);
-  service_server_failsafe_                   = node_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-  service_server_failsafe_escalating_        = node_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_toggle_output_              = node_.advertiseService("toggle_output_in", &ControlManager::callbackToggleOutput, this);
-  service_server_arm_                        = node_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-  service_server_enable_callbacks_           = node_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-  service_server_set_constraints_            = node_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-  service_server_use_joystick_               = node_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-  service_server_use_safety_area_            = node_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
-  service_server_eland_                      = node_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_parachute_                  = node_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
-  service_server_set_min_z_                  = node_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
-  service_server_transform_reference_        = node_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_reference_array_  = node_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
-  service_server_transform_pose_             = node_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
-  service_server_transform_vector3_          = node_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
-  service_server_bumper_enabler_             = node_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
-  service_server_get_min_z_                  = node_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
-  service_server_validate_reference_         = node_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
-  service_server_validate_reference_2d_      = node_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_array_   = node_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
-  service_server_start_trajectory_tracking_  = node_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
-  service_server_stop_trajectory_tracking_   = node_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
-  service_server_resume_trajectory_tracking_ = node_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
-  service_server_goto_trajectory_start_      = node_.advertiseService("goto_trajectory_start_in", &ControlManager::callbackGotoTrajectoryStart, this);
+  service_server_switch_controller_          = node_->create_service<mrs_msgs::srv::String>("switch_controller_in", std::bind(&ControlManager::callbackSwitchController, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_reset_tracker_              = node_->create_service<std_srvs::srv::Trigger>("tracker_reset_static_in", std::bind(&ControlManager::callbackTrackerResetStatic, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_hover_                      = node_->create_service<std_srvs::srv::Trigger>("hover_in", std::bind(&ControlManager::callbackHover, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_ehover_                     = node_->create_service<std_srvs::srv::Trigger>("ehover_in", std::bind(&ControlManager::callbackEHover, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_failsafe_                   = node_->create_service<std_srvs::srv::Trigger>("failsafe_in", std::bind(&ControlManager::callbackFailsafe, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_failsafe_escalating_        = node_->create_service<std_srvs::srv::Trigger>("failsafe_escalating_in", std::bind(&ControlManager::callbackFailsafeEscalating, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_toggle_output_              = node_->create_service<std_srvs::srv::SetBool>("toggle_output_in", std::bind(&ControlManager::callbackToggleOutput, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_arm_                        = node_->create_service<std_srvs::srv::SetBool>("arm_in", std::bind(&ControlManager::callbackArm, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_enable_callbacks_           = node_->create_service<std_srvs::srv::SetBool>("enable_callbacks_in", std::bind(&ControlManager::callbackEnableCallbacks, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_set_constraints_            = node_->create_service<mrs_msgs::srv::DynamicsConstraintsSrv>("set_constraints_in", std::bind(&ControlManager::callbackSetConstraints, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_use_joystick_               = node_->create_service<std_srvs::srv::Trigger>("use_joystick_in", std::bind(&ControlManager::callbackUseJoystick, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_use_safety_area_            = node_->create_service<std_srvs::srv::SetBool>("use_safety_area_in", std::bind(&ControlManager::callbackUseSafetyArea, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_eland_                      = node_->create_service<std_srvs::srv::Trigger>("eland_in", std::bind(&ControlManager::callbackEland, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_parachute_                  = node_->create_service<std_srvs::srv::Trigger>("parachute_in", std::bind(&ControlManager::callbackParachute, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_set_min_z_                  = node_->create_service<mrs_msgs::srv::Float64StampedSrv>("set_min_z_in", std::bind(&ControlManager::callbackSetMinZ, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_transform_reference_        = node_->create_service<mrs_msgs::srv::TransformReferenceSrv>("transform_reference_in", std::bind(&ControlManager::callbackTransformReference, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_transform_reference_array_  = node_->create_service<mrs_msgs::srv::TransformReferenceArraySrv>("transform_reference_array_in", std::bind(&ControlManager::callbackTransformReferenceArray, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_transform_pose_             = node_->create_service<mrs_msgs::srv::TransformPoseSrv>("transform_pose_in", std::bind(&ControlManager::callbackTransformPose, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_transform_vector3_          = node_->create_service<mrs_msgs::srv::TransformVector3Srv>("transform_vector3_in", std::bind(&ControlManager::callbackTransformVector3, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_bumper_enabler_             = node_->create_service<std_srvs::srv::SetBool>("bumper_in", std::bind(&ControlManager::callbackEnableBumper, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_get_min_z_                  = node_->create_service<mrs_msgs::srv::GetFloat64>("get_min_z_in", std::bind(&ControlManager::callbackGetMinZ, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_validate_reference_         = node_->create_service<mrs_msgs::srv::ValidateReference>("validate_reference_in", std::bind(&ControlManager::callbackValidateReference, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_validate_reference_2d_      = node_->create_service<mrs_msgs::srv::ValidateReference>("validate_reference_2d_in", std::bind(&ControlManager::callbackValidateReference2d, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_validate_reference_array_   = node_->create_service<mrs_msgs::srv::ValidateReferenceArray>("validate_reference_array_in", std::bind(&ControlManager::callbackValidateReferenceArray, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_start_trajectory_tracking_  = node_->create_service<std_srvs::srv::Trigger>("start_trajectory_tracking_in", std::bind(&ControlManager::callbackStartTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_stop_trajectory_tracking_   = node_->create_service<std_srvs::srv::Trigger>("stop_trajectory_tracking_in", std::bind(&ControlManager::callbackStopTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_resume_trajectory_tracking_ = node_->create_service<std_srvs::srv::Trigger>("resume_trajectory_tracking_in", std::bind(&ControlManager::callbackResumeTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_goto_trajectory_start_      = node_->create_service<std_srvs::srv::Trigger>("goto_trajectory_start_in", std::bind(&ControlManager::callbackGotoTrajectoryStart, this, std::placeholders::_1, std::placeholders::_2));
 
-  sch_arming_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(node_, "hw_api_arming_out");
-  sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "eland_out");
-  sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "shutdown_out");
-  sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(node_, "set_odometry_callbacks_out");
-  sch_ungrip_                 = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "ungrip_out");
-  sch_parachute_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "parachute_out");
+  sch_arming_                 = mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool>(node_, "hw_api_arming_out");
+  sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "eland_out");
+  sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "shutdown_out");
+  sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool>(node_, "set_odometry_callbacks_out");
+  sch_ungrip_                 = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "ungrip_out");
+  sch_parachute_              = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "parachute_out");
 
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  service_server_goto_                 = node_.advertiseService("goto_in", &ControlManager::callbackGoto, this);
-  service_server_goto_fcu_             = node_.advertiseService("goto_fcu_in", &ControlManager::callbackGotoFcu, this);
-  service_server_goto_relative_        = node_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
-  service_server_goto_altitude_        = node_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
-  service_server_set_heading_          = node_.advertiseService("set_heading_in", &ControlManager::callbackSetHeading, this);
-  service_server_set_heading_relative_ = node_.advertiseService("set_heading_relative_in", &ControlManager::callbackSetHeadingRelative, this);
+  service_server_goto_                 = node_->create_service<mrs_msgs::srv::Vec4>("goto_in", std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_goto_fcu_             = node_->create_service<mrs_msgs::srv::Vec4>("goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_goto_relative_        = node_->create_service<mrs_msgs::srv::Vec4>("goto_relative_in", std::bind(&ControlManager::callbackGotoRelative, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_goto_altitude_        = node_->create_service<mrs_msgs::srv::Vec1>("goto_altitude_in", std::bind(&ControlManager::callbackGotoAltitude, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_goto_heading_         = node_->create_service<mrs_msgs::srv::Vec1>("set_heading_in", std::bind(&ControlManager::callbackSetHeading, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_set_heading_relative_ = node_->create_service<mrs_msgs::srv::Vec1>("set_heading_relative_in", std::bind(&ControlManager::callbackSetHeadingRelative, this, std::placeholders::_1, std::placeholders::_2));
 
-  service_server_reference_ = node_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
-  sh_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts, "reference_in", &ControlManager::callbackReferenceTopic, this);
+  service_server_reference_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>("reference_in", std::bind(&ControlManager::callbackReferenceService, this, std::placeholders::_1, std::placeholders::_2));
+  sh_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts, "reference_in", &ControlManager::callbackReferenceTopic, this);
 
-  service_server_velocity_reference_ = node_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
-  sh_velocity_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts, "velocity_reference_in",
-                                                                                                           &ControlManager::callbackVelocityReferenceTopic, this);
+  service_server_velocity_reference_ = node_->create_service<mrs_msgs::srv::VelocityReferenceSrv>("velocity_reference_in", std::bind(&ControlManager::callbackVelocityReferenceService, this, std::placeholders::_1, std::placeholders::_2));
+  sh_velocity_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts, "velocity_reference_in", &ControlManager::callbackVelocityReferenceTopic, this);
 
-  service_server_trajectory_reference_ = node_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
-  sh_trajectory_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts, "trajectory_reference_in",
-                                                                                                        &ControlManager::callbackTrajectoryReferenceTopic, this);
+  service_server_trajectory_reference_ = node_->create_service<mrs_msgs::srv::TrajectoryReferenceSrv>("trajectory_reference_in", std::bind(&ControlManager::callbackTrajectoryReferenceService, this, std::placeholders::_1, std::placeholders::_2));
+  sh_trajectory_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts, "trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceTopic, this);
 
   // | --------------------- other services --------------------- |
 
-  service_server_emergency_reference_ = node_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
-  service_server_pirouette_           = node_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
+  service_server_emergency_reference_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>("emergency_reference_in", std::bind(&ControlManager::callbackEmergencyReference, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_pirouette_           = node_->create_service<std_srvs::srv::Trigger>("pirouette_in", std::bind(&ControlManager::callbackPirouette, this, std::placeholders::_1, std::placeholders::_2));
 
   // | ------------------------- timers ------------------------- |
 
-  timer_status_    = node_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
-  timer_safety_    = node_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = node_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
-  timer_eland_     = node_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
-  timer_failsafe_  = node_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
-  timer_pirouette_ = node_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
-  timer_joystick_  = node_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
+  mrs_lib::TimerHandlerOptions timer_opts_start;
+
+  timer_opts_start.node      = node_;
+  timer_opts_start.autostart = true;
+
+  mrs_lib::TimerHandlerOptions timer_opts_no_start;
+
+  timer_opts_no_start.node      = node_;
+  timer_opts_no_start.autostart = false;
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerStatus, this);
+
+    timer_status_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_status_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerSafety, this);
+
+    timer_safety_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_safety_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerBumper, this);
+
+    timer_bumper_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_bumper_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerJoystick, this);
+
+    timer_joystick_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_joystick_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerEland, this);
+
+    timer_eland_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_elanding_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerFailsafe, this);
+
+    timer_failsafe_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_failsafe_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerPirouette, this);
+
+    timer_pirouette_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_pirouette_timer_rate_, clock_), callback_fcn);
+  }
 
   // | ----------------------- finish init ---------------------- |
 
@@ -1982,10 +1993,10 @@ void ControlManager::initialize(void) {
 
 /* timerHwApiCapabilities() //{ */
 
-void ControlManager::timerHwApiCapabilities(const std::shared_ptr<TimerType> Event& event) {
+void ControlManager::timerHwApiCapabilities() {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", _status_timer_rate_, 1.0, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: waiting for HW API capabilities");
@@ -2057,7 +2068,7 @@ void ControlManager::timerStatus(const std::shared_ptr<TimerType> Event& event) 
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerStatus", _status_timer_rate_, 0.1, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state             = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -2085,8 +2096,7 @@ void ControlManager::timerStatus(const std::shared_ptr<TimerType> Event& event) 
     double      wx_w       = last_control_output.diagnostics.disturbance_wx_w;
     double      wy_w       = last_control_output.diagnostics.disturbance_wy_w;
 
-    ROS_INFO_THROTTLE(5.0, "[ControlManager]: tracker: '%s', controller: '%s', mass: '%.2f kg', disturbances: body [%.2f, %.2f] N, world [%.2f, %.2f] N",
-                      tracker.c_str(), controller.c_str(), mass, bx_b, by_b, wx_w, wy_w);
+    ROS_INFO_THROTTLE(5.0, "[ControlManager]: tracker: '%s', controller: '%s', mass: '%.2f kg', disturbances: body [%.2f, %.2f] N, world [%.2f, %.2f] N", tracker.c_str(), controller.c_str(), mass, bx_b, by_b, wx_w, wy_w);
   }
 
   // --------------------------------------------------------------
@@ -2324,13 +2334,9 @@ void ControlManager::timerStatus(const std::shared_ptr<TimerType> Event& event) 
         std::stringstream ss;
 
         if (_safety_area_horizontal_frame_ == "latlon_origin") {
-          ss << "idx: " << i << std::endl
-             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original.at(i).x << std::endl
-             << "lon: " << border_points_bot_original.at(i).y;
+          ss << "idx: " << i << std::endl << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original.at(i).x << std::endl << "lon: " << border_points_bot_original.at(i).y;
         } else {
-          ss << "idx: " << i << std::endl
-             << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original.at(i).x << std::endl
-             << "y: " << border_points_bot_original.at(i).y;
+          ss << "idx: " << i << std::endl << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original.at(i).x << std::endl << "y: " << border_points_bot_original.at(i).y;
         }
 
         safety_area_coordinates_marker.color.r = 0;
@@ -2356,13 +2362,9 @@ void ControlManager::timerStatus(const std::shared_ptr<TimerType> Event& event) 
         std::stringstream ss;
 
         if (_safety_area_horizontal_frame_ == "latlon_origin") {
-          ss << "idx: " << i << std::endl
-             << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original.at(i).x << std::endl
-             << "lon: " << border_points_bot_original.at(i).y;
+          ss << "idx: " << i << std::endl << std::setprecision(6) << std::fixed << "lat: " << border_points_bot_original.at(i).x << std::endl << "lon: " << border_points_bot_original.at(i).y;
         } else {
-          ss << "idx: " << i << std::endl
-             << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original.at(i).x << std::endl
-             << "y: " << border_points_bot_original.at(i).y;
+          ss << "idx: " << i << std::endl << std::setprecision(1) << std::fixed << "x: " << border_points_bot_original.at(i).x << std::endl << "y: " << border_points_bot_original.at(i).y;
         }
 
         safety_area_coordinates_marker.color.r = 1;
@@ -2565,7 +2567,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerSafety", _safety_timer_rate_, 0.05, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerSafety", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerSafety", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -2574,8 +2576,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
-  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
-      active_tracker_idx == _null_tracker_idx_) {
+  if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) || active_tracker_idx == _null_tracker_idx_) {
     return;
   }
 
@@ -2698,8 +2699,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
         if (!failsafe_triggered_) {
 
-          RCLCPP_ERROR(node_->get_logger(), "activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(),
-                       _failsafe_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
+          RCLCPP_ERROR(node_->get_logger(), "activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(), _failsafe_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
           failsafe();
         }
@@ -2743,8 +2743,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
           if (!failsafe_triggered_ && !eland_triggered_) {
 
-            RCLCPP_ERROR(node_->get_logger(), "activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
-                         last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+            RCLCPP_ERROR(node_->get_logger(), "activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)", last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
             eland();
           }
@@ -2767,8 +2766,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        RCLCPP_ERROR(node_->get_logger(), "activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
-                     (180.0 / M_PI) * _tilt_limit_eland_);
+        RCLCPP_ERROR(node_->get_logger(), "activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_eland_);
 
         eland();
       }
@@ -2804,8 +2802,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size,
-                       _eland_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
+          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size, _eland_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
           eland();
         }
@@ -2826,8 +2823,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
-                             (180.0 / M_PI) * _yaw_error_eland_ / 2.0);
+          ROS_DEBUG_THROTTLE(1.0, "[ControlManager]: releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(), (180.0 / M_PI) * _yaw_error_eland_ / 2.0);
 
           ungripSrv();
         }
@@ -2842,8 +2838,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
-                       (180.0 / M_PI) * _yaw_error_eland_);
+          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(), (180.0 / M_PI) * _yaw_error_eland_);
 
           eland();
         }
@@ -2856,8 +2851,7 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
   // --------------------------------------------------------------
   if (_tilt_limit_disarm_enabled_ && tilt_angle > _tilt_limit_disarm_) {
 
-    RCLCPP_ERROR(node_->get_logger(), "tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
-                 (180.0 / M_PI) * _tilt_limit_disarm_);
+    RCLCPP_ERROR(node_->get_logger(), "tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_disarm_);
 
     arming(false);
   }
@@ -2887,14 +2881,12 @@ void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) 
           tilt_error_disarm_over_thr_ = true;
           tilt_error_disarm_time_     = clock_->now();
 
-          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error.value(),
-                   (180.0 / M_PI) * _tilt_error_disarm_threshold_);
+          ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error.value(), (180.0 / M_PI) * _tilt_error_disarm_threshold_);
 
           // if it was exceeded before, just keep it
         } else {
 
-          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error.value(),
-                            (clock_->now() - tilt_error_disarm_time_).toSec());
+          ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error.value(), (clock_->now() - tilt_error_disarm_time_).toSec());
         }
 
         // if the tile error is bad, but the controller just switched,
@@ -2954,7 +2946,7 @@ void ControlManager::timerEland(const std::shared_ptr<TimerType> Event& event) {
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerEland", _elanding_timer_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerEland", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerEland", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -3048,7 +3040,7 @@ void ControlManager::timerFailsafe(const std::shared_ptr<TimerType> Event& event
   ROS_INFO_ONCE("[ControlManager]: timerFailsafe() spinning");
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerFailsafe", _failsafe_timer_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerFailsafe", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerFailsafe", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -3119,7 +3111,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerJoystick", _status_timer_rate_, 0.05, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerJoystick", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerJoystick", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
@@ -3128,8 +3120,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
 
     joystick_start_press_time_ = rclcpp::Time(0);
 
-    RCLCPP_INFO(node_->get_logger(), "transitioning to joystick control: activating '%s' and '%s'", _joystick_tracker_name_.c_str(),
-                _joystick_controller_name_.c_str());
+    RCLCPP_INFO(node_->get_logger(), "transitioning to joystick control: activating '%s' and '%s'", _joystick_tracker_name_.c_str(), _joystick_controller_name_.c_str());
 
     joystick_start_pressed_ = false;
 
@@ -3181,8 +3172,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
 
     mrs_msgs::msg::Vec4::Request request;
 
-    if (fabs(joystick_data->axes.at(_channel_pitch_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_roll_)) >= 0.05 ||
-        fabs(joystick_data->axes.at(_channel_heading_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_throttle_)) >= 0.05) {
+    if (fabs(joystick_data->axes.at(_channel_pitch_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_roll_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_heading_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_throttle_)) >= 0.05) {
 
       if (_joystick_mode_ == 0) {
 
@@ -3248,8 +3238,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
 
     if (rc_channels->channels.size() < 4) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in topic is %d)",
-                         int(rc_channels->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC control channel numbers are out of range (the # of channels in rc/in topic is %d)", int(rc_channels->channels.size()));
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: tip: this could be caused by the RC failsafe not being configured!");
 
     } else {
@@ -3301,8 +3290,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
       {
         std::scoped_lock lock(mutex_tracker_list_);
 
-        tracker_list_.at(active_tracker_idx_)
-            ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
       callbacks_enabled_ = true;
@@ -3318,8 +3306,7 @@ void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event
       {
         std::scoped_lock lock(mutex_tracker_list_);
 
-        tracker_list_.at(active_tracker_idx_)
-            ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
     }
   }
@@ -3336,7 +3323,7 @@ void ControlManager::timerBumper(const std::shared_ptr<TimerType> Event& event) 
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerBumper", _bumper_timer_rate_, 0.05, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerBumper", scope_timer_logger_, scope_timer_enabled_);
 
   // | ---------------------- preconditions --------------------- |
 
@@ -3384,7 +3371,7 @@ void ControlManager::timerPirouette(const std::shared_ptr<TimerType> Event& even
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPirouette", _pirouette_timer_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerPirouette", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::timerPirouette", scope_timer_logger_, scope_timer_enabled_);
 
   pirouette_iterator_++;
 
@@ -3421,8 +3408,7 @@ void ControlManager::timerPirouette(const std::shared_ptr<TimerType> Event& even
     std_srvs::SetBoolRequest req_enable_callbacks;
     req_enable_callbacks.data = true;
 
-    tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+    tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     callbacks_enabled_ = true;
   }
@@ -3436,8 +3422,7 @@ void ControlManager::timerPirouette(const std::shared_ptr<TimerType> Event& even
     std_srvs::SetBoolRequest req_enable_callbacks;
     req_enable_callbacks.data = false;
 
-    tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+    tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     callbacks_enabled_ = false;
   }
@@ -3460,7 +3445,7 @@ void ControlManager::asyncControl(void) {
   mrs_lib::AtomicScopeFlag unset_running(running_async_control_);
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("asyncControl");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::asyncControl", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::asyncControl", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -3503,8 +3488,7 @@ void ControlManager::asyncControl(void) {
 
         auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' is enforcing constraints over the ConstraintManager",
-                          _controller_names_.at(active_controller_idx).c_str());
+        ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' is enforcing constraints over the ConstraintManager", _controller_names_.at(active_controller_idx).c_str());
 
       } else if (!enforce && constraints_being_enforced_) {
 
@@ -3532,8 +3516,7 @@ void ControlManager::asyncControl(void) {
     {
       std::scoped_lock lock(mutex_uav_state_);
 
-      RCLCPP_INFO(node_->get_logger(), "odometry after switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
-                  uav_state.pose.position.z, uav_heading_);
+      RCLCPP_INFO(node_->get_logger(), "odometry after switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, uav_heading_);
     }
   }
 }
@@ -3555,7 +3538,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
 
   nav_msgs::msg::OdometryConstSharedPtr odom = msg;
 
@@ -3598,8 +3581,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                    uav_state_.pose.position.z, uav_heading_);
+        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y, uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3676,8 +3658,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
         uav_state_.velocity.linear.y = res.value().vector.y;
         uav_state_.velocity.linear.z = res.value().vector.z;
       } else {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the odometry speed from '%s' to '%s'", odom->child_frame_id.c_str(),
-                           odom->header.frame_id.c_str());
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the odometry speed from '%s' to '%s'", odom->child_frame_id.c_str(), odom->header.frame_id.c_str());
         return;
       }
     }
@@ -3718,7 +3699,7 @@ void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShared
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::UavStateConstSharedPtr uav_state = msg;
 
@@ -3805,8 +3786,7 @@ void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShared
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                    uav_state_.pose.position.z, uav_heading_);
+        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y, uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3899,7 +3879,7 @@ void ControlManager::callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstShared
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGNSS");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
 
   transformer_->setLatLon(msg->latitude, msg->longitude);
 }
@@ -3915,7 +3895,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackJoystick");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
@@ -3931,9 +3911,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
   // | ---- switching back to fallback tracker and controller --- |
 
   // if any of the A, B, X, Y buttons are pressed when flying with joystick, switch back to fallback controller and tracker
-  if ((joystick_data->buttons.at(_channel_A_) == 1 || joystick_data->buttons.at(_channel_B_) == 1 || joystick_data->buttons.at(_channel_X_) == 1 ||
-       joystick_data->buttons.at(_channel_Y_) == 1) &&
-      active_tracker_idx == _joystick_tracker_idx_ && active_controller_idx == _joystick_controller_idx_) {
+  if ((joystick_data->buttons.at(_channel_A_) == 1 || joystick_data->buttons.at(_channel_B_) == 1 || joystick_data->buttons.at(_channel_X_) == 1 || joystick_data->buttons.at(_channel_Y_) == 1) && active_tracker_idx == _joystick_tracker_idx_ && active_controller_idx == _joystick_controller_idx_) {
 
     RCLCPP_INFO(node_->get_logger(), "switching from joystick to normal control");
 
@@ -4037,7 +4015,7 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::Const
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiStatus");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::HwApiStatusConstSharedPtr state = msg;
 
@@ -4086,7 +4064,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::HwApiRcChannelsConstSharedPtr rc = msg;
 
@@ -4099,8 +4077,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
     if (_rc_joystick_channel_ >= int(rc->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", _rc_joystick_channel_,
-                         int(rc->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC joystick activation channel number (%d) is out of range [0-%d]", _rc_joystick_channel_, int(rc->channels.size()));
 
     } else {
 
@@ -4133,8 +4110,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
               // disable callbacks of all trackers
               for (int i = 0; i < int(tracker_list_.size()); i++) {
-                tracker_list_.at(i)->enableCallbacks(
-                    std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+                tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
               }
             }
 
@@ -4190,8 +4166,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
     if (_rc_escalating_failsafe_channel_ >= int(rc->channels.size())) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_escalating_failsafe_channel_,
-                         int(rc->channels.size()));
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: RC eland channel number (%d) is out of range [0-%d]", _rc_escalating_failsafe_channel_, int(rc->channels.size()));
 
     } else {
 
@@ -4236,8 +4211,7 @@ void ControlManager::timeoutUavState(const double& missing_for) {
 
 /* //{ callbackSwitchTracker() */
 
-bool ControlManager::callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
-                                           const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+bool ControlManager::callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4281,8 +4255,7 @@ bool ControlManager::callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::
 
 /* callbackSwitchController() //{ */
 
-bool ControlManager::callbackSwitchController(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
-                                              const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+bool ControlManager::callbackSwitchController(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4326,8 +4299,7 @@ bool ControlManager::callbackSwitchController(const std::shared_ptr<mrs_msgs::sr
 
 /* //{ callbackSwitchTracker() */
 
-bool ControlManager::callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                                const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4374,8 +4346,7 @@ bool ControlManager::callbackTrackerResetStatic(const std::shared_ptr<std_srvs::
 
 /* //{ callbackEHover() */
 
-bool ControlManager::callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                    const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4408,8 +4379,7 @@ bool ControlManager::callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger
 
 /* callbackFailsafe() //{ */
 
-bool ControlManager::callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                      const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4442,8 +4412,7 @@ bool ControlManager::callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigg
 
 /* callbackFailsafeEscalating() //{ */
 
-bool ControlManager::callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                                const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4476,8 +4445,7 @@ bool ControlManager::callbackFailsafeEscalating(const std::shared_ptr<std_srvs::
 
 /* //{ callbackELand() */
 
-bool ControlManager::callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4497,8 +4465,7 @@ bool ControlManager::callbackEland(const std::shared_ptr<std_srvs::srv::Trigger:
 
 /* //{ callbackParachute() */
 
-bool ControlManager::callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4567,8 +4534,7 @@ bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::msg::Float64Stam
 
 /* //{ callbackToggleOutput() */
 
-bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                          const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4634,8 +4600,7 @@ bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::S
 
 /* callbackArm() //{ */
 
-bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4690,8 +4655,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
 
 /* //{ callbackEnableCallbacks() */
 
-bool ControlManager::callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                             const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool ControlManager::callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4754,8 +4718,7 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::msg::DynamicsConstraintsSr
 
 /* //{ callbackEmergencyReference() */
 
-bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4804,18 +4767,14 @@ bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::
 
     // enable the callbacks for the active tracker
     req_enable_callbacks.data = true;
-    tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+    tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     // call the setReference()
-    tracker_response =
-        tracker_list_.at(active_tracker_idx_)
-            ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
+    tracker_response = tracker_list_.at(active_tracker_idx_)->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
 
     // disable the callbacks back again
     req_enable_callbacks.data = false;
-    tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+    tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     if (tracker_response != mrs_msgs::msg::ReferenceSrvResponse::Ptr()) {
       res.message = tracker_response->message;
@@ -4834,8 +4793,7 @@ bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::
 
 /* callbackPirouette() //{ */
 
-bool ControlManager::callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool ControlManager::callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5045,8 +5003,7 @@ bool ControlManager::callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trig
 
 /* //{ callbackTransformReference() */
 
-bool ControlManager::callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request>  request,
-                                                const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response) {
+bool ControlManager::callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5076,8 +5033,7 @@ bool ControlManager::callbackTransformReference(const std::shared_ptr<mrs_msgs::
 
 /* //{ callbackTransformReferenceArray() */
 
-bool ControlManager::callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request>  request,
-                                                     const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response) {
+bool ControlManager::callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5123,8 +5079,7 @@ bool ControlManager::callbackTransformReferenceArray(const std::shared_ptr<mrs_m
 
 /* //{ callbackTransformPose() */
 
-bool ControlManager::callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request>  request,
-                                           const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response) {
+bool ControlManager::callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5154,8 +5109,7 @@ bool ControlManager::callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::
 
 /* //{ callbackTransformVector3() */
 
-bool ControlManager::callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request>  request,
-                                              const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response) {
+bool ControlManager::callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request> request, const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5185,8 +5139,7 @@ bool ControlManager::callbackTransformVector3(const std::shared_ptr<mrs_msgs::sr
 
 /* //{ callbackEnableBumper() */
 
-bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                          const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5210,8 +5163,7 @@ bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::S
 
 /* //{ callbackUseSafetyArea() */
 
-bool ControlManager::callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                           const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool ControlManager::callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5235,8 +5187,7 @@ bool ControlManager::callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::
 
 /* //{ callbackGetMinZ() */
 
-bool ControlManager::callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request>  request,
-                                     const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response) {
+bool ControlManager::callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request, const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5254,8 +5205,7 @@ bool ControlManager::callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFlo
 
 /* //{ callbackValidateReference() */
 
-bool ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                               const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
+bool ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5323,8 +5273,7 @@ bool ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::s
 
 /* //{ callbackValidateReference2d() */
 
-bool ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
+bool ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5392,8 +5341,7 @@ bool ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs:
 
 /* //{ callbackValidateReferenceArray() */
 
-bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
-                                                    const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response) {
+bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request> request, const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5464,8 +5412,7 @@ bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_ms
 
 /* //{ callbackReferenceService() */
 
-bool ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5474,7 +5421,7 @@ bool ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::sr
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceService");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceService", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header    = req.header;
@@ -5499,7 +5446,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::msg::ReferenceStampe
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setReference(*msg);
 }
@@ -5508,8 +5455,7 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::msg::ReferenceStampe
 
 /* //{ callbackVelocityReferenceService() */
 
-bool ControlManager::callbackVelocityReferenceService(mrs_msgs::msg::VelocityReferenceStampedSrv::Request&  req,
-                                                      mrs_msgs::msg::VelocityReferenceStampedSrv::Response& res) {
+bool ControlManager::callbackVelocityReferenceService(mrs_msgs::msg::VelocityReferenceStampedSrv::Request& req, mrs_msgs::msg::VelocityReferenceStampedSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5518,7 +5464,7 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::msg::VelocityRef
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceService", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackVelocityReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::VelocityReferenceStamped des_reference;
   des_reference = req.reference;
@@ -5542,7 +5488,7 @@ void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::msg::Velocit
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackVelocityReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setVelocityReference(*msg);
 }
@@ -5551,8 +5497,7 @@ void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::msg::Velocit
 
 /* //{ callbackTrajectoryReferenceService() */
 
-bool ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
-                                                        const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response) {
+bool ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5561,7 +5506,7 @@ bool ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mr
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackTrajectoryReferenceService", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackTrajectoryReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
   auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = setTrajectoryReference(req.trajectory);
 
@@ -5589,7 +5534,7 @@ void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::msg::Traje
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackTrajectoryReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackTrajectoryReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
   setTrajectoryReference(*msg);
 }
@@ -5609,7 +5554,7 @@ bool ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Req
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGoto");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGoto", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackGoto", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
@@ -5631,8 +5576,7 @@ bool ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Req
 
 /* //{ callbackGotoFcu() */
 
-bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                     const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
+bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5641,7 +5585,7 @@ bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoFcu");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoFcu", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackGotoFcu", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "fcu_untilted";
@@ -5663,8 +5607,7 @@ bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::
 
 /* //{ callbackGotoRelative() */
 
-bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                          const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
+bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5673,7 +5616,7 @@ bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::V
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoRelative");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoRelative", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackGotoRelative", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
@@ -5703,8 +5646,7 @@ bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::V
 
 /* //{ callbackGotoAltitude() */
 
-bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                          const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5713,7 +5655,7 @@ bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::V
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoAltitude", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackGotoAltitude", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
@@ -5743,8 +5685,7 @@ bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::V
 
 /* //{ callbackSetHeading() */
 
-bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                        const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5753,7 +5694,7 @@ bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeading");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeading", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackSetHeading", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
@@ -5783,8 +5724,7 @@ bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec
 
 /* //{ callbackSetHeadingRelative() */
 
-bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                                const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5793,7 +5733,7 @@ bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackSetHeadingRelative", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackSetHeadingRelative", scope_timer_logger_, scope_timer_enabled_);
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
@@ -5890,13 +5830,9 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::msg::
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    RCLCPP_INFO(node_->get_logger(), "setting reference to x=%.2f, y=%.2f, z=%.2f, hdg=%.2f (expressed in '%s')", reference_request.reference.position.x,
-                reference_request.reference.position.y, reference_request.reference.position.z, reference_request.reference.heading,
-                transformed_reference.header.frame_id.c_str());
+    RCLCPP_INFO(node_->get_logger(), "setting reference to x=%.2f, y=%.2f, z=%.2f, hdg=%.2f (expressed in '%s')", reference_request.reference.position.x, reference_request.reference.position.y, reference_request.reference.position.z, reference_request.reference.heading, transformed_reference.header.frame_id.c_str());
 
-    tracker_response =
-        tracker_list_.at(active_tracker_idx_)
-            ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(reference_request)));
+    tracker_response = tracker_list_.at(active_tracker_idx_)->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(reference_request)));
 
     if (tracker_response != mrs_msgs::msg::ReferenceSrvResponse::Ptr()) {
 
@@ -6015,8 +5951,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   mrs_msgs::msg::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
 
-  ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
-            eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
+  ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x, eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
 
   // safety area check
   if (!isPointInSafetyArea3d(eqivalent_reference)) {
@@ -6049,9 +5984,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    tracker_response = tracker_list_.at(active_tracker_idx_)
-                           ->setVelocityReference(mrs_msgs::msg::VelocityReferenceSrvRequest::ConstSharedPtr(
-                               std::make_unique<mrs_msgs::msg::VelocityReferenceSrvRequest>(reference_request)));
+    tracker_response = tracker_list_.at(active_tracker_idx_)->setVelocityReference(mrs_msgs::msg::VelocityReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::VelocityReferenceSrvRequest>(reference_request)));
 
     if (tracker_response != mrs_msgs::msg::VelocityReferenceSrvResponse::Ptr()) {
 
@@ -6070,8 +6003,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
 /* setTrajectoryReference() //{ */
 
-std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
-    const mrs_msgs::msg::TrajectoryReference trajectory_in) {
+std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in) {
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -6263,13 +6195,10 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
             bool interpolation_success = true;
 
             // iterpolate between the last valid point and this new valid point
-            double angle = atan2((processed_trajectory.points.at(i).position.y - processed_trajectory.points.at(last_valid_idx).position.y),
-                                 (processed_trajectory.points.at(i).position.x - processed_trajectory.points.at(last_valid_idx).position.x));
+            double angle = atan2((processed_trajectory.points.at(i).position.y - processed_trajectory.points.at(last_valid_idx).position.y), (processed_trajectory.points.at(i).position.x - processed_trajectory.points.at(last_valid_idx).position.x));
 
-            double dist_two_points = mrs_lib::geometry::dist(
-                vec2_t(processed_trajectory.points.at(i).position.x, processed_trajectory.points.at(i).position.y),
-                vec2_t(processed_trajectory.points.at(last_valid_idx).position.x, processed_trajectory.points.at(last_valid_idx).position.y));
-            double step = dist_two_points / (i - last_valid_idx);
+            double dist_two_points = mrs_lib::geometry::dist(vec2_t(processed_trajectory.points.at(i).position.x, processed_trajectory.points.at(i).position.y), vec2_t(processed_trajectory.points.at(last_valid_idx).position.x, processed_trajectory.points.at(last_valid_idx).position.y));
+            double step            = dist_two_points / (i - last_valid_idx);
 
             for (int j = last_valid_idx; j < i; j++) {
 
@@ -6394,9 +6323,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     std::scoped_lock lock(mutex_tracker_list_);
 
     // set the trajectory to the currently active tracker
-    response = tracker_list_.at(active_tracker_idx_)
-                   ->setTrajectoryReference(
-                       mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->setTrajectoryReference(mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
 
     tracker_names.push_back(_tracker_names_.at(active_tracker_idx_));
 
@@ -6427,8 +6354,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
         tracker_names.push_back(_tracker_names_.at(i));
 
-        response = tracker_list_.at(i)->setTrajectoryReference(
-            mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
+        response = tracker_list_.at(i)->setTrajectoryReference(mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
 
         if (response != mrs_msgs::msg::TrajectoryReferenceSrvResponse::Ptr()) {
 
@@ -6502,7 +6428,7 @@ void ControlManager::publishDiagnostics(void) {
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishDiagnostics");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   std::scoped_lock lock(mutex_diagnostics_);
 
@@ -6577,7 +6503,7 @@ void ControlManager::publishDiagnostics(void) {
 void ControlManager::setConstraintsToTrackers(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToTrackers");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToTrackers", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraintsToTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
@@ -6588,8 +6514,7 @@ void ControlManager::setConstraintsToTrackers(const mrs_msgs::msg::DynamicsConst
     for (int i = 0; i < int(tracker_list_.size()); i++) {
 
       // if it is the active one, update and retrieve the command
-      response = tracker_list_.at(i)->setConstraints(
-          mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
+      response = tracker_list_.at(i)->setConstraints(mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -6601,7 +6526,7 @@ void ControlManager::setConstraintsToTrackers(const mrs_msgs::msg::DynamicsConst
 void ControlManager::setConstraintsToControllers(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToControllers");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToControllers", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraintsToControllers", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
@@ -6612,8 +6537,7 @@ void ControlManager::setConstraintsToControllers(const mrs_msgs::msg::DynamicsCo
     for (int i = 0; i < int(controller_list_.size()); i++) {
 
       // if it is the active one, update and retrieve the command
-      response = controller_list_.at(i)->setConstraints(
-          mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
+      response = controller_list_.at(i)->setConstraints(mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -6625,7 +6549,7 @@ void ControlManager::setConstraintsToControllers(const mrs_msgs::msg::DynamicsCo
 void ControlManager::setConstraints(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
@@ -6638,8 +6562,7 @@ void ControlManager::setConstraints(const mrs_msgs::msg::DynamicsConstraintsSrvR
 
 /* enforceControllerConstraints() //{ */
 
-std::optional<mrs_msgs::msg::DynamicsConstraintsSrvRequest> ControlManager::enforceControllersConstraints(
-    const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
+std::optional<mrs_msgs::msg::DynamicsConstraintsSrvRequest> ControlManager::enforceControllersConstraints(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -6709,11 +6632,7 @@ std::optional<mrs_msgs::msg::DynamicsConstraintsSrvRequest> ControlManager::enfo
 
 bool ControlManager::isFlyingNormally(void) {
 
-  return callbacks_enabled_ && (output_enabled_) && (offboard_mode_) && (armed_) &&
-         (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) &&
-           (active_controller_idx_ != _failsafe_controller_idx_)) ||
-          _controller_names_.size() == 1) &&
-         (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
+  return callbacks_enabled_ && (output_enabled_) && (offboard_mode_) && (armed_) && (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) && (active_controller_idx_ != _failsafe_controller_idx_)) || _controller_names_.size() == 1) && (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
 }
 
 //}
@@ -6873,8 +6792,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceS
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-                                   end_transformed.reference.position.y);
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x, end_transformed.reference.position.y);
 }
 
 //}
@@ -6919,8 +6837,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceS
     end_transformed = ret.value();
   }
 
-  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x,
-                                   end_transformed.reference.position.y);
+  return safety_zone_->isPathValid(start_transformed.reference.position.x, start_transformed.reference.position.y, end_transformed.reference.position.x, end_transformed.reference.position.y);
 }
 
 //}
@@ -7041,14 +6958,10 @@ void ControlManager::bumperPushFromObstacle(void) {
 
 
       // larger from the two accelerations
-      const double vert_acc = constraints.constraints.vertical_ascending_acceleration > constraints.constraints.vertical_descending_acceleration
-                                  ? constraints.constraints.vertical_ascending_acceleration
-                                  : constraints.constraints.vertical_descending_acceleration;
+      const double vert_acc = constraints.constraints.vertical_ascending_acceleration > constraints.constraints.vertical_descending_acceleration ? constraints.constraints.vertical_ascending_acceleration : constraints.constraints.vertical_descending_acceleration;
 
       // larger from the two speeds
-      const double vert_speed = constraints.constraints.vertical_ascending_speed > constraints.constraints.vertical_descending_speed
-                                    ? constraints.constraints.vertical_ascending_speed
-                                    : constraints.constraints.vertical_descending_speed;
+      const double vert_speed = constraints.constraints.vertical_ascending_speed > constraints.constraints.vertical_descending_speed ? constraints.constraints.vertical_ascending_speed : constraints.constraints.vertical_descending_speed;
 
       const double vertical_t_stop    = vert_speed / vert_acc;
       const double vertical_stop_dist = (vertical_t_stop * vert_speed) / 2.0;
@@ -7096,8 +7009,7 @@ void ControlManager::bumperPushFromObstacle(void) {
     // get the id of the oposite sector
     direction = oposite_direction;
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", min_sector_id,
-                      oposite_sector_idx, bumper_data->sectors.at(min_sector_id));
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: Bumper: found potential collision (sector %lu vs. %d), obstacle distance: %.2f, repulsing", min_sector_id, oposite_sector_idx, bumper_data->sectors.at(min_sector_id));
 
     repulsion_distance = min_distance_horizontal + _bumper_horizontal_overshoot_ - bumper_data->sectors.at(min_sector_id);
 
@@ -7115,8 +7027,7 @@ void ControlManager::bumperPushFromObstacle(void) {
   }
 
   // check for vertical collision up
-  if (bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) > 0 &&
-      bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) <= min_distance_vertical) {
+  if (bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) > 0 && bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) <= min_distance_vertical) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
     vertical_collision_detected = true;
@@ -7214,18 +7125,14 @@ void ControlManager::bumperPushFromObstacle(void) {
 
       // enable the callbacks for the active tracker
       req_enable_callbacks.data = true;
-      tracker_list_.at(active_tracker_idx_)
-          ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+      tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
       // call the goto
-      tracker_response =
-          tracker_list_.at(active_tracker_idx_)
-              ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
+      tracker_response = tracker_list_.at(active_tracker_idx_)->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
-      tracker_list_.at(active_tracker_idx_)
-          ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+      tracker_list_.at(active_tracker_idx_)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
   }
 
@@ -7871,8 +7778,7 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
     std_srvs::TriggerResponse::ConstSharedPtr response;
     std_srvs::TriggerRequest                  request;
 
-    response = tracker_list_.at(active_tracker_idx_)
-                   ->startTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->startTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7904,8 +7810,7 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
     std_srvs::TriggerResponse::ConstSharedPtr response;
     std_srvs::TriggerRequest                  request;
 
-    response = tracker_list_.at(active_tracker_idx_)
-                   ->stopTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->stopTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7937,8 +7842,7 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
     std_srvs::TriggerResponse::ConstSharedPtr response;
     std_srvs::TriggerRequest                  request;
 
-    response = tracker_list_.at(active_tracker_idx_)
-                   ->resumeTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->resumeTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7970,8 +7874,7 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
     std_srvs::TriggerResponse::ConstSharedPtr response;
     std_srvs::TriggerRequest                  request;
 
-    response = tracker_list_.at(active_tracker_idx_)
-                   ->gotoTrajectoryStart(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->gotoTrajectoryStart(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -8232,7 +8135,7 @@ void ControlManager::toggleOutput(const bool& input) {
 std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_tracker_cmd   = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
@@ -8366,7 +8269,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -8422,8 +8325,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
         ss << "the controller '" << controller_name << "' was activated";
         ROS_INFO_STREAM("[ControlManager]: " << ss.str());
 
-        RCLCPP_INFO(node_->get_logger(), "triggering hover after switching to '%s', re-activating '%s'",
-                    _controller_names_.at(new_controller_idx.value()).c_str(), _tracker_names_.at(active_tracker_idx_).c_str());
+        RCLCPP_INFO(node_->get_logger(), "triggering hover after switching to '%s', re-activating '%s'", _controller_names_.at(new_controller_idx.value()).c_str(), _tracker_names_.at(active_tracker_idx_).c_str());
 
         // reactivate the current tracker
         // TODO this is not the most elegant way to restart the tracker after a controller switch
@@ -8480,7 +8382,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 void ControlManager::updateTrackers(void) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -8509,8 +8411,7 @@ void ControlManager::updateTrackers(void) {
           tracker_command = tracker_list_.at(i)->update(uav_state, last_control_output);
         }
         catch (std::runtime_error& exrun) {
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: caught an exception while updating the active tracker (%s)",
-                             _tracker_names_.at(active_tracker_idx).c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: caught an exception while updating the active tracker (%s)", _tracker_names_.at(active_tracker_idx).c_str());
           ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the exception: '%s'", exrun.what());
           tracker_command = {};
         }
@@ -8553,8 +8454,7 @@ void ControlManager::updateTrackers(void) {
 
     if (active_tracker_idx == _ehover_tracker_idx_) {
 
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the emergency tracker '%s' returned empty or invalid command!",
-                         _tracker_names_.at(active_tracker_idx).c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the emergency tracker '%s' returned empty or invalid command!", _tracker_names_.at(active_tracker_idx).c_str());
       failsafe();
 
     } else {
@@ -8579,7 +8479,7 @@ void ControlManager::updateTrackers(void) {
 void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
@@ -8621,8 +8521,7 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state)
         }
         catch (std::runtime_error& exrun) {
 
-          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: an exception while updating the active controller (%s)",
-                             _controller_names_.at(active_controller_idx).c_str());
+          ROS_ERROR_THROTTLE(1.0, "[ControlManager]: an exception while updating the active controller (%s)", _controller_names_.at(active_controller_idx).c_str());
           ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the exception: '%s'", exrun.what());
         }
 
@@ -8693,7 +8592,7 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state)
 void ControlManager::publish(void) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publish");
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::publish", scope_timer_logger_, scope_timer_enabled_);
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -8722,8 +8621,7 @@ void ControlManager::publish(void) {
 
     ROS_WARN_THROTTLE(5.0, "[ControlManager]: 'NullTracker' is active, not controlling");
 
-    Controller::HwApiOutputVariant output =
-        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
+    Controller::HwApiOutputVariant output = initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
 
     {
       std::scoped_lock lock(mutex_last_control_output_);
@@ -8735,11 +8633,9 @@ void ControlManager::publish(void) {
 
   } else if (active_tracker_idx != _null_tracker_idx_ && !last_control_output.control_output) {
 
-    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything",
-                      _controller_names_.at(active_controller_idx).c_str());
+    ROS_WARN_THROTTLE(1.0, "[ControlManager]: the controller '%s' returned nil command, not publishing anything", _controller_names_.at(active_controller_idx).c_str());
 
-    Controller::HwApiOutputVariant output =
-        initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
+    Controller::HwApiOutputVariant output = initializeDefaultOutput(_hw_api_inputs_, uav_state, _min_throttle_null_tracker_, common_handlers_->throttle_model.n_motors);
 
     control_output_publisher_.publish(output);
 
@@ -8909,8 +8805,7 @@ mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(con
 
 /* publishControlReferenceOdom() //{ */
 
-void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command,
-                                                 [[maybe_unused]] const Controller::ControlOutput&                    control_output) {
+void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command, [[maybe_unused]] const Controller::ControlOutput& control_output) {
 
   if (!tracker_command || !control_output.control_output) {
     return;
@@ -8960,8 +8855,7 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
       msg.twist.twist.linear.y = res.value().vector.y;
       msg.twist.twist.linear.z = res.value().vector.z;
     } else {
-      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the reference speed from '%s' to '%s'", velocity.header.frame_id.c_str(),
-                         msg.child_frame_id.c_str());
+      ROS_ERROR_THROTTLE(1.0, "[ControlManager]: could not transform the reference speed from '%s' to '%s'", velocity.header.frame_id.c_str(), msg.child_frame_id.c_str());
     }
   }
 
