@@ -3,44 +3,23 @@
 
 /* includes //{ */
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <mrs_uav_managers/control_manager/common_handlers.h>
 #include <mrs_uav_managers/control_manager/private_handlers.h>
 
-#include <mrs_msgs/TrackerCommand.h>
-#include <mrs_msgs/TrackerStatus.h>
-#include <mrs_msgs/UavState.h>
+#include <mrs_msgs/msg/tracker_command.hpp>
+#include <mrs_msgs/msg/tracker_status.hpp>
+#include <mrs_msgs/msg/uav_state.hpp>
+#include <mrs_msgs/msg/float64.hpp>
 
-#include <mrs_msgs/Float64Srv.h>
-#include <mrs_msgs/Float64SrvRequest.h>
-#include <mrs_msgs/Float64SrvResponse.h>
-
-#include <mrs_msgs/Float64.h>
-
-#include <mrs_msgs/ReferenceSrv.h>
-#include <mrs_msgs/ReferenceSrvRequest.h>
-#include <mrs_msgs/ReferenceSrvResponse.h>
-
-#include <mrs_msgs/VelocityReferenceSrv.h>
-#include <mrs_msgs/VelocityReferenceSrvRequest.h>
-#include <mrs_msgs/VelocityReferenceSrvResponse.h>
-
-#include <mrs_msgs/TrajectoryReferenceSrv.h>
-#include <mrs_msgs/TrajectoryReferenceSrvRequest.h>
-#include <mrs_msgs/TrajectoryReferenceSrvResponse.h>
-
-#include <std_srvs/Trigger.h>
-#include <std_srvs/TriggerRequest.h>
-#include <std_srvs/TriggerResponse.h>
-
-#include <std_srvs/SetBool.h>
-#include <std_srvs/SetBoolRequest.h>
-#include <std_srvs/SetBoolResponse.h>
-
-#include <mrs_msgs/DynamicsConstraintsSrv.h>
-#include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
-#include <mrs_msgs/DynamicsConstraintsSrvResponse.h>
+#include <mrs_msgs/srv/float64_srv.hpp>
+#include <mrs_msgs/srv/reference_srv.hpp>
+#include <mrs_msgs/srv/velocity_reference_srv.hpp>
+#include <mrs_msgs/srv/trajectory_reference_srv.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+#include <mrs_msgs/srv/dynamics_constraints_srv.hpp>
 
 #include <mrs_uav_managers/controller.h>
 
@@ -55,14 +34,14 @@ public:
   /**
    * @brief It is called once for every tracker. The runtime is not limited.
    *
-   * @param nh the node handle of the ControlManager
+   * @param node the node handle of the ControlManager
    * @param uav_name the UAV name (e.g., "uav1")
    * @param common_handlers handlers shared between trackers and controllers
    * @param private_handlers handlers provided individually to each tracker
    *
    * @return true if success
    */
-  virtual bool initialize(const ros::NodeHandle &nh, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
+  virtual bool initialize(const rclcpp::Node::SharedPtr &node, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
                           std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) = 0;
 
   /**
@@ -72,7 +51,7 @@ public:
    *
    * @return true if success and message
    */
-  virtual std::tuple<bool, std::string> activate(const std::optional<mrs_msgs::TrackerCommand> &last_tracker_cmd) = 0;
+  virtual std::tuple<bool, std::string> activate(const std::optional<mrs_msgs::msg::TrackerCommand> &last_tracker_cmd) = 0;
 
   /**
    * @brief is called when this trackers output is no longer needed. However, it can be activated later.
@@ -87,7 +66,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr switchOdometrySource(const mrs_msgs::UavState &new_uav_state) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> switchOdometrySource(const mrs_msgs::msg::UavState &new_uav_state) = 0;
 
   /**
    * @brief Request for reseting the tracker's states given the UAV is static.
@@ -105,14 +84,15 @@ public:
    *
    * @return the new reference for the controllers
    */
-  virtual std::optional<mrs_msgs::TrackerCommand> update(const mrs_msgs::UavState &uav_state, const Controller::ControlOutput &last_control_output) = 0;
+  virtual std::optional<mrs_msgs::msg::TrackerCommand> update(const mrs_msgs::msg::UavState   &uav_state,
+                                                              const Controller::ControlOutput &last_control_output) = 0;
 
   /**
    * @brief A request for the tracker's status.
    *
    * @return the tracker's status
    */
-  virtual const mrs_msgs::TrackerStatus getStatus() = 0;
+  virtual const mrs_msgs::msg::TrackerStatus getStatus() = 0;
 
   /**
    * @brief Request for a flight to a given coordinates.
@@ -121,7 +101,7 @@ public:
    *
    * @return a service response
    */
-  virtual const mrs_msgs::ReferenceSrvResponse::ConstPtr setReference(const mrs_msgs::ReferenceSrvRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::ReferenceSrv::Response> setReference(const std::shared_ptr<mrs_msgs::srv::ReferenceSrv::Request> &cmd) = 0;
 
   /**
    * @brief Request for desired velocity reference
@@ -130,7 +110,8 @@ public:
    *
    * @return a service response
    */
-  virtual const mrs_msgs::VelocityReferenceSrvResponse::ConstPtr setVelocityReference(const mrs_msgs::VelocityReferenceSrvRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Request> setVelocityReference(
+      const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Response> &cmd) = 0;
 
   /**
    * @brief Request for a flight along a given trajectory
@@ -139,7 +120,8 @@ public:
    *
    * @return a service response
    */
-  virtual const mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr setTrajectoryReference(const mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> setTrajectoryReference(
+      const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request> &cmd) = 0;
 
   /**
    * @brief Request for stopping the motion of the UAV.
@@ -148,7 +130,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr hover(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> hover(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request to goto to the first trajectory coordinate.
@@ -157,7 +139,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr gotoTrajectoryStart(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> gotoTrajectoryStart(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request to start tracking of the pre-loaded trajectory
@@ -166,7 +148,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr startTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> startTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request to stop tracking of the pre-loaded trajectory. The hover() routine will be engaged, thus it should be implemented by the tracker.
@@ -175,7 +157,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr stopTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> stopTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request to resume the previously stopped trajectory tracking.
@@ -184,7 +166,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::TriggerResponse::ConstPtr resumeTrajectoryTracking(const std_srvs::TriggerRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> resumeTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request for enabling/disabling callbacks.
@@ -193,7 +175,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std_srvs::SetBoolResponse::ConstPtr enableCallbacks(const std_srvs::SetBoolRequest::ConstPtr &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> enableCallbacks(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
 
   /**
    * @brief Request for setting new constraints.
@@ -202,7 +184,8 @@ public:
    *
    * @return a service response
    */
-  virtual const mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr &constraints) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response> setConstraints(
+      const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request> &constraints) = 0;
 
   virtual ~Tracker() = default;
 };

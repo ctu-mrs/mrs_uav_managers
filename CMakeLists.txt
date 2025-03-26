@@ -50,6 +50,7 @@ set(DEPENDENCIES
 set(LIBRARIES
   MrsUavManagers_EstimationManager
   MrsUavManagers_TransformManager
+  MrsUavManagers_ControlManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -96,6 +97,22 @@ ament_target_dependencies(MrsUavManagers_TransformManager
 rclcpp_components_register_nodes(MrsUavManagers_TransformManager PLUGIN "mrs_uav_managers::transform_manager::TransformManager" EXECUTABLE MrsUavManagers_TransformManager)
 
 target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Control Manager
+
+add_library(MrsUavManagers_ControlManager SHARED
+  src/control_manager/control_manager.cpp
+  src/control_manager/output_publisher.cpp
+  src/control_manager/common/common.cpp
+)
+
+ament_target_dependencies(MrsUavManagers_ControlManager
+  ${DEPENDENCIES}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_ControlManager PLUGIN "mrs_uav_managers::control_manager::ControlManager" EXECUTABLE MrsUavManagers_ControlManager)
+
+target_compile_definitions(MrsUavManagers_ControlManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                           install                          |

@@ -16,30 +16,30 @@ class OutputPublisher {
 public:
   OutputPublisher();
 
-  OutputPublisher(ros::NodeHandle& nh);
+  OutputPublisher(const rclcpp::Node::SharedPtr& node);
 
   void publish(const Controller::HwApiOutputVariant& control_output);
 
 private:
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiActuatorCmd>            ph_hw_api_actuator_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiControlGroupCmd>        ph_hw_api_control_group_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeRateCmd>        ph_hw_api_attitude_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAttitudeCmd>            ph_hw_api_attitude_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgRateCmd> ph_hw_api_acceleration_hdg_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiAccelerationHdgCmd>     ph_hw_api_acceleration_hdg_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgRateCmd>     ph_hw_api_velocity_hdg_rate_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiVelocityHdgCmd>         ph_hw_api_velocity_hdg_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiPositionCmd>            ph_hw_api_position_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiActuatorCmd>            ph_hw_api_actuator_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiControlGroupCmd>        ph_hw_api_control_group_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeRateCmd>        ph_hw_api_attitude_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeCmd>            ph_hw_api_attitude_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgRateCmd> ph_hw_api_acceleration_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgCmd>     ph_hw_api_acceleration_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgRateCmd>     ph_hw_api_velocity_hdg_rate_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgCmd>         ph_hw_api_velocity_hdg_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiPositionCmd>            ph_hw_api_position_cmd_;
 
-  void publish(const mrs_msgs::HwApiActuatorCmd& msg);
-  void publish(const mrs_msgs::HwApiControlGroupCmd& msg);
-  void publish(const mrs_msgs::HwApiAttitudeRateCmd& msg);
-  void publish(const mrs_msgs::HwApiAttitudeCmd& msg);
-  void publish(const mrs_msgs::HwApiAccelerationHdgRateCmd& msg);
-  void publish(const mrs_msgs::HwApiAccelerationHdgCmd& msg);
-  void publish(const mrs_msgs::HwApiVelocityHdgRateCmd& msg);
-  void publish(const mrs_msgs::HwApiVelocityHdgCmd& msg);
-  void publish(const mrs_msgs::HwApiPositionCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiActuatorCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiControlGroupCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiAttitudeRateCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiAttitudeCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiAccelerationHdgCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiVelocityHdgRateCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiVelocityHdgCmd& msg);
+  void publish(const mrs_msgs::msg::HwApiPositionCmd& msg);
 
   class PublisherVisitor {
 

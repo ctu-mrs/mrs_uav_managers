@@ -10,7 +10,7 @@ namespace mrs_uav_managers
 namespace control_manager
 {
 
-typedef boost::function<bool(const std::string)> loadConfigFile_t;
+typedef std::function<bool(const std::string)> loadConfigFile_t;
 
 struct PrivateHandlers_t
 {

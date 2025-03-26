@@ -13,10 +13,10 @@ namespace control_manager
 
 /* safety area handler //{ */
 
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea3d_t;
-typedef boost::function<bool(const mrs_msgs::ReferenceStamped &point)> isPointInSafetyArea2d_t;
-typedef boost::function<double(const std::string &frame_id)>           getMaxZ_t;
-typedef boost::function<double(const std::string &frame_id)>           getMinZ_t;
+typedef std::function<bool(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea3d_t;
+typedef std::function<bool(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea2d_t;
+typedef std::function<double(const std::string &frame_id)>                getMaxZ_t;
+typedef std::function<double(const std::string &frame_id)>                getMinZ_t;
 
 struct SafetyArea_t
 {
@@ -39,7 +39,7 @@ struct ScopeTimer_t
 
 //}
 
-typedef boost::function<double(void)> getMass_t;
+typedef std::function<double(void)> getMass_t;
 
 struct DetailedModelParams_t
 {
@@ -75,7 +75,7 @@ struct CommonHandlers_t
   std::optional<DetailedModelParams_t>             detailed_model_params;
   ControlOutputModalities_t                        control_output_modalities;
   std::string                                      uav_name;
-  ros::NodeHandle                                  parent_nh;
+  rclcpp::Node::SharedPtr                          parent_node;
 };
 
 }  // namespace control_manager

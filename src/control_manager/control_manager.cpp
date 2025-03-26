@@ -1,8 +1,6 @@
 /* includes //{ */
 
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <nodelet/nodelet.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <mrs_uav_managers/control_manager/common.h>
 #include <control_manager/output_publisher.h>
@@ -10,31 +8,34 @@
 #include <mrs_uav_managers/controller.h>
 #include <mrs_uav_managers/tracker.h>
 
-#include <mrs_msgs/String.h>
-#include <mrs_msgs/Float64Stamped.h>
-#include <mrs_msgs/Float64StampedSrv.h>
-#include <mrs_msgs/ObstacleSectors.h>
-#include <mrs_msgs/BoolStamped.h>
-#include <mrs_msgs/ControlManagerDiagnostics.h>
-#include <mrs_msgs/DynamicsConstraints.h>
-#include <mrs_msgs/ControlError.h>
-#include <mrs_msgs/GetFloat64.h>
-#include <mrs_msgs/ValidateReference.h>
-#include <mrs_msgs/ValidateReferenceArray.h>
-#include <mrs_msgs/TrackerCommand.h>
-#include <mrs_msgs/EstimatorInput.h>
+#include <mrs_msgs/msg/float64_stamped.hpp>
+#include <mrs_msgs/msg/obstacle_sectors.hpp>
+#include <mrs_msgs/msg/bool_stamped.hpp>
+#include <mrs_msgs/msg/control_manager_diagnostics.hpp>
+#include <mrs_msgs/msg/dynamics_constraints.hpp>
+#include <mrs_msgs/msg/control_error.hpp>
+#include <mrs_msgs/msg/tracker_command.hpp>
+#include <mrs_msgs/msg/estimator_input.hpp>
 
-#include <geometry_msgs/Point32.h>
-#include <geometry_msgs/TwistStamped.h>
-#include <geometry_msgs/PoseArray.h>
-#include <geometry_msgs/Vector3Stamped.h>
+#include <mrs_msgs/srv/validate_reference_array.hpp>
+#include <mrs_msgs/srv/validate_reference.hpp>
+#include <mrs_msgs/srv/get_float64.hpp>
+#include <mrs_msgs/srv/string.hpp>
+#include <mrs_msgs/srv/float64_stamped_srv.hpp>
 
-#include <nav_msgs/Odometry.h>
+#include <geometry_msgs/msg/point32.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
+#include <geometry_msgs/msg/vector3_stamped.hpp>
 
-#include <sensor_msgs/Joy.h>
-#include <sensor_msgs/NavSatFix.h>
+#include <nav_msgs/msg/odometry.hpp>
 
-#include <mrs_lib/safety_zone/safety_zone.h>
+#include <std_msgs/msg/empty.hpp>
+
+#include <sensor_msgs/msg/joy.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+
+#include <mrs_lib/safety_zone.h>
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/utils.h>
@@ -43,79 +44,51 @@
 #include <mrs_lib/geometry/misc.h>
 #include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/attitude_converter.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/msg_extractor.h>
 #include <mrs_lib/quadratic_throttle_model.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 
-#include <mrs_msgs/HwApiCapabilities.h>
-#include <mrs_msgs/HwApiStatus.h>
-#include <mrs_msgs/HwApiRcChannels.h>
+#include <mrs_msgs/msg/hw_api_capabilities.hpp>
+#include <mrs_msgs/msg/hw_api_status.hpp>
+#include <mrs_msgs/msg/hw_api_rc_channels.hpp>
 
-#include <mrs_msgs/HwApiActuatorCmd.h>
-#include <mrs_msgs/HwApiControlGroupCmd.h>
-#include <mrs_msgs/HwApiAttitudeRateCmd.h>
-#include <mrs_msgs/HwApiAttitudeCmd.h>
-#include <mrs_msgs/HwApiAccelerationHdgRateCmd.h>
-#include <mrs_msgs/HwApiAccelerationHdgCmd.h>
-#include <mrs_msgs/HwApiVelocityHdgRateCmd.h>
-#include <mrs_msgs/HwApiVelocityHdgCmd.h>
-#include <mrs_msgs/HwApiPositionCmd.h>
+#include <mrs_msgs/msg/hw_api_actuator_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_control_group_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_attitude_rate_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_attitude_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_acceleration_hdg_rate_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_acceleration_hdg_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_velocity_hdg_rate_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_velocity_hdg_cmd.hpp>
+#include <mrs_msgs/msg/hw_api_position_cmd.hpp>
 
-#include <std_msgs/Float64.h>
+#include <std_msgs/msg/float64.hpp>
 
 #include <future>
 
-#include <pluginlib/class_loader.h>
-
-#include <nodelet/loader.h>
+#include <pluginlib/class_loader.hpp>
 
 #include <eigen3/Eigen/Eigen>
 
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
-#include <mrs_msgs/Reference.h>
-#include <mrs_msgs/ReferenceStamped.h>
-#include <mrs_msgs/ReferenceArray.h>
-#include <mrs_msgs/TrajectoryReference.h>
+#include <mrs_msgs/msg/reference.hpp>
+#include <mrs_msgs/msg/reference_stamped.hpp>
+#include <mrs_msgs/msg/reference_array.hpp>
+#include <mrs_msgs/msg/trajectory_reference.hpp>
 
-#include <mrs_msgs/ReferenceStampedSrv.h>
-#include <mrs_msgs/ReferenceStampedSrvRequest.h>
-#include <mrs_msgs/ReferenceStampedSrvResponse.h>
-
-#include <mrs_msgs/VelocityReferenceStampedSrv.h>
-#include <mrs_msgs/VelocityReferenceStampedSrvRequest.h>
-#include <mrs_msgs/VelocityReferenceStampedSrvResponse.h>
-
-#include <mrs_msgs/TransformReferenceSrv.h>
-#include <mrs_msgs/TransformReferenceSrvRequest.h>
-#include <mrs_msgs/TransformReferenceSrvResponse.h>
-
-#include <mrs_msgs/TransformReferenceArraySrv.h>
-#include <mrs_msgs/TransformReferenceArraySrvRequest.h>
-#include <mrs_msgs/TransformReferenceArraySrvResponse.h>
-
-#include <mrs_msgs/TransformPoseSrv.h>
-#include <mrs_msgs/TransformPoseSrvRequest.h>
-#include <mrs_msgs/TransformPoseSrvResponse.h>
-
-#include <mrs_msgs/TransformVector3Srv.h>
-#include <mrs_msgs/TransformVector3SrvRequest.h>
-#include <mrs_msgs/TransformVector3SrvResponse.h>
-
-#include <mrs_msgs/Float64StampedSrv.h>
-#include <mrs_msgs/Float64StampedSrvRequest.h>
-#include <mrs_msgs/Float64StampedSrvResponse.h>
-
-#include <mrs_msgs/Vec4.h>
-#include <mrs_msgs/Vec4Request.h>
-#include <mrs_msgs/Vec4Response.h>
-
-#include <mrs_msgs/Vec1.h>
-#include <mrs_msgs/Vec1Request.h>
-#include <mrs_msgs/Vec1Response.h>
+#include <mrs_msgs/srv/reference_stamped_srv.hpp>
+#include <mrs_msgs/srv/velocity_reference_stamped_srv.hpp>
+#include <mrs_msgs/srv/transform_reference_srv.hpp>
+#include <mrs_msgs/srv/transform_reference_array_srv.hpp>
+#include <mrs_msgs/srv/transform_pose_srv.hpp>
+#include <mrs_msgs/srv/transform_vector3_srv.hpp>
+#include <mrs_msgs/srv/float64_stamped_srv.hpp>
+#include <mrs_msgs/srv/vec4.hpp>
+#include <mrs_msgs/srv/vec1.hpp>
 
 //}
 
@@ -143,6 +116,16 @@ using vec3_t = mrs_lib::geometry::vec_t<3>;
 
 using radians  = mrs_lib::geometry::radians;
 using sradians = mrs_lib::geometry::sradians;
+
+//}
+
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 //}
 
@@ -239,13 +222,17 @@ TrackerParams::TrackerParams(std::string address, std::string name_space, bool h
 
 //}
 
-class ControlManager : public nodelet::Nodelet {
+class ControlManager : public rclcpp::Node {
 
-public:
-  virtual void onInit();
+  ControlManager(rclcpp::NodeOptions options);
 
 private:
-  ros::NodeHandle   nh_;
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
+  void                         timerPreInitialization();
+
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
   std::string       _body_frame_;
@@ -260,7 +247,7 @@ private:
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Tracker>> tracker_loader_;  // pluginlib loader of dynamically loaded trackers
   std::vector<std::string>                                           _tracker_names_;  // list of tracker names
   std::map<std::string, TrackerParams>                               trackers_;        // map between tracker names and tracker param
-  std::vector<boost::shared_ptr<mrs_uav_managers::Tracker>>          tracker_list_;    // list of trackers, routines are callable from this
+  std::vector<std::shared_ptr<mrs_uav_managers::Tracker>>            tracker_list_;    // list of trackers, routines are callable from this
   std::mutex                                                         mutex_tracker_list_;
 
   // | ------------- dynamic loading of controllers ------------- |
@@ -268,12 +255,12 @@ private:
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Controller>> controller_loader_;  // pluginlib loader of dynamically loaded controllers
   std::vector<std::string>                                              _controller_names_;  // list of controller names
   std::map<std::string, ControllerParams>                               controllers_;        // map between controller names and controller params
-  std::vector<boost::shared_ptr<mrs_uav_managers::Controller>>          controller_list_;    // list of controllers, routines are callable from this
+  std::vector<std::shared_ptr<mrs_uav_managers::Controller>>            controller_list_;    // list of controllers, routines are callable from this
   std::mutex                                                            mutex_controller_list_;
 
   // | ------------------------- HW API ------------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_;
 
   OutputPublisher control_output_publisher_;
 
@@ -284,8 +271,8 @@ private:
   // this timer will check till we already got the hardware api diagnostics
   // then it will trigger the initialization of the controllers and finish
   // the initialization of the ControlManager
-  ros::Timer timer_hw_api_capabilities_;
-  void       timerHwApiCapabilities(const ros::TimerEvent& event);
+  rclcpp::TimerBase::SharedPtr timer_hw_api_capabilities_;
+  void                         timerHwApiCapabilities();
 
   void preinitialize(void);
   void initialize(void);
@@ -296,8 +283,8 @@ private:
   std::tuple<bool, std::string> switchTracker(const std::string& tracker_name);
 
   // the time of last switching of a tracker or a controller
-  ros::Time  controller_tracker_switch_time_;
-  std::mutex mutex_controller_tracker_switch_time_;
+  rclcpp::Time controller_tracker_switch_time_;
+  std::mutex   mutex_controller_tracker_switch_time_;
 
   // | -------------------- the transformer  -------------------- |
 
@@ -350,35 +337,35 @@ private:
 
   // | -------------- uav_state/odometry subscriber ------------- |
 
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
-  mrs_lib::SubscribeHandler<mrs_msgs::UavState> sh_uav_state_;
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_odometry_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState> sh_uav_state_;
 
-  mrs_msgs::UavState uav_state_;
-  mrs_msgs::UavState previous_uav_state_;
-  bool               got_uav_state_               = false;
-  double             _uav_state_max_missing_time_ = 0;  // how long should we tolerate missing state estimate?
-  double             uav_roll_                    = 0;
-  double             uav_pitch_                   = 0;
-  double             uav_yaw_                     = 0;
-  double             uav_heading_                 = 0;
-  std::mutex         mutex_uav_state_;
+  mrs_msgs::msg::UavState uav_state_;
+  mrs_msgs::msg::UavState previous_uav_state_;
+  bool                    got_uav_state_               = false;
+  double                  _uav_state_max_missing_time_ = 0;  // how long should we tolerate missing state estimate?
+  double                  uav_roll_                    = 0;
+  double                  uav_pitch_                   = 0;
+  double                  uav_yaw_                     = 0;
+  double                  uav_heading_                 = 0;
+  std::mutex              mutex_uav_state_;
 
   // odometry hiccup detection
   double uav_state_avg_dt_        = 1;
   double uav_state_hiccup_factor_ = 1;
   int    uav_state_count_         = 0;
 
-  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
+  mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_gnss_;
 
   // | -------------- safety area max z subscriber -------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_max_z_;
 
   // | ------------- odometry innovation subscriber ------------- |
 
   // odometry innovation is published by the odometry node
   // it is used to issue eland if the estimator's input is too wonky
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_innovation_;
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_odometry_innovation_;
 
   // | --------------------- common handlers -------------------- |
 
@@ -409,100 +396,100 @@ private:
 
   // | ----------------------- publishers ----------------------- |
 
-  mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>     ph_controller_diagnostics_;
-  mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>            ph_tracker_cmd_;
-  mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>            ph_mrs_odom_input_;
-  mrs_lib::PublisherHandler<nav_msgs::Odometry>                  ph_control_reference_odom_;
-  mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics> ph_diagnostics_;
-  mrs_lib::PublisherHandler<std_msgs::Empty>                     ph_offboard_on_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_tilt_error_;
-  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_estimate_;
-  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_mass_nominal_;
-  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_throttle_;
-  mrs_lib::PublisherHandler<std_msgs::Float64>                   ph_thrust_;
-  mrs_lib::PublisherHandler<mrs_msgs::ControlError>              ph_control_error_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_markers_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_safety_area_coordinates_markers_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>     ph_disturbances_markers_;
-  mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
-  mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::ControllerDiagnostics>     ph_controller_diagnostics_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::TrackerCommand>            ph_tracker_cmd_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorInput>            ph_mrs_odom_input_;
+  mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>                  ph_control_reference_odom_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics> ph_diagnostics_;
+  mrs_lib::PublisherHandler<std_msgs::msg::Empty>                     ph_offboard_on_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>            ph_tilt_error_;
+  mrs_lib::PublisherHandler<std_msgs::msg::Float64>                   ph_mass_estimate_;
+  mrs_lib::PublisherHandler<std_msgs::msg::Float64>                   ph_mass_nominal_;
+  mrs_lib::PublisherHandler<std_msgs::msg::Float64>                   ph_throttle_;
+  mrs_lib::PublisherHandler<std_msgs::msg::Float64>                   ph_thrust_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>              ph_control_error_;
+  mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>     ph_safety_area_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>     ph_safety_area_coordinates_markers_;
+  mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>     ph_disturbances_markers_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::DynamicsConstraints>       ph_current_constraints_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>            ph_heading_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>            ph_speed_;
 
   // | --------------------- service servers -------------------- |
 
-  ros::ServiceServer service_server_switch_tracker_;
-  ros::ServiceServer service_server_switch_controller_;
-  ros::ServiceServer service_server_reset_tracker_;
-  ros::ServiceServer service_server_hover_;
-  ros::ServiceServer service_server_ehover_;
-  ros::ServiceServer service_server_failsafe_;
-  ros::ServiceServer service_server_failsafe_escalating_;
-  ros::ServiceServer service_server_toggle_output_;
-  ros::ServiceServer service_server_arm_;
-  ros::ServiceServer service_server_enable_callbacks_;
-  ros::ServiceServer service_server_set_constraints_;
-  ros::ServiceServer service_server_use_joystick_;
-  ros::ServiceServer service_server_use_safety_area_;
-  ros::ServiceServer service_server_emergency_reference_;
-  ros::ServiceServer service_server_pirouette_;
-  ros::ServiceServer service_server_eland_;
-  ros::ServiceServer service_server_parachute_;
-  ros::ServiceServer service_server_set_min_z_;
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr                 service_server_switch_tracker_;
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr                 service_server_switch_controller_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_reset_tracker_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_hover_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_eland_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_ehover_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_failsafe_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_failsafe_escalating_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr                service_server_toggle_output_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr                service_server_arm_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr                service_server_enable_callbacks_;
+  rclcpp::Service<mrs_msgs::srv::DynamicsConstraintsSrv>::SharedPtr service_server_set_constraints_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_use_joystick_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr                service_server_use_safety_area_;
+  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr    service_server_emergency_reference_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_pirouette_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_parachute_;
+  rclcpp::Service<mrs_msgs::srv::Float64StampedSrv>::SharedPtr      service_server_set_min_z_;
 
   // human callbable services for references
-  ros::ServiceServer service_server_goto_;
-  ros::ServiceServer service_server_goto_fcu_;
-  ros::ServiceServer service_server_goto_relative_;
-  ros::ServiceServer service_server_goto_altitude_;
-  ros::ServiceServer service_server_set_heading_;
-  ros::ServiceServer service_server_set_heading_relative_;
+  rclcpp::Service<mrs_msgs::srv::Vec4>::SharedPtr service_server_goto_;
+  rclcpp::Service<mrs_msgs::srv::Vec4>::SharedPtr service_server_goto_fcu_;
+  rclcpp::Service<mrs_msgs::srv::Vec4>::SharedPtr service_server_goto_relative_;
+  rclcpp::Service<mrs_msgs::srv::Vec1>::SharedPtr service_server_goto_altitude_;
+  rclcpp::Service<mrs_msgs::srv::Vec1>::SharedPtr service_server_goto_heading_;
+  rclcpp::Service<mrs_msgs::srv::Vec1>::SharedPtr service_server_set_heading_relative_;
 
   // the reference service and subscriber
-  ros::ServiceServer                                    service_server_reference_;
-  mrs_lib::SubscribeHandler<mrs_msgs::ReferenceStamped> sh_reference_;
+  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr service_server_reference_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>    sh_reference_;
 
   // the velocity reference service and subscriber
-  ros::ServiceServer                                            service_server_velocity_reference_;
-  mrs_lib::SubscribeHandler<mrs_msgs::VelocityReferenceStamped> sh_velocity_reference_;
+  rclcpp::Service<mrs_msgs::srv::VelocityReferenceSrv>::SharedPtr     service_server_velocity_reference_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped> sh_velocity_reference_;
 
   // trajectory tracking
-  ros::ServiceServer                                       service_server_trajectory_reference_;
-  mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference> sh_trajectory_reference_;
-  ros::ServiceServer                                       service_server_start_trajectory_tracking_;
-  ros::ServiceServer                                       service_server_stop_trajectory_tracking_;
-  ros::ServiceServer                                       service_server_resume_trajectory_tracking_;
-  ros::ServiceServer                                       service_server_goto_trajectory_start_;
+  rclcpp::Service<mrs_msgs::srv::TrajectoryReferenceSrv>::SharedPtr service_server_trajectory_reference_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>    sh_trajectory_reference_;
+
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_start_trajectory_tracking_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_stop_trajectory_tracking_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_resume_trajectory_tracking_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_goto_trajectory_start_;
 
   // transform service servers
-  ros::ServiceServer service_server_transform_reference_;
-  ros::ServiceServer service_server_transform_reference_array_;
-  ros::ServiceServer service_server_transform_pose_;
-  ros::ServiceServer service_server_transform_vector3_;
+  rclcpp::Service<mrs_msgs::srv::TransformReferenceSrv>::SharedPtr      service_server_transform_reference_;
+  rclcpp::Service<mrs_msgs::srv::TransformReferenceArraySrv>::SharedPtr service_server_transform_reference_array_;
+  rclcpp::Service<mrs_msgs::srv::TransformPoseSrv>::SharedPtr           service_server_transform_pose_;
+  rclcpp::Service<mrs_msgs::srv::TransformVector3Srv>::SharedPtr        service_server_transform_vector3_;
 
   // safety area services
-  ros::ServiceServer service_server_validate_reference_;
-  ros::ServiceServer service_server_validate_reference_2d_;
-  ros::ServiceServer service_server_validate_reference_array_;
+  rclcpp::Service<mrs_msgs::srv::ValidateReference>::SharedPtr      service_server_validate_reference_;
+  rclcpp::Service<mrs_msgs::srv::ValidateReference>::SharedPtr      service_server_validate_reference_2d_;
+  rclcpp::Service<mrs_msgs::srv::ValidateReferenceArray>::SharedPtr service_server_validate_reference_array_;
 
   // bumper service servers
-  ros::ServiceServer service_server_bumper_enabler_;
-  ros::ServiceServer service_server_bumper_repulsion_enabler_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr service_server_bumper_enabler_;
 
   // service clients
-  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_arming_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_eland_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_shutdown_;
-  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_set_odometry_callbacks_;
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_parachute_;
+  mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> sch_arming_;
+  mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_eland_;
+  mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_shutdown_;
+  mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> sch_set_odometry_callbacks_;
+  mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_parachute_;
 
   // safety area min z servers
-  ros::ServiceServer service_server_get_min_z_;
+  rclcpp::Service<mrs_msgs::srv::GetFloat64>::SharedPtr service_server_get_min_z_;
 
   // | --------- trackers' and controllers' last results -------- |
 
   // the last result of an active tracker
-  std::optional<mrs_msgs::TrackerCommand> last_tracker_cmd_;
-  std::mutex                              mutex_last_tracker_cmd_;
+  std::optional<mrs_msgs::msg::TrackerCommand> last_tracker_cmd_;
+  std::mutex                                   mutex_last_tracker_cmd_;
 
   // the last result of an active controller
   Controller::ControlOutput last_control_output_;
@@ -510,7 +497,7 @@ private:
 
   // | -------------- HW API diagnostics subscriber ------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus> sh_hw_api_status_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus> sh_hw_api_status_;
 
   bool offboard_mode_          = false;
   bool offboard_mode_was_true_ = false;  // if it was ever true
@@ -519,9 +506,9 @@ private:
   // | -------------------- throttle and mass ------------------- |
 
   // throttle mass estimation during eland
-  double    throttle_mass_estimate_   = 0;
-  bool      throttle_under_threshold_ = false;
-  ros::Time throttle_mass_estimate_first_time_;
+  double       throttle_mass_estimate_   = 0;
+  bool         throttle_under_threshold_ = false;
+  rclcpp::Time throttle_mass_estimate_first_time_;
 
   // | ---------------------- safety params --------------------- |
 
@@ -530,8 +517,8 @@ private:
   double _tilt_error_disarm_timeout_;
   double _tilt_error_disarm_threshold_;
 
-  ros::Time tilt_error_disarm_time_;
-  bool      tilt_error_disarm_over_thr_ = false;
+  rclcpp::Time tilt_error_disarm_time_;
+  bool         tilt_error_disarm_over_thr_ = false;
 
   // elanding when tilt error is too large
   bool   _tilt_limit_eland_enabled_;
@@ -585,92 +572,113 @@ private:
 
   // safety area routines
   // those are passed to trackers using the common_handlers object
-  bool   isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point);
-  bool   isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point);
-  bool   isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
-  bool   isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
+  bool   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& from, const mrs_msgs::msg::ReferenceStamped& to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& from, const mrs_msgs::msg::ReferenceStamped& to);
   double getMinZ(const std::string& frame_id);
   double getMaxZ(const std::string& frame_id);
 
   // | ------------------------ callbacks ----------------------- |
 
   // topic callbacks
-  void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
-  void callbackUavState(const mrs_msgs::UavState::ConstPtr msg);
-  void callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr msg);
-  void callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg);
-  void callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg);
+  void callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+  void callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
+  void callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr msg);
+  void callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
+  void callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg);
 
   // topic timeouts
   void timeoutUavState(const double& missing_for);
 
   // switching controller and tracker services
-  bool callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-  bool callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-  bool callbackTrackerResetStatic(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  bool callbackSwitchController(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  bool callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                  const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // reference callbacks
-  void callbackReferenceTopic(const mrs_msgs::ReferenceStamped::ConstPtr msg);
-  void callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStamped::ConstPtr msg);
-  void callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReference::ConstPtr msg);
-  bool callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
-  bool callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
-  bool callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res);
-  bool callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res);
-  bool callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-  bool callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request& req, mrs_msgs::VelocityReferenceStampedSrv::Response& res);
-  bool callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res);
-  bool callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
+  void callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg);
+  void callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg);
+  void callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg);
+  bool callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
+                                        const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response);
+  bool callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response);
+  bool callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                  const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   // safety callbacks
-  bool callbackHover(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackStartTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackStopTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackResumeTrajectoryTracking([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackEHover(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackFailsafe(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackFailsafeEscalating(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackEland(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
-  bool callbackSetMinZ(mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res);
-  bool callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-  bool callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
+  bool callbackHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackStartTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackStopTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                      const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackResumeTrajectoryTracking(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                        const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackGotoTrajectoryStart(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                  const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackSetMinZ(const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Request>  request,
+                       const std::shared_ptr<mrs_msgs::srv::Float64StampedSrv::Response> response);
+  bool callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                               const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
-  bool callbackGetMinZ(mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res);
+  bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request, const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response);
 
-  bool callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
-  bool callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res);
-  bool callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res);
+  bool callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                   const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
+                                      const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response);
 
   // transformation callbacks
-  bool callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res);
-  bool callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res);
-  bool callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res);
-  bool callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res);
+  bool callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request>  request,
+                                  const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response);
+  bool callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request>  request,
+                                       const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response);
+  bool callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request>  request,
+                             const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response);
+  bool callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request>  request,
+                                const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response);
 
   // | ----------------------- constraints ---------------------- |
 
   // sets constraints to all trackers
-  bool callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Request& req, mrs_msgs::DynamicsConstraintsSrv::Response& res);
+  bool callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>  request,
+                              const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response> response);
 
   // constraints management
   bool              got_constraints_ = false;
   std::mutex        mutex_constraints_;
-  void              setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
-  void              setConstraintsToTrackers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
-  void              setConstraintsToControllers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  void              setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
+  void              setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
+  void              setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
   std::atomic<bool> constraints_being_enforced_ = false;
 
-  std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> enforceControllersConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints);
+  std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> enforceControllersConstraints(
+      const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
 
-  mrs_msgs::DynamicsConstraintsSrvRequest current_constraints_;
-  mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints_;
+  mrs_msgs::srv::DynamicsConstraintsSrv::Request current_constraints_;
+  mrs_msgs::srv::DynamicsConstraintsSrv::Request sanitized_constraints_;
 
   // | ------------------ emergency triggered? ------------------ |
 
@@ -680,12 +688,12 @@ private:
   // | ------------------------- timers ------------------------- |
 
   // timer for regular status publishing
-  ros::Timer timer_status_;
-  void       timerStatus(const ros::TimerEvent& event);
+  std::shared_ptr<TimerType> timer_status_;
+  void                       timerStatus();
 
   // timer for issuing the failsafe landing
-  ros::Timer timer_failsafe_;
-  void       timerFailsafe(const ros::TimerEvent& event);
+  std::shared_ptr<TimerType> timer_failsafe_;
+  void                       timerFailsafe();
 
   // oneshot timer for running controllers and trackers
   void              asyncControl(void);
@@ -693,27 +701,27 @@ private:
   std::future<void> async_control_result_;
 
   // timer for issuing emergancy landing
-  ros::Timer timer_eland_;
-  void       timerEland(const ros::TimerEvent& event);
+  std::shared_ptr<TimerType> timer_eland_;
+  void                       timerEland();
 
   // timer for regular checking of controller errors
-  ros::Timer        timer_safety_;
-  void              timerSafety(const ros::TimerEvent& event);
-  std::atomic<bool> running_safety_timer_        = false;
-  std::atomic<bool> odometry_switch_in_progress_ = false;
+  std::shared_ptr<TimerType> timer_safety_;
+  void                       timerSafety();
+  std::atomic<bool>          running_safety_timer_        = false;
+  std::atomic<bool>          odometry_switch_in_progress_ = false;
 
   // timer for issuing the pirouette
-  ros::Timer timer_pirouette_;
-  void       timerPirouette(const ros::TimerEvent& event);
+  std::shared_ptr<TimerType> timer_pirouette_;
+  void                       timerPirouette();
 
   // | --------------------- obstacle bumper -------------------- |
 
   // bumper timer
-  ros::Timer timer_bumper_;
-  void       timerBumper(const ros::TimerEvent& event);
+  std::shared_ptr<TimerType> timer_bumper_;
+  void                       timerBumper();
 
   // bumper subscriber
-  mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors> sh_bumper_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors> sh_bumper_;
 
   bool        _bumper_switch_tracker_    = false;
   bool        _bumper_switch_controller_ = false;
@@ -743,7 +751,7 @@ private:
   bool                       _service_escalating_failsafe_enabled_ = false;
   bool                       _rc_escalating_failsafe_enabled_      = false;
   double                     _escalating_failsafe_timeout_         = 0;
-  ros::Time                  escalating_failsafe_time_;
+  rclcpp::Time               escalating_failsafe_time_;
   bool                       _escalating_failsafe_ehover_   = false;
   bool                       _escalating_failsafe_eland_    = false;
   bool                       _escalating_failsafe_failsafe_ = false;
@@ -776,8 +784,8 @@ private:
   void       publishDiagnostics(void);
   std::mutex mutex_diagnostics_;
 
-  void                                             ungripSrv(void);
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_ungrip_;
+  void                                                  ungripSrv(void);
+  mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_ungrip_;
 
   bool isFlyingNormally(void);
 
@@ -789,14 +797,14 @@ private:
   std::mutex mutex_pirouette_;
   double     pirouette_initial_heading_;
   double     pirouette_iterator_;
-  bool       callbackPirouette(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  bool callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // | -------------------- joystick control -------------------- |
 
-  mrs_lib::SubscribeHandler<sensor_msgs::Joy> sh_joystick_;
+  mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy> sh_joystick_;
 
-  void callbackJoystick(const sensor_msgs::Joy::ConstPtr msg);
-  bool callbackUseJoystick([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
+  void callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPtr msg);
+  bool callbackUseJoystick(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // joystick buttons mappings
   int _channel_A_, _channel_B_, _channel_X_, _channel_Y_, _channel_start_, _channel_back_, _channel_LT_, _channel_RT_, _channel_L_joy_, _channel_R_joy_;
@@ -805,29 +813,29 @@ private:
   int    _channel_pitch_, _channel_roll_, _channel_heading_, _channel_throttle_;
   double _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_throttle_;
 
-  ros::Timer timer_joystick_;
-  void       timerJoystick(const ros::TimerEvent& event);
-  double     _joystick_timer_rate_ = 0;
+  std::shared_ptr<TimerType> timer_joystick_;
+  void                       timerJoystick();
+  double                     _joystick_timer_rate_ = 0;
 
   double _joystick_carrot_distance_ = 0;
 
-  ros::Time joystick_start_press_time_;
-  bool      joystick_start_pressed_ = false;
+  rclcpp::Time joystick_start_press_time_;
+  bool         joystick_start_pressed_ = false;
 
-  ros::Time joystick_back_press_time_;
-  bool      joystick_back_pressed_ = false;
-  bool      joystick_goto_enabled_ = false;
+  rclcpp::Time joystick_back_press_time_;
+  bool         joystick_back_pressed_ = false;
+  bool         joystick_goto_enabled_ = false;
 
-  bool      joystick_failsafe_pressed_ = false;
-  ros::Time joystick_failsafe_press_time_;
+  bool         joystick_failsafe_pressed_ = false;
+  rclcpp::Time joystick_failsafe_press_time_;
 
-  bool      joystick_eland_pressed_ = false;
-  ros::Time joystick_eland_press_time_;
+  bool         joystick_eland_pressed_ = false;
+  rclcpp::Time joystick_eland_press_time_;
 
   // | ------------------- RC joystick control ------------------ |
 
   // listening to the RC channels as told by pixhawk
-  mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels> sh_hw_api_rc_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels> sh_hw_api_rc_;
 
   // the RC channel mapping of the main 4 control signals
   double _rc_channel_pitch_, _rc_channel_roll_, _rc_channel_heading_, _rc_channel_throttle_;
@@ -844,8 +852,8 @@ private:
 
   // | ------------------- trajectory loading ------------------- |
 
-  mrs_lib::PublisherHandler<geometry_msgs::PoseArray>        pub_debug_original_trajectory_poses_;
-  mrs_lib::PublisherHandler<visualization_msgs::MarkerArray> pub_debug_original_trajectory_markers_;
+  mrs_lib::PublisherHandler<geometry_msgs::msg::PoseArray>        pub_debug_original_trajectory_poses_;
+  mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray> pub_debug_original_trajectory_markers_;
 
   // | --------------------- other routines --------------------- |
 
@@ -853,17 +861,17 @@ private:
   void updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
-  void updateControllers(const mrs_msgs::UavState& uav_state);
+  void updateControllers(const mrs_msgs::msg::UavState& uav_state);
 
   // sets the reference to the active tracker
-  std::tuple<bool, std::string> setReference(const mrs_msgs::ReferenceStamped reference_in);
+  std::tuple<bool, std::string> setReference(const mrs_msgs::msg::ReferenceStamped reference_in);
 
   // sets the velocity reference to the active tracker
-  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::VelocityReferenceStamped& reference_in);
+  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped& reference_in);
 
   // sets the reference trajectory to the active tracker
   std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
-      const mrs_msgs::TrajectoryReference trajectory_in);
+      const mrs_msgs::msg::TrajectoryReference trajectory_in);
 
   // publishes
   void publish(void);
@@ -873,14 +881,14 @@ private:
   double getMass(void);
 
   // publishes rviz-visualizable control reference
-  void publishControlReferenceOdom(const std::optional<mrs_msgs::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
+  void publishControlReferenceOdom(const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
 
   void initializeControlOutput(void);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
 
-  mrs_msgs::ReferenceStamped velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference);
+  mrs_msgs::msg::ReferenceStamped velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped& vel_reference);
 
   void                          setCallbacks(bool in);
   bool                          isOffboard(void);
@@ -903,34 +911,28 @@ private:
 
 //}
 
-/* //{ onInit() */
+ControlManager::ControlManager(rclcpp::NodeOptions options) : Node("control_manager", options) {
 
-void ControlManager::onInit() {
-  preinitialize();
+  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&ControlManager::timerPreInitialization, this));
 }
-
-//}
 
 /* preinitialize() //{ */
 
-void ControlManager::preinitialize(void) {
+void ControlManager::timerPreInitialization() {
 
-  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  node_  = this->shared_from_this();
+  clock_ = node_->get_clock();
 
-  ros::Time::waitForValid();
+  mrs_lib::SubscriberHandlerOptions shopts;
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "ControlManager";
+  shopts.node               = node_;
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_hw_api_capabilities_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+  sh_hw_api_capabilities_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
 
-  timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerHwApiCapabilities, this);
+  timer_hw_api_capabilities_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&ControlManager::timerHwApiCapabilities, this));
 }
 
 //}
@@ -939,13 +941,13 @@ void ControlManager::preinitialize(void) {
 
 void ControlManager::initialize(void) {
 
-  joystick_start_press_time_      = ros::Time(0);
-  joystick_failsafe_press_time_   = ros::Time(0);
-  joystick_eland_press_time_      = ros::Time(0);
-  escalating_failsafe_time_       = ros::Time(0);
-  controller_tracker_switch_time_ = ros::Time(0);
+  joystick_start_press_time_      = rclcpp::Time(0);
+  joystick_failsafe_press_time_   = rclcpp::Time(0);
+  joystick_eland_press_time_      = rclcpp::Time(0);
+  escalating_failsafe_time_       = rclcpp::Time(0);
+  controller_tracker_switch_time_ = rclcpp::Time(0);
 
-  ROS_INFO("[ControlManager]: initializing");
+  RCLCPP_INFO(node_->get_logger(), "initializing");
 
   // --------------------------------------------------------------
   // |         common handler for trackers and controllers        |
@@ -957,7 +959,7 @@ void ControlManager::initialize(void) {
   // |                           params                           |
   // --------------------------------------------------------------
 
-  mrs_lib::ParamLoader param_loader(nh_, "ControlManager");
+  mrs_lib::ParamLoader param_loader(node_, "ControlManager");
 
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);
@@ -1031,15 +1033,15 @@ void ControlManager::initialize(void) {
     }
 
     catch (mrs_lib::SafetyZone::BorderError& e) {
-      ROS_ERROR("[ControlManager]: SafetyArea: wrong configruation for the safety zone border polygon");
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: wrong configruation for the safety zone border polygon");
+      rclcpp::shutdown();
     }
     catch (...) {
-      ROS_ERROR("[ControlManager]: SafetyArea: unhandled exception!");
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: unhandled exception!");
+      rclcpp::shutdown();
     }
 
-    ROS_INFO("[ControlManager]: safety area initialized");
+    RCLCPP_INFO(node_->get_logger(), "safety area initialized");
   }
 
   param_loader.setPrefix("mrs_uav_managers/control_manager/");
@@ -1047,8 +1049,8 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("state_input", _state_input_);
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
-    ROS_ERROR("[ControlManager]: the state_input parameter has to be in {0, 1}");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "the state_input parameter has to be in {0, 1}");
+    rclcpp::shutdown();
   }
 
   param_loader.loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
@@ -1076,8 +1078,8 @@ void ControlManager::initialize(void) {
   _tilt_limit_eland_ = M_PI * (_tilt_limit_eland_ / 180.0);
 
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
-    ROS_ERROR("[ControlManager]: safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
+    rclcpp::shutdown();
   }
 
   param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
@@ -1086,8 +1088,8 @@ void ControlManager::initialize(void) {
   _tilt_limit_disarm_ = M_PI * (_tilt_limit_disarm_ / 180.0);
 
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
-    ROS_ERROR("[ControlManager]: safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
+    rclcpp::shutdown();
   }
 
   param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
@@ -1096,8 +1098,8 @@ void ControlManager::initialize(void) {
   _yaw_error_eland_ = M_PI * (_yaw_error_eland_ / 180.0);
 
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
-    ROS_ERROR("[ControlManager]: safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
+    rclcpp::shutdown();
   }
 
   param_loader.loadParam("status_timer_rate", _status_timer_rate_);
@@ -1115,8 +1117,8 @@ void ControlManager::initialize(void) {
   _tilt_error_disarm_threshold_ = M_PI * (_tilt_error_disarm_threshold_ / 180.0);
 
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
-    ROS_ERROR("[ControlManager]: safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
+    rclcpp::shutdown();
   }
 
   // default constraints
@@ -1208,9 +1210,9 @@ void ControlManager::initialize(void) {
 
   // check the values of tracker error action
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
-    ROS_ERROR("[ControlManager]: the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
-              EHOVER_STR);
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
+                 EHOVER_STR);
+    rclcpp::shutdown();
   }
 
   param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
@@ -1237,7 +1239,7 @@ void ControlManager::initialize(void) {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "ControlManager");
+  transformer_ = std::make_shared<mrs_lib::Transformer>(node_, "ControlManager");
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->retryLookupNewest(true);
 
@@ -1255,20 +1257,20 @@ void ControlManager::initialize(void) {
   common_handlers_->scope_timer.logger  = scope_timer_logger_;
 
   common_handlers_->safety_area.use_safety_area       = use_safety_area_;
-  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&ControlManager::isPointInSafetyArea2d, this, _1);
-  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&ControlManager::isPointInSafetyArea3d, this, _1);
-  common_handlers_->safety_area.getMinZ               = boost::bind(&ControlManager::getMinZ, this, _1);
-  common_handlers_->safety_area.getMaxZ               = boost::bind(&ControlManager::getMaxZ, this, _1);
+  common_handlers_->safety_area.isPointInSafetyArea2d = std::bind(&ControlManager::isPointInSafetyArea2d, this, std::placeholders::_1);
+  common_handlers_->safety_area.isPointInSafetyArea3d = std::bind(&ControlManager::isPointInSafetyArea3d, this, std::placeholders::_1);
+  common_handlers_->safety_area.getMinZ               = std::bind(&ControlManager::getMinZ, this, std::placeholders::_1);
+  common_handlers_->safety_area.getMaxZ               = std::bind(&ControlManager::getMaxZ, this, std::placeholders::_1);
 
-  common_handlers_->getMass = boost::bind(&ControlManager::getMass, this);
+  common_handlers_->getMass = std::bind(&ControlManager::getMass, this);
 
-  common_handlers_->detailed_model_params = loadDetailedUavModelParams(nh_, "ControlManager", _platform_config_, _custom_config_);
+  common_handlers_->detailed_model_params = loadDetailedUavModelParams(node_, "ControlManager", _platform_config_, _custom_config_);
 
   common_handlers_->control_output_modalities = _hw_api_inputs_;
 
   common_handlers_->uav_name = _uav_name_;
 
-  common_handlers_->parent_nh = nh_;
+  common_handlers_->parent_node = node_;
 
   // --------------------------------------------------------------
   // |                        load trackers                       |
@@ -1305,22 +1307,22 @@ void ControlManager::initialize(void) {
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
 
     try {
-      ROS_INFO("[ControlManager]: loading the tracker '%s'", new_tracker.address.c_str());
-      tracker_list_.push_back(tracker_loader_->createInstance(new_tracker.address.c_str()));
+      RCLCPP_INFO(node_->get_logger(), "loading the tracker '%s'", new_tracker.address.c_str());
+      tracker_list_.push_back(tracker_loader_->createSharedInstance(new_tracker.address.c_str()));
     }
     catch (pluginlib::CreateClassException& ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for the tracker '%s'", new_tracker.address.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the tracker '%s'", new_tracker.address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
+      rclcpp::shutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for the tracker '%s'", new_tracker.address.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the tracker '%s'", new_tracker.address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
+      rclcpp::shutdown();
     }
   }
 
-  ROS_INFO("[ControlManager]: trackers were loaded");
+  RCLCPP_INFO(node_->get_logger(), "trackers were loaded");
 
   for (int i = 0; i < int(tracker_list_.size()); i++) {
 
@@ -1331,10 +1333,10 @@ void ControlManager::initialize(void) {
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers =
         std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = boost::bind(&ControlManager::loadConfigFile, this, _1, it->second.name_space);
+    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _tracker_names_.at(i);
-    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, it->second.name_space), _tracker_names_.at(i));
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(node_->create_sub_node(it->second.name_space), _tracker_names_.at(i));
 
     if (_custom_config_ != "") {
       private_handlers->param_loader->addYamlFile(_custom_config_);
@@ -1355,20 +1357,20 @@ void ControlManager::initialize(void) {
     bool success = false;
 
     try {
-      ROS_INFO("[ControlManager]: initializing the tracker '%s'", it->second.address.c_str());
-      success = tracker_list_.at(i)->initialize(ros::NodeHandle(nh_, it->second.name_space), common_handlers_, private_handlers);
+      RCLCPP_INFO(node_->get_logger(), "initializing the tracker '%s'", it->second.address.c_str());
+      success = tracker_list_.at(i)->initialize(node_->create_sub_node(it->second.name_space), common_handlers_, private_handlers);
     }
     catch (std::runtime_error& ex) {
-      ROS_ERROR("[ControlManager]: exception caught during tracker initialization: '%s'", ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "exception caught during tracker initialization: '%s'", ex.what());
     }
 
     if (!success) {
-      ROS_ERROR("[ControlManager]: failed to initialize the tracker '%s'", it->second.address.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "failed to initialize the tracker '%s'", it->second.address.c_str());
+      rclcpp::shutdown();
     }
   }
 
-  ROS_INFO("[ControlManager]: trackers were initialized");
+  RCLCPP_INFO(node_->get_logger(), "trackers were initialized");
 
   // --------------------------------------------------------------
   // |           check the existance of selected trackers         |
@@ -1383,8 +1385,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _ehover_tracker_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the safety/hover_tracker (%s) is not within the loaded trackers", _ehover_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the safety/hover_tracker (%s) is not within the loaded trackers", _ehover_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1396,8 +1398,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _landoff_tracker_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the landoff tracker (%s) is not within the loaded trackers", _landoff_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the landoff tracker (%s) is not within the loaded trackers", _landoff_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1409,8 +1411,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _null_tracker_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the null tracker (%s) is not within the loaded trackers", _null_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the null tracker (%s) is not within the loaded trackers", _null_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1425,8 +1427,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _joystick_tracker_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the joystick tracker (%s) is not within the loaded trackers", _joystick_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the joystick tracker (%s) is not within the loaded trackers", _joystick_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1435,8 +1437,8 @@ void ControlManager::initialize(void) {
     auto idx = idxInVector(_bumper_tracker_name_, _tracker_names_);
 
     if (!idx) {
-      ROS_ERROR("[ControlManager]: the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1446,8 +1448,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _joystick_fallback_tracker_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the joystick fallback tracker (%s) is not within the loaded trackers", _joystick_fallback_tracker_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the joystick fallback tracker (%s) is not within the loaded trackers", _joystick_fallback_tracker_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1512,52 +1514,52 @@ void ControlManager::initialize(void) {
 
       if (!meets_requirements) {
 
-        ROS_ERROR("[ControlManager]: the controller '%s' does not meet the control output requirements, which are some of the following",
-                  controller_name.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "the controller '%s' does not meet the control output requirements, which are some of the following",
+                     controller_name.c_str());
 
         if (_hw_api_inputs_.actuators) {
-          ROS_ERROR("[ControlManager]: - actuators");
+          RCLCPP_ERROR(node_->get_logger(), "- actuators");
         }
 
         if (_hw_api_inputs_.control_group) {
-          ROS_ERROR("[ControlManager]: - control group");
+          RCLCPP_ERROR(node_->get_logger(), "- control group");
         }
 
         if (_hw_api_inputs_.attitude_rate) {
-          ROS_ERROR("[ControlManager]: - attitude rate");
+          RCLCPP_ERROR(node_->get_logger(), "- attitude rate");
         }
 
         if (_hw_api_inputs_.attitude) {
-          ROS_ERROR("[ControlManager]: - attitude");
+          RCLCPP_ERROR(node_->get_logger(), "- attitude");
         }
 
         if (_hw_api_inputs_.acceleration_hdg_rate) {
-          ROS_ERROR("[ControlManager]: - acceleration+hdg rate");
+          RCLCPP_ERROR(node_->get_logger(), "- acceleration+hdg rate");
         }
 
         if (_hw_api_inputs_.acceleration_hdg) {
-          ROS_ERROR("[ControlManager]: - acceleration+hdg");
+          RCLCPP_ERROR(node_->get_logger(), "- acceleration+hdg");
         }
 
         if (_hw_api_inputs_.velocity_hdg_rate) {
-          ROS_ERROR("[ControlManager]: - velocity+hdg rate");
+          RCLCPP_ERROR(node_->get_logger(), "- velocity+hdg rate");
         }
 
         if (_hw_api_inputs_.velocity_hdg) {
-          ROS_ERROR("[ControlManager]: - velocity+hdg");
+          RCLCPP_ERROR(node_->get_logger(), "- velocity+hdg");
         }
 
         if (_hw_api_inputs_.position) {
-          ROS_ERROR("[ControlManager]: - position");
+          RCLCPP_ERROR(node_->get_logger(), "- position");
         }
 
-        ros::shutdown();
+        rclcpp::shutdown();
       }
 
       if ((_hw_api_inputs_.actuators || _hw_api_inputs_.control_group) && !common_handlers_->detailed_model_params) {
-        ROS_ERROR(
-            "[ControlManager]: the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
-        ros::shutdown();
+        RCLCPP_ERROR(node_->get_logger(),
+                     "the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
+        rclcpp::shutdown();
       }
     }
 
@@ -1605,22 +1607,22 @@ void ControlManager::initialize(void) {
     controllers_.insert(std::pair<std::string, ControllerParams>(controller_name, new_controller));
 
     try {
-      ROS_INFO("[ControlManager]: loading the controller '%s'", new_controller.address.c_str());
-      controller_list_.push_back(controller_loader_->createInstance(new_controller.address.c_str()));
+      RCLCPP_INFO(node_->get_logger(), "loading the controller '%s'", new_controller.address.c_str());
+      controller_list_.push_back(controller_loader_->createSharedInstance(new_controller.address.c_str()));
     }
     catch (pluginlib::CreateClassException& ex1) {
-      ROS_ERROR("[ControlManager]: CreateClassException for the controller '%s'", new_controller.address.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex1.what());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the controller '%s'", new_controller.address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
+      rclcpp::shutdown();
     }
     catch (pluginlib::PluginlibException& ex) {
-      ROS_ERROR("[ControlManager]: PluginlibException for the controller '%s'", new_controller.address.c_str());
-      ROS_ERROR("[ControlManager]: Error: %s", ex.what());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the controller '%s'", new_controller.address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
+      rclcpp::shutdown();
     }
   }
 
-  ROS_INFO("[ControlManager]: controllers were loaded");
+  RCLCPP_INFO(node_->get_logger(), "controllers were loaded");
 
   for (int i = 0; i < int(controller_list_.size()); i++) {
 
@@ -1631,10 +1633,10 @@ void ControlManager::initialize(void) {
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers =
         std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = boost::bind(&ControlManager::loadConfigFile, this, _1, it->second.name_space);
+    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _controller_names_.at(i);
-    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(ros::NodeHandle(nh_, it->second.name_space), _controller_names_.at(i));
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(node_->create_sub_node(it->second.name_space), _controller_names_.at(i));
 
     if (_custom_config_ != "") {
       private_handlers->param_loader->addYamlFile(_custom_config_);
@@ -1656,20 +1658,20 @@ void ControlManager::initialize(void) {
 
     try {
 
-      ROS_INFO("[ControlManager]: initializing the controller '%s'", it->second.address.c_str());
-      success = controller_list_.at(i)->initialize(ros::NodeHandle(nh_, it->second.name_space), common_handlers_, private_handlers);
+      RCLCPP_INFO(node_->get_logger(), "initializing the controller '%s'", it->second.address.c_str());
+      success = controller_list_.at(i)->initialize(node_->create_sub_node(it->second.name_space), common_handlers_, private_handlers);
     }
     catch (std::runtime_error& ex) {
-      ROS_ERROR("[ControlManager]: exception caught during controller initialization: '%s'", ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "exception caught during controller initialization: '%s'", ex.what());
     }
 
     if (!success) {
-      ROS_ERROR("[ControlManager]: failed to initialize the controller '%s'", it->second.address.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "failed to initialize the controller '%s'", it->second.address.c_str());
+      rclcpp::shutdown();
     }
   }
 
-  ROS_INFO("[ControlManager]: controllers were initialized");
+  RCLCPP_INFO(node_->get_logger(), "controllers were initialized");
 
   {
     auto idx = idxInVector(_failsafe_controller_name_, _controller_names_);
@@ -1677,8 +1679,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _failsafe_controller_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the failsafe controller (%s) is not within the loaded controllers", _failsafe_controller_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the failsafe controller (%s) is not within the loaded controllers", _failsafe_controller_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1688,8 +1690,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _eland_controller_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the eland controller (%s) is not within the loaded controllers", _eland_controller_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the eland controller (%s) is not within the loaded controllers", _eland_controller_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1699,8 +1701,8 @@ void ControlManager::initialize(void) {
     if (idx) {
       _joystick_controller_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1709,8 +1711,8 @@ void ControlManager::initialize(void) {
     auto idx = idxInVector(_bumper_controller_name_, _controller_names_);
 
     if (!idx) {
-      ROS_ERROR("[ControlManager]: the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1720,8 +1722,9 @@ void ControlManager::initialize(void) {
     if (idx) {
       _joystick_fallback_controller_idx_ = idx.value();
     } else {
-      ROS_ERROR("[ControlManager]: the joystick fallback controller (%s) is not within the loaded controllers", _joystick_fallback_controller_name_.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "the joystick fallback controller (%s) is not within the loaded controllers",
+                   _joystick_fallback_controller_name_.c_str());
+      rclcpp::shutdown();
     }
   }
 
@@ -1729,7 +1732,7 @@ void ControlManager::initialize(void) {
   // |                  activate the NullTracker                  |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: activating the null tracker");
+  RCLCPP_INFO(node_->get_logger(), "activating the null tracker");
 
   tracker_list_.at(_null_tracker_idx_)->activate(last_tracker_cmd_);
   active_tracker_idx_ = _null_tracker_idx_;
@@ -1738,7 +1741,7 @@ void ControlManager::initialize(void) {
   // |    activate the eland controller as the first controller   |
   // --------------------------------------------------------------
 
-  ROS_INFO("[ControlManager]: activating the the eland controller (%s) as the first controller", _controller_names_.at(_eland_controller_idx_).c_str());
+  RCLCPP_INFO(node_->get_logger(), "activating the the eland controller (%s) as the first controller", _controller_names_.at(_eland_controller_idx_).c_str());
 
   controller_list_.at(_eland_controller_idx_)->activate(last_control_output_);
   active_controller_idx_ = _eland_controller_idx_;
@@ -1747,7 +1750,7 @@ void ControlManager::initialize(void) {
   {
     std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
-    controller_tracker_switch_time_ = ros::Time::now();
+    controller_tracker_switch_time_ = clock_->now();
   }
 
   output_enabled_ = false;
@@ -1759,37 +1762,98 @@ void ControlManager::initialize(void) {
 
   // | ------------------------ profiler ------------------------ |
 
-  profiler_ = mrs_lib::Profiler(nh_, "ControlManager", _profiler_enabled_);
+  profiler_ = mrs_lib::Profiler(node_, "ControlManager", _profiler_enabled_);
 
   // | ----------------------- publishers ----------------------- |
 
-  control_output_publisher_ = OutputPublisher(nh_);
+  control_output_publisher_ = OutputPublisher(node_);
 
-  ph_controller_diagnostics_             = mrs_lib::PublisherHandler<mrs_msgs::ControllerDiagnostics>(nh_, "controller_diagnostics_out", 1);
-  ph_tracker_cmd_                        = mrs_lib::PublisherHandler<mrs_msgs::TrackerCommand>(nh_, "tracker_cmd_out", 1);
-  ph_mrs_odom_input_                     = mrs_lib::PublisherHandler<mrs_msgs::EstimatorInput>(nh_, "estimator_input_out", 1);
-  ph_control_reference_odom_             = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "control_reference_out", 1);
-  ph_diagnostics_                        = mrs_lib::PublisherHandler<mrs_msgs::ControlManagerDiagnostics>(nh_, "diagnostics_out", 1);
-  ph_offboard_on_                        = mrs_lib::PublisherHandler<std_msgs::Empty>(nh_, "offboard_on_out", 1);
-  ph_tilt_error_                         = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "tilt_error_out", 1);
-  ph_mass_estimate_                      = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_estimate_out", 1, false, 10.0);
-  ph_mass_nominal_                       = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "mass_nominal_out", 1, true);
-  ph_throttle_                           = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "throttle_out", 1, false, 10.0);
-  ph_thrust_                             = mrs_lib::PublisherHandler<std_msgs::Float64>(nh_, "thrust_out", 1, false, 100.0);
-  ph_control_error_                      = mrs_lib::PublisherHandler<mrs_msgs::ControlError>(nh_, "control_error_out", 1);
-  ph_safety_area_markers_                = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_markers_out", 1, true, 1.0);
-  ph_safety_area_coordinates_markers_    = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "safety_area_coordinates_markers_out", 1, true, 1.0);
-  ph_disturbances_markers_               = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "disturbances_markers_out", 1, false, 10.0);
-  ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
-  ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
-  ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
-  pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
-  pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
+  ph_controller_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ControllerDiagnostics>(node_, "controller_diagnostics_out");
+  ph_tracker_cmd_            = mrs_lib::PublisherHandler<mrs_msgs::msg::TrackerCommand>(node_, "tracker_cmd_out");
+  ph_mrs_odom_input_         = mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorInput>(node_, "estimator_input_out");
+  ph_control_reference_odom_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "control_reference_out");
+  ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "diagnostics_out");
+  ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "offboard_on_out");
+  ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "tilt_error_out");
+  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "mass_nominal_out");  // TODO latch
+  ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "control_error_out");
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 10.0;
+    // TODO latch
+
+    ph_throttle_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "throttle_out");
+  }
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 100.0;
+
+    ph_thrust_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "thrust_out");
+  }
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 10.0;
+
+    ph_mass_estimate_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "mass_estimate_out");
+  }
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 1.0;
+    // TODO latch
+
+    ph_safety_area_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "safety_area_markers_out");
+  }
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 1.0;
+    // TODO latch
+
+    ph_safety_area_coordinates_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "safety_area_coordinates_markers_out");
+  }
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 10.0;
+
+    ph_disturbances_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "disturbances_markers_out");
+  }
+
+  ph_current_constraints_ = mrs_lib::PublisherHandler<mrs_msgs::msg::DynamicsConstraints>(node_, "current_constraints_out");
+  ph_heading_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "heading_out");
+  ph_speed_               = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "speed_out");
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 1.0;
+    // TODO latch
+
+    pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::msg::PoseArray>(opts, "trajectory_original/poses_out");
+    pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "trajectory_original/markers_out");
+  }
 
   // | ------------------ publish nominal mass ------------------ |
 
   {
-    std_msgs::Float64 nominal_mass;
+    std_msgs::msg::Float64 nominal_mass;
 
     nominal_mass.data = _uav_mass_;
 
@@ -1798,118 +1862,116 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "ControlManager";
+  mrs_lib::SubscriberHandlerOptions shopts;
+
+  shopts.node               = node_;
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
   if (_state_input_ == INPUT_UAV_STATE) {
-    sh_uav_state_ = mrs_lib::SubscribeHandler<mrs_msgs::UavState>(shopts, "uav_state_in", &ControlManager::callbackUavState, this);
+    sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "uav_state_in", &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETRY) {
-    sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &ControlManager::callbackOdometry, this);
+    sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "odometry_in", &ControlManager::callbackOdometry, this);
   }
 
   if (_odometry_innovation_check_enabled_) {
-    sh_odometry_innovation_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_innovation_in");
+    sh_odometry_innovation_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "odometry_innovation_in");
   }
 
-  sh_bumper_    = mrs_lib::SubscribeHandler<mrs_msgs::ObstacleSectors>(shopts, "bumper_sectors_in");
-  sh_max_z_     = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
-  sh_joystick_  = mrs_lib::SubscribeHandler<sensor_msgs::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
-  sh_gnss_      = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_bumper_    = mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors>(shopts, "bumper_sectors_in");
+  sh_max_z_     = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "max_z_in");
+  sh_joystick_  = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts, "joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_      = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "gnss_in", &ControlManager::callbackGNSS, this);
+  sh_hw_api_rc_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts, "hw_api_rc_in", &ControlManager::callbackRC, this);
 
-  sh_hw_api_status_ = mrs_lib::SubscribeHandler<mrs_msgs::HwApiStatus>(shopts, "hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
+  sh_hw_api_status_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus>(shopts, "hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
   // | -------------------- general services -------------------- |
 
-  service_server_switch_tracker_             = nh_.advertiseService("switch_tracker_in", &ControlManager::callbackSwitchTracker, this);
-  service_server_switch_controller_          = nh_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
-  service_server_reset_tracker_              = nh_.advertiseService("tracker_reset_static_in", &ControlManager::callbackTrackerResetStatic, this);
-  service_server_hover_                      = nh_.advertiseService("hover_in", &ControlManager::callbackHover, this);
-  service_server_ehover_                     = nh_.advertiseService("ehover_in", &ControlManager::callbackEHover, this);
-  service_server_failsafe_                   = nh_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
-  service_server_failsafe_escalating_        = nh_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
-  service_server_toggle_output_              = nh_.advertiseService("toggle_output_in", &ControlManager::callbackToggleOutput, this);
-  service_server_arm_                        = nh_.advertiseService("arm_in", &ControlManager::callbackArm, this);
-  service_server_enable_callbacks_           = nh_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
-  service_server_set_constraints_            = nh_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
-  service_server_use_joystick_               = nh_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
-  service_server_use_safety_area_            = nh_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
-  service_server_eland_                      = nh_.advertiseService("eland_in", &ControlManager::callbackEland, this);
-  service_server_parachute_                  = nh_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
-  service_server_set_min_z_                  = nh_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
-  service_server_transform_reference_        = nh_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
-  service_server_transform_reference_array_  = nh_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
-  service_server_transform_pose_             = nh_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
-  service_server_transform_vector3_          = nh_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
-  service_server_bumper_enabler_             = nh_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
-  service_server_get_min_z_                  = nh_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
-  service_server_validate_reference_         = nh_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
-  service_server_validate_reference_2d_      = nh_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
-  service_server_validate_reference_array_   = nh_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
-  service_server_start_trajectory_tracking_  = nh_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
-  service_server_stop_trajectory_tracking_   = nh_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
-  service_server_resume_trajectory_tracking_ = nh_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
-  service_server_goto_trajectory_start_      = nh_.advertiseService("goto_trajectory_start_in", &ControlManager::callbackGotoTrajectoryStart, this);
+  service_server_switch_tracker_             = node_->create_service<mrs_msgs::srv::String>("switch_tracker_in", std::bind(&ControlManager::callbackSwitchTracker, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_switch_controller_          = node_.advertiseService("switch_controller_in", &ControlManager::callbackSwitchController, this);
+  service_server_reset_tracker_              = node_.advertiseService("tracker_reset_static_in", &ControlManager::callbackTrackerResetStatic, this);
+  service_server_hover_                      = node_.advertiseService("hover_in", &ControlManager::callbackHover, this);
+  service_server_ehover_                     = node_.advertiseService("ehover_in", &ControlManager::callbackEHover, this);
+  service_server_failsafe_                   = node_.advertiseService("failsafe_in", &ControlManager::callbackFailsafe, this);
+  service_server_failsafe_escalating_        = node_.advertiseService("failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this);
+  service_server_toggle_output_              = node_.advertiseService("toggle_output_in", &ControlManager::callbackToggleOutput, this);
+  service_server_arm_                        = node_.advertiseService("arm_in", &ControlManager::callbackArm, this);
+  service_server_enable_callbacks_           = node_.advertiseService("enable_callbacks_in", &ControlManager::callbackEnableCallbacks, this);
+  service_server_set_constraints_            = node_.advertiseService("set_constraints_in", &ControlManager::callbackSetConstraints, this);
+  service_server_use_joystick_               = node_.advertiseService("use_joystick_in", &ControlManager::callbackUseJoystick, this);
+  service_server_use_safety_area_            = node_.advertiseService("use_safety_area_in", &ControlManager::callbackUseSafetyArea, this);
+  service_server_eland_                      = node_.advertiseService("eland_in", &ControlManager::callbackEland, this);
+  service_server_parachute_                  = node_.advertiseService("parachute_in", &ControlManager::callbackParachute, this);
+  service_server_set_min_z_                  = node_.advertiseService("set_min_z_in", &ControlManager::callbackSetMinZ, this);
+  service_server_transform_reference_        = node_.advertiseService("transform_reference_in", &ControlManager::callbackTransformReference, this);
+  service_server_transform_reference_array_  = node_.advertiseService("transform_reference_array_in", &ControlManager::callbackTransformReferenceArray, this);
+  service_server_transform_pose_             = node_.advertiseService("transform_pose_in", &ControlManager::callbackTransformPose, this);
+  service_server_transform_vector3_          = node_.advertiseService("transform_vector3_in", &ControlManager::callbackTransformVector3, this);
+  service_server_bumper_enabler_             = node_.advertiseService("bumper_in", &ControlManager::callbackEnableBumper, this);
+  service_server_get_min_z_                  = node_.advertiseService("get_min_z_in", &ControlManager::callbackGetMinZ, this);
+  service_server_validate_reference_         = node_.advertiseService("validate_reference_in", &ControlManager::callbackValidateReference, this);
+  service_server_validate_reference_2d_      = node_.advertiseService("validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this);
+  service_server_validate_reference_array_   = node_.advertiseService("validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this);
+  service_server_start_trajectory_tracking_  = node_.advertiseService("start_trajectory_tracking_in", &ControlManager::callbackStartTrajectoryTracking, this);
+  service_server_stop_trajectory_tracking_   = node_.advertiseService("stop_trajectory_tracking_in", &ControlManager::callbackStopTrajectoryTracking, this);
+  service_server_resume_trajectory_tracking_ = node_.advertiseService("resume_trajectory_tracking_in", &ControlManager::callbackResumeTrajectoryTracking, this);
+  service_server_goto_trajectory_start_      = node_.advertiseService("goto_trajectory_start_in", &ControlManager::callbackGotoTrajectoryStart, this);
 
-  sch_arming_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "hw_api_arming_out");
-  sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "eland_out");
-  sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "shutdown_out");
-  sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "set_odometry_callbacks_out");
-  sch_ungrip_                 = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "ungrip_out");
-  sch_parachute_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "parachute_out");
+  sch_arming_                 = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(node_, "hw_api_arming_out");
+  sch_eland_                  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "eland_out");
+  sch_shutdown_               = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "shutdown_out");
+  sch_set_odometry_callbacks_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(node_, "set_odometry_callbacks_out");
+  sch_ungrip_                 = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "ungrip_out");
+  sch_parachute_              = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(node_, "parachute_out");
 
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  service_server_goto_                 = nh_.advertiseService("goto_in", &ControlManager::callbackGoto, this);
-  service_server_goto_fcu_             = nh_.advertiseService("goto_fcu_in", &ControlManager::callbackGotoFcu, this);
-  service_server_goto_relative_        = nh_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
-  service_server_goto_altitude_        = nh_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
-  service_server_set_heading_          = nh_.advertiseService("set_heading_in", &ControlManager::callbackSetHeading, this);
-  service_server_set_heading_relative_ = nh_.advertiseService("set_heading_relative_in", &ControlManager::callbackSetHeadingRelative, this);
+  service_server_goto_                 = node_.advertiseService("goto_in", &ControlManager::callbackGoto, this);
+  service_server_goto_fcu_             = node_.advertiseService("goto_fcu_in", &ControlManager::callbackGotoFcu, this);
+  service_server_goto_relative_        = node_.advertiseService("goto_relative_in", &ControlManager::callbackGotoRelative, this);
+  service_server_goto_altitude_        = node_.advertiseService("goto_altitude_in", &ControlManager::callbackGotoAltitude, this);
+  service_server_set_heading_          = node_.advertiseService("set_heading_in", &ControlManager::callbackSetHeading, this);
+  service_server_set_heading_relative_ = node_.advertiseService("set_heading_relative_in", &ControlManager::callbackSetHeadingRelative, this);
 
-  service_server_reference_ = nh_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
-  sh_reference_             = mrs_lib::SubscribeHandler<mrs_msgs::ReferenceStamped>(shopts, "reference_in", &ControlManager::callbackReferenceTopic, this);
+  service_server_reference_ = node_.advertiseService("reference_in", &ControlManager::callbackReferenceService, this);
+  sh_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts, "reference_in", &ControlManager::callbackReferenceTopic, this);
 
-  service_server_velocity_reference_ = nh_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
-  sh_velocity_reference_ =
-      mrs_lib::SubscribeHandler<mrs_msgs::VelocityReferenceStamped>(shopts, "velocity_reference_in", &ControlManager::callbackVelocityReferenceTopic, this);
+  service_server_velocity_reference_ = node_.advertiseService("velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this);
+  sh_velocity_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts, "velocity_reference_in",
+                                                                                                           &ControlManager::callbackVelocityReferenceTopic, this);
 
-  service_server_trajectory_reference_ = nh_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
-  sh_trajectory_reference_ =
-      mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>(shopts, "trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceTopic, this);
+  service_server_trajectory_reference_ = node_.advertiseService("trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this);
+  sh_trajectory_reference_             = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts, "trajectory_reference_in",
+                                                                                                        &ControlManager::callbackTrajectoryReferenceTopic, this);
 
   // | --------------------- other services --------------------- |
 
-  service_server_emergency_reference_ = nh_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
-  service_server_pirouette_           = nh_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
+  service_server_emergency_reference_ = node_.advertiseService("emergency_reference_in", &ControlManager::callbackEmergencyReference, this);
+  service_server_pirouette_           = node_.advertiseService("pirouette_in", &ControlManager::callbackPirouette, this);
 
   // | ------------------------- timers ------------------------- |
 
-  timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
-  timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
-  timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
-  timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
-  timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
-  timer_joystick_  = nh_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
+  timer_status_    = node_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
+  timer_safety_    = node_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
+  timer_bumper_    = node_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
+  timer_eland_     = node_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
+  timer_failsafe_  = node_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
+  timer_pirouette_ = node_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);
+  timer_joystick_  = node_.createTimer(ros::Rate(_joystick_timer_rate_), &ControlManager::timerJoystick, this);
 
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[ControlManager]: could not load all parameters!");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
+    rclcpp::shutdown();
   }
 
   is_initialized_ = true;
 
-  ROS_INFO("[ControlManager]: initialized");
+  RCLCPP_INFO(node_->get_logger(), "initialized");
 }
 
 //}
@@ -1920,7 +1982,7 @@ void ControlManager::initialize(void) {
 
 /* timerHwApiCapabilities() //{ */
 
-void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
+void ControlManager::timerHwApiCapabilities(const std::shared_ptr<TimerType> Event& event) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", _status_timer_rate_, 1.0, event);
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
@@ -1932,50 +1994,50 @@ void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
   auto hw_ap_capabilities = sh_hw_api_capabilities_.getMsg();
 
-  ROS_INFO("[ControlManager]: got HW API capabilities, the possible control modes are:");
+  RCLCPP_INFO(node_->get_logger(), "got HW API capabilities, the possible control modes are:");
 
   if (hw_ap_capabilities->accepts_actuator_cmd) {
-    ROS_INFO("[ControlManager]: - actuator command");
+    RCLCPP_INFO(node_->get_logger(), "- actuator command");
     _hw_api_inputs_.actuators = true;
   }
 
   if (hw_ap_capabilities->accepts_control_group_cmd) {
-    ROS_INFO("[ControlManager]: - control group command");
+    RCLCPP_INFO(node_->get_logger(), "- control group command");
     _hw_api_inputs_.control_group = true;
   }
 
   if (hw_ap_capabilities->accepts_attitude_rate_cmd) {
-    ROS_INFO("[ControlManager]: - attitude rate command");
+    RCLCPP_INFO(node_->get_logger(), "- attitude rate command");
     _hw_api_inputs_.attitude_rate = true;
   }
 
   if (hw_ap_capabilities->accepts_attitude_cmd) {
-    ROS_INFO("[ControlManager]: - attitude command");
+    RCLCPP_INFO(node_->get_logger(), "- attitude command");
     _hw_api_inputs_.attitude = true;
   }
 
   if (hw_ap_capabilities->accepts_acceleration_hdg_rate_cmd) {
-    ROS_INFO("[ControlManager]: - acceleration+hdg rate command");
+    RCLCPP_INFO(node_->get_logger(), "- acceleration+hdg rate command");
     _hw_api_inputs_.acceleration_hdg_rate = true;
   }
 
   if (hw_ap_capabilities->accepts_acceleration_hdg_cmd) {
-    ROS_INFO("[ControlManager]: - acceleration+hdg command");
+    RCLCPP_INFO(node_->get_logger(), "- acceleration+hdg command");
     _hw_api_inputs_.acceleration_hdg = true;
   }
 
   if (hw_ap_capabilities->accepts_velocity_hdg_rate_cmd) {
-    ROS_INFO("[ControlManager]: - velocityhdg rate command");
+    RCLCPP_INFO(node_->get_logger(), "- velocityhdg rate command");
     _hw_api_inputs_.velocity_hdg_rate = true;
   }
 
   if (hw_ap_capabilities->accepts_velocity_hdg_cmd) {
-    ROS_INFO("[ControlManager]: - velocityhdg command");
+    RCLCPP_INFO(node_->get_logger(), "- velocityhdg command");
     _hw_api_inputs_.velocity_hdg = true;
   }
 
   if (hw_ap_capabilities->accepts_position_cmd) {
-    ROS_INFO("[ControlManager]: - position command");
+    RCLCPP_INFO(node_->get_logger(), "- position command");
     _hw_api_inputs_.position = true;
   }
 
@@ -1988,7 +2050,7 @@ void ControlManager::timerHwApiCapabilities(const ros::TimerEvent& event) {
 
 /* //{ timerStatus() */
 
-void ControlManager::timerStatus(const ros::TimerEvent& event) {
+void ControlManager::timerStatus(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -2039,7 +2101,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (offboard_mode_) {
 
-    std_msgs::Empty offboard_on_out;
+    std_msgs::msg::Empty offboard_on_out;
 
     ph_offboard_on_.publish(offboard_on_out);
   }
@@ -2052,8 +2114,8 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     if (tilt_error_) {
 
-      mrs_msgs::Float64Stamped tilt_error_out;
-      tilt_error_out.header.stamp    = ros::Time::now();
+      mrs_msgs::msg::Float64Stamped tilt_error_out;
+      tilt_error_out.header.stamp    = clock_->now();
       tilt_error_out.header.frame_id = uav_state.header.frame_id;
       tilt_error_out.value           = (180.0 / M_PI) * tilt_error_.value();
 
@@ -2069,9 +2131,9 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     Eigen::Vector3d pos_error_value = position_error.value();
 
-    mrs_msgs::ControlError msg_out;
+    mrs_msgs::msg::ControlError msg_out;
 
-    msg_out.header.stamp    = ros::Time::now();
+    msg_out.header.stamp    = clock_->now();
     msg_out.header.frame_id = uav_state.header.frame_id;
 
     msg_out.position_errors.x    = pos_error_value(0);
@@ -2099,7 +2161,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (last_control_output.diagnostics.mass_estimator) {
 
-    std_msgs::Float64 mass_estimate_out;
+    std_msgs::msg::Float64 mass_estimate_out;
     mass_estimate_out.data = _uav_mass_ + last_control_output.diagnostics.mass_difference;
 
     ph_mass_estimate_.publish(mass_estimate_out);
@@ -2117,7 +2179,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
 
-      mrs_msgs::Float64Stamped heading_out;
+      mrs_msgs::msg::Float64Stamped heading_out;
       heading_out.header = uav_state.header;
       heading_out.value  = heading;
 
@@ -2136,7 +2198,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     double speed = sqrt(pow(uav_state.velocity.linear.x, 2) + pow(uav_state.velocity.linear.y, 2) + pow(uav_state.velocity.linear.z, 2));
 
-    mrs_msgs::Float64Stamped speed_out;
+    mrs_msgs::msg::Float64Stamped speed_out;
     speed_out.header = uav_state.header;
     speed_out.value  = speed;
 
@@ -2149,33 +2211,33 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (use_safety_area_) {
 
-    mrs_msgs::ReferenceStamped temp_ref;
+    mrs_msgs::msg::ReferenceStamped temp_ref;
     temp_ref.header.frame_id = _safety_area_horizontal_frame_;
 
-    geometry_msgs::TransformStamped tf;
+    geometry_msgs::msg::TransformStamped tf;
 
-    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", ros::Time(0));
+    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", rclcpp::Time(0));
 
     if (ret) {
 
       ROS_INFO_ONCE("[ControlManager]: got TFs, publishing safety area markers");
 
-      visualization_msgs::MarkerArray safety_area_marker_array;
-      visualization_msgs::MarkerArray safety_area_coordinates_marker_array;
+      visualization_msgs::msg::MarkerArray safety_area_marker_array;
+      visualization_msgs::msg::MarkerArray safety_area_coordinates_marker_array;
 
       mrs_lib::Polygon border = safety_zone_->getBorder();
 
-      std::vector<geometry_msgs::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_horizontal_frame_));
-      std::vector<geometry_msgs::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_horizontal_frame_));
+      std::vector<geometry_msgs::msg::Point> border_points_bot_original = border.getPointMessageVector(getMinZ(_safety_area_horizontal_frame_));
+      std::vector<geometry_msgs::msg::Point> border_points_top_original = border.getPointMessageVector(getMaxZ(_safety_area_horizontal_frame_));
 
-      std::vector<geometry_msgs::Point> border_points_bot_transformed = border_points_bot_original;
-      std::vector<geometry_msgs::Point> border_points_top_transformed = border_points_bot_original;
+      std::vector<geometry_msgs::msg::Point> border_points_bot_transformed = border_points_bot_original;
+      std::vector<geometry_msgs::msg::Point> border_points_top_transformed = border_points_bot_original;
 
       // if we fail in transforming the area at some point
       // do not publish it at all
       bool tf_success = true;
 
-      geometry_msgs::TransformStamped tf = ret.value();
+      geometry_msgs::msg::TransformStamped tf = ret.value();
 
       /* transform area points to local origin //{ */
 
@@ -2183,7 +2245,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = ros::Time(0);
+        temp_ref.header.stamp         = rclcpp::Time(0);
         temp_ref.reference.position.x = border_points_bot_original.at(i).x;
         temp_ref.reference.position.y = border_points_bot_original.at(i).y;
         temp_ref.reference.position.z = border_points_bot_original.at(i).z;
@@ -2205,7 +2267,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
       for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = ros::Time(0);
+        temp_ref.header.stamp         = rclcpp::Time(0);
         temp_ref.reference.position.x = border_points_top_original.at(i).x;
         temp_ref.reference.position.y = border_points_top_original.at(i).y;
         temp_ref.reference.position.z = border_points_top_original.at(i).z;
@@ -2225,10 +2287,10 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       //}
 
-      visualization_msgs::Marker safety_area_marker;
+      visualization_msgs::msg::Marker safety_area_marker;
 
       safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
-      safety_area_marker.type            = visualization_msgs::Marker::LINE_LIST;
+      safety_area_marker.type            = visualization_msgs::msg::Marker::LINE_LIST;
       safety_area_marker.color.a         = 0.15;
       safety_area_marker.scale.x         = 0.2;
       safety_area_marker.color.r         = 1;
@@ -2237,10 +2299,10 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
       safety_area_marker.pose.orientation = mrs_lib::AttitudeConverter(0, 0, 0);
 
-      visualization_msgs::Marker safety_area_coordinates_marker;
+      visualization_msgs::msg::Marker safety_area_coordinates_marker;
 
       safety_area_coordinates_marker.header.frame_id = _uav_name_ + "/local_origin";
-      safety_area_coordinates_marker.type            = visualization_msgs::Marker::TEXT_VIEW_FACING;
+      safety_area_coordinates_marker.type            = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
       safety_area_coordinates_marker.color.a         = 1;
       safety_area_coordinates_marker.scale.z         = 1.0;
       safety_area_coordinates_marker.color.r         = 0;
@@ -2336,7 +2398,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
   if (last_control_output.diagnostics.disturbance_estimator && got_uav_state_) {
 
-    visualization_msgs::MarkerArray msg_out;
+    visualization_msgs::msg::MarkerArray msg_out;
 
     double id = 0;
 
@@ -2344,20 +2406,20 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     Eigen::Quaterniond quat_eigen = mrs_lib::AttitudeConverter(uav_state.pose.orientation);
 
-    Eigen::Vector3d      vec3d;
-    geometry_msgs::Point point;
+    Eigen::Vector3d           vec3d;
+    geometry_msgs::msg::Point point;
 
     /* world disturbance //{ */
     {
 
-      visualization_msgs::Marker marker;
+      visualization_msgs::msg::Marker marker;
 
       marker.header.frame_id = uav_state.header.frame_id;
-      marker.header.stamp    = ros::Time::now();
+      marker.header.stamp    = clock_->now();
       marker.ns              = "control_manager";
       marker.id              = id++;
-      marker.type            = visualization_msgs::Marker::ARROW;
-      marker.action          = visualization_msgs::Marker::ADD;
+      marker.type            = visualization_msgs::msg::Marker::ARROW;
+      marker.action          = visualization_msgs::msg::Marker::ADD;
 
       /* position //{ */
 
@@ -2411,14 +2473,14 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     /* body disturbance //{ */
     {
 
-      visualization_msgs::Marker marker;
+      visualization_msgs::msg::Marker marker;
 
       marker.header.frame_id = uav_state.header.frame_id;
-      marker.header.stamp    = ros::Time::now();
+      marker.header.stamp    = clock_->now();
       marker.ns              = "control_manager";
       marker.id              = id++;
-      marker.type            = visualization_msgs::Marker::ARROW;
-      marker.action          = visualization_msgs::Marker::ADD;
+      marker.type            = visualization_msgs::msg::Marker::ARROW;
+      marker.action          = visualization_msgs::msg::Marker::ADD;
 
       /* position //{ */
 
@@ -2484,7 +2546,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
     auto sanitized_constraints = mrs_lib::get_mutexed(mutex_constraints_, sanitized_constraints_);
 
-    mrs_msgs::DynamicsConstraints constraints = sanitized_constraints.constraints;
+    mrs_msgs::msg::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
     ph_current_constraints_.publish(constraints);
   }
@@ -2494,7 +2556,7 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
 
 /* //{ timerSafety() */
 
-void ControlManager::timerSafety(const ros::TimerEvent& event) {
+void ControlManager::timerSafety(const std::shared_ptr<TimerType> Event& event) {
 
   mrs_lib::AtomicScopeFlag unset_running(running_safety_timer_);
 
@@ -2525,7 +2587,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // | ------------------------ timeouts ------------------------ |
 
   if (_state_input_ == INPUT_UAV_STATE && sh_uav_state_.hasMsg()) {
-    double missing_for = (ros::Time::now() - sh_uav_state_.lastMsgTime()).toSec();
+    double missing_for = (clock_->now() - sh_uav_state_.lastMsgTime()).toSec();
 
     if (missing_for > _uav_state_max_missing_time_) {
       timeoutUavState(missing_for);
@@ -2533,7 +2595,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   }
 
   if (_state_input_ == INPUT_ODOMETRY && sh_odometry_.hasMsg()) {
-    double missing_for = (ros::Time::now() - sh_odometry_.lastMsgTime()).toSec();
+    double missing_for = (clock_->now() - sh_odometry_.lastMsgTime()).toSec();
 
     if (missing_for > _uav_state_max_missing_time_) {
       timeoutUavState(missing_for);
@@ -2569,7 +2631,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     bool position_error_set = false;
 
-    if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
+    if (last_tracker_cmd->use_position_horizontal && !std::holds_alternative<mrs_msgs::msg::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
       position_error(0) = last_tracker_cmd->position.x - uav_state.pose.position.x;
       position_error(1) = last_tracker_cmd->position.y - uav_state.pose.position.y;
@@ -2577,7 +2639,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       position_error_set = true;
     }
 
-    if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::HwApiPositionCmd>(last_control_output.control_output.value())) {
+    if (last_tracker_cmd->use_position_vertical && !std::holds_alternative<mrs_msgs::msg::HwApiPositionCmd>(last_control_output.control_output.value())) {
 
       position_error(2) = last_tracker_cmd->position.z - uav_state.pose.position.z;
 
@@ -2632,12 +2694,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(),
-                    _failsafe_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
+          RCLCPP_ERROR(node_->get_logger(), "activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(),
+                       _failsafe_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
           failsafe();
         }
@@ -2651,7 +2713,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
   if (_odometry_innovation_check_enabled_) {
 
-    std::optional<nav_msgs::Odometry::ConstPtr> innovation;
+    std::optional<nav_msgs::msg::Odometry::ConstSharedPtr> innovation;
 
     if (sh_odometry_innovation_.hasMsg()) {
       innovation = {sh_odometry_innovation_.getMsg()};
@@ -2677,12 +2739,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
         auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-        if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+        if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
           if (!failsafe_triggered_ && !eland_triggered_) {
 
-            ROS_ERROR("[ControlManager]: activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
-                      last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
+            RCLCPP_ERROR(node_->get_logger(), "activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
+                         last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
             eland();
           }
@@ -2701,12 +2763,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-    if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+    if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
       if (!failsafe_triggered_ && !eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
-                  (180.0 / M_PI) * _tilt_limit_eland_);
+        RCLCPP_ERROR(node_->get_logger(), "activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
+                     (180.0 / M_PI) * _tilt_limit_eland_);
 
         eland();
       }
@@ -2723,7 +2785,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
@@ -2738,12 +2800,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size, _eland_threshold_,
-                    position_error.value()(0), position_error.value()(1), position_error.value()(2));
+          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size,
+                       _eland_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
           eland();
         }
@@ -2760,7 +2822,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
@@ -2776,12 +2838,12 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       auto controller_tracker_switch_time = mrs_lib::get_mutexed(mutex_controller_tracker_switch_time_, controller_tracker_switch_time_);
 
-      if ((ros::Time::now() - controller_tracker_switch_time).toSec() > 1.0) {
+      if ((clock_->now() - controller_tracker_switch_time).toSec() > 1.0) {
 
         if (!failsafe_triggered_ && !eland_triggered_) {
 
-          ROS_ERROR("[ControlManager]: activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
-                    (180.0 / M_PI) * _yaw_error_eland_);
+          RCLCPP_ERROR(node_->get_logger(), "activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
+                       (180.0 / M_PI) * _yaw_error_eland_);
 
           eland();
         }
@@ -2794,7 +2856,8 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
   // --------------------------------------------------------------
   if (_tilt_limit_disarm_enabled_ && tilt_angle > _tilt_limit_disarm_) {
 
-    ROS_ERROR("[ControlManager]: tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle, (180.0 / M_PI) * _tilt_limit_disarm_);
+    RCLCPP_ERROR(node_->get_logger(), "tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
+                 (180.0 / M_PI) * _tilt_limit_disarm_);
 
     arming(false);
   }
@@ -2809,7 +2872,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
     // the time from the last controller/tracker switch
     // fyi: we should not
-    double time_from_ctrl_tracker_switch = (ros::Time::now() - controller_tracker_switch_time).toSec();
+    double time_from_ctrl_tracker_switch = (clock_->now() - controller_tracker_switch_time).toSec();
 
     // if the tile error is over the threshold
     // && we are not ramping up during takeoff
@@ -2822,7 +2885,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         if (!tilt_error_disarm_over_thr_) {
 
           tilt_error_disarm_over_thr_ = true;
-          tilt_error_disarm_time_     = ros::Time::now();
+          tilt_error_disarm_time_     = clock_->now();
 
           ROS_WARN("[ControlManager]: tilt error exceeded threshold (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_error.value(),
                    (180.0 / M_PI) * _tilt_error_disarm_threshold_);
@@ -2831,7 +2894,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
         } else {
 
           ROS_WARN_THROTTLE(0.1, "[ControlManager]: tilt error (%.2f deg) over threshold for %.2f s", (180.0 / M_PI) * tilt_error.value(),
-                            (ros::Time::now() - tilt_error_disarm_time_).toSec());
+                            (clock_->now() - tilt_error_disarm_time_).toSec());
         }
 
         // if the tile error is bad, but the controller just switched,
@@ -2839,7 +2902,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       } else {
 
         tilt_error_disarm_over_thr_ = false;
-        tilt_error_disarm_time_     = ros::Time::now();
+        tilt_error_disarm_time_     = clock_->now();
       }
 
       // if the tilt error is fine
@@ -2847,11 +2910,11 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
       // make it fine
       tilt_error_disarm_over_thr_ = false;
-      tilt_error_disarm_time_     = ros::Time::now();
+      tilt_error_disarm_time_     = clock_->now();
     }
 
     // calculate the time over the threshold
-    double tot = (ros::Time::now() - tilt_error_disarm_time_).toSec();
+    double tot = (clock_->now() - tilt_error_disarm_time_).toSec();
 
     // if the tot exceeds the limit (and if we are actually over the threshold)
     if (tilt_error_disarm_over_thr_ && (tot > _tilt_error_disarm_timeout_)) {
@@ -2861,7 +2924,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
       // only when flying and not in failsafe
       if (is_flying) {
 
-        ROS_ERROR("[ControlManager]: tilt error too large for %.2f s, disarming", tot);
+        RCLCPP_ERROR(node_->get_logger(), "tilt error too large for %.2f s, disarming", tot);
 
         toggleOutput(false);
         arming(false);
@@ -2884,7 +2947,7 @@ void ControlManager::timerSafety(const ros::TimerEvent& event) {
 
 /* //{ timerEland() */
 
-void ControlManager::timerEland(const ros::TimerEvent& event) {
+void ControlManager::timerEland(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -2935,27 +2998,27 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
     if (((throttle_mass_estimate_ < _elanding_cutoff_mass_factor_ * landing_uav_mass_) || throttle < 0.01)) {
       if (!throttle_under_threshold_) {
 
-        throttle_mass_estimate_first_time_ = ros::Time::now();
+        throttle_mass_estimate_first_time_ = clock_->now();
         throttle_under_threshold_          = true;
       }
 
-      ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_first_time_).toSec());
+      ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (clock_->now() - throttle_mass_estimate_first_time_).toSec());
 
     } else {
-      throttle_mass_estimate_first_time_ = ros::Time::now();
+      throttle_mass_estimate_first_time_ = clock_->now();
       throttle_under_threshold_          = false;
     }
 
-    if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
+    if (throttle_under_threshold_ && ((clock_->now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
       // enable callbacks? ... NO
 
-      ROS_INFO("[ControlManager]: reached cutoff throttle, disabling output");
+      RCLCPP_INFO(node_->get_logger(), "reached cutoff throttle, disabling output");
       toggleOutput(false);
 
       // disarm the drone
       if (_eland_disarm_enabled_) {
 
-        ROS_INFO("[ControlManager]: calling for disarm");
+        RCLCPP_INFO(node_->get_logger(), "calling for disarm");
         arming(false);
       }
 
@@ -2976,7 +3039,7 @@ void ControlManager::timerEland(const ros::TimerEvent& event) {
 
 /* //{ timerFailsafe() */
 
-void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
+void ControlManager::timerFailsafe(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -3024,20 +3087,20 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
     if (!throttle_under_threshold_) {
 
-      throttle_mass_estimate_first_time_ = ros::Time::now();
+      throttle_mass_estimate_first_time_ = clock_->now();
       throttle_under_threshold_          = true;
     }
 
-    ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (ros::Time::now() - throttle_mass_estimate_first_time_).toSec());
+    ROS_INFO_THROTTLE(0.1, "[ControlManager]: throttle is under cutoff factor for %.2f s", (clock_->now() - throttle_mass_estimate_first_time_).toSec());
 
   } else {
 
-    throttle_mass_estimate_first_time_ = ros::Time::now();
+    throttle_mass_estimate_first_time_ = clock_->now();
     throttle_under_threshold_          = false;
   }
 
   // condition for automatic motor turn off
-  if (throttle_under_threshold_ && ((ros::Time::now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
+  if (throttle_under_threshold_ && ((clock_->now() - throttle_mass_estimate_first_time_).toSec() > _elanding_cutoff_timeout_)) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: detecting zero throttle, disarming");
 
@@ -3049,7 +3112,7 @@ void ControlManager::timerFailsafe(const ros::TimerEvent& event) {
 
 /* //{ timerJoystick() */
 
-void ControlManager::timerJoystick(const ros::TimerEvent& event) {
+void ControlManager::timerJoystick(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -3061,12 +3124,12 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // if start was pressed and held for > 3.0 s
-  if (joystick_start_pressed_ && joystick_start_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_start_press_time_).toSec() > 3.0) {
+  if (joystick_start_pressed_ && joystick_start_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_start_press_time_).toSec() > 3.0) {
 
-    joystick_start_press_time_ = ros::Time(0);
+    joystick_start_press_time_ = rclcpp::Time(0);
 
-    ROS_INFO("[ControlManager]: transitioning to joystick control: activating '%s' and '%s'", _joystick_tracker_name_.c_str(),
-             _joystick_controller_name_.c_str());
+    RCLCPP_INFO(node_->get_logger(), "transitioning to joystick control: activating '%s' and '%s'", _joystick_tracker_name_.c_str(),
+                _joystick_controller_name_.c_str());
 
     joystick_start_pressed_ = false;
 
@@ -3075,11 +3138,11 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   }
 
   // if RT+LT were pressed and held for > 0.1 s
-  if (joystick_failsafe_pressed_ && joystick_failsafe_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_failsafe_press_time_).toSec() > 0.1) {
+  if (joystick_failsafe_pressed_ && joystick_failsafe_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_failsafe_press_time_).toSec() > 0.1) {
 
-    joystick_failsafe_press_time_ = ros::Time(0);
+    joystick_failsafe_press_time_ = rclcpp::Time(0);
 
-    ROS_INFO("[ControlManager]: activating failsafe by joystick");
+    RCLCPP_INFO(node_->get_logger(), "activating failsafe by joystick");
 
     joystick_failsafe_pressed_ = false;
 
@@ -3087,11 +3150,11 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   }
 
   // if joypads were pressed and held for > 0.1 s
-  if (joystick_eland_pressed_ && joystick_eland_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_eland_press_time_).toSec() > 0.1) {
+  if (joystick_eland_pressed_ && joystick_eland_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_eland_press_time_).toSec() > 0.1) {
 
-    joystick_eland_press_time_ = ros::Time(0);
+    joystick_eland_press_time_ = rclcpp::Time(0);
 
-    ROS_INFO("[ControlManager]: activating eland by joystick");
+    RCLCPP_INFO(node_->get_logger(), "activating eland by joystick");
 
     joystick_failsafe_pressed_ = false;
 
@@ -3099,14 +3162,14 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   }
 
   // if back was pressed and held for > 0.1 s
-  if (joystick_back_pressed_ && joystick_back_press_time_ != ros::Time(0) && (ros::Time::now() - joystick_back_press_time_).toSec() > 0.1) {
+  if (joystick_back_pressed_ && joystick_back_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_back_press_time_).toSec() > 0.1) {
 
-    joystick_back_press_time_ = ros::Time(0);
+    joystick_back_press_time_ = rclcpp::Time(0);
 
     // activate/deactivate the joystick goto functionality
     joystick_goto_enabled_ = !joystick_goto_enabled_;
 
-    ROS_INFO("[ControlManager]: joystick control %s", joystick_goto_enabled_ ? "activated" : "deactivated");
+    RCLCPP_INFO(node_->get_logger(), "joystick control %s", joystick_goto_enabled_ ? "activated" : "deactivated");
   }
 
   // if the GOTO functionality is enabled...
@@ -3116,7 +3179,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
     // create the reference
 
-    mrs_msgs::Vec4::Request request;
+    mrs_msgs::msg::Vec4::Request request;
 
     if (fabs(joystick_data->axes.at(_channel_pitch_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_roll_)) >= 0.05 ||
         fabs(joystick_data->axes.at(_channel_heading_)) >= 0.05 || fabs(joystick_data->axes.at(_channel_throttle_)) >= 0.05) {
@@ -3128,13 +3191,13 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
         request.goal.at(REF_Z)       = _channel_mult_throttle_ * joystick_data->axes.at(_channel_throttle_);
         request.goal.at(REF_HEADING) = _channel_mult_heading_ * joystick_data->axes.at(_channel_heading_);
 
-        mrs_msgs::Vec4::Response response;
+        mrs_msgs::msg::Vec4::Response response;
 
         callbackGotoFcu(request, response);
 
       } else if (_joystick_mode_ == 1) {
 
-        mrs_msgs::TrajectoryReference trajectory;
+        mrs_msgs::msg::TrajectoryReference trajectory;
 
         double dt = 0.2;
 
@@ -3143,7 +3206,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
         trajectory.use_heading     = true;
         trajectory.dt              = dt;
 
-        mrs_msgs::Reference point;
+        mrs_msgs::msg::Reference point;
         point.position.x = 0;
         point.position.y = 0;
         point.position.z = 0;
@@ -3171,7 +3234,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
   if (rc_goto_active_ && !bumper_repulsing_ && last_tracker_cmd && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
-    mrs_msgs::VelocityReferenceStampedSrv::Request request;
+    mrs_msgs::msg::VelocityReferenceStampedSrv::Request request;
 
     double des_x       = 0;
     double des_y       = 0;
@@ -3181,7 +3244,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     bool nothing_to_do = true;
 
     // copy member variables
-    mrs_msgs::HwApiRcChannelsConstPtr rc_channels = sh_hw_api_rc_.getMsg();
+    mrs_msgs::msg::HwApiRcChannelsConstSharedPtr rc_channels = sh_hw_api_rc_.getMsg();
 
     if (rc_channels->channels.size() < 4) {
 
@@ -3228,7 +3291,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
       request.reference.reference.velocity.z   = des_z;
       request.reference.reference.heading_rate = des_heading;
 
-      mrs_msgs::VelocityReferenceStampedSrv::Response response;
+      mrs_msgs::msg::VelocityReferenceStampedSrv::Response response;
 
       // disable callbacks of all trackers
       std_srvs::SetBoolRequest req_enable_callbacks;
@@ -3239,7 +3302,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         tracker_list_.at(active_tracker_idx_)
-            ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+            ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
       callbacks_enabled_ = true;
@@ -3256,7 +3319,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
         std::scoped_lock lock(mutex_tracker_list_);
 
         tracker_list_.at(active_tracker_idx_)
-            ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+            ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
     }
   }
@@ -3266,7 +3329,7 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
 
 /* //{ timerBumper() */
 
-void ControlManager::timerBumper(const ros::TimerEvent& event) {
+void ControlManager::timerBumper(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -3296,7 +3359,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
     return;
   }
 
-  if (sh_bumper_.hasMsg() && (ros::Time::now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
+  if (sh_bumper_.hasMsg() && (clock_->now() - sh_bumper_.lastMsgTime()).toSec() > 1.0) {
 
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: obstacle bumper is missing messages although we got them before");
 
@@ -3314,7 +3377,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
 /* //{ timerPirouette() */
 
-void ControlManager::timerPirouette(const ros::TimerEvent& event) {
+void ControlManager::timerPirouette(const std::shared_ptr<TimerType> Event& event) {
 
   if (!is_initialized_) {
     return;
@@ -3340,12 +3403,12 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
   }
 
   // set the reference
-  mrs_msgs::ReferenceStamped reference_request;
+  mrs_msgs::msg::ReferenceStamped reference_request;
 
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   reference_request.header.frame_id      = "";
-  reference_request.header.stamp         = ros::Time(0);
+  reference_request.header.stamp         = rclcpp::Time(0);
   reference_request.reference.position.x = last_tracker_cmd->position.x;
   reference_request.reference.position.y = last_tracker_cmd->position.y;
   reference_request.reference.position.z = last_tracker_cmd->position.z;
@@ -3359,7 +3422,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
     req_enable_callbacks.data = true;
 
     tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     callbacks_enabled_ = true;
   }
@@ -3374,7 +3437,7 @@ void ControlManager::timerPirouette(const ros::TimerEvent& event) {
     req_enable_callbacks.data = false;
 
     tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     callbacks_enabled_ = false;
   }
@@ -3419,7 +3482,7 @@ void ControlManager::asyncControl(void) {
       }
     }
 
-    ros::TimerEvent safety_timer_event;
+    std::shared_ptr<TimerType> Event safety_timer_event;
     timerSafety(safety_timer_event);
 
     updateTrackers();
@@ -3469,8 +3532,8 @@ void ControlManager::asyncControl(void) {
     {
       std::scoped_lock lock(mutex_uav_state_);
 
-      ROS_INFO("[ControlManager]: odometry after switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
-               uav_state.pose.position.z, uav_heading_);
+      RCLCPP_INFO(node_->get_logger(), "odometry after switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state.pose.position.x, uav_state.pose.position.y,
+                  uav_state.pose.position.z, uav_heading_);
     }
   }
 }
@@ -3485,7 +3548,7 @@ void ControlManager::asyncControl(void) {
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
+void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -3494,7 +3557,7 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
 
-  nav_msgs::OdometryConstPtr odom = msg;
+  nav_msgs::msg::OdometryConstSharedPtr odom = msg;
 
   // | ------------------ check for time stamp ------------------ |
 
@@ -3517,9 +3580,9 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
   /* Odometry frame switch //{ */
 
-  // | -- prepare an OdometryConstPtr for trackers & controllers -- |
+  // | -- prepare an OdometryConstSharedPtr for trackers & controllers -- |
 
-  mrs_msgs::UavState uav_state_odom;
+  mrs_msgs::msg::UavState uav_state_odom;
 
   uav_state_odom.header   = odom->header;
   uav_state_odom.pose     = odom->pose.pose;
@@ -3531,12 +3594,12 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
     if (odom->header.frame_id != uav_state_.header.frame_id) {
 
-      ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      RCLCPP_INFO(node_->get_logger(), "detecting switch of odometry frame");
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                 uav_state_.pose.position.z, uav_heading_);
+        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                    uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3590,7 +3653,7 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
     previous_uav_state_ = uav_state_;
 
-    uav_state_ = mrs_msgs::UavState();
+    uav_state_ = mrs_msgs::msg::UavState();
 
     uav_state_.header           = odom->header;
     uav_state_.pose             = odom->pose.pose;
@@ -3599,7 +3662,7 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
     // transform the twist into the header's frame
     {
       // the velocity from the odometry
-      geometry_msgs::Vector3Stamped speed_child_frame;
+      geometry_msgs::msg::Vector3Stamped speed_child_frame;
       speed_child_frame.header.frame_id = odom->child_frame_id;
       speed_child_frame.header.stamp    = odom->header.stamp;
       speed_child_frame.vector.x        = odom->twist.twist.linear.x;
@@ -3648,7 +3711,7 @@ void ControlManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
+void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -3657,7 +3720,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackUavState", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::UavStateConstPtr uav_state = msg;
+  mrs_msgs::msg::UavStateConstSharedPtr uav_state = msg;
 
   // | ------------------ check for time stamp ------------------ |
 
@@ -3684,7 +3747,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
   double alpha2              = 0.666;
   double uav_state_count_lim = 1000;
 
-  double uav_state_dt = (ros::Time::now() - previous_uav_state_.header.stamp).toSec();
+  double uav_state_dt = (clock_->now() - previous_uav_state_.header.stamp).toSec();
 
   // belive only reasonable numbers
   if (uav_state_dt <= 1.0) {
@@ -3738,12 +3801,12 @@ void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
     if (uav_state->estimator_iteration != uav_state_.estimator_iteration) {
 
-      ROS_INFO("[ControlManager]: detecting switch of odometry frame");
+      RCLCPP_INFO(node_->get_logger(), "detecting switch of odometry frame");
       {
         std::scoped_lock lock(mutex_uav_state_);
 
-        ROS_INFO("[ControlManager]: odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
-                 uav_state_.pose.position.z, uav_heading_);
+        RCLCPP_INFO(node_->get_logger(), "odometry before switch: x=%.2f, y=%.2f, z=%.2f, heading=%.2f", uav_state_.pose.position.x, uav_state_.pose.position.y,
+                    uav_state_.pose.position.z, uav_heading_);
       }
 
       odometry_switch_in_progress_ = true;
@@ -3829,7 +3892,7 @@ void ControlManager::callbackUavState(const mrs_msgs::UavState::ConstPtr msg) {
 
 /* //{ callbackGNSS() */
 
-void ControlManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
+void ControlManager::callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -3845,7 +3908,7 @@ void ControlManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
 /* callbackJoystick() //{ */
 
-void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
+void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -3858,7 +3921,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
   auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
 
-  sensor_msgs::JoyConstPtr joystick_data = msg;
+  sensor_msgs::msg::JoyConstSharedPtr joystick_data = msg;
 
   // TODO check if the array is smaller than the largest idx
   if (joystick_data->buttons.size() == 0 || joystick_data->axes.size() == 0) {
@@ -3872,7 +3935,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
        joystick_data->buttons.at(_channel_Y_) == 1) &&
       active_tracker_idx == _joystick_tracker_idx_ && active_controller_idx == _joystick_controller_idx_) {
 
-    ROS_INFO("[ControlManager]: switching from joystick to normal control");
+    RCLCPP_INFO(node_->get_logger(), "switching from joystick to normal control");
 
     switchTracker(_joystick_fallback_tracker_name_);
     switchController(_joystick_fallback_controller_name_);
@@ -3887,18 +3950,18 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
     if (!joystick_start_pressed_) {
 
-      ROS_INFO("[ControlManager]: joystick start button pressed");
+      RCLCPP_INFO(node_->get_logger(), "joystick start button pressed");
 
       joystick_start_pressed_    = true;
-      joystick_start_press_time_ = ros::Time::now();
+      joystick_start_press_time_ = clock_->now();
     }
 
   } else if (joystick_start_pressed_) {
 
-    ROS_INFO("[ControlManager]: joystick start button released");
+    RCLCPP_INFO(node_->get_logger(), "joystick start button released");
 
     joystick_start_pressed_    = false;
-    joystick_start_press_time_ = ros::Time(0);
+    joystick_start_press_time_ = rclcpp::Time(0);
   }
 
   // | ---------------- Joystick goto activation ---------------- |
@@ -3908,18 +3971,18 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
     if (!joystick_back_pressed_) {
 
-      ROS_INFO("[ControlManager]: joystick back button pressed");
+      RCLCPP_INFO(node_->get_logger(), "joystick back button pressed");
 
       joystick_back_pressed_    = true;
-      joystick_back_press_time_ = ros::Time::now();
+      joystick_back_press_time_ = clock_->now();
     }
 
   } else if (joystick_back_pressed_) {
 
-    ROS_INFO("[ControlManager]: joystick back button released");
+    RCLCPP_INFO(node_->get_logger(), "joystick back button released");
 
     joystick_back_pressed_    = false;
-    joystick_back_press_time_ = ros::Time(0);
+    joystick_back_press_time_ = rclcpp::Time(0);
   }
 
   // | ------------------------ Failsafes ----------------------- |
@@ -3929,18 +3992,18 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
     if (!joystick_failsafe_pressed_) {
 
-      ROS_INFO("[ControlManager]: joystick Failsafe pressed");
+      RCLCPP_INFO(node_->get_logger(), "joystick Failsafe pressed");
 
       joystick_failsafe_pressed_    = true;
-      joystick_failsafe_press_time_ = ros::Time::now();
+      joystick_failsafe_press_time_ = clock_->now();
     }
 
   } else if (joystick_failsafe_pressed_) {
 
-    ROS_INFO("[ControlManager]: joystick Failsafe released");
+    RCLCPP_INFO(node_->get_logger(), "joystick Failsafe released");
 
     joystick_failsafe_pressed_    = false;
-    joystick_failsafe_press_time_ = ros::Time(0);
+    joystick_failsafe_press_time_ = rclcpp::Time(0);
   }
 
   // if left and right joypads are both pressed down
@@ -3948,18 +4011,18 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
     if (!joystick_eland_pressed_) {
 
-      ROS_INFO("[ControlManager]: joystick eland pressed");
+      RCLCPP_INFO(node_->get_logger(), "joystick eland pressed");
 
       joystick_eland_pressed_    = true;
-      joystick_eland_press_time_ = ros::Time::now();
+      joystick_eland_press_time_ = clock_->now();
     }
 
   } else if (joystick_eland_pressed_) {
 
-    ROS_INFO("[ControlManager]: joystick eland released");
+    RCLCPP_INFO(node_->get_logger(), "joystick eland released");
 
     joystick_eland_pressed_    = false;
-    joystick_eland_press_time_ = ros::Time(0);
+    joystick_eland_press_time_ = rclcpp::Time(0);
   }
 }
 
@@ -3967,7 +4030,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::Joy::ConstPtr msg) {
 
 /* //{ callbackHwApiStatus() */
 
-void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr msg) {
+void ControlManager::callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -3976,7 +4039,7 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr m
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackHwApiStatus");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackHwApiStatus", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::HwApiStatusConstPtr state = msg;
+  mrs_msgs::msg::HwApiStatusConstSharedPtr state = msg;
 
   // | ------ detect and print the changes in offboard mode ----- |
   if (state->offboard) {
@@ -3984,14 +4047,14 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr m
     if (!offboard_mode_) {
       offboard_mode_          = true;
       offboard_mode_was_true_ = true;
-      ROS_INFO("[ControlManager]: detected: OFFBOARD mode ON");
+      RCLCPP_INFO(node_->get_logger(), "detected: OFFBOARD mode ON");
     }
 
   } else {
 
     if (offboard_mode_) {
       offboard_mode_ = false;
-      ROS_INFO("[ControlManager]: detected: OFFBOARD mode OFF");
+      RCLCPP_INFO(node_->get_logger(), "detected: OFFBOARD mode OFF");
     }
   }
 
@@ -4000,14 +4063,14 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr m
 
     if (!armed_) {
       armed_ = true;
-      ROS_INFO("[ControlManager]: detected: vehicle ARMED");
+      RCLCPP_INFO(node_->get_logger(), "detected: vehicle ARMED");
     }
 
   } else {
 
     if (armed_) {
       armed_ = false;
-      ROS_INFO("[ControlManager]: detected: vehicle DISARMED");
+      RCLCPP_INFO(node_->get_logger(), "detected: vehicle DISARMED");
     }
   }
 }
@@ -4016,7 +4079,7 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::HwApiStatus::ConstPtr m
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
+void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -4025,7 +4088,7 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackRC", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::HwApiRcChannelsConstPtr rc = msg;
+  mrs_msgs::msg::HwApiRcChannelsConstSharedPtr rc = msg;
 
   ROS_INFO_ONCE("[ControlManager]: getting RC channels");
 
@@ -4070,7 +4133,8 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
               // disable callbacks of all trackers
               for (int i = 0; i < int(tracker_list_.size()); i++) {
-                tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+                tracker_list_.at(i)->enableCallbacks(
+                    std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
               }
             }
 
@@ -4090,7 +4154,7 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
       // rc control deactivation
       if (rc_goto_active_ && channel_low) {
 
-        ROS_INFO("[ControlManager]: deactivating RC joystick");
+        RCLCPP_INFO(node_->get_logger(), "deactivating RC joystick");
 
         callbacks_enabled_ = true;
 
@@ -4105,7 +4169,7 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
           // enable callbacks of all trackers
           for (int i = 0; i < int(tracker_list_.size()); i++) {
-            tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+            tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
           }
         }
 
@@ -4172,7 +4236,8 @@ void ControlManager::timeoutUavState(const double& missing_for) {
 
 /* //{ callbackSwitchTracker() */
 
-bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+bool ControlManager::callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                           const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4216,7 +4281,8 @@ bool ControlManager::callbackSwitchTracker(mrs_msgs::String::Request& req, mrs_m
 
 /* callbackSwitchController() //{ */
 
-bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+bool ControlManager::callbackSwitchController(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                              const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4260,7 +4326,8 @@ bool ControlManager::callbackSwitchController(mrs_msgs::String::Request& req, mr
 
 /* //{ callbackSwitchTracker() */
 
-bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackTrackerResetStatic(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                                const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4307,7 +4374,8 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] std_srvs::Trigg
 
 /* //{ callbackEHover() */
 
-bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                    const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4340,7 +4408,8 @@ bool ControlManager::callbackEHover([[maybe_unused]] std_srvs::Trigger::Request&
 
 /* callbackFailsafe() //{ */
 
-bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                      const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4373,7 +4442,8 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] std_srvs::Trigger::Reques
 
 /* callbackFailsafeEscalating() //{ */
 
-bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                                const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4406,7 +4476,8 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] std_srvs::Trigg
 
 /* //{ callbackELand() */
 
-bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4426,7 +4497,8 @@ bool ControlManager::callbackEland([[maybe_unused]] std_srvs::Trigger::Request& 
 
 /* //{ callbackParachute() */
 
-bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4455,7 +4527,7 @@ bool ControlManager::callbackParachute([[maybe_unused]] std_srvs::Trigger::Reque
 
 /* //{ callbackSetMinZ() */
 
-bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSrv::Request& req, mrs_msgs::Float64StampedSrv::Response& res) {
+bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::msg::Float64StampedSrv::Request& req, mrs_msgs::msg::Float64StampedSrv::Response& res) {
 
   if (!is_initialized_) {
     return false;
@@ -4469,7 +4541,7 @@ bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSr
 
   // | -------- transform min_z to the safety area frame -------- |
 
-  mrs_msgs::ReferenceStamped point;
+  mrs_msgs::msg::ReferenceStamped point;
   point.header               = req.header;
   point.reference.position.z = req.value;
 
@@ -4495,13 +4567,14 @@ bool ControlManager::callbackSetMinZ([[maybe_unused]] mrs_msgs::Float64StampedSr
 
 /* //{ callbackToggleOutput() */
 
-bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                          const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
   }
 
-  ROS_INFO("[ControlManager]: toggling output by service");
+  RCLCPP_INFO(node_->get_logger(), "toggling output by service");
 
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -4511,7 +4584,7 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
   bool prereq_check = true;
 
   {
-    mrs_msgs::ReferenceStamped current_coord;
+    mrs_msgs::msg::ReferenceStamped current_coord;
     current_coord.header.frame_id      = uav_state.header.frame_id;
     current_coord.reference.position.x = uav_state.pose.position.x;
     current_coord.reference.position.y = uav_state.pose.position.y;
@@ -4527,7 +4600,7 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
     prereq_check = false;
   }
 
-  if (!sh_hw_api_status_.hasMsg() || (ros::Time::now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
+  if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).toSec() > 1.0) {
     ss << "cannot toggle output ON, missing HW API status!";
     prereq_check = false;
   }
@@ -4561,13 +4634,14 @@ bool ControlManager::callbackToggleOutput(std_srvs::SetBool::Request& req, std_s
 
 /* callbackArm() //{ */
 
-bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
   }
 
-  ROS_INFO("[ControlManager]: arming by service");
+  RCLCPP_INFO(node_->get_logger(), "arming by service");
 
   std::stringstream ss;
 
@@ -4616,7 +4690,8 @@ bool ControlManager::callbackArm(std_srvs::SetBool::Request& req, std_srvs::SetB
 
 /* //{ callbackEnableCallbacks() */
 
-bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                             const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4640,7 +4715,7 @@ bool ControlManager::callbackEnableCallbacks(std_srvs::SetBool::Request& req, st
 
 /* callbackSetConstraints() //{ */
 
-bool ControlManager::callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Request& req, mrs_msgs::DynamicsConstraintsSrv::Response& res) {
+bool ControlManager::callbackSetConstraints(mrs_msgs::msg::DynamicsConstraintsSrv::Request& req, mrs_msgs::msg::DynamicsConstraintsSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -4679,7 +4754,8 @@ bool ControlManager::callbackSetConstraints(mrs_msgs::DynamicsConstraintsSrv::Re
 
 /* //{ callbackEmergencyReference() */
 
-bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4689,12 +4765,12 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
 
   callbacks_enabled_ = false;
 
-  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  mrs_msgs::msg::ReferenceSrvResponse::ConstSharedPtr tracker_response;
 
   std::stringstream ss;
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped original_reference;
+  mrs_msgs::msg::ReferenceStamped original_reference;
   original_reference.header    = req.header;
   original_reference.reference = req.reference;
 
@@ -4710,11 +4786,11 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
     return true;
   }
 
-  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+  mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
   std_srvs::SetBoolRequest req_enable_callbacks;
 
-  mrs_msgs::ReferenceSrvRequest req_goto_out;
+  mrs_msgs::msg::ReferenceSrvRequest req_goto_out;
   req_goto_out.reference = transformed_reference.reference;
 
   {
@@ -4723,24 +4799,25 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
     // disable callbacks of all trackers
     req_enable_callbacks.data = false;
     for (int i = 0; i < int(tracker_list_.size()); i++) {
-      tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+      tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
 
     // enable the callbacks for the active tracker
     req_enable_callbacks.data = true;
     tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
     // call the setReference()
-    tracker_response = tracker_list_.at(active_tracker_idx_)
-                           ->setReference(mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(req_goto_out)));
+    tracker_response =
+        tracker_list_.at(active_tracker_idx_)
+            ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
 
     // disable the callbacks back again
     req_enable_callbacks.data = false;
     tracker_list_.at(active_tracker_idx_)
-        ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
-    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+    if (tracker_response != mrs_msgs::msg::ReferenceSrvResponse::Ptr()) {
       res.message = tracker_response->message;
       res.success = tracker_response->success;
     } else {
@@ -4757,7 +4834,8 @@ bool ControlManager::callbackEmergencyReference(mrs_msgs::ReferenceStampedSrv::R
 
 /* callbackPirouette() //{ */
 
-bool ControlManager::callbackPirouette([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
+bool ControlManager::callbackPirouette(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -4967,14 +5045,15 @@ bool ControlManager::callbackGotoTrajectoryStart([[maybe_unused]] std_srvs::Trig
 
 /* //{ callbackTransformReference() */
 
-bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv::Request& req, mrs_msgs::TransformReferenceSrv::Response& res) {
+bool ControlManager::callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
   }
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped transformed_reference = req.reference;
+  mrs_msgs::msg::ReferenceStamped transformed_reference = req.reference;
 
   if (auto ret = transformer_->transformSingle(transformed_reference, req.frame_id)) {
 
@@ -4997,7 +5076,8 @@ bool ControlManager::callbackTransformReference(mrs_msgs::TransformReferenceSrv:
 
 /* //{ callbackTransformReferenceArray() */
 
-bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenceArraySrv::Request& req, mrs_msgs::TransformReferenceArraySrv::Response& res) {
+bool ControlManager::callbackTransformReferenceArray(const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Request>  request,
+                                                     const std::shared_ptr<mrs_msgs::srv::TransformReferenceArraySrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5018,7 +5098,7 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
 
   for (const auto& ref : req.array.array) {
 
-    mrs_msgs::ReferenceStamped ref_stamped;
+    mrs_msgs::msg::ReferenceStamped ref_stamped;
     ref_stamped.header    = req.array.header;
     ref_stamped.reference = ref;
 
@@ -5043,14 +5123,15 @@ bool ControlManager::callbackTransformReferenceArray(mrs_msgs::TransformReferenc
 
 /* //{ callbackTransformPose() */
 
-bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& req, mrs_msgs::TransformPoseSrv::Response& res) {
+bool ControlManager::callbackTransformPose(const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Request>  request,
+                                           const std::shared_ptr<mrs_msgs::srv::TransformPoseSrv::Response> response) {
 
   if (!is_initialized_) {
     return false;
   }
 
   // transform the reference to the current frame
-  geometry_msgs::PoseStamped transformed_pose = req.pose;
+  geometry_msgs::msg::PoseStamped transformed_pose = req.pose;
 
   if (auto ret = transformer_->transformSingle(transformed_pose, req.frame_id)) {
 
@@ -5073,14 +5154,15 @@ bool ControlManager::callbackTransformPose(mrs_msgs::TransformPoseSrv::Request& 
 
 /* //{ callbackTransformVector3() */
 
-bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Request& req, mrs_msgs::TransformVector3Srv::Response& res) {
+bool ControlManager::callbackTransformVector3(const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Request>  request,
+                                              const std::shared_ptr<mrs_msgs::srv::TransformVector3Srv::Response> response) {
 
   if (!is_initialized_) {
     return false;
   }
 
   // transform the reference to the current frame
-  geometry_msgs::Vector3Stamped transformed_vector3 = req.vector;
+  geometry_msgs::msg::Vector3Stamped transformed_vector3 = req.vector;
 
   if (auto ret = transformer_->transformSingle(transformed_vector3, req.frame_id)) {
 
@@ -5103,7 +5185,8 @@ bool ControlManager::callbackTransformVector3(mrs_msgs::TransformVector3Srv::Req
 
 /* //{ callbackEnableBumper() */
 
-bool ControlManager::callbackEnableBumper(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                          const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5127,7 +5210,8 @@ bool ControlManager::callbackEnableBumper(std_srvs::SetBool::Request& req, std_s
 
 /* //{ callbackUseSafetyArea() */
 
-bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res) {
+bool ControlManager::callbackUseSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                           const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5151,7 +5235,8 @@ bool ControlManager::callbackUseSafetyArea(std_srvs::SetBool::Request& req, std_
 
 /* //{ callbackGetMinZ() */
 
-bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Request& req, mrs_msgs::GetFloat64::Response& res) {
+bool ControlManager::callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request>  request,
+                                     const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -5169,7 +5254,8 @@ bool ControlManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetFloat64::Requ
 
 /* //{ callbackValidateReference() */
 
-bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res) {
+bool ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                               const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5189,7 +5275,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped original_reference;
+  mrs_msgs::msg::ReferenceStamped original_reference;
   original_reference.header    = req.reference.header;
   original_reference.reference = req.reference.reference;
 
@@ -5203,7 +5289,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
     return true;
   }
 
-  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+  mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
   if (!isPointInSafetyArea3d(transformed_reference)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
@@ -5214,7 +5300,7 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
   if (last_tracker_cmd) {
 
-    mrs_msgs::ReferenceStamped from_point;
+    mrs_msgs::msg::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
     from_point.reference.position.x = last_tracker_cmd->position.x;
     from_point.reference.position.y = last_tracker_cmd->position.y;
@@ -5237,7 +5323,8 @@ bool ControlManager::callbackValidateReference(mrs_msgs::ValidateReference::Requ
 
 /* //{ callbackValidateReference2d() */
 
-bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Request& req, mrs_msgs::ValidateReference::Response& res) {
+bool ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5257,7 +5344,7 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // transform the reference to the current frame
-  mrs_msgs::ReferenceStamped original_reference;
+  mrs_msgs::msg::ReferenceStamped original_reference;
   original_reference.header    = req.reference.header;
   original_reference.reference = req.reference.reference;
 
@@ -5271,7 +5358,7 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
     return true;
   }
 
-  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+  mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
   if (!isPointInSafetyArea2d(transformed_reference)) {
     ROS_ERROR_THROTTLE(1.0, "[ControlManager]: reference validation failed, the point is outside of the safety area!");
@@ -5282,7 +5369,7 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
 
   if (last_tracker_cmd) {
 
-    mrs_msgs::ReferenceStamped from_point;
+    mrs_msgs::msg::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
     from_point.reference.position.x = last_tracker_cmd->position.x;
     from_point.reference.position.y = last_tracker_cmd->position.y;
@@ -5305,7 +5392,8 @@ bool ControlManager::callbackValidateReference2d(mrs_msgs::ValidateReference::Re
 
 /* //{ callbackValidateReferenceArray() */
 
-bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceArray::Request& req, mrs_msgs::ValidateReferenceArray::Response& res) {
+bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
+                                                    const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5326,13 +5414,13 @@ bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceA
     return false;
   }
 
-  geometry_msgs::TransformStamped tf = ret.value();
+  geometry_msgs::msg::TransformStamped tf = ret.value();
 
   for (int i = 0; i < int(req.array.array.size()); i++) {
 
     res.success.push_back(true);
 
-    mrs_msgs::ReferenceStamped original_reference;
+    mrs_msgs::msg::ReferenceStamped original_reference;
     original_reference.header    = req.array.header;
     original_reference.reference = req.array.array.at(i);
 
@@ -5346,7 +5434,7 @@ bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceA
       res.success.at(i) = false;
     }
 
-    mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+    mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
     if (!isPointInSafetyArea3d(transformed_reference)) {
       res.success.at(i) = false;
@@ -5354,7 +5442,7 @@ bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceA
 
     if (last_tracker_cmd) {
 
-      mrs_msgs::ReferenceStamped from_point;
+      mrs_msgs::msg::ReferenceStamped from_point;
       from_point.header.frame_id      = uav_state.header.frame_id;
       from_point.reference.position.x = last_tracker_cmd->position.x;
       from_point.reference.position.y = last_tracker_cmd->position.y;
@@ -5376,7 +5464,8 @@ bool ControlManager::callbackValidateReferenceArray(mrs_msgs::ValidateReferenceA
 
 /* //{ callbackReferenceService() */
 
-bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res) {
+bool ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5387,7 +5476,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceService");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header    = req.header;
   des_reference.reference = req.reference;
 
@@ -5403,7 +5492,7 @@ bool ControlManager::callbackReferenceService(mrs_msgs::ReferenceStampedSrv::Req
 
 /* //{ callbackReferenceTopic() */
 
-void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStamped::ConstPtr msg) {
+void ControlManager::callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -5419,8 +5508,8 @@ void ControlManager::callbackReferenceTopic(const mrs_msgs::ReferenceStamped::Co
 
 /* //{ callbackVelocityReferenceService() */
 
-bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenceStampedSrv::Request&  req,
-                                                      mrs_msgs::VelocityReferenceStampedSrv::Response& res) {
+bool ControlManager::callbackVelocityReferenceService(mrs_msgs::msg::VelocityReferenceStampedSrv::Request&  req,
+                                                      mrs_msgs::msg::VelocityReferenceStampedSrv::Response& res) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5431,7 +5520,7 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenc
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackVelocityReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::VelocityReferenceStamped des_reference;
+  mrs_msgs::msg::VelocityReferenceStamped des_reference;
   des_reference = req.reference;
 
   auto [success, message] = setVelocityReference(des_reference);
@@ -5446,7 +5535,7 @@ bool ControlManager::callbackVelocityReferenceService(mrs_msgs::VelocityReferenc
 
 /* //{ callbackVelocityReferenceTopic() */
 
-void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityReferenceStamped::ConstPtr msg) {
+void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -5462,7 +5551,8 @@ void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::VelocityRefe
 
 /* //{ callbackTrajectoryReferenceService() */
 
-bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryReferenceSrv::Request& req, mrs_msgs::TrajectoryReferenceSrv::Response& res) {
+bool ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
+                                                        const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5492,7 +5582,7 @@ bool ControlManager::callbackTrajectoryReferenceService(mrs_msgs::TrajectoryRefe
 
 /* //{ callbackTrajectoryReferenceTopic() */
 
-void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::TrajectoryReference::ConstPtr msg) {
+void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -5510,7 +5600,7 @@ void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::Trajectory
 
 /* //{ callbackGoto() */
 
-bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
+bool ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5521,9 +5611,9 @@ bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGoto");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGoto", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = req.goal.at(REF_X);
   des_reference.reference.position.y = req.goal.at(REF_Y);
   des_reference.reference.position.z = req.goal.at(REF_Z);
@@ -5541,7 +5631,8 @@ bool ControlManager::callbackGoto(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::
 
 /* //{ callbackGotoFcu() */
 
-bool ControlManager::callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
+bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
+                                     const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5552,9 +5643,9 @@ bool ControlManager::callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoFcu");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::callbackGotoFcu", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "fcu_untilted";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = req.goal.at(REF_X);
   des_reference.reference.position.y = req.goal.at(REF_Y);
   des_reference.reference.position.z = req.goal.at(REF_Z);
@@ -5572,7 +5663,8 @@ bool ControlManager::callbackGotoFcu(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec
 
 /* //{ callbackGotoRelative() */
 
-bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs::Vec4::Response& res) {
+bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5591,9 +5683,9 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
     return true;
   }
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = last_tracker_cmd->position.x + req.goal.at(REF_X);
   des_reference.reference.position.y = last_tracker_cmd->position.y + req.goal.at(REF_Y);
   des_reference.reference.position.z = last_tracker_cmd->position.z + req.goal.at(REF_Z);
@@ -5611,7 +5703,8 @@ bool ControlManager::callbackGotoRelative(mrs_msgs::Vec4::Request& req, mrs_msgs
 
 /* //{ callbackGotoAltitude() */
 
-bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5630,9 +5723,9 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
     return true;
   }
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = req.goal;
@@ -5650,7 +5743,8 @@ bool ControlManager::callbackGotoAltitude(mrs_msgs::Vec1::Request& req, mrs_msgs
 
 /* //{ callbackSetHeading() */
 
-bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                        const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5669,9 +5763,9 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
     return true;
   }
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = last_tracker_cmd->position.z;
@@ -5689,7 +5783,8 @@ bool ControlManager::callbackSetHeading(mrs_msgs::Vec1::Request& req, mrs_msgs::
 
 /* //{ callbackSetHeadingRelative() */
 
-bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mrs_msgs::Vec1::Response& res) {
+bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     res.message = "not initialized";
@@ -5708,9 +5803,9 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
     return true;
   }
 
-  mrs_msgs::ReferenceStamped des_reference;
+  mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = ros::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0);
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = last_tracker_cmd->position.z;
@@ -5732,7 +5827,7 @@ bool ControlManager::callbackSetHeadingRelative(mrs_msgs::Vec1::Request& req, mr
 
 /* setReference() //{ */
 
-std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::ReferenceStamped reference_in) {
+std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::msg::ReferenceStamped reference_in) {
 
   std::stringstream ss;
 
@@ -5762,7 +5857,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     return std::tuple(false, ss.str());
   }
 
-  mrs_msgs::ReferenceStamped transformed_reference = ret.value();
+  mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
   // safety area check
   if (!isPointInSafetyArea3d(transformed_reference)) {
@@ -5773,7 +5868,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
   if (last_tracker_cmd) {
 
-    mrs_msgs::ReferenceStamped from_point;
+    mrs_msgs::msg::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
     from_point.reference.position.x = last_tracker_cmd->position.x;
     from_point.reference.position.y = last_tracker_cmd->position.y;
@@ -5786,23 +5881,24 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
     }
   }
 
-  mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+  mrs_msgs::msg::ReferenceSrvResponse::ConstSharedPtr tracker_response;
 
   // prepare the message for current tracker
-  mrs_msgs::ReferenceSrvRequest reference_request;
+  mrs_msgs::msg::ReferenceSrvRequest reference_request;
   reference_request.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    ROS_INFO("[ControlManager]: setting reference to x=%.2f, y=%.2f, z=%.2f, hdg=%.2f (expressed in '%s')", reference_request.reference.position.x,
-             reference_request.reference.position.y, reference_request.reference.position.z, reference_request.reference.heading,
-             transformed_reference.header.frame_id.c_str());
+    RCLCPP_INFO(node_->get_logger(), "setting reference to x=%.2f, y=%.2f, z=%.2f, hdg=%.2f (expressed in '%s')", reference_request.reference.position.x,
+                reference_request.reference.position.y, reference_request.reference.position.z, reference_request.reference.heading,
+                transformed_reference.header.frame_id.c_str());
 
-    tracker_response = tracker_list_.at(active_tracker_idx_)
-                           ->setReference(mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(reference_request)));
+    tracker_response =
+        tracker_list_.at(active_tracker_idx_)
+            ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(reference_request)));
 
-    if (tracker_response != mrs_msgs::ReferenceSrvResponse::Ptr()) {
+    if (tracker_response != mrs_msgs::msg::ReferenceSrvResponse::Ptr()) {
 
       return std::tuple(tracker_response->success, tracker_response->message);
 
@@ -5819,7 +5915,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::Refer
 
 /* setVelocityReference() //{ */
 
-std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::VelocityReferenceStamped& reference_in) {
+std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped& reference_in) {
 
   std::stringstream ss;
 
@@ -5851,11 +5947,11 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   // | -- transform the velocity reference to the current frame - |
 
-  mrs_msgs::VelocityReferenceStamped transformed_reference = reference_in;
+  mrs_msgs::msg::VelocityReferenceStamped transformed_reference = reference_in;
 
   auto ret = transformer_->getTransform(reference_in.header.frame_id, uav_state.header.frame_id, reference_in.header.stamp);
 
-  geometry_msgs::TransformStamped tf;
+  geometry_msgs::msg::TransformStamped tf;
 
   if (!ret) {
     ss << "could not find tf from " << reference_in.header.frame_id << " to " << uav_state.header.frame_id;
@@ -5867,7 +5963,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   // transform the velocity
   {
-    geometry_msgs::Vector3Stamped velocity;
+    geometry_msgs::msg::Vector3Stamped velocity;
     velocity.header   = reference_in.header;
     velocity.vector.x = reference_in.reference.velocity.x;
     velocity.vector.y = reference_in.reference.velocity.y;
@@ -5890,7 +5986,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   // transform the z and the heading
   {
-    geometry_msgs::PoseStamped pose;
+    geometry_msgs::msg::PoseStamped pose;
     pose.header           = reference_in.header;
     pose.pose.position.x  = 0;
     pose.pose.position.y  = 0;
@@ -5917,7 +6013,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
   transformed_reference.header.stamp    = tf.header.stamp;
   transformed_reference.header.frame_id = transformer_->frame_to(tf);
 
-  mrs_msgs::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
+  mrs_msgs::msg::ReferenceStamped eqivalent_reference = velocityReferenceToReference(transformed_reference);
 
   ROS_DEBUG("[ControlManager]: equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
             eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
@@ -5931,7 +6027,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
   if (last_tracker_cmd) {
 
-    mrs_msgs::ReferenceStamped from_point;
+    mrs_msgs::msg::ReferenceStamped from_point;
     from_point.header.frame_id      = uav_state.header.frame_id;
     from_point.reference.position.x = last_tracker_cmd->position.x;
     from_point.reference.position.y = last_tracker_cmd->position.y;
@@ -5944,20 +6040,20 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
     }
   }
 
-  mrs_msgs::VelocityReferenceSrvResponse::ConstPtr tracker_response;
+  mrs_msgs::msg::VelocityReferenceSrvResponse::ConstSharedPtr tracker_response;
 
   // prepare the message for current tracker
-  mrs_msgs::VelocityReferenceSrvRequest reference_request;
+  mrs_msgs::msg::VelocityReferenceSrvRequest reference_request;
   reference_request.reference = transformed_reference.reference;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    tracker_response =
-        tracker_list_.at(active_tracker_idx_)
-            ->setVelocityReference(mrs_msgs::VelocityReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::VelocityReferenceSrvRequest>(reference_request)));
+    tracker_response = tracker_list_.at(active_tracker_idx_)
+                           ->setVelocityReference(mrs_msgs::msg::VelocityReferenceSrvRequest::ConstSharedPtr(
+                               std::make_unique<mrs_msgs::msg::VelocityReferenceSrvRequest>(reference_request)));
 
-    if (tracker_response != mrs_msgs::VelocityReferenceSrvResponse::Ptr()) {
+    if (tracker_response != mrs_msgs::msg::VelocityReferenceSrvResponse::Ptr()) {
 
       return std::tuple(tracker_response->success, tracker_response->message);
 
@@ -5975,7 +6071,7 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 /* setTrajectoryReference() //{ */
 
 std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
-    const mrs_msgs::TrajectoryReference trajectory_in) {
+    const mrs_msgs::msg::TrajectoryReference trajectory_in) {
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -6016,18 +6112,18 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   {
 
-    geometry_msgs::PoseArray debug_trajectory_out;
+    geometry_msgs::msg::PoseArray debug_trajectory_out;
     debug_trajectory_out.header = trajectory_in.header;
 
     debug_trajectory_out.header.frame_id = transformer_->resolveFrame(debug_trajectory_out.header.frame_id);
 
-    if (debug_trajectory_out.header.stamp == ros::Time(0)) {
-      debug_trajectory_out.header.stamp = ros::Time::now();
+    if (debug_trajectory_out.header.stamp == rclcpp::Time(0)) {
+      debug_trajectory_out.header.stamp = clock_->now();
     }
 
     for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
 
-      geometry_msgs::Pose new_pose;
+      geometry_msgs::msg::Pose new_pose;
 
       new_pose.position.x = trajectory_in.points.at(i).position.x;
       new_pose.position.y = trajectory_in.points.at(i).position.y;
@@ -6040,9 +6136,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     pub_debug_original_trajectory_poses_.publish(debug_trajectory_out);
 
-    visualization_msgs::MarkerArray msg_out;
+    visualization_msgs::msg::MarkerArray msg_out;
 
-    visualization_msgs::Marker marker;
+    visualization_msgs::msg::Marker marker;
 
     marker.header = trajectory_in.header;
 
@@ -6052,11 +6148,11 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       marker.header.frame_id = uav_state.header.frame_id;
     }
 
-    if (marker.header.stamp == ros::Time(0)) {
-      marker.header.stamp = ros::Time::now();
+    if (marker.header.stamp == rclcpp::Time(0)) {
+      marker.header.stamp = clock_->now();
     }
 
-    marker.type             = visualization_msgs::Marker::LINE_LIST;
+    marker.type             = visualization_msgs::msg::Marker::LINE_LIST;
     marker.color.a          = 1;
     marker.scale.x          = 0.05;
     marker.color.r          = 0;
@@ -6066,7 +6162,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     for (int i = 0; i < int(trajectory_in.points.size()) - 1; i++) {
 
-      geometry_msgs::Point point1;
+      geometry_msgs::msg::Point point1;
 
       point1.x = trajectory_in.points.at(i).position.x;
       point1.y = trajectory_in.points.at(i).position.y;
@@ -6074,7 +6170,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
       marker.points.push_back(point1);
 
-      geometry_msgs::Point point2;
+      geometry_msgs::msg::Point point2;
 
       point2.x = trajectory_in.points.at(i + 1).position.x;
       point2.y = trajectory_in.points.at(i + 1).position.y;
@@ -6090,7 +6186,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   //}
 
-  mrs_msgs::TrajectoryReference processed_trajectory = trajectory_in;
+  mrs_msgs::msg::TrajectoryReference processed_trajectory = trajectory_in;
 
   int trajectory_size = int(processed_trajectory.points.size());
 
@@ -6127,7 +6223,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       }
 
       // check the point against the safety area
-      mrs_msgs::ReferenceStamped des_reference;
+      mrs_msgs::msg::ReferenceStamped des_reference;
       des_reference.header    = processed_trajectory.header;
       des_reference.reference = processed_trajectory.points.at(i);
 
@@ -6177,7 +6273,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
             for (int j = last_valid_idx; j < i; j++) {
 
-              mrs_msgs::ReferenceStamped temp_point;
+              mrs_msgs::msg::ReferenceStamped temp_point;
               temp_point.header.frame_id      = processed_trajectory.header.frame_id;
               temp_point.reference.position.x = processed_trajectory.points.at(last_valid_idx).position.x + (j - last_valid_idx) * cos(angle) * step;
               temp_point.reference.position.y = processed_trajectory.points.at(last_valid_idx).position.y + (j - last_valid_idx) * sin(angle) * step;
@@ -6235,9 +6331,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   /* transform the trajectory to the current control frame //{ */
 
-  std::optional<geometry_msgs::TransformStamped> tf_traj_state;
+  std::optional<geometry_msgs::msg::TransformStamped> tf_traj_state;
 
-  if (processed_trajectory.header.stamp > ros::Time::now()) {
+  if (processed_trajectory.header.stamp > clock_->now()) {
     tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", processed_trajectory.header.stamp);
   } else {
     tf_traj_state = transformer_->getTransform(processed_trajectory.header.frame_id, "", uav_state_.header.stamp);
@@ -6253,7 +6349,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   for (int i = 0; i < trajectory_size; i++) {
 
-    mrs_msgs::ReferenceStamped trajectory_point;
+    mrs_msgs::msg::ReferenceStamped trajectory_point;
     trajectory_point.header    = processed_trajectory.header;
     trajectory_point.reference = processed_trajectory.points.at(i);
 
@@ -6274,8 +6370,8 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
   //}
 
-  mrs_msgs::TrajectoryReferenceSrvResponse::ConstPtr response;
-  mrs_msgs::TrajectoryReferenceSrvRequest            request;
+  mrs_msgs::msg::TrajectoryReferenceSrvResponse::ConstSharedPtr response;
+  mrs_msgs::msg::TrajectoryReferenceSrvRequest                  request;
 
   // check for empty trajectory
   if (processed_trajectory.points.size() == 0) {
@@ -6298,13 +6394,13 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
     std::scoped_lock lock(mutex_tracker_list_);
 
     // set the trajectory to the currently active tracker
-    response =
-        tracker_list_.at(active_tracker_idx_)
-            ->setTrajectoryReference(mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)
+                   ->setTrajectoryReference(
+                       mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
 
     tracker_names.push_back(_tracker_names_.at(active_tracker_idx_));
 
-    if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+    if (response != mrs_msgs::msg::TrajectoryReferenceSrvResponse::Ptr()) {
 
       success  = response->success;
       message  = response->message;
@@ -6332,9 +6428,9 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
         tracker_names.push_back(_tracker_names_.at(i));
 
         response = tracker_list_.at(i)->setTrajectoryReference(
-            mrs_msgs::TrajectoryReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::TrajectoryReferenceSrvRequest>(request)));
+            mrs_msgs::msg::TrajectoryReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::TrajectoryReferenceSrvRequest>(request)));
 
-        if (response != mrs_msgs::TrajectoryReferenceSrvResponse::Ptr()) {
+        if (response != mrs_msgs::msg::TrajectoryReferenceSrvResponse::Ptr()) {
 
           tracker_successes.push_back(response->success);
           tracker_messages.push_back(response->message);
@@ -6369,7 +6465,7 @@ bool ControlManager::isOffboard(void) {
     return false;
   }
 
-  mrs_msgs::HwApiStatusConstPtr hw_api_status = sh_hw_api_status_.getMsg();
+  mrs_msgs::msg::HwApiStatusConstSharedPtr hw_api_status = sh_hw_api_status_.getMsg();
 
   return hw_api_status->connected && hw_api_status->offboard;
 }
@@ -6390,7 +6486,7 @@ void ControlManager::setCallbacks(bool in) {
 
     // set callbacks to all trackers
     for (int i = 0; i < int(tracker_list_.size()); i++) {
-      tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+      tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
   }
 }
@@ -6410,9 +6506,9 @@ void ControlManager::publishDiagnostics(void) {
 
   std::scoped_lock lock(mutex_diagnostics_);
 
-  mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
+  mrs_msgs::msg::ControlManagerDiagnostics diagnostics_msg;
 
-  diagnostics_msg.stamp    = ros::Time::now();
+  diagnostics_msg.stamp    = clock_->now();
   diagnostics_msg.uav_name = _uav_name_;
 
   diagnostics_msg.desired_uav_state_rate = desired_uav_state_rate_;
@@ -6434,7 +6530,7 @@ void ControlManager::publishDiagnostics(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    mrs_msgs::TrackerStatus tracker_status;
+    mrs_msgs::msg::TrackerStatus tracker_status;
 
     diagnostics_msg.active_tracker = _tracker_names_.at(active_tracker_idx_);
     diagnostics_msg.tracker_status = tracker_list_.at(active_tracker_idx_)->getStatus();
@@ -6445,7 +6541,7 @@ void ControlManager::publishDiagnostics(void) {
   {
     std::scoped_lock lock(mutex_controller_list_);
 
-    mrs_msgs::ControllerStatus controller_status;
+    mrs_msgs::msg::ControllerStatus controller_status;
 
     diagnostics_msg.active_controller = _controller_names_.at(active_controller_idx_);
     diagnostics_msg.controller_status = controller_list_.at(active_controller_idx_)->getStatus();
@@ -6478,12 +6574,12 @@ void ControlManager::publishDiagnostics(void) {
 
 /* setConstraintsToTrackers() //{ */
 
-void ControlManager::setConstraintsToTrackers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+void ControlManager::setConstraintsToTrackers(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToTrackers", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
+  mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -6493,7 +6589,7 @@ void ControlManager::setConstraintsToTrackers(const mrs_msgs::DynamicsConstraint
 
       // if it is the active one, update and retrieve the command
       response = tracker_list_.at(i)->setConstraints(
-          mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::DynamicsConstraintsSrvRequest>(constraints)));
+          mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -6502,12 +6598,12 @@ void ControlManager::setConstraintsToTrackers(const mrs_msgs::DynamicsConstraint
 
 /* setConstraintsToControllers() //{ */
 
-void ControlManager::setConstraintsToControllers(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+void ControlManager::setConstraintsToControllers(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraintsToControllers", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
+  mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
   {
     std::scoped_lock lock(mutex_controller_list_);
@@ -6517,7 +6613,7 @@ void ControlManager::setConstraintsToControllers(const mrs_msgs::DynamicsConstra
 
       // if it is the active one, update and retrieve the command
       response = controller_list_.at(i)->setConstraints(
-          mrs_msgs::DynamicsConstraintsSrvRequest::ConstPtr(std::make_unique<mrs_msgs::DynamicsConstraintsSrvRequest>(constraints)));
+          mrs_msgs::msg::DynamicsConstraintsSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::DynamicsConstraintsSrvRequest>(constraints)));
     }
   }
 }
@@ -6526,12 +6622,12 @@ void ControlManager::setConstraintsToControllers(const mrs_msgs::DynamicsConstra
 
 /* setConstraints() //{ */
 
-void ControlManager::setConstraints(const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+void ControlManager::setConstraints(const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
 
-  mrs_msgs::DynamicsConstraintsSrvResponse::ConstPtr response;
+  mrs_msgs::msg::DynamicsConstraintsSrvResponse::ConstSharedPtr response;
 
   setConstraintsToTrackers(constraints);
 
@@ -6542,8 +6638,8 @@ void ControlManager::setConstraints(const mrs_msgs::DynamicsConstraintsSrvReques
 
 /* enforceControllerConstraints() //{ */
 
-std::optional<mrs_msgs::DynamicsConstraintsSrvRequest> ControlManager::enforceControllersConstraints(
-    const mrs_msgs::DynamicsConstraintsSrvRequest& constraints) {
+std::optional<mrs_msgs::msg::DynamicsConstraintsSrvRequest> ControlManager::enforceControllersConstraints(
+    const mrs_msgs::msg::DynamicsConstraintsSrvRequest& constraints) {
 
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -6641,9 +6737,9 @@ double ControlManager::getMass(void) {
 
 bool ControlManager::loadConfigFile(const std::string& file_path, const std::string ns) {
 
-  const std::string name_space = nh_.getNamespace() + "/" + ns;
+  const std::string name_space = node_.getNamespace() + "/" + ns;
 
-  ROS_INFO("[ControlManager]: loading '%s' under the namespace '%s'", file_path.c_str(), name_space.c_str());
+  RCLCPP_INFO(node_->get_logger(), "loading '%s' under the namespace '%s'", file_path.c_str(), name_space.c_str());
 
   // load the user-requested file
   {
@@ -6651,7 +6747,7 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      ROS_ERROR("[ControlManager]: failed to load '%s'", file_path.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load '%s'", file_path.c_str());
       return false;
     }
   }
@@ -6662,7 +6758,7 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      ROS_ERROR("[ControlManager]: failed to load the platform config file '%s'", _platform_config_.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load the platform config file '%s'", _platform_config_.c_str());
       return false;
     }
   }
@@ -6673,7 +6769,7 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      ROS_ERROR("[ControlManager]: failed to load the custom config file '%s'", _custom_config_.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load the custom config file '%s'", _custom_config_.c_str());
       return false;
     }
   }
@@ -6687,7 +6783,7 @@ bool ControlManager::loadConfigFile(const std::string& file_path, const std::str
 
 /* //{ isPointInSafetyArea3d() */
 
-bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point) {
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& point) {
 
   if (!use_safety_area_) {
     return true;
@@ -6715,7 +6811,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& poi
 
 /* //{ isPointInSafetyArea2d() */
 
-bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point) {
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& point) {
 
   if (!use_safety_area_) {
     return true;
@@ -6739,7 +6835,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& poi
 
 /* //{ isPathToPointInSafetyArea3d() */
 
-bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
 
   if (!use_safety_area_) {
     return true;
@@ -6749,14 +6845,14 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
     return false;
   }
 
-  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+  mrs_msgs::msg::ReferenceStamped start_transformed, end_transformed;
 
   {
     auto ret = transformer_->transformSingle(start, _safety_area_horizontal_frame_);
 
     if (!ret) {
 
-      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: Could not transform the first point in the path");
 
       return false;
     }
@@ -6769,7 +6865,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
 
     if (!ret) {
 
-      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: Could not transform the first point in the path");
 
       return false;
     }
@@ -6785,13 +6881,13 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStampe
 
 /* //{ isPathToPointInSafetyArea2d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
 
   if (!use_safety_area_) {
     return true;
   }
 
-  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+  mrs_msgs::msg::ReferenceStamped start_transformed, end_transformed;
 
   if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end)) {
     return false;
@@ -6802,7 +6898,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
     if (!ret) {
 
-      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: Could not transform the first point in the path");
 
       return false;
     }
@@ -6815,7 +6911,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStampe
 
     if (!ret) {
 
-      ROS_ERROR("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+      RCLCPP_ERROR(node_->get_logger(), "SafetyArea: Could not transform the first point in the path");
 
       return false;
     }
@@ -6839,7 +6935,7 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
 
   {
 
-    geometry_msgs::PointStamped point;
+    geometry_msgs::msg::PointStamped point;
 
     point.header.frame_id = _safety_area_vertical_frame_;
     point.point.x         = 0;
@@ -6866,7 +6962,7 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
       auto msg = sh_max_z_.getMsg();
 
       // transform it into the safety area frame
-      geometry_msgs::PointStamped point;
+      geometry_msgs::msg::PointStamped point;
       point.header  = msg->header;
       point.point.x = 0;
       point.point.y = 0;
@@ -6899,7 +6995,7 @@ double ControlManager::getMinZ(const std::string& frame_id) {
     return std::numeric_limits<double>::lowest();
   }
 
-  geometry_msgs::PointStamped point;
+  geometry_msgs::msg::PointStamped point;
 
   point.header.frame_id = _safety_area_vertical_frame_;
   point.point.x         = 0;
@@ -6964,8 +7060,8 @@ void ControlManager::bumperPushFromObstacle(void) {
   // | ----------------------------  ---------------------------- |
 
   // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
-  auto                              uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  mrs_msgs::msg::ObstacleSectorsConstSharedPtr bumper_data = sh_bumper_.getMsg();
+  auto                                         uav_state   = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   double sector_size = TAU / double(bumper_data->n_horizontal_sectors);
 
@@ -7065,12 +7161,12 @@ void ControlManager::bumperPushFromObstacle(void) {
 
     callbacks_enabled_ = false;
 
-    mrs_msgs::ReferenceSrvResponse::ConstPtr tracker_response;
+    mrs_msgs::msg::ReferenceSrvResponse::ConstSharedPtr tracker_response;
 
     std_srvs::SetBoolRequest req_enable_callbacks;
 
     // create the reference in the fcu_untilted frame
-    mrs_msgs::ReferenceStamped reference_fcu_untilted;
+    mrs_msgs::msg::ReferenceStamped reference_fcu_untilted;
 
     reference_fcu_untilted.header.frame_id = "fcu_untilted";
 
@@ -7107,28 +7203,29 @@ void ControlManager::bumperPushFromObstacle(void) {
       reference_fcu_untilted = ret.value();
 
       // copy the reference into the service type message
-      mrs_msgs::ReferenceSrvRequest req_goto_out;
+      mrs_msgs::msg::ReferenceSrvRequest req_goto_out;
       req_goto_out.reference = reference_fcu_untilted.reference;
 
       // disable callbacks of all trackers
       req_enable_callbacks.data = false;
       for (size_t i = 0; i < tracker_list_.size(); i++) {
-        tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
 
       // enable the callbacks for the active tracker
       req_enable_callbacks.data = true;
       tracker_list_.at(active_tracker_idx_)
-          ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+          ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
 
       // call the goto
-      tracker_response = tracker_list_.at(active_tracker_idx_)
-                             ->setReference(mrs_msgs::ReferenceSrvRequest::ConstPtr(std::make_unique<mrs_msgs::ReferenceSrvRequest>(req_goto_out)));
+      tracker_response =
+          tracker_list_.at(active_tracker_idx_)
+              ->setReference(mrs_msgs::msg::ReferenceSrvRequest::ConstSharedPtr(std::make_unique<mrs_msgs::msg::ReferenceSrvRequest>(req_goto_out)));
 
       // disable the callbacks back again
       req_enable_callbacks.data = false;
       tracker_list_.at(active_tracker_idx_)
-          ->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+          ->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
     }
   }
 
@@ -7167,7 +7264,7 @@ void ControlManager::bumperPushFromObstacle(void) {
       // enable callbacks of all trackers
       req_enable_callbacks.data = true;
       for (size_t i = 0; i < tracker_list_.size(); i++) {
-        tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
+        tracker_list_.at(i)->enableCallbacks(std_srvs::SetBoolRequest::ConstSharedPtr(std::make_unique<std_srvs::SetBoolRequest>(req_enable_callbacks)));
       }
     }
 
@@ -7184,7 +7281,7 @@ void ControlManager::bumperPushFromObstacle(void) {
 int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
 
   // copy member variables
-  mrs_msgs::ObstacleSectorsConstPtr bumper_data = sh_bumper_.getMsg();
+  mrs_msgs::msg::ObstacleSectorsConstSharedPtr bumper_data = sh_bumper_.getMsg();
 
   // heading of the point in drone frame
   double point_heading_horizontal = atan2(y, x);
@@ -7245,7 +7342,7 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
     break;
   }
 
-  ROS_INFO("[ControlManager]: switching emergency landing state %s -> %s", state_names[previous_state_landing_], state_names[current_state_landing_]);
+  RCLCPP_INFO(node_->get_logger(), "switching emergency landing state %s -> %s", state_names[previous_state_landing_], state_names[current_state_landing_]);
 }
 
 //}
@@ -7269,10 +7366,10 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr response;
-    std_srvs::TriggerRequest            request;
+    std_srvs::TriggerResponse::ConstSharedPtr response;
+    std_srvs::TriggerRequest                  request;
 
-    response = tracker_list_.at(active_tracker_idx_)->hover(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)->hover(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7518,14 +7615,14 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
       std::scoped_lock lock(mutex_controller_list_);
 
-      ROS_INFO("[ControlManager]: activating the controller '%s'", _failsafe_controller_name_.c_str());
+      RCLCPP_INFO(node_->get_logger(), "activating the controller '%s'", _failsafe_controller_name_.c_str());
       controller_list_.at(_failsafe_controller_idx_)->activate(last_control_output);
 
       {
         std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
         // update the time (used in failsafe)
-        controller_tracker_switch_time_ = ros::Time::now();
+        controller_tracker_switch_time_ = clock_->now();
       }
 
       failsafe_triggered_ = true;
@@ -7574,7 +7671,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   std::stringstream ss;
 
-  if ((ros::Time::now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
+  if ((clock_->now() - escalating_failsafe_time_).toSec() < _escalating_failsafe_timeout_) {
 
     ss << "too soon for escalating failsafe";
     ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
@@ -7600,7 +7697,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   EscalatingFailsafeStates_t next_state = getNextEscFailsafeState();
 
-  escalating_failsafe_time_ = ros::Time::now();
+  escalating_failsafe_time_ = clock_->now();
 
   switch (next_state) {
 
@@ -7648,7 +7745,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
     case ESC_FAILSAFE_STATE: {
 
-      escalating_failsafe_time_ = ros::Time::now();
+      escalating_failsafe_time_ = clock_->now();
 
       ss << "escalating failsafe escalates to failsafe";
       ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
@@ -7666,7 +7763,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
     case ESC_FINISHED_STATE: {
 
-      escalating_failsafe_time_ = ros::Time::now();
+      escalating_failsafe_time_ = clock_->now();
 
       ss << "escalating failsafe has nothing more to do";
       ROS_WARN_STREAM_THROTTLE(0.1, "[ControlManager]: " << ss.str());
@@ -7682,7 +7779,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     }
   }
 
-  ROS_ERROR("[ControlManager]: escalatingFailsafe() reached the final return, this should not happen!");
+  RCLCPP_ERROR(node_->get_logger(), "escalatingFailsafe() reached the final return, this should not happen!");
 
   return std::tuple(false, "escalating failsafe exception");
 }
@@ -7751,7 +7848,7 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
     }
   }
 
-  ROS_ERROR("[ControlManager]: getNextEscFailsafeState() reached the final return, this should not happen!");
+  RCLCPP_ERROR(node_->get_logger(), "getNextEscFailsafeState() reached the final return, this should not happen!");
 
   return ESC_NONE_STATE;
 }
@@ -7771,11 +7868,11 @@ std::tuple<bool, std::string> ControlManager::startTrajectoryTracking(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr response;
-    std_srvs::TriggerRequest            request;
+    std_srvs::TriggerResponse::ConstSharedPtr response;
+    std_srvs::TriggerRequest                  request;
 
-    response =
-        tracker_list_.at(active_tracker_idx_)->startTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)
+                   ->startTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7804,11 +7901,11 @@ std::tuple<bool, std::string> ControlManager::stopTrajectoryTracking(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr response;
-    std_srvs::TriggerRequest            request;
+    std_srvs::TriggerResponse::ConstSharedPtr response;
+    std_srvs::TriggerRequest                  request;
 
-    response =
-        tracker_list_.at(active_tracker_idx_)->stopTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)
+                   ->stopTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7837,11 +7934,11 @@ std::tuple<bool, std::string> ControlManager::resumeTrajectoryTracking(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr response;
-    std_srvs::TriggerRequest            request;
+    std_srvs::TriggerResponse::ConstSharedPtr response;
+    std_srvs::TriggerRequest                  request;
 
     response = tracker_list_.at(active_tracker_idx_)
-                   ->resumeTrajectoryTracking(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+                   ->resumeTrajectoryTracking(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7870,11 +7967,11 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
-    std_srvs::TriggerResponse::ConstPtr response;
-    std_srvs::TriggerRequest            request;
+    std_srvs::TriggerResponse::ConstSharedPtr response;
+    std_srvs::TriggerRequest                  request;
 
-    response =
-        tracker_list_.at(active_tracker_idx_)->gotoTrajectoryStart(std_srvs::TriggerRequest::ConstPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
+    response = tracker_list_.at(active_tracker_idx_)
+                   ->gotoTrajectoryStart(std_srvs::TriggerRequest::ConstSharedPtr(std::make_unique<std_srvs::TriggerRequest>(request)));
 
     if (response != std_srvs::TriggerResponse::Ptr()) {
 
@@ -7925,7 +8022,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
   srv_out.request.data = input ? 1 : 0;  // arm or disarm?
 
-  ROS_INFO("[ControlManager]: calling for %s", input ? "arming" : "disarming");
+  RCLCPP_INFO(node_->get_logger(), "calling for %s", input ? "arming" : "disarming");
 
   if (sch_arming_.call(srv_out)) {
 
@@ -7966,7 +8063,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
 void ControlManager::odometryCallbacksSrv(const bool input) {
 
-  ROS_INFO("[ControlManager]: switching odometry callbacks to %s", input ? "ON" : "OFF");
+  RCLCPP_INFO(node_->get_logger(), "switching odometry callbacks to %s", input ? "ON" : "OFF");
 
   std_srvs::SetBool srv;
 
@@ -7981,7 +8078,7 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
     }
 
   } else {
-    ROS_ERROR("[ControlManager]: service call for toggle odometry callbacks failed!");
+    RCLCPP_ERROR(node_->get_logger(), "service call for toggle odometry callbacks failed!");
   }
 }
 
@@ -7991,7 +8088,7 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 
 bool ControlManager::elandSrv(void) {
 
-  ROS_INFO("[ControlManager]: calling for eland");
+  RCLCPP_INFO(node_->get_logger(), "calling for eland");
 
   std_srvs::Trigger srv;
 
@@ -8007,7 +8104,7 @@ bool ControlManager::elandSrv(void) {
 
   } else {
 
-    ROS_ERROR("[ControlManager]: service call for eland failed!");
+    RCLCPP_ERROR(node_->get_logger(), "service call for eland failed!");
 
     return false;
   }
@@ -8019,7 +8116,7 @@ bool ControlManager::elandSrv(void) {
 
 bool ControlManager::parachuteSrv(void) {
 
-  ROS_INFO("[ControlManager]: calling for parachute deployment");
+  RCLCPP_INFO(node_->get_logger(), "calling for parachute deployment");
 
   std_srvs::Trigger srv;
 
@@ -8035,7 +8132,7 @@ bool ControlManager::parachuteSrv(void) {
 
   } else {
 
-    ROS_ERROR("[ControlManager]: service call for parachute deployment failed!");
+    RCLCPP_ERROR(node_->get_logger(), "service call for parachute deployment failed!");
 
     return false;
   }
@@ -8075,14 +8172,14 @@ void ControlManager::toggleOutput(const bool& input) {
     return;
   }
 
-  ROS_INFO("[ControlManager]: switching output %s", input ? "ON" : "OFF");
+  RCLCPP_INFO(node_->get_logger(), "switching output %s", input ? "ON" : "OFF");
 
   output_enabled_ = input;
 
   // if switching output off, switch to NullTracker
   if (!output_enabled_) {
 
-    ROS_INFO("[ControlManager]: switching to 'NullTracker' after switching output off");
+    RCLCPP_INFO(node_->get_logger(), "switching to 'NullTracker' after switching output off");
 
     switchTracker(_null_tracker_name_);
 
@@ -8098,11 +8195,11 @@ void ControlManager::toggleOutput(const bool& input) {
       it = trackers_.find(_tracker_names_.at(i));
 
       try {
-        ROS_INFO("[ControlManager]: deactivating the tracker '%s'", it->second.address.c_str());
+        RCLCPP_INFO(node_->get_logger(), "deactivating the tracker '%s'", it->second.address.c_str());
         tracker_list_.at(i)->deactivate();
       }
       catch (std::runtime_error& ex) {
-        ROS_ERROR("[ControlManager]: exception caught during tracker deactivation: '%s'", ex.what());
+        RCLCPP_ERROR(node_->get_logger(), "exception caught during tracker deactivation: '%s'", ex.what());
       }
     }
 
@@ -8112,11 +8209,11 @@ void ControlManager::toggleOutput(const bool& input) {
       it = controllers_.find(_controller_names_.at(i));
 
       try {
-        ROS_INFO("[ControlManager]: deactivating the controller '%s'", it->second.address.c_str());
+        RCLCPP_INFO(node_->get_logger(), "deactivating the controller '%s'", it->second.address.c_str());
         controller_list_.at(i)->deactivate();
       }
       catch (std::runtime_error& ex) {
-        ROS_ERROR("[ControlManager]: exception caught during controller deactivation: '%s'", ex.what());
+        RCLCPP_ERROR(node_->get_logger(), "exception caught during controller deactivation: '%s'", ex.what());
       }
     }
 
@@ -8178,7 +8275,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 
     try {
 
-      ROS_INFO("[ControlManager]: activating the tracker '%s'", _tracker_names_.at(new_tracker_idx.value()).c_str());
+      RCLCPP_INFO(node_->get_logger(), "activating the tracker '%s'", _tracker_names_.at(new_tracker_idx.value()).c_str());
 
       auto [success, message] = tracker_list_.at(new_tracker_idx.value())->activate(last_tracker_cmd);
 
@@ -8197,19 +8294,19 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
           std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
           // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
+          controller_tracker_switch_time_ = clock_->now();
         }
 
         // super important, switch the active tracker idx
         try {
 
-          ROS_INFO("[ControlManager]: deactivating '%s'", _tracker_names_.at(active_tracker_idx_).c_str());
+          RCLCPP_INFO(node_->get_logger(), "deactivating '%s'", _tracker_names_.at(active_tracker_idx_).c_str());
           tracker_list_.at(active_tracker_idx_)->deactivate();
 
           // if switching from null tracker, re-activate the already active the controller
           if (active_tracker_idx_ == _null_tracker_idx_) {
 
-            ROS_INFO("[ControlManager]: reactivating '%s' due to switching from 'NullTracker'", _controller_names_.at(active_controller_idx_).c_str());
+            RCLCPP_INFO(node_->get_logger(), "reactivating '%s' due to switching from 'NullTracker'", _controller_names_.at(active_controller_idx_).c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
 
@@ -8223,14 +8320,14 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
                 std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
                 // update the time (used in failsafe)
-                controller_tracker_switch_time_ = ros::Time::now();
+                controller_tracker_switch_time_ = clock_->now();
               }
             }
 
             // if switching to null tracker, deactivate the active controller
           } else if (new_tracker_idx == _null_tracker_idx_) {
 
-            ROS_INFO("[ControlManager]: deactivating '%s' due to switching to 'NullTracker'", _controller_names_.at(active_controller_idx_).c_str());
+            RCLCPP_INFO(node_->get_logger(), "deactivating '%s' due to switching to 'NullTracker'", _controller_names_.at(active_controller_idx_).c_str());
             {
               std::scoped_lock lock(mutex_controller_list_);
 
@@ -8249,13 +8346,13 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
           active_tracker_idx_ = new_tracker_idx.value();
         }
         catch (std::runtime_error& exrun) {
-          ROS_ERROR("[ControlManager]: could not deactivate the tracker '%s'", _tracker_names_.at(active_tracker_idx_).c_str());
+          RCLCPP_ERROR(node_->get_logger(), "could not deactivate the tracker '%s'", _tracker_names_.at(active_tracker_idx_).c_str());
         }
       }
     }
     catch (std::runtime_error& exrun) {
-      ROS_ERROR("[ControlManager]: error during activation of the tracker '%s'", tracker_name.c_str());
-      ROS_ERROR("[ControlManager]: exception: '%s'", exrun.what());
+      RCLCPP_ERROR(node_->get_logger(), "error during activation of the tracker '%s'", tracker_name.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "exception: '%s'", exrun.what());
     }
   }
 
@@ -8313,7 +8410,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     try {
 
-      ROS_INFO("[ControlManager]: activating the controller '%s'", _controller_names_.at(new_controller_idx.value()).c_str());
+      RCLCPP_INFO(node_->get_logger(), "activating the controller '%s'", _controller_names_.at(new_controller_idx.value()).c_str());
       if (!controller_list_.at(new_controller_idx.value())->activate(last_control_output)) {
 
         ss << "the controller '" << controller_name << "' was not activated";
@@ -8325,8 +8422,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
         ss << "the controller '" << controller_name << "' was activated";
         ROS_INFO_STREAM("[ControlManager]: " << ss.str());
 
-        ROS_INFO("[ControlManager]: triggering hover after switching to '%s', re-activating '%s'", _controller_names_.at(new_controller_idx.value()).c_str(),
-                 _tracker_names_.at(active_tracker_idx_).c_str());
+        RCLCPP_INFO(node_->get_logger(), "triggering hover after switching to '%s', re-activating '%s'",
+                    _controller_names_.at(new_controller_idx.value()).c_str(), _tracker_names_.at(active_tracker_idx_).c_str());
 
         // reactivate the current tracker
         // TODO this is not the most elegant way to restart the tracker after a controller switch
@@ -8342,7 +8439,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           std::scoped_lock lock(mutex_controller_tracker_switch_time_);
 
           // update the time (used in failsafe)
-          controller_tracker_switch_time_ = ros::Time::now();
+          controller_tracker_switch_time_ = clock_->now();
         }
 
         // super important, switch the active controller idx
@@ -8352,17 +8449,17 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           active_controller_idx_ = new_controller_idx.value();
         }
         catch (std::runtime_error& exrun) {
-          ROS_ERROR("[ControlManager]: could not deactivate controller '%s'", _controller_names_.at(active_controller_idx_).c_str());
+          RCLCPP_ERROR(node_->get_logger(), "could not deactivate controller '%s'", _controller_names_.at(active_controller_idx_).c_str());
         }
       }
     }
     catch (std::runtime_error& exrun) {
-      ROS_ERROR("[ControlManager]: error during activation of controller '%s'", controller_name.c_str());
-      ROS_ERROR("[ControlManager]: exception: '%s'", exrun.what());
+      RCLCPP_ERROR(node_->get_logger(), "error during activation of controller '%s'", controller_name.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "exception: '%s'", exrun.what());
     }
   }
 
-  mrs_msgs::DynamicsConstraintsSrvRequest sanitized_constraints;
+  mrs_msgs::msg::DynamicsConstraintsSrvRequest sanitized_constraints;
 
   {
     std::scoped_lock lock(mutex_constraints_);
@@ -8393,7 +8490,7 @@ void ControlManager::updateTrackers(void) {
   // |                     Update the trackers                    |
   // --------------------------------------------------------------
 
-  std::optional<mrs_msgs::TrackerCommand> tracker_command;
+  std::optional<mrs_msgs::msg::TrackerCommand> tracker_command;
 
   unsigned int active_tracker_idx;
 
@@ -8448,8 +8545,8 @@ void ControlManager::updateTrackers(void) {
       last_tracker_cmd_->header.frame_id = uav_state.header.frame_id;
     }
 
-    if (last_tracker_cmd_->header.stamp == ros::Time(0)) {
-      last_tracker_cmd_->header.stamp = ros::Time::now();
+    if (last_tracker_cmd_->header.stamp == rclcpp::Time(0)) {
+      last_tracker_cmd_->header.stamp = clock_->now();
     }
 
   } else {
@@ -8479,7 +8576,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
+void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -8569,19 +8666,19 @@ void ControlManager::updateControllers(const mrs_msgs::UavState& uav_state) {
 
       if (failsafe_triggered_) {
 
-        ROS_ERROR("[ControlManager]: disabling control, the active controller returned an empty command when failsafe was active");
+        RCLCPP_ERROR(node_->get_logger(), "disabling control, the active controller returned an empty command when failsafe was active");
 
         toggleOutput(false);
 
       } else if (eland_triggered_) {
 
-        ROS_ERROR("[ControlManager]: triggering failsafe, the active controller returned an empty command when eland was active");
+        RCLCPP_ERROR(node_->get_logger(), "triggering failsafe, the active controller returned an empty command when eland was active");
 
         failsafe();
 
       } else {
 
-        ROS_ERROR("[ControlManager]: triggering eland, the active controller returned an empty command");
+        RCLCPP_ERROR(node_->get_logger(), "triggering eland, the active controller returned an empty command");
 
         eland();
       }
@@ -8611,11 +8708,11 @@ void ControlManager::publish(void) {
   // |                 Publish the control command                |
   // --------------------------------------------------------------
 
-  mrs_msgs::HwApiAttitudeCmd attitude_target;
-  attitude_target.stamp = ros::Time::now();
+  mrs_msgs::msg::HwApiAttitudeCmd attitude_target;
+  attitude_target.stamp = clock_->now();
 
-  mrs_msgs::HwApiAttitudeRateCmd attitude_rate_target;
-  attitude_rate_target.stamp = ros::Time::now();
+  mrs_msgs::msg::HwApiAttitudeRateCmd attitude_rate_target;
+  attitude_rate_target.stamp = clock_->now();
 
   if (!output_enabled_) {
 
@@ -8648,7 +8745,7 @@ void ControlManager::publish(void) {
 
   } else if (last_control_output.control_output) {
 
-    if (validateHwApiAttitudeCmd(attitude_target, "ControlManager", "last_control_output.control_output")) {
+    if (validateHwApiAttitudeCmd(node, attitude_target, "last_control_output.control_output")) {
       control_output_publisher_.publish(last_control_output.control_output.value());
     } else {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: the attitude cmd is not valid just before publishing!");
@@ -8670,7 +8767,7 @@ void ControlManager::publish(void) {
   if (throttle) {
 
     {
-      std_msgs::Float64 msg;
+      std_msgs::msg::Float64 msg;
       msg.data = throttle.value();
       ph_throttle_.publish(msg);
     }
@@ -8678,7 +8775,7 @@ void ControlManager::publish(void) {
     double thrust = mrs_lib::quadratic_throttle_model::throttleToForce(common_handlers_->throttle_model, throttle.value());
 
     {
-      std_msgs::Float64 msg;
+      std_msgs::msg::Float64 msg;
       msg.data = thrust;
       ph_thrust_.publish(msg);
     }
@@ -8694,10 +8791,10 @@ void ControlManager::publish(void) {
 
   if (last_control_output.control_output) {
 
-    mrs_msgs::EstimatorInput msg;
+    mrs_msgs::msg::EstimatorInput msg;
 
     msg.header.frame_id = _uav_name_ + "/fcu";
-    msg.header.stamp    = ros::Time::now();
+    msg.header.stamp    = clock_->now();
 
     if (last_control_output.desired_unbiased_acceleration) {
       msg.control_acceleration.x = last_control_output.desired_unbiased_acceleration.value()(0);
@@ -8764,13 +8861,13 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
 /* velocityReferenceToReference() //{ */
 
-mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::VelocityReferenceStamped& vel_reference) {
+mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped& vel_reference) {
 
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
 
-  mrs_msgs::ReferenceStamped reference_out;
+  mrs_msgs::msg::ReferenceStamped reference_out;
 
   reference_out.header = vel_reference.header;
 
@@ -8812,8 +8909,8 @@ mrs_msgs::ReferenceStamped ControlManager::velocityReferenceToReference(const mr
 
 /* publishControlReferenceOdom() //{ */
 
-void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::TrackerCommand>& tracker_command,
-                                                 [[maybe_unused]] const Controller::ControlOutput&               control_output) {
+void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command,
+                                                 [[maybe_unused]] const Controller::ControlOutput&                    control_output) {
 
   if (!tracker_command || !control_output.control_output) {
     return;
@@ -8821,7 +8918,7 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  nav_msgs::Odometry msg;
+  nav_msgs::msg::Odometry msg;
 
   msg.header = tracker_command->header;
 
@@ -8844,7 +8941,7 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
 
     msg.child_frame_id = _uav_name_ + "/" + _body_frame_;
 
-    geometry_msgs::Vector3Stamped velocity;
+    geometry_msgs::msg::Vector3Stamped velocity;
     velocity.header = tracker_command->header;
 
     if (tracker_command->use_velocity_horizontal) {
@@ -8876,9 +8973,9 @@ void ControlManager::publishControlReferenceOdom([[maybe_unused]] const std::opt
   }
 
   // fill in the attitude rate
-  if (std::holds_alternative<mrs_msgs::HwApiAttitudeRateCmd>(control_output.control_output.value())) {
+  if (std::holds_alternative<mrs_msgs::msg::HwApiAttitudeRateCmd>(control_output.control_output.value())) {
 
-    auto attitude_cmd = std::get<mrs_msgs::HwApiAttitudeRateCmd>(control_output.control_output.value());
+    auto attitude_cmd = std::get<mrs_msgs::msg::HwApiAttitudeRateCmd>(control_output.control_output.value());
 
     msg.twist.twist.angular.x = attitude_cmd.body_rate.x;
     msg.twist.twist.angular.y = attitude_cmd.body_rate.y;
