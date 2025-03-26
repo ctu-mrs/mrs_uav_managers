@@ -175,7 +175,7 @@ public:
    *
    * @return a service response
    */
-  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> enableCallbacks(const std::shared_ptr<std_srvs::srv::Trigger::Request> &cmd) = 0;
+  virtual const std::shared_ptr<std_srvs::srv::Trigger::Response> enableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request> &cmd) = 0;
 
   /**
    * @brief Request for setting new constraints.

@@ -60,10 +60,10 @@ std::optional<unsigned int> idxInVector(const std::string& str, const std::vecto
 bool validateTrackerCommand(const std::optional<mrs_msgs::msg::TrackerCommand>& msg, const std::string& node_name, const std::string& var_name);
 
 // checks for invalid messages in/out
-bool validateOdometry(const nav_msgs::msg::Odometry& msg, const std::string& node_name, const std::string& var_name);
-bool validateUavState(const mrs_msgs::msg::UavState& msg, const std::string& node_name, const std::string& var_nam);
-bool validateVelocityReference(const mrs_msgs::msg::VelocityReference& msg, const std::string& node_name, const std::string& var_name);
-bool validateReference(const mrs_msgs::msg::Reference& msg, const std::string& node_name, const std::string& var_name);
+bool validateOdometry(const rclcpp::Node::SharedPtr& node, const nav_msgs::msg::Odometry& msg, const std::string& var_name);
+bool validateUavState(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::UavState& msg, const std::string& var_name);
+bool validateVelocityReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::VelocityReference& msg, const std::string& var_name);
+bool validateReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::Reference& msg, const std::string& var_name);
 
 std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& node_name,
                                                                 const std::string& platform_config, const std::string& custom_config);
