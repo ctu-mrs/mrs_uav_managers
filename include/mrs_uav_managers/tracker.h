@@ -110,8 +110,8 @@ public:
    *
    * @return a service response
    */
-  virtual const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Request> setVelocityReference(
-      const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Response> &cmd) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Response> setVelocityReference(
+      const std::shared_ptr<mrs_msgs::srv::VelocityReferenceSrv::Request> &cmd) = 0;
 
   /**
    * @brief Request for a flight along a given trajectory
