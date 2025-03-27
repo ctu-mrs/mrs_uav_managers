@@ -519,20 +519,20 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
   bool detailed_loaded = true;
 
-  detailed_loaded *= param_loader.loadParam("uav_mass", mass, 0.0);
+  detailed_loaded &= param_loader.loadParam("uav_mass", mass, 0.0);
 
-  detailed_loaded *= param_loader.loadParam("model_params/arm_length", arm_length, 0.0);
-  detailed_loaded *= param_loader.loadParam("model_params/body_height", body_height, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/arm_length", arm_length, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/body_height", body_height, 0.0);
 
-  detailed_loaded *= param_loader.loadParam("model_params/propulsion/force_constant", force_constant, 0.0);
-  detailed_loaded *= param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant, 0.0);
-  detailed_loaded *= param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius, 0.0);
-  detailed_loaded *= param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min, 0.0);
-  detailed_loaded *= param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/propulsion/force_constant", force_constant, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min, 0.0);
+  detailed_loaded &= param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max, 0.0);
 
   Eigen::MatrixXd allocation_matrix;
 
-  detailed_loaded *= param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
+  detailed_loaded &= param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
 
   if (!detailed_loaded) {
     RCLCPP_WARN(node->get_logger(),
