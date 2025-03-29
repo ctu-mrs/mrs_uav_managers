@@ -1,0 +1,5 @@
+<library path="MrsUavManagers_NullTracker">
+  <class type="mrs_uav_managers::NullTracker" base_class_type="mrs_uav_managers::Tracker">
+    <description>NullTracker</description>
+  </class>
+</library>
