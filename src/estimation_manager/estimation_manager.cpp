@@ -1002,11 +1002,13 @@ void EstimationManager::timerInitialization() {
   /*//{ initialize estimators */
   for (auto estimator : estimator_list_) {
 
+    rclcpp::Node::SharedPtr subnode = node_->create_sub_node(estimator->getName());
+
     // create private handlers
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(node_->create_sub_node(estimator->getName()), "EstimationManager/" + estimator->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + estimator->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -1022,7 +1024,7 @@ void EstimationManager::timerInitialization() {
 
     try {
       RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
-      estimator->initialize(node_, ch_, ph);
+      estimator->initialize(subnode, ch_, ph);
     }
     catch (std::runtime_error& ex) {
       RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
@@ -1039,10 +1041,12 @@ void EstimationManager::timerInitialization() {
   // | ----------- agl height estimator initialization ---------- |
   if (is_using_agl_estimator_) {
 
+    rclcpp::Node::SharedPtr subnode = node_->create_sub_node(est_alt_agl_->getName());
+
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader = std::make_unique<mrs_lib::ParamLoader>(node_->create_sub_node(est_alt_agl_->getName()), "EstimationManager/" + est_alt_agl_->getName());
+    ph->param_loader = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + est_alt_agl_->getName());
 
     if (_custom_config_ != "") {
       ph->param_loader->addYamlFile(_custom_config_);
@@ -1058,7 +1062,7 @@ void EstimationManager::timerInitialization() {
 
     try {
       RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
-      est_alt_agl_->initialize(node_, ch_, ph);
+      est_alt_agl_->initialize(subnode, ch_, ph);
     }
     catch (std::runtime_error& ex) {
       RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());

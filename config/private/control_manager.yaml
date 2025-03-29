@@ -17,7 +17,7 @@ mrs_uav_managers:
       "MpcController",
       # "Se3Controller",
       # "FailsafeController",
-      # "EmergencyController",
+      "EmergencyController",
       # "MidairActivationController",
     ]
 

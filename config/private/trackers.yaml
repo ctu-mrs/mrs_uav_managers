@@ -3,34 +3,34 @@ mrs_uav_managers:
   control_manager:
 
     MpcTracker:
-      address: "mrs_uav_trackers/MpcTracker"
+      address: "mrs_uav_trackers::mpc_tracker::MpcTracker"
       namespace: "mpc_tracker"
       human_switchable: true
 
     LandoffTracker:
+      address: "mrs_uav_trackers::landoff_tracker::LandoffTracker"
       namespace: "landoff_tracker"
-      address: "mrs_uav_trackers/LandoffTracker"
 
     LineTracker:
+      address: "mrs_uav_trackers::line_tracker::LineTracker"
       namespace: "line_tracker"
-      address: "mrs_uav_trackers/LineTracker"
 
     JoyTracker:
+      address: "mrs_uav_trackers::joy_tracker::JoyTracker"
       namespace: "joy_tracker"
-      address: "mrs_uav_trackers/JoyTracker"
 
     SpeedTracker:
+      address: "mrs_uav_trackers::speed_tracker::SpeedTracker"
       namespace: "speed_tracker"
-      address: "mrs_uav_trackers/SpeedTracker"
 
     FlipTracker:
+      address: "mrs_uav_trackers::flip_tracker::FlipTracker"
       namespace: "flip_tracker"
-      address: "mrs_uav_trackers/FlipTracker"
 
     MidairActivationTracker:
+      address: "mrs_uav_trackers::midair_activation_tracker::MidairActivationTracker"
       namespace: "midair_activation_tracker"
-      address: "mrs_uav_trackers/MidairActivationTracker"
 
     NullTracker:
+      address: "mrs_uav_managers::NullTracker"
       namespace: "null_tracker"
-      address: "mrs_uav_managers/NullTracker"

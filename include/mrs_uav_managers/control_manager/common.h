@@ -65,8 +65,8 @@ bool validateUavState(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::
 bool validateVelocityReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::VelocityReference& msg, const std::string& var_name);
 bool validateReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::Reference& msg, const std::string& var_name);
 
-std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& node_name,
-                                                                const std::string& platform_config, const std::string& custom_config);
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& platform_config,
+                                                                const std::string& custom_config);
 
 // translates the channel values to desired range
 double RCChannelToRange(double rc_value, double range, double deadband);

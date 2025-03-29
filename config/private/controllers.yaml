@@ -4,7 +4,7 @@ mrs_uav_managers:
 
     Se3Controller:
 
-      address: "mrs_uav_controllers/Se3Controller"
+      address: "mrs_uav_controllers::se3_controller::Se3Controller"
       namespace: "se3_controller"
       human_switchable: true
 
@@ -21,7 +21,7 @@ mrs_uav_managers:
         position:              true
 
     MpcController:
-      address: "mrs_uav_controllers/MpcController"
+      address: "mrs_uav_controllers::mpc_controller::MpcController"
       namespace: "mpc_controller"
       human_switchable: true
 
@@ -38,7 +38,7 @@ mrs_uav_managers:
         position:              true
 
     FailsafeController:
-      address: "mrs_uav_controllers/FailsafeController"
+      address: "mrs_uav_controllers::failsafe_controller::FailsafeController"
       namespace: "failsafe_controller"
 
       # which outputs the controller can provide
@@ -54,7 +54,7 @@ mrs_uav_managers:
         position:              true
 
     EmergencyController:
-      address: "mrs_uav_controllers/MpcController"
+      address: "mrs_uav_controllers::mpc_controller::MpcController"
       namespace: "emergency_controller"
 
       # which outputs the controller can provide
@@ -71,7 +71,7 @@ mrs_uav_managers:
 
 
     MidairActivationController:
-      address: "mrs_uav_controllers/MidairActivationController"
+      address: "mrs_uav_controllers::midair_activation_controller::MidairActivationController"
       namespace: "midair_activation_controller"
 
       # which outputs the controller can provide
