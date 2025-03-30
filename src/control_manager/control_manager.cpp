@@ -1809,15 +1809,15 @@ void ControlManager::initialize(void) {
 
   control_output_publisher_ = OutputPublisher(node_);
 
-  ph_controller_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ControllerDiagnostics>(node_, "controller_diagnostics_out");
-  ph_tracker_cmd_            = mrs_lib::PublisherHandler<mrs_msgs::msg::TrackerCommand>(node_, "tracker_cmd_out");
-  ph_mrs_odom_input_         = mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorInput>(node_, "estimator_input_out");
-  ph_control_reference_odom_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "control_reference_out");
-  ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "diagnostics_out");
-  ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "offboard_on_out");
-  ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "tilt_error_out");
-  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "mass_nominal_out");  // TODO latch
-  ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "control_error_out");
+  ph_controller_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ControllerDiagnostics>(node_, "~/controller_diagnostics_out");
+  ph_tracker_cmd_            = mrs_lib::PublisherHandler<mrs_msgs::msg::TrackerCommand>(node_, "~/tracker_cmd_out");
+  ph_mrs_odom_input_         = mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorInput>(node_, "~/estimator_input_out");
+  ph_control_reference_odom_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "~/control_reference_out");
+  ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "~/diagnostics_out");
+  ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "~/offboard_on_out");
+  ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/tilt_error_out");
+  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "~/mass_nominal_out");  // TODO latch
+  ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
 
   {
     mrs_lib::PublisherHandlerOptions opts;
@@ -1826,7 +1826,7 @@ void ControlManager::initialize(void) {
     opts.throttle_rate = 10.0;
     // TODO latch
 
-    ph_throttle_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "throttle_out");
+    ph_throttle_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "~/throttle_out");
   }
 
   {
@@ -1835,7 +1835,7 @@ void ControlManager::initialize(void) {
     opts.node          = node_;
     opts.throttle_rate = 100.0;
 
-    ph_thrust_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "thrust_out");
+    ph_thrust_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "~/thrust_out");
   }
 
   {
@@ -1844,7 +1844,7 @@ void ControlManager::initialize(void) {
     opts.node          = node_;
     opts.throttle_rate = 10.0;
 
-    ph_mass_estimate_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "mass_estimate_out");
+    ph_mass_estimate_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "~/mass_estimate_out");
   }
 
   {
@@ -1854,7 +1854,7 @@ void ControlManager::initialize(void) {
     opts.throttle_rate = 1.0;
     // TODO latch
 
-    ph_safety_area_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "safety_area_markers_out");
+    ph_safety_area_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "~/safety_area_markers_out");
   }
 
   {
@@ -1864,7 +1864,7 @@ void ControlManager::initialize(void) {
     opts.throttle_rate = 1.0;
     // TODO latch
 
-    ph_safety_area_coordinates_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "safety_area_coordinates_markers_out");
+    ph_safety_area_coordinates_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "~/safety_area_coordinates_markers_out");
   }
 
   {
@@ -1873,12 +1873,12 @@ void ControlManager::initialize(void) {
     opts.node          = node_;
     opts.throttle_rate = 10.0;
 
-    ph_disturbances_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "disturbances_markers_out");
+    ph_disturbances_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "~/disturbances_markers_out");
   }
 
-  ph_current_constraints_ = mrs_lib::PublisherHandler<mrs_msgs::msg::DynamicsConstraints>(node_, "current_constraints_out");
-  ph_heading_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "heading_out");
-  ph_speed_               = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "speed_out");
+  ph_current_constraints_ = mrs_lib::PublisherHandler<mrs_msgs::msg::DynamicsConstraints>(node_, "~/current_constraints_out");
+  ph_heading_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/heading_out");
+  ph_speed_               = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/speed_out");
 
   {
     mrs_lib::PublisherHandlerOptions opts;
@@ -1887,8 +1887,8 @@ void ControlManager::initialize(void) {
     opts.throttle_rate = 1.0;
     // TODO latch
 
-    pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::msg::PoseArray>(opts, "trajectory_original/poses_out");
-    pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "trajectory_original/markers_out");
+    pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::msg::PoseArray>(opts, "~/trajectory_original/poses_out");
+    pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::msg::MarkerArray>(opts, "~/trajectory_original/markers_out");
   }
 
   // | ------------------ publish nominal mass ------------------ |

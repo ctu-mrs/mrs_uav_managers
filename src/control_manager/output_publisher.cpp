@@ -11,15 +11,15 @@ OutputPublisher::OutputPublisher() {
 
 OutputPublisher::OutputPublisher(const rclcpp::Node::SharedPtr& node) {
 
-  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiActuatorCmd>(node, "hw_api_actuator_cmd_out");
-  ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiControlGroupCmd>(node, "hw_api_control_group_cmd_out");
-  ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeRateCmd>(node, "hw_api_attitude_rate_cmd_out");
-  ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeCmd>(node, "hw_api_attitude_cmd_out");
-  ph_hw_api_acceleration_hdg_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgRateCmd>(node, "hw_api_acceleration_hdg_rate_cmd_out");
-  ph_hw_api_acceleration_hdg_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgCmd>(node, "hw_api_acceleration_hdg_cmd_out");
-  ph_hw_api_velocity_hdg_rate_cmd_     = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgRateCmd>(node, "hw_api_velocity_hdg_rate_cmd_out");
-  ph_hw_api_velocity_hdg_cmd_          = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgCmd>(node, "hw_api_velocity_hdg_cmd_out");
-  ph_hw_api_position_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiPositionCmd>(node, "hw_api_position_cmd_out");
+  ph_hw_api_actuator_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiActuatorCmd>(node, "~/hw_api_actuator_cmd_out");
+  ph_hw_api_control_group_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiControlGroupCmd>(node, "~/hw_api_control_group_cmd_out");
+  ph_hw_api_attitude_rate_cmd_         = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeRateCmd>(node, "~/hw_api_attitude_rate_cmd_out");
+  ph_hw_api_attitude_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAttitudeCmd>(node, "~/hw_api_attitude_cmd_out");
+  ph_hw_api_acceleration_hdg_rate_cmd_ = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgRateCmd>(node, "~/hw_api_acceleration_hdg_rate_cmd_out");
+  ph_hw_api_acceleration_hdg_cmd_      = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiAccelerationHdgCmd>(node, "~/hw_api_acceleration_hdg_cmd_out");
+  ph_hw_api_velocity_hdg_rate_cmd_     = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgRateCmd>(node, "~/hw_api_velocity_hdg_rate_cmd_out");
+  ph_hw_api_velocity_hdg_cmd_          = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiVelocityHdgCmd>(node, "~/hw_api_velocity_hdg_cmd_out");
+  ph_hw_api_position_cmd_              = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiPositionCmd>(node, "~/hw_api_position_cmd_out");
 }
 
 void OutputPublisher::publish(const Controller::HwApiOutputVariant& control_output) {
