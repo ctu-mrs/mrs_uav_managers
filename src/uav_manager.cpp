@@ -1,7 +1,6 @@
 /* includes //{ */
 
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>

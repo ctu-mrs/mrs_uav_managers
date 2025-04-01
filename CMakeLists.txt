@@ -52,6 +52,7 @@ set(LIBRARIES
   MrsUavManagers_TransformManager
   MrsUavManagers_ControlManager
   MrsUavManagers_NullTracker
+  # MrsUavManagers_UavManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -114,6 +115,20 @@ ament_target_dependencies(MrsUavManagers_ControlManager
 rclcpp_components_register_nodes(MrsUavManagers_ControlManager PLUGIN "mrs_uav_managers::control_manager::ControlManager" EXECUTABLE MrsUavManagers_ControlManager)
 
 target_compile_definitions(MrsUavManagers_ControlManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# UAV Manager
+
+# add_library(MrsUavManagers_UavManager SHARED
+#   src/uav_manager.cpp
+# )
+
+# ament_target_dependencies(MrsUavManagers_UavManager
+#   ${DEPENDENCIES}
+# )
+
+# rclcpp_components_register_nodes(MrsUavManagers_UavManager PLUGIN "mrs_uav_managers::uav_manager::UavManager" EXECUTABLE MrsUavManagers_UavManager)
+
+# target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 
