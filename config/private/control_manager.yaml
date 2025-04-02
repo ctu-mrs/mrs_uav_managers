@@ -7,7 +7,7 @@ mrs_uav_managers:
       "NullTracker",
       "LandoffTracker",
       "LineTracker",
-      # "MpcTracker",
+      "MpcTracker",
       # "JoyTracker",
       # "SpeedTracker",
       # "MidairActivationTracker",
