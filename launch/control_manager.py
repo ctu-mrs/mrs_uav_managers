@@ -132,6 +132,12 @@ def generate_launch_description():
 
     # #} end of env-based params
 
+    # #{ log_level
+
+    ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
+
+    # #} end of log_level
+
     ld.add_action(ComposableNodeContainer(
 
         namespace=uav_name,
@@ -139,6 +145,7 @@ def generate_launch_description():
         package='rclcpp_components',
         executable='component_container_mt',
         output="screen",
+        arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
 
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
 
@@ -150,6 +157,7 @@ def generate_launch_description():
                 plugin='mrs_uav_managers::control_manager::ControlManager',
                 namespace=uav_name,
                 name='control_manager',
+
                 parameters=[
                     {"uav_name": uav_name},
                     {"uav_mass": 2.0},

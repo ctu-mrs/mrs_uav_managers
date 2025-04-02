@@ -40,8 +40,7 @@ mrs_uav_managers:
       ehover_tracker: "LandoffTracker"
 
       # controller used for safety landing (feed forward)
-      # failsafe_controller: "FailsafeController" # TODO return
-      failsafe_controller: "MpcController"
+      failsafe_controller: "FailsafeController"
 
       # after not receiving odometry for more than this, the failsafe landing will trigger
       # will be overriden for ACCELERATION+ output mode
@@ -108,8 +107,7 @@ mrs_uav_managers:
       enabled: true
 
       switch_tracker: true
-      # tracker: "MpcTracker" # TODO return
-      tracker: "LandoffTracker"
+      tracker: "MpcTracker"
 
       switch_controller: true
       # controller: "Se3Controller" # TODO return
@@ -157,8 +155,7 @@ mrs_uav_managers:
         # switching back from joystick control?
         fallback:
 
-          # tracker: "MpcTracker" TODO return
-          tracker: "LandoffTracker"
+          tracker: "MpcTracker"
           controller: "EmergencyController"
 
       # channel numbers, indeces in array
