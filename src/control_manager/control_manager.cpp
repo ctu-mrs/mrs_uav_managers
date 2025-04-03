@@ -897,12 +897,16 @@ private:
 
 //}
 
+/* ControlManager::ControlManager() //{ */
+
 ControlManager::ControlManager(rclcpp::NodeOptions options) : Node("control_manager", options) {
 
   timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&ControlManager::timerPreInitialization, this));
 }
 
-/* preinitialize() //{ */
+//}
+
+/* timerPreInitialization() //{ */
 
 void ControlManager::timerPreInitialization() {
 

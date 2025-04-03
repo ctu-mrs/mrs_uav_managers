@@ -45,14 +45,14 @@ set(DEPENDENCIES
   visualization_msgs
   tf2_geometry_msgs
   Eigen3
-)
+  )
 
 set(LIBRARIES
   MrsUavManagers_EstimationManager
   MrsUavManagers_TransformManager
   MrsUavManagers_ControlManager
   MrsUavManagers_NullTracker
-  # MrsUavManagers_UavManager
+  MrsUavManagers_UavManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -63,7 +63,7 @@ include_directories(
   include
   ${rclcpp_INCLUDE_DIRS}
   ${mrs_lib_INCLUDE_DIRS}
-)
+  )
 
 ## --------------------------------------------------------------
 ## |                           Compile                          |
@@ -76,11 +76,11 @@ add_library(MrsUavManagers_EstimationManager SHARED
   src/estimation_manager/estimator.cpp
   src/estimation_manager/estimators/state_estimator.cpp
   src/estimation_manager/estimators/agl_estimator.cpp
-)
+  )
 
 ament_target_dependencies(MrsUavManagers_EstimationManager
   ${DEPENDENCIES}
-)
+  )
 
 rclcpp_components_register_nodes(MrsUavManagers_EstimationManager PLUGIN "mrs_uav_managers::estimation_manager::EstimationManager" EXECUTABLE MrsUavManagers_EstimationManager)
 
@@ -90,11 +90,11 @@ target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIME
 
 add_library(MrsUavManagers_TransformManager SHARED
   src/transform_manager/transform_manager.cpp
-)
+  )
 
 ament_target_dependencies(MrsUavManagers_TransformManager
   ${DEPENDENCIES}
-)
+  )
 
 rclcpp_components_register_nodes(MrsUavManagers_TransformManager PLUGIN "mrs_uav_managers::transform_manager::TransformManager" EXECUTABLE MrsUavManagers_TransformManager)
 
@@ -106,11 +106,11 @@ add_library(MrsUavManagers_ControlManager SHARED
   src/control_manager/control_manager.cpp
   src/control_manager/output_publisher.cpp
   src/control_manager/common/common.cpp
-)
+  )
 
 ament_target_dependencies(MrsUavManagers_ControlManager
   ${DEPENDENCIES}
-)
+  )
 
 rclcpp_components_register_nodes(MrsUavManagers_ControlManager PLUGIN "mrs_uav_managers::control_manager::ControlManager" EXECUTABLE MrsUavManagers_ControlManager)
 
@@ -118,17 +118,17 @@ target_compile_definitions(MrsUavManagers_ControlManager PRIVATE USE_ROS_TIMER=$
 
 # UAV Manager
 
-# add_library(MrsUavManagers_UavManager SHARED
-#   src/uav_manager.cpp
-# )
+add_library(MrsUavManagers_UavManager SHARED
+  src/uav_manager.cpp
+  )
 
-# ament_target_dependencies(MrsUavManagers_UavManager
-#   ${DEPENDENCIES}
-# )
+ament_target_dependencies(MrsUavManagers_UavManager
+  ${DEPENDENCIES}
+  )
 
-# rclcpp_components_register_nodes(MrsUavManagers_UavManager PLUGIN "mrs_uav_managers::uav_manager::UavManager" EXECUTABLE MrsUavManagers_UavManager)
+rclcpp_components_register_nodes(MrsUavManagers_UavManager PLUGIN "mrs_uav_managers::uav_manager::UavManager" EXECUTABLE MrsUavManagers_UavManager)
 
-# target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 
@@ -159,7 +159,7 @@ pluginlib_export_plugin_description_file(mrs_uav_managers plugins.xml)
 
 ament_export_libraries(
   ${LIBRARIES}
-)
+  )
 
 install(
   TARGETS ${LIBRARIES}
@@ -167,39 +167,39 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
-)
+  )
 
 install(
   DIRECTORY include
   DESTINATION .
-)
+  )
 
 install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
-)
+  )
 
 install(
   DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
-)
+  )
 
 install(
   DIRECTORY scripts
   USE_SOURCE_PERMISSIONS
   DESTINATION share/${PROJECT_NAME}
-)
+  )
 
 ament_export_include_directories(
   include
-)
+  )
 
 ament_export_targets(
   export_${PROJECT_NAME} HAS_LIBRARY_TARGET
-)
+  )
 
 ament_export_dependencies(
   ${DEPENDENCIES}
-)
+  )
 
 ament_package()
