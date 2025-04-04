@@ -53,6 +53,7 @@ set(LIBRARIES
   MrsUavManagers_ControlManager
   MrsUavManagers_NullTracker
   MrsUavManagers_UavManager
+  MrsUavManagers_ConstraintManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -129,6 +130,20 @@ ament_target_dependencies(MrsUavManagers_UavManager
 rclcpp_components_register_nodes(MrsUavManagers_UavManager PLUGIN "mrs_uav_managers::uav_manager::UavManager" EXECUTABLE MrsUavManagers_UavManager)
 
 target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Constraint Manager
+
+add_library(MrsUavManagers_ConstraintManager SHARED
+  src/constraint_manager.cpp
+  )
+
+ament_target_dependencies(MrsUavManagers_ConstraintManager
+  ${DEPENDENCIES}
+  )
+
+rclcpp_components_register_nodes(MrsUavManagers_ConstraintManager PLUGIN "mrs_uav_managers::constraint_manager::ConstraintManager" EXECUTABLE MrsUavManagers_ConstraintManager)
+
+target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 

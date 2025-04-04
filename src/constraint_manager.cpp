@@ -1,16 +1,14 @@
 /* includes //{ */
 
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
+#include <rclcpp/rclcpp.hpp>
 
-#include <std_msgs/String.h>
+#include <std_msgs/msg/string.hpp>
 
-#include <mrs_msgs/ConstraintManagerDiagnostics.h>
-#include <mrs_msgs/EstimationDiagnostics.h>
-#include <mrs_msgs/DynamicsConstraintsSrv.h>
-#include <mrs_msgs/DynamicsConstraintsSrvRequest.h>
-#include <mrs_msgs/String.h>
-#include <mrs_msgs/ConstraintsOverride.h>
+#include <mrs_msgs/msg/constraint_manager_diagnostics.hpp>
+#include <mrs_msgs/msg/estimation_diagnostics.hpp>
+#include <mrs_msgs/srv/dynamics_constraints_srv.hpp>
+#include <mrs_msgs/srv/string.hpp>
+#include <mrs_msgs/srv/constraints_override.hpp>
 
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/scope_timer.h>
@@ -18,11 +16,23 @@
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
 
-#include <dynamic_reconfigure/ReconfigureRequest.h>
-#include <dynamic_reconfigure/Reconfigure.h>
-#include <dynamic_reconfigure/Config.h>
+//}
+
+/* using //{ */
+
+using namespace std::chrono_literals;
+
+//}
+
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 //}
 
@@ -34,13 +44,23 @@ namespace constraint_manager
 
 /* //{ class ConstraintManager */
 
-class ConstraintManager : public nodelet::Nodelet {
+class ConstraintManager : public rclcpp::Node {
 
 public:
-  virtual void onInit();
+  ConstraintManager(rclcpp::NodeOptions options);
 
 private:
-  ros::NodeHandle nh_;
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+
+  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
+  void                         timerPreInitialization();
+
+  void initialize();
 
   std::atomic<bool> is_initialized_ = false;
 
@@ -48,54 +68,56 @@ private:
 
   std::vector<std::string> _estimator_type_names_;
 
-  std::vector<std::string>                                       _constraint_names_;
-  std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest> _constraints_;
+  std::vector<std::string>                                                               _constraint_names_;
+  std::map<std::string, std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>> _constraints_;
 
   std::map<std::string, std::vector<std::string>> _map_type_allowed_constraints_;
   std::map<std::string, std::string>              _map_type_default_constraints_;
 
   // | --------------------- service clients -------------------- |
 
-  mrs_lib::ServiceClientHandler<mrs_msgs::DynamicsConstraintsSrv> sc_set_constraints_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::srv::DynamicsConstraintsSrv> sc_set_constraints_;
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics> sh_estimation_diag_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics> sh_estimation_diag_;
 
   // | ------------- constraint management ------------- |
 
   bool setConstraints(std::string constraints_names);
 
-  ros::ServiceServer service_server_set_constraints_;
-  bool               callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr service_server_set_constraints_;
+
+  bool callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   std::string last_estimator_name_;
   std::mutex  mutex_last_estimator_name_;
 
-  void       timerConstraintManagement(const ros::TimerEvent& event);
-  ros::Timer timer_constraint_management_;
-  double     _constraint_management_rate_;
+  void                       timerConstraintManagement();
+  std::shared_ptr<TimerType> timer_constraint_management_;
+  double                     _constraint_management_rate_;
 
   std::string current_constraints_;
   std::mutex  mutex_current_constraints_;
 
   // | ------------------ constraints override ------------------ |
 
-  ros::ServiceServer service_server_constraints_override_;
-  bool               callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res);
+  rclcpp::Service<mrs_msgs::srv::ConstraintsOverride>::SharedPtr service_server_constraints_override_;
 
-  std::atomic<bool>                    override_constraints_         = false;
-  std::atomic<bool>                    constraints_override_updated_ = false;
-  std::mutex                           mutex_constraints_override_;
-  mrs_msgs::ConstraintsOverrideRequest constraints_override_;
+  bool callbackConstraintsOverride(const std::shared_ptr<mrs_msgs::srv::ConstraintsOverride::Request> request, const std::shared_ptr<mrs_msgs::srv::ConstraintsOverride::Response> response);
+
+  std::atomic<bool>                                            override_constraints_         = false;
+  std::atomic<bool>                                            constraints_override_updated_ = false;
+  std::mutex                                                   mutex_constraints_override_;
+  std::shared_ptr<mrs_msgs::srv::ConstraintsOverride::Request> constraints_override_;
 
   // | ------------------ diagnostics publisher ----------------- |
 
-  mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics> ph_diagnostics_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::ConstraintManagerDiagnostics> ph_diagnostics_;
 
-  void       timerDiagnostics(const ros::TimerEvent& event);
-  ros::Timer timer_diagnostics_;
-  double     _diagnostics_rate_;
+  void                       timerDiagnostics();
+  std::shared_ptr<TimerType> timer_diagnostics_;
+  double                     _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
 
@@ -114,19 +136,42 @@ private:
 
 //}
 
+/* ConstraintManager::ConstraintManager() //{ */
+
+ConstraintManager::ConstraintManager(rclcpp::NodeOptions options) : Node("control_manager", options) {
+
+  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&ConstraintManager::timerPreInitialization, this));
+}
+
+//}
+
+/* timerPreInitialization() //{ */
+
+void ConstraintManager::timerPreInitialization() {
+
+  node_  = this->shared_from_this();
+  clock_ = node_->get_clock();
+
+  cbkgrp_subs_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  initialize();
+
+  timer_preinitialization_->cancel();
+}
+
+//}
+
 /* //{ onInit() */
 
-void ConstraintManager::onInit() {
+void ConstraintManager::initialize() {
 
-  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-
-  ros::Time::waitForValid();
-
-  ROS_INFO("[ConstraintManager]: initializing");
+  RCLCPP_INFO(node_->get_logger(), "[ConstraintManager]: initializing");
 
   // | ------------------------- params ------------------------- |
 
-  mrs_lib::ParamLoader param_loader(nh_, "ConstraintManager");
+  mrs_lib::ParamLoader param_loader(node_, "ConstraintManager");
 
   std::string custom_config_path;
   std::string platform_config_path;
@@ -163,41 +208,43 @@ void ConstraintManager::onInit() {
   // loading constraint names
   for (it = _constraint_names_.begin(); it != _constraint_names_.end(); ++it) {
 
-    ROS_INFO_STREAM("[ConstraintManager]: loading constraints '" << *it << "'");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "[ConstraintManager]: loading constraints '" << *it << "'");
 
-    mrs_msgs::DynamicsConstraintsSrvRequest new_constraints;
+    std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request> new_constraints;
 
-    param_loader.loadParam(yaml_prefix + *it + "/horizontal/speed", new_constraints.constraints.horizontal_speed);
-    param_loader.loadParam(yaml_prefix + *it + "/horizontal/acceleration", new_constraints.constraints.horizontal_acceleration);
-    param_loader.loadParam(yaml_prefix + *it + "/horizontal/jerk", new_constraints.constraints.horizontal_jerk);
-    param_loader.loadParam(yaml_prefix + *it + "/horizontal/snap", new_constraints.constraints.horizontal_snap);
+    new_constraints = std::make_shared<mrs_msgs::srv::DynamicsConstraintsSrv::Request>();
 
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/speed", new_constraints.constraints.vertical_ascending_speed);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/acceleration", new_constraints.constraints.vertical_ascending_acceleration);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/jerk", new_constraints.constraints.vertical_ascending_jerk);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/snap", new_constraints.constraints.vertical_ascending_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/speed", new_constraints->constraints.horizontal_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/acceleration", new_constraints->constraints.horizontal_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/jerk", new_constraints->constraints.horizontal_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/horizontal/snap", new_constraints->constraints.horizontal_snap);
 
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/speed", new_constraints.constraints.vertical_descending_speed);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/acceleration", new_constraints.constraints.vertical_descending_acceleration);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/jerk", new_constraints.constraints.vertical_descending_jerk);
-    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/snap", new_constraints.constraints.vertical_descending_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/speed", new_constraints->constraints.vertical_ascending_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/acceleration", new_constraints->constraints.vertical_ascending_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/jerk", new_constraints->constraints.vertical_ascending_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/ascending/snap", new_constraints->constraints.vertical_ascending_snap);
 
-    param_loader.loadParam(yaml_prefix + *it + "/heading/speed", new_constraints.constraints.heading_speed);
-    param_loader.loadParam(yaml_prefix + *it + "/heading/acceleration", new_constraints.constraints.heading_acceleration);
-    param_loader.loadParam(yaml_prefix + *it + "/heading/jerk", new_constraints.constraints.heading_jerk);
-    param_loader.loadParam(yaml_prefix + *it + "/heading/snap", new_constraints.constraints.heading_snap);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/speed", new_constraints->constraints.vertical_descending_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/acceleration", new_constraints->constraints.vertical_descending_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/jerk", new_constraints->constraints.vertical_descending_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/vertical/descending/snap", new_constraints->constraints.vertical_descending_snap);
 
-    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/roll", new_constraints.constraints.roll_rate);
-    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/pitch", new_constraints.constraints.pitch_rate);
-    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/yaw", new_constraints.constraints.yaw_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/speed", new_constraints->constraints.heading_speed);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/acceleration", new_constraints->constraints.heading_acceleration);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/jerk", new_constraints->constraints.heading_jerk);
+    param_loader.loadParam(yaml_prefix + *it + "/heading/snap", new_constraints->constraints.heading_snap);
+
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/roll", new_constraints->constraints.roll_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/pitch", new_constraints->constraints.pitch_rate);
+    param_loader.loadParam(yaml_prefix + *it + "/angular_speed/yaw", new_constraints->constraints.yaw_rate);
 
     double tilt_deg;
 
     param_loader.loadParam(yaml_prefix + *it + "/tilt", tilt_deg);
 
-    new_constraints.constraints.tilt = M_PI * (tilt_deg / 180.0);
+    new_constraints->constraints.tilt = M_PI * (tilt_deg / 180.0);
 
-    _constraints_.insert(std::pair<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>(*it, new_constraints));
+    _constraints_.insert(std::pair<std::string, std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>>(*it, new_constraints));
   }
 
   // loading the allowed constraints lists
@@ -209,8 +256,9 @@ void ConstraintManager::onInit() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _constraint_names_)) {
-        ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
-        ros::shutdown();
+        RCLCPP_ERROR(node_->get_logger(), "[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
+        rclcpp::shutdown();
+        exit(1);
       }
     }
 
@@ -224,70 +272,83 @@ void ConstraintManager::onInit() {
     param_loader.loadParam(yaml_prefix + "default_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
-      ROS_ERROR("[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "[ConstraintManager]: the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
+      rclcpp::shutdown();
+      exit(1);
     }
 
     _map_type_default_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  ROS_INFO("[ConstraintManager]: done loading dynamic params");
+  RCLCPP_INFO(node_->get_logger(), "[ConstraintManager]: done loading dynamic params");
 
   current_constraints_ = "";
   last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
-  service_server_set_constraints_ = nh_.advertiseService("set_constraints_in", &ConstraintManager::callbackSetConstraints, this);
+  service_server_set_constraints_      = node_->create_service<mrs_msgs::srv::String>("~/set_constraints_in", std::bind(&ConstraintManager::callbackSetConstraints, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_constraints_override_ = node_->create_service<mrs_msgs::srv::ConstraintsOverride>("~/constraints_override_in", std::bind(&ConstraintManager::callbackConstraintsOverride, this, std::placeholders::_1, std::placeholders::_2));
 
-  service_server_constraints_override_ = nh_.advertiseService("constraints_override_in", &ConstraintManager::callbackConstraintsOverride, this);
-
-  sc_set_constraints_ = mrs_lib::ServiceClientHandler<mrs_msgs::DynamicsConstraintsSrv>(nh_, "set_constraints_out");
+  sc_set_constraints_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::DynamicsConstraintsSrv>(node_, "~/set_constraints_out");
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "ConstraintManager";
-  shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+  mrs_lib::SubscriberHandlerOptions shopts;
 
-  sh_estimation_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
+  shopts.node                                = node_;
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
+
+  sh_estimation_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>(shopts, "~/estimation_diagnostics_in");
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::ConstraintManagerDiagnostics>(nh_, "diagnostics_out", 10);
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ConstraintManagerDiagnostics>(node_, "~/diagnostics_out");
 
   // | ------------------------- timers ------------------------- |
 
-  timer_constraint_management_ = nh_.createTimer(ros::Rate(_constraint_management_rate_), &ConstraintManager::timerConstraintManagement, this);
-  timer_diagnostics_           = nh_.createTimer(ros::Rate(_diagnostics_rate_), &ConstraintManager::timerDiagnostics, this);
+  mrs_lib::TimerHandlerOptions timer_opts_start;
+
+  timer_opts_start.node      = node_;
+  timer_opts_start.autostart = true;
+
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ConstraintManager::timerConstraintManagement, this);
+
+    timer_constraint_management_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_constraint_management_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&ConstraintManager::timerDiagnostics, this);
+
+    timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
+  }
 
   // | ------------------------ profiler ------------------------ |
 
-  profiler_ = mrs_lib::Profiler(nh_, "ConstraintManager", _profiler_enabled_);
+  profiler_ = mrs_lib::Profiler(node_, "ConstraintManager", _profiler_enabled_);
 
   // | ------------------- scope timer logger ------------------- |
 
   param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
-  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(node_, scope_timer_log_filename, scope_timer_enabled_);
 
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[ConstraintManager]: Could not load all parameters!");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[ConstraintManager]: Could not load all parameters!");
+    rclcpp::shutdown();
+    exit(1);
   }
 
   is_initialized_ = true;
 
-  ROS_INFO("[ConstraintManager]: initialized");
-
-  ROS_DEBUG("[ConstraintManager]: debug output is enabled");
+  RCLCPP_INFO(node_->get_logger(), "[ConstraintManager]: initialized");
 }
 
 //}
@@ -300,56 +361,51 @@ void ConstraintManager::onInit() {
 
 bool ConstraintManager::setConstraints(std::string constraints_name) {
 
-  std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>::iterator it;
+  std::map<std::string, std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>>::iterator it;
   it = _constraints_.find(constraints_name);
 
   if (it == _constraints_.end()) {
-    ROS_ERROR("[ConstraintManager]: could not setConstraints(), the constraint name '%s' is not on the list", constraints_name.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[ConstraintManager]: could not setConstraints(), the constraint name '%s' is not on the list", constraints_name.c_str());
     return false;
   }
 
-  mrs_msgs::DynamicsConstraintsSrv srv_call;
-
-  srv_call.request = it->second;
+  auto request = std::make_shared<mrs_msgs::srv::DynamicsConstraintsSrv::Request>(*it->second);
 
   if (override_constraints_) {
 
     auto constraints_override = mrs_lib::get_mutexed(mutex_constraints_override_, constraints_override_);
 
-    if (constraints_override.acceleration_horizontal > 0 &&
-        constraints_override.acceleration_horizontal <= srv_call.request.constraints.horizontal_acceleration) {
-      srv_call.request.constraints.horizontal_acceleration = constraints_override.acceleration_horizontal;
+    if (constraints_override->acceleration_horizontal > 0 && constraints_override->acceleration_horizontal <= request->constraints.horizontal_acceleration) {
+      request->constraints.horizontal_acceleration = constraints_override->acceleration_horizontal;
     } else {
-      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required horizontal acceleration override is out of bounds");
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: required horizontal acceleration override is out of bounds");
     }
 
-    if (constraints_override.acceleration_vertical > 0 &&
-        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_ascending_acceleration &&
-        constraints_override.acceleration_vertical <= srv_call.request.constraints.vertical_descending_acceleration) {
-      srv_call.request.constraints.vertical_ascending_acceleration  = constraints_override.acceleration_vertical;
-      srv_call.request.constraints.vertical_descending_acceleration = constraints_override.acceleration_vertical;
+    if (constraints_override->acceleration_vertical > 0 && constraints_override->acceleration_vertical <= request->constraints.vertical_ascending_acceleration && constraints_override->acceleration_vertical <= request->constraints.vertical_descending_acceleration) {
+      request->constraints.vertical_ascending_acceleration  = constraints_override->acceleration_vertical;
+      request->constraints.vertical_descending_acceleration = constraints_override->acceleration_vertical;
     } else {
-      ROS_ERROR_THROTTLE(1.0, "[ConstraintManager]: required vertical acceleration override is out of bounds");
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: required vertical acceleration override is out of bounds");
     }
   }
 
-  bool res = sc_set_constraints_.call(srv_call);
+  auto response = sc_set_constraints_.callSync(request);
 
-  if (!res) {
+  if (!response) {
 
-    ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the service for setting constraints has failed!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: the service for setting constraints has failed!");
     return false;
 
   } else {
 
-    if (srv_call.response.success) {
+    if (response.value()->success) {
 
       mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
       return true;
 
     } else {
 
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: set service for setting constraints returned: '%s'", srv_call.response.message.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: set service for setting constraints returned: '%s'", response.value()->message.c_str());
       return false;
     }
   }
@@ -365,7 +421,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
 /* //{ callbackSetConstraints() */
 
-bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -377,58 +433,58 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
 
     ss << "missing odometry diagnostics";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
-  if (!stringInVector(req.value, _constraint_names_)) {
+  if (!stringInVector(request->value, _constraint_names_)) {
 
-    ss << "the constraints '" << req.value.c_str() << "' do not exist (in the ConstraintManager's config)";
+    ss << "the constraints '" << request->value.c_str() << "' do not exist (in the ConstraintManager's config)";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_constraints_.at(estimation_diagnostics->current_state_estimator))) {
+  if (!stringInVector(request->value, _map_type_allowed_constraints_.at(estimation_diagnostics->current_state_estimator))) {
 
-    ss << "the constraints '" << req.value.c_str() << "' are not allowed given the current odometry type";
+    ss << "the constraints '" << request->value.c_str() << "' are not allowed given the current odometry type";
 
-    ROS_WARN_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
   override_constraints_ = false;
 
   // try to set the constraints
-  if (!setConstraints(req.value)) {
+  if (!setConstraints(request->value)) {
 
     ss << "the ControlManager could not set the constraints";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
 
   } else {
 
-    ss << "the constraints '" << req.value.c_str() << "' were set";
+    ss << "the constraints '" << request->value.c_str() << "' were set";
 
-    ROS_INFO_STREAM_THROTTLE(1.0, "[ConstraintManager]: " << ss.str());
+    RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = true;
+    response->message = ss.str();
+    response->success = true;
     return true;
   }
 }
@@ -437,7 +493,7 @@ bool ConstraintManager::callbackSetConstraints(mrs_msgs::String::Request& req, m
 
 /* callackConstraintsOverride() //{ */
 
-bool ConstraintManager::callbackConstraintsOverride(mrs_msgs::ConstraintsOverride::Request& req, mrs_msgs::ConstraintsOverride::Response& res) {
+bool ConstraintManager::callbackConstraintsOverride(const std::shared_ptr<mrs_msgs::srv::ConstraintsOverride::Request> request, const std::shared_ptr<mrs_msgs::srv::ConstraintsOverride::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -446,16 +502,16 @@ bool ConstraintManager::callbackConstraintsOverride(mrs_msgs::ConstraintsOverrid
   {
     std::scoped_lock lock(mutex_constraints_override_);
 
-    constraints_override_ = req;
+    constraints_override_ = request;
   }
 
   override_constraints_         = true;
   constraints_override_updated_ = true;
 
-  ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: setting constraints override");
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 100, "[ConstraintManager]: setting constraints override");
 
-  res.message = "override set";
-  res.success = true;
+  response->message = "override set";
+  response->success = true;
 
   return true;
 }
@@ -468,14 +524,14 @@ bool ConstraintManager::callbackConstraintsOverride(mrs_msgs::ConstraintsOverrid
 
 /* timerConstraintManagement() //{ */
 
-void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) {
+void ConstraintManager::timerConstraintManagement() {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerConstraintManagement", _constraint_management_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerConstraintManagement", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerConstraintManagement");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ContraintManager::timerConstraintManagement", scope_timer_logger_, scope_timer_enabled_);
 
   auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
@@ -489,16 +545,14 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
   // | --- automatically set constraints when the state estimator changes -- |
   if (estimation_diagnostics->current_state_estimator != last_estimator_name_) {
 
-    ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
-                      estimation_diagnostics->current_state_estimator.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_default_constraints_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_default_constraints_.end()) {
 
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the state estimator type '%s' was not specified in the constraint_manager's config!",
-                        estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: the state estimator type '%s' was not specified in the constraint_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
 
@@ -510,18 +564,17 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
         // else, try to set the initial constraints
       } else {
 
-        ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(),
-                          estimation_diagnostics->current_state_estimator.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
         if (setConstraints(it->second)) {
 
           last_estimator_name = estimation_diagnostics->current_state_estimator;
 
-          ROS_INFO_THROTTLE(1.0, "[ConstraintManager]: constraints set to initial: '%s'", it->second.c_str());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: constraints set to initial: '%s'", it->second.c_str());
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: could not set constraints!");
+          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: could not set constraints!");
         }
       }
     }
@@ -532,12 +585,12 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_default_constraints_.find(last_estimator_name_);
 
-    ROS_INFO_THROTTLE(0.1, "[ConstraintManager]: re-setting constraints with user value override");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 100, "[ConstraintManager]: re-setting constraints with user value override");
 
     if (setConstraints(it->second)) {
       constraints_override_updated_ = false;
     } else {
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: could not re-set the constraints!");
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: could not re-set the constraints!");
     }
   }
 
@@ -548,17 +601,17 @@ void ConstraintManager::timerConstraintManagement(const ros::TimerEvent& event) 
 
 /* timerDiagnostics() //{ */
 
-void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
+void ConstraintManager::timerDiagnostics() {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ContraintManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ContraintManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(10.0, "[ConstraintManager]: can not do constraint management, missing estimation diagnostics!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[ConstraintManager]: can not do constraint management, missing estimation diagnostics!");
     return;
   }
 
@@ -570,9 +623,9 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
     return;
   }
 
-  mrs_msgs::ConstraintManagerDiagnostics diagnostics;
+  mrs_msgs::msg::ConstraintManagerDiagnostics diagnostics;
 
-  diagnostics.stamp        = ros::Time::now();
+  diagnostics.stamp        = clock_->now();
   diagnostics.current_name = current_constraints;
   diagnostics.loaded       = _constraint_names_;
 
@@ -582,8 +635,7 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
     it = _map_type_allowed_constraints_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_constraints_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[ConstraintManager]: the state estimator '%s' was not specified in the constraint_manager's config!",
-                        estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ConstraintManager]: the state estimator '%s' was not specified in the constraint_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }
@@ -591,15 +643,15 @@ void ConstraintManager::timerDiagnostics(const ros::TimerEvent& event) {
 
   // get the current constraint values
   {
-    std::map<std::string, mrs_msgs::DynamicsConstraintsSrvRequest>::iterator it;
+    std::map<std::string, std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>>::iterator it;
     it = _constraints_.find(current_constraints);
 
     if (it == _constraints_.end()) {
-      ROS_ERROR("[ConstraintManager]: current constraints '%s' not found in the constraint list!", current_constraints.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "[ConstraintManager]: current constraints '%s' not found in the constraint list!", current_constraints.c_str());
       return;
     }
 
-    diagnostics.current_values = it->second.constraints;
+    diagnostics.current_values = it->second->constraints;
   }
 
   ph_diagnostics_.publish(diagnostics);
@@ -628,5 +680,5 @@ bool ConstraintManager::stringInVector(const std::string& value, const std::vect
 
 }  // namespace mrs_uav_managers
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::constraint_manager::ConstraintManager, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::constraint_manager::ConstraintManager)

@@ -4,7 +4,7 @@ mrs_uav_managers:
 
     # require gain or constraint manager running to takeoff?
     require_gain_manager: false # TODO set to true
-    require_constraint_manager: false # TODO set to true
+    require_constraint_manager: true
 
     # periodically checks if max height was exceeded
     # if so, retakes control and descends below it
