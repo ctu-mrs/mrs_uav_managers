@@ -524,7 +524,7 @@ void UavManager::initialize() {
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_diag_ = mrs_lib::PublisherHandler<mrs_msgs::msg::UavManagerDiagnostics>(node_, "diagnostics_out");
+  ph_diag_ = mrs_lib::PublisherHandler<mrs_msgs::msg::UavManagerDiagnostics>(node_, "~/diagnostics_out");
 
   // | --------------------- service servers -------------------- |
 
