@@ -129,6 +129,7 @@ def generate_launch_description():
     # #{ env-based params
 
     uav_name=os.getenv('UAV_NAME', "uav1")
+    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of env-based params
 
@@ -162,6 +163,7 @@ def generate_launch_description():
                     {"uav_name": uav_name},
                     {"uav_mass": 2.0},
                     {"topic_prefix": "/" + uav_name},
+                    {"use_sim_time": use_sim_time},
                     {"enable_profiler": False},
                     {"g": 9.81},
                     {"body_frame": "fcu"},

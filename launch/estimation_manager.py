@@ -104,6 +104,7 @@ def generate_launch_description():
     # #{ env-based params
 
     uav_name=os.getenv('UAV_NAME', "uav1")
+    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of env-based params
 
@@ -129,6 +130,7 @@ def generate_launch_description():
                     {"uav_name": uav_name},
                     {"topic_prefix": "/" + uav_name},
                     {"enable_profiler": False},
+                    {"use_sim_time": use_sim_time},
                     {'private_config': this_pkg_path + '/config/private/estimation_manager/estimation_manager.yaml'},
                     {'public_config': this_pkg_path + '/config/public/estimation_manager/estimation_manager.yaml'},
                     {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},

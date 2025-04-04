@@ -79,6 +79,7 @@ def generate_launch_description():
     # #{ env-based params
 
     uav_name=os.getenv('UAV_NAME', "uav1")
+    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of env-based params
 
@@ -111,6 +112,7 @@ def generate_launch_description():
                 parameters=[
                     {"uav_name": uav_name},
                     {"enable_profiler": False},
+                    {"use_sim_time": use_sim_time},
                     {'private_config': this_pkg_path + '/config/private/constraint_manager/constraint_manager.yaml'},
                     {'public_config': this_pkg_path + '/config/public/constraint_manager/constraint_manager.yaml'},
                     {'public_constraints': this_pkg_path + '/config/public/constraint_manager/constraints.yaml'},

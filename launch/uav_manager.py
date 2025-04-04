@@ -104,6 +104,7 @@ def generate_launch_description():
     # #{ env-based params
 
     uav_name=os.getenv('UAV_NAME', "uav1")
+    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of env-based params
 
@@ -137,6 +138,7 @@ def generate_launch_description():
                     {"uav_name": uav_name},
                     {"uav_mass": 2.0},
                     {"enable_profiler": False},
+                    {"use_sim_time": use_sim_time},
                     {"g": 9.81},
                     {"run_type": "simulation"},
                     {'private_config': this_pkg_path + '/config/private/uav_manager.yaml'},
