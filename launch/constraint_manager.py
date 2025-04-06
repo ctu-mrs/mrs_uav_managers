@@ -2,11 +2,11 @@
 
 import launch
 import os
-import sys
 
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
         LaunchConfiguration,
         IfElseSubstitution,
@@ -25,6 +25,34 @@ def generate_launch_description():
 
     this_pkg_path = get_package_share_directory(pkg_name)
     namespace='constraint_manager'
+
+    # #{ standalone
+
+    standalone = LaunchConfiguration('standalone')
+
+    declare_standalone = DeclareLaunchArgument(
+        'standalone',
+        default_value='true',
+        description='Whether to start a as a standalone or load into an existing container.'
+    )
+
+    ld.add_action(declare_standalone)
+
+    # #} end of standalone
+
+    # #{ container_name
+
+    container_name = LaunchConfiguration('container_name')
+
+    declare_container_name = DeclareLaunchArgument(
+        'container_name',
+        default_value='',
+        description='Name of an existing container to load into (if standalone is false)'
+    )
+
+    ld.add_action(declare_container_name)
+
+    # #} end of container_name
 
     # #{ custom_config
 
@@ -89,53 +117,66 @@ def generate_launch_description():
 
     # #} end of log_level
 
-    ld.add_action(ComposableNodeContainer(
+    # #{ constraint manaager node
 
+    constraint_manager_node = ComposableNode(
+
+        package=pkg_name,
+        plugin='mrs_uav_managers::constraint_manager::ConstraintManager',
+        namespace=uav_name,
+        name='constraint_manager',
+
+        parameters=[
+            {"uav_name": uav_name},
+            {"enable_profiler": False},
+            {"use_sim_time": use_sim_time},
+            {'private_config': this_pkg_path + '/config/private/constraint_manager/constraint_manager.yaml'},
+            {'public_config': this_pkg_path + '/config/public/constraint_manager/constraint_manager.yaml'},
+            {'public_constraints': this_pkg_path + '/config/public/constraint_manager/constraints.yaml'},
+            {'platform_config': platform_config},
+            {'custom_config': custom_config},
+            ],
+
+        remappings=[
+            # subscribers
+            ("~/estimation_diagnostics_in", "estimation_manager/diagnostics"),
+            # publishers
+            ("~/diagnostics_out", "~/diagnostics"),
+            ("~/profiler", "profiler"),
+            # services in
+            ("~/set_constraints_in", "~/set_constraints"),
+            ("~/constraints_override_in", "control_manager/set_constraints"),
+            # services out
+            ("~/set_constraints_out", "control_manager/set_constraints"),
+        ],
+    )
+
+    load_into_existing = LoadComposableNodes(
+        target_container=container_name,
+        composable_node_descriptions=[constraint_manager_node],
+        condition=UnlessCondition(standalone)
+    )
+
+    ld.add_action(load_into_existing)
+
+    # #} end of constraint manaager node
+
+    # #{ standalone container
+
+    standalone_container = ComposableNodeContainer(
         namespace=uav_name,
         name=namespace+'_container',
         package='rclcpp_components',
         executable='component_container_mt',
         output="screen",
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
-
+        composable_node_descriptions=[constraint_manager_node],
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
+        condition=IfCondition(standalone)
+    )
 
-        composable_node_descriptions=[
+    ld.add_action(standalone_container)
 
-            ComposableNode(
-
-                package=pkg_name,
-                plugin='mrs_uav_managers::constraint_manager::ConstraintManager',
-                namespace=uav_name,
-                name='constraint_manager',
-
-                parameters=[
-                    {"uav_name": uav_name},
-                    {"enable_profiler": False},
-                    {"use_sim_time": use_sim_time},
-                    {'private_config': this_pkg_path + '/config/private/constraint_manager/constraint_manager.yaml'},
-                    {'public_config': this_pkg_path + '/config/public/constraint_manager/constraint_manager.yaml'},
-                    {'public_constraints': this_pkg_path + '/config/public/constraint_manager/constraints.yaml'},
-                    {'platform_config': platform_config},
-                    {'custom_config': custom_config},
-                    ],
-
-                remappings=[
-                    # subscribers
-                    ("~/estimation_diagnostics_in", "estimation_manager/diagnostics"),
-                    # publishers
-                    ("~/diagnostics_out", "~/diagnostics"),
-                    ("~/profiler", "profiler"),
-                    # services in
-                    ("~/set_constraints_in", "~/set_constraints"),
-                    ("~/constraints_override_in", "control_manager/set_constraints"),
-                    # services out
-                    ("~/set_constraints_out", "control_manager/set_constraints"),
-                ],
-            )
-
-        ],
-
-    ))
+    # #} end of own container
 
     return ld

@@ -4,16 +4,17 @@ import launch
 import os
 import sys
 
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
-    LaunchConfiguration,
-    IfElseSubstitution,
-    PythonExpression,
-    PathJoinSubstitution,
-    EnvironmentVariable,
-)
+        LaunchConfiguration,
+        IfElseSubstitution,
+        PythonExpression,
+        PathJoinSubstitution,
+        EnvironmentVariable,
+        )
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -25,6 +26,34 @@ def generate_launch_description():
 
     this_pkg_path = get_package_share_directory(pkg_name)
     namespace='estimation_manager'
+
+    # #{ standalone
+
+    standalone = LaunchConfiguration('standalone')
+
+    declare_standalone = DeclareLaunchArgument(
+        'standalone',
+        default_value='true',
+        description='Whether to start a as a standalone or load into an existing container.'
+    )
+
+    ld.add_action(declare_standalone)
+
+    # #} end of standalone
+
+    # #{ container_name
+
+    container_name = LaunchConfiguration('container_name')
+
+    declare_container_name = DeclareLaunchArgument(
+        'container_name',
+        default_value='',
+        description='Name of an existing container to load into (if standalone is false)'
+    )
+
+    ld.add_action(declare_container_name)
+
+    # #} end of container_name
 
     # #{ custom_config
 
@@ -108,65 +137,79 @@ def generate_launch_description():
 
     # #} end of env-based params
 
-    ld.add_action(ComposableNodeContainer(
+    # #{ estimation manager node
 
+    estimation_manager_node = ComposableNode(
+
+        package=pkg_name,
+        plugin='mrs_uav_managers::estimation_manager::EstimationManager',
+        namespace=uav_name,
+        name='estimation_manager',
+        parameters=[
+            {"uav_name": uav_name},
+            {"topic_prefix": "/" + uav_name},
+            {"enable_profiler": False},
+            {"use_sim_time": use_sim_time},
+            {'private_config': this_pkg_path + '/config/private/estimation_manager/estimation_manager.yaml'},
+            {'public_config': this_pkg_path + '/config/public/estimation_manager/estimation_manager.yaml'},
+            {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},
+            {'estimators_config': this_pkg_path + '/config/private/estimators.yaml'},
+            {'active_estimators_config': this_pkg_path + '/config/public/active_estimators.yaml'},
+            {'platform_config': platform_config},
+            {'custom_config': custom_config},
+            {'world_config': world_config},
+        ],
+
+        remappings=[
+            # subscribers
+            ("~/control_input_in", "control_manager/estimator_input"),
+            ("~/imu_in", "hw_api/imu"),
+            ("~/hw_api_capabilities_in", "hw_api/capabilities"),
+            ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
+            ("~/control_reference_in", "control_manager/control_reference"),
+            ("~/controller_diagnostics_in", "control_manager/controller_diagnostics"),
+            # publishers
+            ("~/odom_main_out", "~/odom_main"),
+            ("~/innovation_out", "~/innovation"),
+            ("~/uav_state_out", "~/uav_state"),
+            ("~/diagnostics_out", "~/diagnostics"),
+            ("~/max_flight_z_agl_out", "~/max_flight_z_agl"),
+            ("~/height_agl_out", "~/height_agl"),
+            # services in
+            ("~/change_estimator_in", "~/change_estimator"),
+            ("~/reset_estimator_in", "~/reset_estimator"),
+            ("~/toggle_service_callbacks_in", "~/toggle_service_callbacks"),
+            # services out
+            ("~/failsafe_out", "control_manager/failsafe"),
+        ],
+    )
+
+    load_into_existing = LoadComposableNodes(
+        target_container=container_name,
+        composable_node_descriptions=[estimation_manager_node],
+        condition=UnlessCondition(standalone)
+    )
+
+    ld.add_action(load_into_existing)
+
+    # #} end of estimation manager node
+
+    # #{ standalone container
+
+    standalone_container = ComposableNodeContainer(
         namespace=uav_name,
         name=namespace+'_container',
         package='rclcpp_components',
         executable='component_container_mt',
         output="screen",
-
+        arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
+        composable_node_descriptions=[estimation_manager_node],
+        condition=IfCondition(standalone)
+    )
 
-        composable_node_descriptions=[
+    ld.add_action(standalone_container)
 
-            ComposableNode(
-
-                package=pkg_name,
-                plugin='mrs_uav_managers::estimation_manager::EstimationManager',
-                namespace=uav_name,
-                name='estimation_manager',
-                parameters=[
-                    {"uav_name": uav_name},
-                    {"topic_prefix": "/" + uav_name},
-                    {"enable_profiler": False},
-                    {"use_sim_time": use_sim_time},
-                    {'private_config': this_pkg_path + '/config/private/estimation_manager/estimation_manager.yaml'},
-                    {'public_config': this_pkg_path + '/config/public/estimation_manager/estimation_manager.yaml'},
-                    {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},
-                    {'estimators_config': this_pkg_path + '/config/private/estimators.yaml'},
-                    {'active_estimators_config': this_pkg_path + '/config/public/active_estimators.yaml'},
-                    {'platform_config': platform_config},
-                    {'custom_config': custom_config},
-                    {'world_config': world_config},
-                ],
-
-                remappings=[
-                    # subscribers
-                    ("~/control_input_in", "control_manager/estimator_input"),
-                    ("~/imu_in", "hw_api/imu"),
-                    ("~/hw_api_capabilities_in", "hw_api/capabilities"),
-                    ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
-                    ("~/control_reference_in", "control_manager/control_reference"),
-                    ("~/controller_diagnostics_in", "control_manager/controller_diagnostics"),
-                    # publishers
-                    ("~/odom_main_out", "~/odom_main"),
-                    ("~/innovation_out", "~/innovation"),
-                    ("~/uav_state_out", "~/uav_state"),
-                    ("~/diagnostics_out", "~/diagnostics"),
-                    ("~/max_flight_z_agl_out", "~/max_flight_z_agl"),
-                    ("~/height_agl_out", "~/height_agl"),
-                    # services in
-                    ("~/change_estimator_in", "~/change_estimator"),
-                    ("~/reset_estimator_in", "~/reset_estimator"),
-                    ("~/toggle_service_callbacks_in", "~/toggle_service_callbacks"),
-                    # services out
-                    ("~/failsafe_out", "control_manager/failsafe"),
-                ],
-            )
-
-        ],
-
-    ))
+    # #} end of own container
 
     return ld
