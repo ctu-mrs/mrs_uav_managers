@@ -145,7 +145,7 @@ def generate_launch_description():
             ("~/profiler", "profiler"),
             # services in
             ("~/set_constraints_in", "~/set_constraints"),
-            ("~/constraints_override_in", "control_manager/set_constraints"),
+            ("~/constraints_override_in", "~/constraints_override"),
             # services out
             ("~/set_constraints_out", "control_manager/set_constraints"),
         ],
