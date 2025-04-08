@@ -2278,7 +2278,7 @@ void ControlManager::timerStatus() {
 
     geometry_msgs::msg::TransformStamped tf;
 
-    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", rclcpp::Time(0, 0, clock_->get_clock_type()));
+    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", clock_->now());
 
     if (ret) {
 
@@ -2307,7 +2307,7 @@ void ControlManager::timerStatus() {
       for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
+        temp_ref.header.stamp         = clock_->now();
         temp_ref.reference.position.x = border_points_bot_original.at(i).x;
         temp_ref.reference.position.y = border_points_bot_original.at(i).y;
         temp_ref.reference.position.z = border_points_bot_original.at(i).z;
@@ -2329,7 +2329,7 @@ void ControlManager::timerStatus() {
       for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
+        temp_ref.header.stamp         = clock_->now();
         temp_ref.reference.position.x = border_points_top_original.at(i).x;
         temp_ref.reference.position.y = border_points_top_original.at(i).y;
         temp_ref.reference.position.z = border_points_top_original.at(i).z;
@@ -2352,6 +2352,7 @@ void ControlManager::timerStatus() {
       visualization_msgs::msg::Marker safety_area_marker;
 
       safety_area_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_marker.header.stamp    = clock_->now();
       safety_area_marker.type            = visualization_msgs::msg::Marker::LINE_LIST;
       safety_area_marker.color.a         = 0.15;
       safety_area_marker.scale.x         = 0.2;
@@ -2364,6 +2365,7 @@ void ControlManager::timerStatus() {
       visualization_msgs::msg::Marker safety_area_coordinates_marker;
 
       safety_area_coordinates_marker.header.frame_id = _uav_name_ + "/local_origin";
+      safety_area_coordinates_marker.header.stamp    = clock_->now();
       safety_area_coordinates_marker.type            = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
       safety_area_coordinates_marker.color.a         = 1;
       safety_area_coordinates_marker.scale.z         = 1.0;
