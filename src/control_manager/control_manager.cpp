@@ -938,11 +938,11 @@ void ControlManager::timerPreInitialization() {
 
 void ControlManager::initialize(void) {
 
-  joystick_start_press_time_      = rclcpp::Time(0);
-  joystick_failsafe_press_time_   = rclcpp::Time(0);
-  joystick_eland_press_time_      = rclcpp::Time(0);
-  escalating_failsafe_time_       = rclcpp::Time(0);
-  controller_tracker_switch_time_ = rclcpp::Time(0);
+  joystick_start_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
+  joystick_failsafe_press_time_   = rclcpp::Time(0, 0, clock_->get_clock_type());
+  joystick_eland_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
+  escalating_failsafe_time_       = rclcpp::Time(0, 0, clock_->get_clock_type());
+  controller_tracker_switch_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
   RCLCPP_INFO(node_->get_logger(), "initializing");
 
@@ -2278,7 +2278,7 @@ void ControlManager::timerStatus() {
 
     geometry_msgs::msg::TransformStamped tf;
 
-    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", rclcpp::Time(0));
+    auto ret = transformer_->getTransform(_safety_area_horizontal_frame_, "local_origin", rclcpp::Time(0, 0, clock_->get_clock_type()));
 
     if (ret) {
 
@@ -2307,7 +2307,7 @@ void ControlManager::timerStatus() {
       for (size_t i = 0; i < border_points_bot_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = rclcpp::Time(0);
+        temp_ref.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
         temp_ref.reference.position.x = border_points_bot_original.at(i).x;
         temp_ref.reference.position.y = border_points_bot_original.at(i).y;
         temp_ref.reference.position.z = border_points_bot_original.at(i).z;
@@ -2329,7 +2329,7 @@ void ControlManager::timerStatus() {
       for (size_t i = 0; i < border_points_top_original.size(); i++) {
 
         temp_ref.header.frame_id      = _safety_area_horizontal_frame_;
-        temp_ref.header.stamp         = rclcpp::Time(0);
+        temp_ref.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
         temp_ref.reference.position.x = border_points_top_original.at(i).x;
         temp_ref.reference.position.y = border_points_top_original.at(i).y;
         temp_ref.reference.position.z = border_points_top_original.at(i).z;
@@ -3168,9 +3168,9 @@ void ControlManager::timerJoystick() {
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // if start was pressed and held for > 3.0 s
-  if (joystick_start_pressed_ && joystick_start_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_start_press_time_).seconds() > 3.0) {
+  if (joystick_start_pressed_ && joystick_start_press_time_.seconds() != 0 && (clock_->now() - joystick_start_press_time_).seconds() > 3.0) {
 
-    joystick_start_press_time_ = rclcpp::Time(0);
+    joystick_start_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
     RCLCPP_INFO(node_->get_logger(), "transitioning to joystick control: activating '%s' and '%s'", _joystick_tracker_name_.c_str(), _joystick_controller_name_.c_str());
 
@@ -3181,9 +3181,9 @@ void ControlManager::timerJoystick() {
   }
 
   // if RT+LT were pressed and held for > 0.1 s
-  if (joystick_failsafe_pressed_ && joystick_failsafe_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_failsafe_press_time_).seconds() > 0.1) {
+  if (joystick_failsafe_pressed_ && joystick_failsafe_press_time_.seconds() != 0 && (clock_->now() - joystick_failsafe_press_time_).seconds() > 0.1) {
 
-    joystick_failsafe_press_time_ = rclcpp::Time(0);
+    joystick_failsafe_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
     RCLCPP_INFO(node_->get_logger(), "activating failsafe by joystick");
 
@@ -3193,9 +3193,9 @@ void ControlManager::timerJoystick() {
   }
 
   // if joypads were pressed and held for > 0.1 s
-  if (joystick_eland_pressed_ && joystick_eland_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_eland_press_time_).seconds() > 0.1) {
+  if (joystick_eland_pressed_ && joystick_eland_press_time_.seconds() != 0 && (clock_->now() - joystick_eland_press_time_).seconds() > 0.1) {
 
-    joystick_eland_press_time_ = rclcpp::Time(0);
+    joystick_eland_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
     RCLCPP_INFO(node_->get_logger(), "activating eland by joystick");
 
@@ -3205,9 +3205,9 @@ void ControlManager::timerJoystick() {
   }
 
   // if back was pressed and held for > 0.1 s
-  if (joystick_back_pressed_ && joystick_back_press_time_ != rclcpp::Time(0) && (clock_->now() - joystick_back_press_time_).seconds() > 0.1) {
+  if (joystick_back_pressed_ && joystick_back_press_time_.seconds() != 0 && (clock_->now() - joystick_back_press_time_).seconds() > 0.1) {
 
-    joystick_back_press_time_ = rclcpp::Time(0);
+    joystick_back_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
 
     // activate/deactivate the joystick goto functionality
     joystick_goto_enabled_ = !joystick_goto_enabled_;
@@ -3448,7 +3448,7 @@ void ControlManager::timerPirouette() {
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   reference_request.header.frame_id      = "";
-  reference_request.header.stamp         = rclcpp::Time(0);
+  reference_request.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   reference_request.reference.position.x = last_tracker_cmd->position.x;
   reference_request.reference.position.y = last_tracker_cmd->position.y;
   reference_request.reference.position.z = last_tracker_cmd->position.z;
@@ -3982,7 +3982,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
     RCLCPP_INFO(node_->get_logger(), "joystick start button released");
 
     joystick_start_pressed_    = false;
-    joystick_start_press_time_ = rclcpp::Time(0);
+    joystick_start_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
   }
 
   // | ---------------- Joystick goto activation ---------------- |
@@ -4003,7 +4003,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
     RCLCPP_INFO(node_->get_logger(), "joystick back button released");
 
     joystick_back_pressed_    = false;
-    joystick_back_press_time_ = rclcpp::Time(0);
+    joystick_back_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
   }
 
   // | ------------------------ Failsafes ----------------------- |
@@ -4024,7 +4024,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
     RCLCPP_INFO(node_->get_logger(), "joystick Failsafe released");
 
     joystick_failsafe_pressed_    = false;
-    joystick_failsafe_press_time_ = rclcpp::Time(0);
+    joystick_failsafe_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
   }
 
   // if left and right joypads are both pressed down
@@ -4043,7 +4043,7 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
     RCLCPP_INFO(node_->get_logger(), "joystick eland released");
 
     joystick_eland_pressed_    = false;
-    joystick_eland_press_time_ = rclcpp::Time(0);
+    joystick_eland_press_time_ = rclcpp::Time(0, 0, clock_->get_clock_type());
   }
 }
 
@@ -5601,7 +5601,7 @@ bool ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Req
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = request->goal.at(REF_X);
   des_reference.reference.position.y = request->goal.at(REF_Y);
   des_reference.reference.position.z = request->goal.at(REF_Z);
@@ -5632,7 +5632,7 @@ bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "fcu_untilted";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = request->goal.at(REF_X);
   des_reference.reference.position.y = request->goal.at(REF_Y);
   des_reference.reference.position.z = request->goal.at(REF_Z);
@@ -5671,7 +5671,7 @@ bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::V
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = last_tracker_cmd->position.x + request->goal.at(REF_X);
   des_reference.reference.position.y = last_tracker_cmd->position.y + request->goal.at(REF_Y);
   des_reference.reference.position.z = last_tracker_cmd->position.z + request->goal.at(REF_Z);
@@ -5710,7 +5710,7 @@ bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::V
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = request->goal;
@@ -5749,7 +5749,7 @@ bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = last_tracker_cmd->position.z;
@@ -5788,7 +5788,7 @@ bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::
 
   mrs_msgs::msg::ReferenceStamped des_reference;
   des_reference.header.frame_id      = "";
-  des_reference.header.stamp         = rclcpp::Time(0);
+  des_reference.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
   des_reference.reference.position.x = last_tracker_cmd->position.x;
   des_reference.reference.position.y = last_tracker_cmd->position.y;
   des_reference.reference.position.z = last_tracker_cmd->position.z;
@@ -6088,7 +6088,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
 
     debug_trajectory_out.header.frame_id = transformer_->resolveFrame(debug_trajectory_out.header.frame_id);
 
-    if (debug_trajectory_out.header.stamp == rclcpp::Time(0)) {
+    if (debug_trajectory_out.header.stamp == rclcpp::Time(0, 0, clock_->get_clock_type())) {
       debug_trajectory_out.header.stamp = clock_->now();
     }
 
@@ -6119,7 +6119,7 @@ std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>,
       marker.header.frame_id = uav_state.header.frame_id;
     }
 
-    if (marker.header.stamp == rclcpp::Time(0)) {
+    if (marker.header.stamp == rclcpp::Time(0, 0, clock_->get_clock_type())) {
       marker.header.stamp = clock_->now();
     }
 
@@ -8477,7 +8477,7 @@ void ControlManager::updateTrackers(void) {
       last_tracker_cmd_->header.frame_id = uav_state.header.frame_id;
     }
 
-    if (last_tracker_cmd_->header.stamp == rclcpp::Time(0)) {
+    if (rclcpp::Time(last_tracker_cmd_->header.stamp).seconds() == 0) {
       last_tracker_cmd_->header.stamp = clock_->now();
     }
 
