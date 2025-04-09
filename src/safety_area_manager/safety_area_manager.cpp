@@ -2299,8 +2299,8 @@ namespace mrs_uav_managers
         auto fcu_tf = transformer_->getTransform("fcu","world_origin", ros::Time(0));
 
         //Check if the world origin changed, through the estimation Mgr service
-        bool translation_x_change =  fcu_tf.value().transform.translation.x != tf_fcu_to_world_origin_.transform.translation.x; 
-        bool translation_y_change =  fcu_tf.value().transform.translation.y != tf_fcu_to_world_origin_.transform.translation.y; 
+        bool translation_x_change = std::abs(fcu_tf.value().transform.translation.x - tf_fcu_to_world_origin_.transform.translation.x) > 1e-2; //more than mm
+        bool translation_y_change = std::abs(fcu_tf.value().transform.translation.y - tf_fcu_to_world_origin_.transform.translation.y) > 1e-2; //more than mm
         
         if (translation_x_change || translation_y_change) {
 
