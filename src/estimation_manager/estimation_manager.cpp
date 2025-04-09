@@ -309,6 +309,8 @@ private:
   const std::string package_name_ = "mrs_uav_managers";
 
   rclcpp::Node::SharedPtr  node_;
+  rclcpp::Node::SharedPtr  mrs_uav_managers_subnode_;
+  rclcpp::Node::SharedPtr  estimation_manager_subnode_;;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_main_;
@@ -725,6 +727,9 @@ void EstimationManager::timerInitialization() {
   ch_->nodelet_name = nodelet_name_;
   ch_->package_name = package_name_;
 
+  mrs_uav_managers_subnode_ = node_->create_sub_node("mrs_uav_managers");
+  estimation_manager_subnode_ = mrs_uav_managers_subnode_->create_sub_node("estimation_manager");
+
   mrs_lib::ParamLoader param_loader(node_, getName());
 
   param_loader.loadParam("custom_config", _custom_config_);
@@ -973,25 +978,14 @@ void EstimationManager::timerInitialization() {
   /*//{ initialize estimators */
   for (auto estimator : estimator_list_) {
 
-    rclcpp::Node::SharedPtr subnode = node_->create_sub_node(estimator->getName());
+    rclcpp::Node::SharedPtr subnode = estimation_manager_subnode_->create_sub_node(estimator->getName());
 
     // create private handlers
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
     ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + estimator->getName());
-
-    if (_custom_config_ != "") {
-      ph->param_loader->addYamlFile(_custom_config_);
-    }
-
-    if (_platform_config_ != "") {
-      ph->param_loader->addYamlFile(_platform_config_);
-    }
-
-    if (_world_config_ != "") {
-      ph->param_loader->addYamlFile(_world_config_);
-    }
+    ph->param_loader->copyYamls(param_loader);
 
     try {
       RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
@@ -1017,18 +1011,7 @@ void EstimationManager::timerInitialization() {
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
     ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + est_alt_agl_->getName());
-
-    if (_custom_config_ != "") {
-      ph->param_loader->addYamlFile(_custom_config_);
-    }
-
-    if (_platform_config_ != "") {
-      ph->param_loader->addYamlFile(_platform_config_);
-    }
-
-    if (_world_config_ != "") {
-      ph->param_loader->addYamlFile(_world_config_);
-    }
+    ph->param_loader->copyYamls(param_loader);
 
     try {
       RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());

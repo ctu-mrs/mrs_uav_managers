@@ -229,6 +229,8 @@ public:
 
 private:
   rclcpp::Node::SharedPtr  node_;
+  rclcpp::Node::SharedPtr  trackers_subnode_;
+  rclcpp::Node::SharedPtr  controllers_subnode_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -956,70 +958,70 @@ void ControlManager::initialize(void) {
   // |                           params                           |
   // --------------------------------------------------------------
 
-  mrs_lib::ParamLoader param_loader(node_, "ControlManager");
+  auto param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "ControlManager");
 
-  param_loader.loadParam("custom_config", _custom_config_);
-  param_loader.loadParam("platform_config", _platform_config_);
-  param_loader.loadParam("world_config", _world_config_);
-  param_loader.loadParam("network_config", _network_config_);
+  param_loader->loadParam("custom_config", _custom_config_);
+  param_loader->loadParam("platform_config", _platform_config_);
+  param_loader->loadParam("world_config", _world_config_);
+  param_loader->loadParam("network_config", _network_config_);
 
   if (_custom_config_ != "") {
-    param_loader.addYamlFile(_custom_config_);
+    param_loader->addYamlFile(_custom_config_);
   }
 
   if (_platform_config_ != "") {
-    param_loader.addYamlFile(_platform_config_);
+    param_loader->addYamlFile(_platform_config_);
   }
 
   if (_world_config_ != "") {
-    param_loader.addYamlFile(_world_config_);
+    param_loader->addYamlFile(_world_config_);
   }
 
   if (_network_config_ != "") {
-    param_loader.addYamlFile(_network_config_);
+    param_loader->addYamlFile(_network_config_);
   }
 
-  param_loader.addYamlFileFromParam("private_config");
-  param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("private_trackers");
-  param_loader.addYamlFileFromParam("private_controllers");
-  param_loader.addYamlFileFromParam("public_controllers");
+  param_loader->addYamlFileFromParam("private_config");
+  param_loader->addYamlFileFromParam("public_config");
+  param_loader->addYamlFileFromParam("private_trackers");
+  param_loader->addYamlFileFromParam("private_controllers");
+  param_loader->addYamlFileFromParam("public_controllers");
 
   // params passed from the launch file are not prefixed
-  param_loader.loadParam("uav_name", _uav_name_);
-  param_loader.loadParam("body_frame", _body_frame_);
-  param_loader.loadParam("enable_profiler", _profiler_enabled_);
-  param_loader.loadParam("uav_mass", _uav_mass_);
-  param_loader.loadParam("body_disturbance_x", _initial_body_disturbance_x_);
-  param_loader.loadParam("body_disturbance_y", _initial_body_disturbance_y_);
-  param_loader.loadParam("g", common_handlers_->g);
+  param_loader->loadParam("uav_name", _uav_name_);
+  param_loader->loadParam("body_frame", _body_frame_);
+  param_loader->loadParam("enable_profiler", _profiler_enabled_);
+  param_loader->loadParam("uav_mass", _uav_mass_);
+  param_loader->loadParam("body_disturbance_x", _initial_body_disturbance_x_);
+  param_loader->loadParam("body_disturbance_y", _initial_body_disturbance_y_);
+  param_loader->loadParam("g", common_handlers_->g);
 
   // motor params are also not prefixed, since they are common to more nodes
-  param_loader.loadParam("motor_params/a", common_handlers_->throttle_model.A);
-  param_loader.loadParam("motor_params/b", common_handlers_->throttle_model.B);
-  param_loader.loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
+  param_loader->loadParam("motor_params/a", common_handlers_->throttle_model.A);
+  param_loader->loadParam("motor_params/b", common_handlers_->throttle_model.B);
+  param_loader->loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
 
   // | ----------------------- safety area ---------------------- |
 
   bool use_safety_area;
-  param_loader.loadParam("safety_area/enabled", use_safety_area);
+  param_loader->loadParam("safety_area/enabled", use_safety_area);
   use_safety_area_ = use_safety_area;
 
-  param_loader.loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
+  param_loader->loadParam("safety_area/horizontal/frame_name", _safety_area_horizontal_frame_);
 
-  param_loader.loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
-  param_loader.loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
+  param_loader->loadParam("safety_area/vertical/frame_name", _safety_area_vertical_frame_);
+  param_loader->loadParam("safety_area/vertical/max_z", _safety_area_max_z_);
 
   {
     double temp;
-    param_loader.loadParam("safety_area/vertical/min_z", temp);
+    param_loader->loadParam("safety_area/vertical/min_z", temp);
 
     _safety_area_min_z_ = temp;
   }
 
   if (use_safety_area_) {
 
-    Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
+    Eigen::MatrixXd border_points = param_loader->loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
 
     try {
 
@@ -1043,9 +1045,9 @@ void ControlManager::initialize(void) {
     RCLCPP_INFO(node_->get_logger(), "safety area initialized");
   }
 
-  param_loader.setPrefix("mrs_uav_managers/control_manager/");
+  param_loader->setPrefix("mrs_uav_managers/control_manager/");
 
-  param_loader.loadParam("state_input", _state_input_);
+  param_loader->loadParam("state_input", _state_input_);
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     RCLCPP_ERROR(node_->get_logger(), "the state_input parameter has to be in {0, 1}");
@@ -1053,27 +1055,27 @@ void ControlManager::initialize(void) {
     exit(1);
   }
 
-  param_loader.loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
-  param_loader.loadParam("safety/ehover_tracker", _ehover_tracker_name_);
-  param_loader.loadParam("safety/failsafe_controller", _failsafe_controller_name_);
+  param_loader->loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
+  param_loader->loadParam("safety/ehover_tracker", _ehover_tracker_name_);
+  param_loader->loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
-  param_loader.loadParam("safety/eland/controller", _eland_controller_name_);
-  param_loader.loadParam("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
-  param_loader.loadParam("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
-  param_loader.loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
-  param_loader.loadParam("safety/eland/disarm", _eland_disarm_enabled_);
+  param_loader->loadParam("safety/eland/controller", _eland_controller_name_);
+  param_loader->loadParam("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
+  param_loader->loadParam("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
+  param_loader->loadParam("safety/eland/timer_rate", _elanding_timer_rate_);
+  param_loader->loadParam("safety/eland/disarm", _eland_disarm_enabled_);
 
-  param_loader.loadParam("safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
-  param_loader.loadParam("safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
-  param_loader.loadParam("safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
-  param_loader.loadParam("safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
-  param_loader.loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
-  param_loader.loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
-  param_loader.loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
-  param_loader.loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
+  param_loader->loadParam("safety/escalating_failsafe/service/enabled", _service_escalating_failsafe_enabled_);
+  param_loader->loadParam("safety/escalating_failsafe/rc/enabled", _rc_escalating_failsafe_enabled_);
+  param_loader->loadParam("safety/escalating_failsafe/rc/channel_number", _rc_escalating_failsafe_channel_);
+  param_loader->loadParam("safety/escalating_failsafe/rc/threshold", _rc_escalating_failsafe_threshold_);
+  param_loader->loadParam("safety/escalating_failsafe/timeout", _escalating_failsafe_timeout_);
+  param_loader->loadParam("safety/escalating_failsafe/ehover", _escalating_failsafe_ehover_);
+  param_loader->loadParam("safety/escalating_failsafe/eland", _escalating_failsafe_eland_);
+  param_loader->loadParam("safety/escalating_failsafe/failsafe", _escalating_failsafe_failsafe_);
 
-  param_loader.loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
-  param_loader.loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
+  param_loader->loadParam("safety/tilt_limit/eland/enabled", _tilt_limit_eland_enabled_);
+  param_loader->loadParam("safety/tilt_limit/eland/limit", _tilt_limit_eland_);
 
   _tilt_limit_eland_ = M_PI * (_tilt_limit_eland_ / 180.0);
 
@@ -1083,8 +1085,8 @@ void ControlManager::initialize(void) {
     exit(1);
   }
 
-  param_loader.loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
-  param_loader.loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
+  param_loader->loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
+  param_loader->loadParam("safety/tilt_limit/disarm/limit", _tilt_limit_disarm_);
 
   _tilt_limit_disarm_ = M_PI * (_tilt_limit_disarm_ / 180.0);
 
@@ -1094,8 +1096,8 @@ void ControlManager::initialize(void) {
     exit(1);
   }
 
-  param_loader.loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
-  param_loader.loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
+  param_loader->loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
+  param_loader->loadParam("safety/yaw_error_eland/limit", _yaw_error_eland_);
 
   _yaw_error_eland_ = M_PI * (_yaw_error_eland_ / 180.0);
 
@@ -1105,17 +1107,17 @@ void ControlManager::initialize(void) {
     exit(1);
   }
 
-  param_loader.loadParam("status_timer_rate", _status_timer_rate_);
-  param_loader.loadParam("safety/safety_timer_rate", _safety_timer_rate_);
-  param_loader.loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
-  param_loader.loadParam("safety/rc_emergency_handoff/enabled", _rc_emergency_handoff_);
+  param_loader->loadParam("status_timer_rate", _status_timer_rate_);
+  param_loader->loadParam("safety/safety_timer_rate", _safety_timer_rate_);
+  param_loader->loadParam("safety/failsafe_timer_rate", _failsafe_timer_rate_);
+  param_loader->loadParam("safety/rc_emergency_handoff/enabled", _rc_emergency_handoff_);
 
-  param_loader.loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
-  param_loader.loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_check_enabled_);
+  param_loader->loadParam("safety/odometry_max_missing_time", _uav_state_max_missing_time_);
+  param_loader->loadParam("safety/odometry_innovation_eland/enabled", _odometry_innovation_check_enabled_);
 
-  param_loader.loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
-  param_loader.loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
-  param_loader.loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
+  param_loader->loadParam("safety/tilt_error_disarm/enabled", _tilt_error_disarm_enabled_);
+  param_loader->loadParam("safety/tilt_error_disarm/timeout", _tilt_error_disarm_timeout_);
+  param_loader->loadParam("safety/tilt_error_disarm/error_threshold", _tilt_error_disarm_threshold_);
 
   _tilt_error_disarm_threshold_ = M_PI * (_tilt_error_disarm_threshold_ / 180.0);
 
@@ -1127,90 +1129,90 @@ void ControlManager::initialize(void) {
 
   // default constraints
 
-  param_loader.loadParam("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
-  param_loader.loadParam("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
-  param_loader.loadParam("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
-  param_loader.loadParam("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
+  param_loader->loadParam("default_constraints/horizontal/speed", current_constraints_.constraints.horizontal_speed);
+  param_loader->loadParam("default_constraints/horizontal/acceleration", current_constraints_.constraints.horizontal_acceleration);
+  param_loader->loadParam("default_constraints/horizontal/jerk", current_constraints_.constraints.horizontal_jerk);
+  param_loader->loadParam("default_constraints/horizontal/snap", current_constraints_.constraints.horizontal_snap);
 
-  param_loader.loadParam("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
-  param_loader.loadParam("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
-  param_loader.loadParam("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
-  param_loader.loadParam("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
+  param_loader->loadParam("default_constraints/vertical/ascending/speed", current_constraints_.constraints.vertical_ascending_speed);
+  param_loader->loadParam("default_constraints/vertical/ascending/acceleration", current_constraints_.constraints.vertical_ascending_acceleration);
+  param_loader->loadParam("default_constraints/vertical/ascending/jerk", current_constraints_.constraints.vertical_ascending_jerk);
+  param_loader->loadParam("default_constraints/vertical/ascending/snap", current_constraints_.constraints.vertical_ascending_snap);
 
-  param_loader.loadParam("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
-  param_loader.loadParam("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
-  param_loader.loadParam("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
-  param_loader.loadParam("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
+  param_loader->loadParam("default_constraints/vertical/descending/speed", current_constraints_.constraints.vertical_descending_speed);
+  param_loader->loadParam("default_constraints/vertical/descending/acceleration", current_constraints_.constraints.vertical_descending_acceleration);
+  param_loader->loadParam("default_constraints/vertical/descending/jerk", current_constraints_.constraints.vertical_descending_jerk);
+  param_loader->loadParam("default_constraints/vertical/descending/snap", current_constraints_.constraints.vertical_descending_snap);
 
-  param_loader.loadParam("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
-  param_loader.loadParam("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
-  param_loader.loadParam("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
-  param_loader.loadParam("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
+  param_loader->loadParam("default_constraints/heading/speed", current_constraints_.constraints.heading_speed);
+  param_loader->loadParam("default_constraints/heading/acceleration", current_constraints_.constraints.heading_acceleration);
+  param_loader->loadParam("default_constraints/heading/jerk", current_constraints_.constraints.heading_jerk);
+  param_loader->loadParam("default_constraints/heading/snap", current_constraints_.constraints.heading_snap);
 
-  param_loader.loadParam("default_constraints/angular_speed/roll", current_constraints_.constraints.roll_rate);
-  param_loader.loadParam("default_constraints/angular_speed/pitch", current_constraints_.constraints.pitch_rate);
-  param_loader.loadParam("default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
+  param_loader->loadParam("default_constraints/angular_speed/roll", current_constraints_.constraints.roll_rate);
+  param_loader->loadParam("default_constraints/angular_speed/pitch", current_constraints_.constraints.pitch_rate);
+  param_loader->loadParam("default_constraints/angular_speed/yaw", current_constraints_.constraints.yaw_rate);
 
-  param_loader.loadParam("default_constraints/tilt", current_constraints_.constraints.tilt);
+  param_loader->loadParam("default_constraints/tilt", current_constraints_.constraints.tilt);
 
   current_constraints_.constraints.tilt = M_PI * (current_constraints_.constraints.tilt / 180.0);
 
   // joystick
 
-  param_loader.loadParam("joystick/enabled", _joystick_enabled_);
-  param_loader.loadParam("joystick/mode", _joystick_mode_);
-  param_loader.loadParam("joystick/carrot_distance", _joystick_carrot_distance_);
-  param_loader.loadParam("joystick/joystick_timer_rate", _joystick_timer_rate_);
-  param_loader.loadParam("joystick/attitude_control/tracker", _joystick_tracker_name_);
-  param_loader.loadParam("joystick/attitude_control/controller", _joystick_controller_name_);
-  param_loader.loadParam("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
-  param_loader.loadParam("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
+  param_loader->loadParam("joystick/enabled", _joystick_enabled_);
+  param_loader->loadParam("joystick/mode", _joystick_mode_);
+  param_loader->loadParam("joystick/carrot_distance", _joystick_carrot_distance_);
+  param_loader->loadParam("joystick/joystick_timer_rate", _joystick_timer_rate_);
+  param_loader->loadParam("joystick/attitude_control/tracker", _joystick_tracker_name_);
+  param_loader->loadParam("joystick/attitude_control/controller", _joystick_controller_name_);
+  param_loader->loadParam("joystick/attitude_control/fallback/tracker", _joystick_fallback_tracker_name_);
+  param_loader->loadParam("joystick/attitude_control/fallback/controller", _joystick_fallback_controller_name_);
 
-  param_loader.loadParam("joystick/channels/A", _channel_A_);
-  param_loader.loadParam("joystick/channels/B", _channel_B_);
-  param_loader.loadParam("joystick/channels/X", _channel_X_);
-  param_loader.loadParam("joystick/channels/Y", _channel_Y_);
-  param_loader.loadParam("joystick/channels/start", _channel_start_);
-  param_loader.loadParam("joystick/channels/back", _channel_back_);
-  param_loader.loadParam("joystick/channels/LT", _channel_LT_);
-  param_loader.loadParam("joystick/channels/RT", _channel_RT_);
-  param_loader.loadParam("joystick/channels/L_joy", _channel_L_joy_);
-  param_loader.loadParam("joystick/channels/R_joy", _channel_R_joy_);
+  param_loader->loadParam("joystick/channels/A", _channel_A_);
+  param_loader->loadParam("joystick/channels/B", _channel_B_);
+  param_loader->loadParam("joystick/channels/X", _channel_X_);
+  param_loader->loadParam("joystick/channels/Y", _channel_Y_);
+  param_loader->loadParam("joystick/channels/start", _channel_start_);
+  param_loader->loadParam("joystick/channels/back", _channel_back_);
+  param_loader->loadParam("joystick/channels/LT", _channel_LT_);
+  param_loader->loadParam("joystick/channels/RT", _channel_RT_);
+  param_loader->loadParam("joystick/channels/L_joy", _channel_L_joy_);
+  param_loader->loadParam("joystick/channels/R_joy", _channel_R_joy_);
 
   // load channels
-  param_loader.loadParam("joystick/channels/pitch", _channel_pitch_);
-  param_loader.loadParam("joystick/channels/roll", _channel_roll_);
-  param_loader.loadParam("joystick/channels/heading", _channel_heading_);
-  param_loader.loadParam("joystick/channels/throttle", _channel_throttle_);
+  param_loader->loadParam("joystick/channels/pitch", _channel_pitch_);
+  param_loader->loadParam("joystick/channels/roll", _channel_roll_);
+  param_loader->loadParam("joystick/channels/heading", _channel_heading_);
+  param_loader->loadParam("joystick/channels/throttle", _channel_throttle_);
 
   // load channel multipliers
-  param_loader.loadParam("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
-  param_loader.loadParam("joystick/channel_multipliers/roll", _channel_mult_roll_);
-  param_loader.loadParam("joystick/channel_multipliers/heading", _channel_mult_heading_);
-  param_loader.loadParam("joystick/channel_multipliers/throttle", _channel_mult_throttle_);
+  param_loader->loadParam("joystick/channel_multipliers/pitch", _channel_mult_pitch_);
+  param_loader->loadParam("joystick/channel_multipliers/roll", _channel_mult_roll_);
+  param_loader->loadParam("joystick/channel_multipliers/heading", _channel_mult_heading_);
+  param_loader->loadParam("joystick/channel_multipliers/throttle", _channel_mult_throttle_);
 
   bool bumper_enabled;
-  param_loader.loadParam("obstacle_bumper/enabled", bumper_enabled);
+  param_loader->loadParam("obstacle_bumper/enabled", bumper_enabled);
   bumper_enabled_ = bumper_enabled;
 
-  param_loader.loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
-  param_loader.loadParam("obstacle_bumper/switch_controller", _bumper_switch_controller_);
-  param_loader.loadParam("obstacle_bumper/tracker", _bumper_tracker_name_);
-  param_loader.loadParam("obstacle_bumper/controller", _bumper_controller_name_);
-  param_loader.loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
+  param_loader->loadParam("obstacle_bumper/switch_tracker", _bumper_switch_tracker_);
+  param_loader->loadParam("obstacle_bumper/switch_controller", _bumper_switch_controller_);
+  param_loader->loadParam("obstacle_bumper/tracker", _bumper_tracker_name_);
+  param_loader->loadParam("obstacle_bumper/controller", _bumper_controller_name_);
+  param_loader->loadParam("obstacle_bumper/timer_rate", _bumper_timer_rate_);
 
-  param_loader.loadParam("obstacle_bumper/horizontal/min_distance_to_obstacle", _bumper_horizontal_distance_);
-  param_loader.loadParam("obstacle_bumper/horizontal/derived_from_dynamics", _bumper_horizontal_derive_from_dynamics_);
+  param_loader->loadParam("obstacle_bumper/horizontal/min_distance_to_obstacle", _bumper_horizontal_distance_);
+  param_loader->loadParam("obstacle_bumper/horizontal/derived_from_dynamics", _bumper_horizontal_derive_from_dynamics_);
 
-  param_loader.loadParam("obstacle_bumper/vertical/min_distance_to_obstacle", _bumper_vertical_distance_);
-  param_loader.loadParam("obstacle_bumper/vertical/derived_from_dynamics", _bumper_vertical_derive_from_dynamics_);
+  param_loader->loadParam("obstacle_bumper/vertical/min_distance_to_obstacle", _bumper_vertical_distance_);
+  param_loader->loadParam("obstacle_bumper/vertical/derived_from_dynamics", _bumper_vertical_derive_from_dynamics_);
 
-  param_loader.loadParam("obstacle_bumper/horizontal/overshoot", _bumper_horizontal_overshoot_);
-  param_loader.loadParam("obstacle_bumper/vertical/overshoot", _bumper_vertical_overshoot_);
+  param_loader->loadParam("obstacle_bumper/horizontal/overshoot", _bumper_horizontal_overshoot_);
+  param_loader->loadParam("obstacle_bumper/vertical/overshoot", _bumper_vertical_overshoot_);
 
-  param_loader.loadParam("safety/tracker_error_action", _tracker_error_action_);
+  param_loader->loadParam("safety/tracker_error_action", _tracker_error_action_);
 
-  param_loader.loadParam("trajectory_tracking/snap_to_safety_area", _snap_trajectory_to_safety_area_);
+  param_loader->loadParam("trajectory_tracking/snap_to_safety_area", _snap_trajectory_to_safety_area_);
 
   // check the values of tracker error action
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
@@ -1219,21 +1221,21 @@ void ControlManager::initialize(void) {
     exit(1);
   }
 
-  param_loader.loadParam("rc_joystick/enabled", _rc_goto_enabled_);
-  param_loader.loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
-  param_loader.loadParam("rc_joystick/horizontal_speed", _rc_horizontal_speed_);
-  param_loader.loadParam("rc_joystick/vertical_speed", _rc_vertical_speed_);
-  param_loader.loadParam("rc_joystick/heading_rate", _rc_heading_rate_);
+  param_loader->loadParam("rc_joystick/enabled", _rc_goto_enabled_);
+  param_loader->loadParam("rc_joystick/channel_number", _rc_joystick_channel_);
+  param_loader->loadParam("rc_joystick/horizontal_speed", _rc_horizontal_speed_);
+  param_loader->loadParam("rc_joystick/vertical_speed", _rc_vertical_speed_);
+  param_loader->loadParam("rc_joystick/heading_rate", _rc_heading_rate_);
 
-  param_loader.loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
-  param_loader.loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
-  param_loader.loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
-  param_loader.loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
+  param_loader->loadParam("rc_joystick/channels/pitch", _rc_channel_pitch_);
+  param_loader->loadParam("rc_joystick/channels/roll", _rc_channel_roll_);
+  param_loader->loadParam("rc_joystick/channels/heading", _rc_channel_heading_);
+  param_loader->loadParam("rc_joystick/channels/throttle", _rc_channel_throttle_);
 
-  param_loader.loadParam("pirouette/speed", _pirouette_speed_);
-  param_loader.loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
+  param_loader->loadParam("pirouette/speed", _pirouette_speed_);
+  param_loader->loadParam("pirouette/timer_rate", _pirouette_timer_rate_);
 
-  param_loader.loadParam("safety/parachute/enabled", _parachute_enabled_);
+  param_loader->loadParam("safety/parachute/enabled", _parachute_enabled_);
 
   // --------------------------------------------------------------
   // |             initialize the last control output             |
@@ -1249,8 +1251,8 @@ void ControlManager::initialize(void) {
 
   // | ------------------- scope timer logger ------------------- |
 
-  param_loader.loadParam("scope_timer/enabled", scope_timer_enabled_);
-  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  param_loader->loadParam("scope_timer/enabled", scope_timer_enabled_);
+  const std::string scope_timer_log_filename = param_loader->loadParam2("scope_timer/log_filename", std::string(""));
   scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(node_, scope_timer_log_filename, scope_timer_enabled_);
 
   // bind transformer to trackers and controllers for use
@@ -1282,15 +1284,15 @@ void ControlManager::initialize(void) {
 
   std::vector<std::string> custom_trackers;
 
-  param_loader.loadParam("mrs_trackers", _tracker_names_);
-  param_loader.loadParam("trackers", custom_trackers);
+  param_loader->loadParam("mrs_trackers", _tracker_names_);
+  param_loader->loadParam("trackers", custom_trackers);
 
   if (!custom_trackers.empty()) {
     _tracker_names_.insert(_tracker_names_.end(), custom_trackers.begin(), custom_trackers.end());
   }
 
-  param_loader.loadParam("null_tracker", _null_tracker_name_);
-  param_loader.loadParam("landing_takeoff_tracker", _landoff_tracker_name_);
+  param_loader->loadParam("null_tracker", _null_tracker_name_);
+  param_loader->loadParam("landing_takeoff_tracker", _landoff_tracker_name_);
 
   tracker_loader_ = std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::Tracker>>("mrs_uav_managers", "mrs_uav_managers::Tracker");
 
@@ -1303,9 +1305,9 @@ void ControlManager::initialize(void) {
     std::string name_space;
     bool        human_switchable;
 
-    param_loader.loadParam(tracker_name + "/address", address);
-    param_loader.loadParam(tracker_name + "/namespace", name_space);
-    param_loader.loadParam(tracker_name + "/human_switchable", human_switchable, false);
+    param_loader->loadParam(tracker_name + "/address", address);
+    param_loader->loadParam(tracker_name + "/namespace", name_space);
+    param_loader->loadParam(tracker_name + "/human_switchable", human_switchable, false);
 
     TrackerParams new_tracker(address, name_space, human_switchable);
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
@@ -1330,36 +1332,25 @@ void ControlManager::initialize(void) {
 
   RCLCPP_INFO(node_->get_logger(), "trackers were loaded");
 
+  trackers_subnode_ = node_->create_sub_node("mrs_uav_trackers");
+  param_loader->setPrefix("");
+
   for (int i = 0; i < int(tracker_list_.size()); i++) {
 
     std::map<std::string, TrackerParams>::iterator it;
     it = trackers_.find(_tracker_names_.at(i));
 
-    rclcpp::Node::SharedPtr subnode = node_->create_sub_node(it->second.name_space);
+    rclcpp::Node::SharedPtr subnode = trackers_subnode_->create_sub_node(it->second.name_space);
 
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
-    private_handlers->name_space     = it->second.name_space;
-    private_handlers->runtime_name   = _tracker_names_.at(i);
-    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _tracker_names_.at(i));
-
-    if (_custom_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_custom_config_);
-    }
-
-    if (_platform_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_platform_config_);
-    }
-
-    if (_world_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_world_config_);
-    }
-
-    if (_network_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_network_config_);
-    }
+    private_handlers->loadConfigFile        = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
+    private_handlers->name_space            = it->second.name_space;
+    private_handlers->runtime_name          = _tracker_names_.at(i);
+    private_handlers->param_loader          = std::make_unique<mrs_lib::ParamLoader>(subnode, _tracker_names_.at(i));
+    private_handlers->param_loader->copyYamls(*param_loader);
+    private_handlers->parent_param_loader   = param_loader;
 
     bool success = false;
 
@@ -1473,8 +1464,9 @@ void ControlManager::initialize(void) {
 
   std::vector<std::string> custom_controllers;
 
-  param_loader.loadParam("mrs_controllers", _controller_names_);
-  param_loader.loadParam("controllers", custom_controllers);
+  param_loader->setPrefix("mrs_uav_managers/control_manager/");
+  param_loader->loadParam("mrs_controllers", _controller_names_);
+  param_loader->loadParam("controllers", custom_controllers);
 
   if (!custom_controllers.empty()) {
     _controller_names_.insert(_controller_names_.end(), custom_controllers.begin(), custom_controllers.end());
@@ -1492,26 +1484,26 @@ void ControlManager::initialize(void) {
     std::string name_space;
     double      eland_threshold, failsafe_threshold, odometry_innovation_threshold;
     bool        human_switchable;
-    param_loader.loadParam(controller_name + "/address", address);
-    param_loader.loadParam(controller_name + "/namespace", name_space);
-    param_loader.loadParam(controller_name + "/eland_threshold", eland_threshold);
-    param_loader.loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
-    param_loader.loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
-    param_loader.loadParam(controller_name + "/human_switchable", human_switchable, false);
+    param_loader->loadParam(controller_name + "/address", address);
+    param_loader->loadParam(controller_name + "/namespace", name_space);
+    param_loader->loadParam(controller_name + "/eland_threshold", eland_threshold);
+    param_loader->loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
+    param_loader->loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
+    param_loader->loadParam(controller_name + "/human_switchable", human_switchable, false);
 
     // check if the controller can output some of the required outputs
     {
 
       ControlOutputModalities_t outputs;
-      param_loader.loadParam(controller_name + "/outputs/actuators", outputs.actuators, false);
-      param_loader.loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
-      param_loader.loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
-      param_loader.loadParam(controller_name + "/outputs/attitude", outputs.attitude, false);
-      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg_rate", outputs.acceleration_hdg_rate, false);
-      param_loader.loadParam(controller_name + "/outputs/acceleration_hdg", outputs.acceleration_hdg, false);
-      param_loader.loadParam(controller_name + "/outputs/velocity_hdg_rate", outputs.velocity_hdg_rate, false);
-      param_loader.loadParam(controller_name + "/outputs/velocity_hdg", outputs.velocity_hdg, false);
-      param_loader.loadParam(controller_name + "/outputs/position", outputs.position, false);
+      param_loader->loadParam(controller_name + "/outputs/actuators", outputs.actuators, false);
+      param_loader->loadParam(controller_name + "/outputs/control_group", outputs.control_group, false);
+      param_loader->loadParam(controller_name + "/outputs/attitude_rate", outputs.attitude_rate, false);
+      param_loader->loadParam(controller_name + "/outputs/attitude", outputs.attitude, false);
+      param_loader->loadParam(controller_name + "/outputs/acceleration_hdg_rate", outputs.acceleration_hdg_rate, false);
+      param_loader->loadParam(controller_name + "/outputs/acceleration_hdg", outputs.acceleration_hdg, false);
+      param_loader->loadParam(controller_name + "/outputs/velocity_hdg_rate", outputs.velocity_hdg_rate, false);
+      param_loader->loadParam(controller_name + "/outputs/velocity_hdg", outputs.velocity_hdg, false);
+      param_loader->loadParam(controller_name + "/outputs/position", outputs.position, false);
 
       bool meets_actuators             = (_hw_api_inputs_.actuators && outputs.actuators);
       bool meets_control_group         = (_hw_api_inputs_.control_group && outputs.control_group);
@@ -1639,36 +1631,25 @@ void ControlManager::initialize(void) {
 
   RCLCPP_INFO(node_->get_logger(), "controllers were loaded");
 
+  controllers_subnode_ = node_->create_sub_node("mrs_uav_controllers");
+  param_loader->setPrefix("");
+
   for (int i = 0; i < int(controller_list_.size()); i++) {
 
     std::map<std::string, ControllerParams>::iterator it;
     it = controllers_.find(_controller_names_.at(i));
 
-    rclcpp::Node::SharedPtr subnode = node_->create_sub_node(it->second.name_space);
+    rclcpp::Node::SharedPtr subnode = controllers_subnode_->create_sub_node(it->second.name_space);
 
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
-    private_handlers->name_space     = it->second.name_space;
-    private_handlers->runtime_name   = _controller_names_.at(i);
-    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _controller_names_.at(i));
-
-    if (_custom_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_custom_config_);
-    }
-
-    if (_platform_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_platform_config_);
-    }
-
-    if (_world_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_world_config_);
-    }
-
-    if (_network_config_ != "") {
-      private_handlers->param_loader->addYamlFile(_network_config_);
-    }
+    private_handlers->loadConfigFile        = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
+    private_handlers->name_space            = it->second.name_space;
+    private_handlers->runtime_name          = _controller_names_.at(i);
+    private_handlers->param_loader          = std::make_unique<mrs_lib::ParamLoader>(subnode, _controller_names_.at(i));
+    private_handlers->param_loader->copyYamls(*param_loader);
+    private_handlers->parent_param_loader   = param_loader;
 
     bool success = false;
 
@@ -2026,7 +2007,7 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loadedSuccessfully()) {
+  if (!param_loader->loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
     rclcpp::shutdown();
     exit(1);

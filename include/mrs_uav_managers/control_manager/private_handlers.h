@@ -16,6 +16,7 @@ struct PrivateHandlers_t
 {
   loadConfigFile_t                      loadConfigFile;
   std::unique_ptr<mrs_lib::ParamLoader> param_loader;
+  std::shared_ptr<mrs_lib::ParamLoader> parent_param_loader;
   std::string                           name_space;
   std::string                           runtime_name;
 };
