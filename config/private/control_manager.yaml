@@ -16,7 +16,7 @@ mrs_uav_managers:
     # list of names of dynamically loaded controllers
     mrs_controllers : [
       "MpcController",
-      # "Se3Controller",
+      "Se3Controller",
       "FailsafeController",
       "EmergencyController",
       # "MidairActivationController",

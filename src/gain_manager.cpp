@@ -1,9 +1,8 @@
 /* includes //{ */
 
-#include <ros/ros.h>
-#include <nodelet/nodelet.h>
+#include <rclcpp/rclcpp.hpp>
 
-#include <std_msgs/String.h>
+#include <std_msgs/msg/string.hpp>
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/EstimationDiagnostics.h>
@@ -21,6 +20,22 @@
 #include <dynamic_reconfigure/ReconfigureRequest.h>
 #include <dynamic_reconfigure/Reconfigure.h>
 #include <dynamic_reconfigure/Config.h>
+
+//}
+
+/* using //{ */
+
+using namespace std::chrono_literals;
+
+//}
+
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 //}
 

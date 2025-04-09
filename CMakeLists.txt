@@ -54,6 +54,7 @@ set(LIBRARIES
   MrsUavManagers_NullTracker
   MrsUavManagers_UavManager
   MrsUavManagers_ConstraintManager
+  MrsUavManagers_GainManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -144,6 +145,20 @@ ament_target_dependencies(MrsUavManagers_ConstraintManager
 rclcpp_components_register_nodes(MrsUavManagers_ConstraintManager PLUGIN "mrs_uav_managers::constraint_manager::ConstraintManager" EXECUTABLE MrsUavManagers_ConstraintManager)
 
 target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Gain Manager
+
+add_library(MrsUavManagers_GainManager SHARED
+  src/gain_manager.cpp
+  )
+
+ament_target_dependencies(MrsUavManagers_GainManager
+  ${DEPENDENCIES}
+  )
+
+rclcpp_components_register_nodes(MrsUavManagers_GainManager PLUGIN "mrs_uav_managers::gain_manager::GainManager" EXECUTABLE MrsUavManagers_GainManager)
+
+target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 
