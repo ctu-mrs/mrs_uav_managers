@@ -4,10 +4,10 @@
 
 #include <std_msgs/msg/string.hpp>
 
-#include <mrs_msgs/String.h>
-#include <mrs_msgs/EstimationDiagnostics.h>
-#include <mrs_msgs/ControlManagerDiagnostics.h>
-#include <mrs_msgs/GainManagerDiagnostics.h>
+#include <mrs_msgs/msg/estimation_diagnostics.hpp>
+#include <mrs_msgs/msg/control_manager_diagnostics.hpp>
+#include <mrs_msgs/msg/gain_manager_diagnostics.hpp>
+#include <mrs_msgs/srv/string.hpp>
 
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/scope_timer.h>
@@ -15,11 +15,9 @@
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
 
-#include <dynamic_reconfigure/ReconfigureRequest.h>
-#include <dynamic_reconfigure/Reconfigure.h>
-#include <dynamic_reconfigure/Config.h>
+#include <rcl_interfaces/srv/set_parameters.hpp>
 
 //}
 
@@ -60,13 +58,23 @@ typedef struct
 
 } Gains_t;
 
-class GainManager : public nodelet::Nodelet {
+class GainManager : public rclcpp::Node {
 
 public:
-  virtual void onInit();
+  GainManager(rclcpp::NodeOptions options);
 
 private:
-  ros::NodeHandle nh_;
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+
+  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
+  void                         timerPreInitialization();
+
+  void initialize();
 
   std::atomic<bool> is_initialized_ = false;
 
@@ -83,37 +91,38 @@ private:
 
   // | --------------------- service clients -------------------- |
 
-  ros::ServiceClient service_client_set_gains_;
+  mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters> sc_set_gains_;
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>     sh_estimation_diag_;
-  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>     sh_estimation_diag_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
 
   // | --------------------- gain management -------------------- |
 
   bool setGains(std::string gains_name);
 
-  ros::ServiceServer service_server_set_gains_;
-  bool               callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr service_server_set_gains_;
+
+  bool callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   std::string last_estimator_name_;
   std::mutex  mutex_last_estimator_name_;
 
-  void       timerGainManagement(const ros::TimerEvent& event);
-  ros::Timer timer_gain_management_;
-  double     _gain_management_rate_;
+  void                       timerGainManagement();
+  std::shared_ptr<TimerType> timer_gain_management_;
+  double                     _gain_management_rate_;
 
   std::string current_gains_;
   std::mutex  mutex_current_gains_;
 
   // | ------------------ diagnostics publisher ----------------- |
+  //
+  mrs_lib::PublisherHandler<mrs_msgs::msg::GainManagerDiagnostics> ph_diagnostics_;
 
-  mrs_lib::PublisherHandler<mrs_msgs::GainManagerDiagnostics> ph_diagnostics_;
-
-  void       timerDiagnostics(const ros::TimerEvent& event);
-  ros::Timer timer_diagnostics_;
-  double     _diagnostics_rate_;
+  void                       timerDiagnostics();
+  std::shared_ptr<TimerType> timer_diagnostics_;
+  double                     _diagnostics_rate_;
 
   // | ------------------------ profiler ------------------------ |
 
@@ -132,19 +141,42 @@ private:
 
 //}
 
-/* //{ onInit() */
+/* GainManager::GainManager() //{ */
 
-void GainManager::onInit() {
+GainManager::GainManager(rclcpp::NodeOptions options) : Node("control_manager", options) {
 
-  ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&GainManager::timerPreInitialization, this));
+}
 
-  ros::Time::waitForValid();
+//}
 
-  ROS_INFO("[GainManager]: initializing");
+/* timerPreInitialization() //{ */
+
+void GainManager::timerPreInitialization() {
+
+  node_  = this->shared_from_this();
+  clock_ = node_->get_clock();
+
+  cbkgrp_subs_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  initialize();
+
+  timer_preinitialization_->cancel();
+}
+
+//}
+
+/* //{ initialize() */
+
+void GainManager::initialize() {
+
+  RCLCPP_INFO(node_->get_logger(), "[GainManager]: initializing");
 
   // | ------------------------- params ------------------------- |
 
-  mrs_lib::ParamLoader param_loader(nh_, "GainManager");
+  mrs_lib::ParamLoader param_loader(node_, "GainManager");
 
   std::string custom_config_path;
   std::string platform_config_path;
@@ -180,14 +212,14 @@ void GainManager::onInit() {
 
   param_loader.loadParam(yaml_prefix + "scope_timer/enabled", scope_timer_enabled_);
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
-  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(node_, scope_timer_log_filename, scope_timer_enabled_);
 
   std::vector<std::string>::iterator it;
 
   // loading gain_names
   for (it = _gain_names_.begin(); it != _gain_names_.end(); ++it) {
 
-    ROS_INFO_STREAM("[GainManager]: loading gains '" << *it << "'");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "[GainManager]: loading gains '" << *it << "'");
 
     Gains_t new_gains;
 
@@ -221,8 +253,9 @@ void GainManager::onInit() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _gain_names_)) {
-        ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
-        ros::shutdown();
+        RCLCPP_ERROR(node_->get_logger(), "[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
+        rclcpp::shutdown();
+        exit(1);
       }
     }
 
@@ -236,63 +269,79 @@ void GainManager::onInit() {
     param_loader.loadParam(yaml_prefix + "default_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
-      ROS_ERROR("[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
+      rclcpp::shutdown();
+      exit(1);
     }
 
     _map_type_default_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  ROS_INFO("[GainManager]: done loading dynamical params");
+  RCLCPP_INFO(node_->get_logger(), "[GainManager]: done loading dynamical params");
 
   current_gains_       = "";
   last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
-  service_server_set_gains_ = nh_.advertiseService("set_gains_in", &GainManager::callbackSetGains, this);
+  service_server_set_gains_ = node_->create_service<mrs_msgs::srv::String>("~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2));
 
-  service_client_set_gains_ = nh_.serviceClient<dynamic_reconfigure::Reconfigure>("set_gains_out");
+  sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out");
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "GainManager";
+  mrs_lib::SubscriberHandlerOptions shopts;
+
+  shopts.node               = node_;
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_estimation_diag_      = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
-  sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  sh_estimation_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>(shopts, "~/estimation_diagnostics_in");
+
+  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::GainManagerDiagnostics>(nh_, "diagnostics_out", 10);
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::GainManagerDiagnostics>(node_, "~/diagnostics_out");
 
   // | ------------------------- timers ------------------------- |
+  //
+  mrs_lib::TimerHandlerOptions timer_opts_start;
 
-  timer_gain_management_ = nh_.createTimer(ros::Rate(_gain_management_rate_), &GainManager::timerGainManagement, this);
-  timer_diagnostics_     = nh_.createTimer(ros::Rate(_diagnostics_rate_), &GainManager::timerDiagnostics, this);
+  timer_opts_start.node      = node_;
+  timer_opts_start.autostart = true;
+
+
+  {
+    std::function<void()> callback_fcn = std::bind(&GainManager::timerGainManagement, this);
+
+    timer_gain_management_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_gain_management_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&GainManager::timerDiagnostics, this);
+
+    timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
+  }
 
   // | ------------------------ profiler ------------------------ |
 
-  profiler_ = mrs_lib::Profiler(nh_, "GainManager", _profiler_enabled_);
+  profiler_ = mrs_lib::Profiler(node_, "GainManager", _profiler_enabled_);
 
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[GainManager]: could not load all parameters!");
-    ros::shutdown();
+    RCLCPP_ERROR(node_->get_logger(), "[GainManager]: could not load all parameters!");
+    rclcpp::shutdown();
+    exit(1);
   }
 
   is_initialized_ = true;
 
-  ROS_INFO("[GainManager]: initialized");
+  RCLCPP_INFO(node_->get_logger(), "[GainManager]: initialized");
 
-  ROS_DEBUG("[GainManager]: debug output is enabled");
+  RCLCPP_DEBUG(node_->get_logger(), "[GainManager]: debug output is enabled");
 }
 
 //}
@@ -309,90 +358,184 @@ bool GainManager::setGains(std::string gains_name) {
   it = _gains_.find(gains_name);
 
   if (it == _gains_.end()) {
-    ROS_WARN("[GainManager]: can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
+    RCLCPP_WARN(node_->get_logger(), "[GainManager]: can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
     return false;
   }
 
-  dynamic_reconfigure::Config          conf;
-  dynamic_reconfigure::DoubleParameter param;
+  auto request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
 
-  param.name  = "kpxy";
-  param.value = it->second.kpxy;
-  conf.doubles.push_back(param);
+  {
+    auto param = rcl_interfaces::msg::Parameter();
 
-  param.name  = "kvxy";
-  param.value = it->second.kvxy;
-  conf.doubles.push_back(param);
+    param.name = "se3_controller/horizontal.kpxy";
 
-  param.name  = "kaxy";
-  param.value = it->second.kaxy;
-  conf.doubles.push_back(param);
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kpxy;
 
-  param.name  = "kq_roll_pitch";
-  param.value = it->second.kqrp;
-  conf.doubles.push_back(param);
+    request->parameters.push_back(param);
+  }
 
-  param.name  = "kibxy";
-  param.value = it->second.kibxy;
-  conf.doubles.push_back(param);
+  {
+    auto param = rcl_interfaces::msg::Parameter();
 
-  param.name  = "kiwxy";
-  param.value = it->second.kiwxy;
-  conf.doubles.push_back(param);
+    param.name = "se3_controller/horizontal.kvxy";
 
-  param.name  = "kibxy_lim";
-  param.value = it->second.kibxy_lim;
-  conf.doubles.push_back(param);
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kpxy;
 
-  param.name  = "kiwxy_lim";
-  param.value = it->second.kiwxy_lim;
-  conf.doubles.push_back(param);
+    request->parameters.push_back(param);
+  }
 
-  param.name  = "kpz";
-  param.value = it->second.kpz;
-  conf.doubles.push_back(param);
+  {
+    auto param = rcl_interfaces::msg::Parameter();
 
-  param.name  = "kvz";
-  param.value = it->second.kvz;
-  conf.doubles.push_back(param);
+    param.name = "se3_controller/horizontal.kaxy";
 
-  param.name  = "kaz";
-  param.value = it->second.kaz;
-  conf.doubles.push_back(param);
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kaxy;
 
-  param.name  = "kq_yaw";
-  param.value = it->second.kqy;
-  conf.doubles.push_back(param);
+    request->parameters.push_back(param);
+  }
 
-  param.name  = "km";
-  param.value = it->second.km;
-  conf.doubles.push_back(param);
+  {
+    auto param = rcl_interfaces::msg::Parameter();
 
-  param.name  = "km_lim";
-  param.value = it->second.km_lim;
-  conf.doubles.push_back(param);
+    param.name = "se3_controller/attitude.kq_roll_pitch";
 
-  dynamic_reconfigure::ReconfigureRequest  srv_req;
-  dynamic_reconfigure::ReconfigureResponse srv_resp;
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kqrp;
 
-  srv_req.config = conf;
+    request->parameters.push_back(param);
+  }
 
-  dynamic_reconfigure::Reconfigure reconf;
-  reconf.request = srv_req;
+  {
+    auto param = rcl_interfaces::msg::Parameter();
 
-  ROS_INFO_THROTTLE(1.0, "[GainManager]: setting up gains for '%s'", gains_name.c_str());
+    param.name = "se3_controller/horizontal.kibxy";
 
-  bool res = service_client_set_gains_.call(reconf);
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kibxy;
 
-  if (!res) {
+    request->parameters.push_back(param);
+  }
 
-    ROS_WARN_THROTTLE(1.0, "[GainManager]: the service for setting gains has failed!");
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/horizontal.kiwxy";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kiwxy;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/horizontal.kibxy_lim";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kibxy_lim;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/horizontal.kiwxy_lim";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kiwxy_lim;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/vertical.kpz";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kpz;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/vertical.kvz";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kvz;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/vertical.kaz";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kaz;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/attitude.kq_yaw";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.kqy;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/mass.km";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.km;
+
+    request->parameters.push_back(param);
+  }
+
+  {
+    auto param = rcl_interfaces::msg::Parameter();
+
+    param.name = "se3_controller/mass.km_lim";
+
+    param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    param.value.double_value = it->second.km_lim;
+
+    request->parameters.push_back(param);
+  }
+
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: setting up gains for '%s'", gains_name.c_str());
+
+  auto response = sc_set_gains_.callSync(request);
+
+  if (!response) {
+
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the service for setting gains has failed!");
     return false;
 
   } else {
 
-    mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
+    for (auto res : response.value()->results) {
+      if (!res.successful) {
+        RCLCPP_ERROR(get_logger(), "could not set param: %s", res.reason.c_str());
+      }
+    }
 
+    mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
     return true;
   }
 }
@@ -407,7 +550,7 @@ bool GainManager::setGains(std::string gains_name) {
 
 /* //{ callbackSetGains() */
 
-bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res) {
+bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -419,56 +562,56 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
 
     ss << "missing estimation diagnostics";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
-  if (!stringInVector(req.value, _gain_names_)) {
+  if (!stringInVector(request->value, _gain_names_)) {
 
-    ss << "the gains '" << req.value.c_str() << "' do not exist (in the GainManager's config)";
+    ss << "the gains '" << request->value.c_str() << "' do not exist (in the GainManager's config)";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
-  if (!stringInVector(req.value, _map_type_allowed_gains_.at(estimation_diagnostics->current_state_estimator))) {
+  if (!stringInVector(request->value, _map_type_allowed_gains_.at(estimation_diagnostics->current_state_estimator))) {
 
-    ss << "the gains '" << req.value.c_str() << "' are not allowed given the current state estimator";
+    ss << "the gains '" << request->value.c_str() << "' are not allowed given the current state estimator";
 
-    ROS_WARN_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
   }
 
   // try to set the gains
-  if (!setGains(req.value)) {
+  if (!setGains(request->value)) {
 
     ss << "the Se3Controller could not set the gains";
 
-    ROS_ERROR_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = false;
+    response->message = ss.str();
+    response->success = false;
     return true;
 
   } else {
 
-    ss << "the gains '" << req.value.c_str() << "' are set";
+    ss << "the gains '" << request->value.c_str() << "' are set";
 
-    ROS_INFO_STREAM_THROTTLE(1.0, "[GainManager]: " << ss.str());
+    RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
 
-    res.message = ss.str();
-    res.success = true;
+    response->message = ss.str();
+    response->success = true;
     return true;
   }
 }
@@ -481,14 +624,14 @@ bool GainManager::callbackSetGains(mrs_msgs::String::Request& req, mrs_msgs::Str
 
 /* timerGainManagement() //{ */
 
-void GainManager::timerGainManagement(const ros::TimerEvent& event) {
+void GainManager::timerGainManagement() {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("gainManagementTimer", _gain_management_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::gainManagementTimer", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("gainManagementTimer");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "GainManager::gainManagementTimer", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
     return;
@@ -508,16 +651,14 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
   // | --- automatically set _gains_ when currrent state estimator changes -- |
   if (estimation_diagnostics->current_state_estimator != last_estimator_name) {
 
-    ROS_INFO_THROTTLE(1.0, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
-                      estimation_diagnostics->current_state_estimator.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_default_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_default_gains_.end()) {
 
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
-                        estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
 
@@ -529,18 +670,17 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
         // else, try to set the default gains
       } else {
 
-        ROS_WARN_THROTTLE(1.0, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
-                          estimation_diagnostics->current_state_estimator.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
         if (setGains(it->second)) {
 
           last_estimator_name = estimation_diagnostics->current_state_estimator;
 
-          ROS_INFO_THROTTLE(1.0, "[GainManager]: gains set to default: '%s'", it->second.c_str());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: gains set to default: '%s'", it->second.c_str());
 
         } else {
 
-          ROS_WARN_THROTTLE(1.0, "[GainManager]: could not set gains!");
+          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: could not set gains!");
         }
       }
     }
@@ -553,36 +693,36 @@ void GainManager::timerGainManagement(const ros::TimerEvent& event) {
 
 /* timerDiagnostics() //{ */
 
-void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
+void GainManager::timerDiagnostics() {
 
   if (!is_initialized_) {
     return;
   }
 
-  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics", _diagnostics_rate_, 0.01, event);
-  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do gain management, missing estimator diagnostics!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[GainManager]: can not do gain management, missing estimator diagnostics!");
     return;
   }
 
   if (!sh_control_manager_diag_.hasMsg()) {
-    ROS_WARN_THROTTLE(10.0, "[GainManager]: can not do gain management, missing control manager diagnostics!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[GainManager]: can not do gain management, missing control manager diagnostics!");
     return;
   }
 
   auto current_gains = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
-  if (current_gains == "") { // this could happend just before timerGainManagement() finishes
+  if (current_gains == "") {  // this could happend just before timerGainManagement() finishes
     return;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
-  mrs_msgs::GainManagerDiagnostics diagnostics;
+  mrs_msgs::msg::GainManagerDiagnostics diagnostics;
 
-  diagnostics.stamp        = ros::Time::now();
+  diagnostics.stamp        = clock_->now();
   diagnostics.current_name = current_gains;
   diagnostics.loaded       = _gain_names_;
 
@@ -592,8 +732,7 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
     it = _map_type_allowed_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_gains_.end()) {
-      ROS_WARN_THROTTLE(1.0, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!",
-                        estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }
@@ -605,7 +744,7 @@ void GainManager::timerDiagnostics(const ros::TimerEvent& event) {
     it = _gains_.find(current_gains);
 
     if (it == _gains_.end()) {
-      ROS_ERROR("[GainManager]: current gains '%s' not found in the gain list!", current_gains.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "[GainManager]: current gains '%s' not found in the gain list!", current_gains.c_str());
       return;
     }
 
@@ -657,5 +796,5 @@ bool GainManager::stringInVector(const std::string& value, const std::vector<std
 
 }  // namespace mrs_uav_managers
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::gain_manager::GainManager, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::gain_manager::GainManager)
