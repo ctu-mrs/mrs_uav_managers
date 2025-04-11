@@ -163,7 +163,7 @@ void ConstraintManager::timerPreInitialization() {
 
 //}
 
-/* //{ onInit() */
+/* //{ initialize() */
 
 void ConstraintManager::initialize() {
 
