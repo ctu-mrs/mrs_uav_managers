@@ -367,7 +367,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kpxy";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kpxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kpxy;
@@ -378,7 +378,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kvxy";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kvxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kpxy;
@@ -389,7 +389,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kaxy";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kaxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kaxy;
@@ -400,7 +400,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/attitude.kq_roll_pitch";
+    param.name = "mrs_uav_controllers/se3_controller/attitude.kq_roll_pitch";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kqrp;
@@ -411,7 +411,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kibxy";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kibxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kibxy;
@@ -422,7 +422,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kiwxy";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kiwxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kiwxy;
@@ -433,7 +433,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kibxy_lim";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kibxy_lim";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kibxy_lim;
@@ -444,7 +444,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/horizontal.kiwxy_lim";
+    param.name = "mrs_uav_controllers/se3_controller/horizontal.kiwxy_lim";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kiwxy_lim;
@@ -455,7 +455,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/vertical.kpz";
+    param.name = "mrs_uav_controllers/se3_controller/vertical.kpz";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kpz;
@@ -466,7 +466,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/vertical.kvz";
+    param.name = "mrs_uav_controllers/se3_controller/vertical.kvz";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kvz;
@@ -477,7 +477,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/vertical.kaz";
+    param.name = "mrs_uav_controllers/se3_controller/vertical.kaz";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kaz;
@@ -488,7 +488,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/attitude.kq_yaw";
+    param.name = "mrs_uav_controllers/se3_controller/attitude.kq_yaw";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.kqy;
@@ -499,7 +499,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/mass.km";
+    param.name = "mrs_uav_controllers/se3_controller/mass.km";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.km;
@@ -510,7 +510,7 @@ bool GainManager::setGains(std::string gains_name) {
   {
     auto param = rcl_interfaces::msg::Parameter();
 
-    param.name = "se3_controller/mass.km_lim";
+    param.name = "mrs_uav_controllers/se3_controller/mass.km_lim";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
     param.value.double_value = it->second.km_lim;

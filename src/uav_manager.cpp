@@ -2502,7 +2502,7 @@ void UavManager::ungripSrv(void) {
 
 bool UavManager::toggleControlOutput(const bool& input) {
 
-  RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: toggling control output %s", input ? "ON" : "OFF");
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: toggling control output %s", input ? "ON" : "OFF");
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
 
@@ -2513,14 +2513,14 @@ bool UavManager::toggleControlOutput(const bool& input) {
   if (response) {
 
     if (!response.value()->success) {
-      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output returned: %s.", response.value()->message.c_str());
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output returned: %s.", response.value()->message.c_str());
       return false;
     } else {
       return true;
     }
 
   } else {
-    RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output failed!");
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output failed!");
     return false;
   }
 }

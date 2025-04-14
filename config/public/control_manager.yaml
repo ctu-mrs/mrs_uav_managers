@@ -110,8 +110,7 @@ mrs_uav_managers:
       tracker: "MpcTracker"
 
       switch_controller: true
-      # controller: "Se3Controller" # TODO return
-      controller: "MpcController"
+      controller: "Se3Controller"
 
       horizontal:
 
