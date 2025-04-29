@@ -1,5 +1,7 @@
 #!/bin/bash
 
+MY_PATH=`pwd`
+
 while [ ! -e "build/COLCON_IGNORE" ]; do
   cd ..
   if [[ `pwd` == "/" ]]; then
@@ -11,6 +13,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --executor sequential
+colcon test --paths $MY_PATH/.. --event-handlers console_direct+
 
 colcon test-result --all --verbose
