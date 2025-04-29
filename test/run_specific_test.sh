@@ -11,6 +11,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --executor sequential
+colcon test --packages-select mrs_uav_managers --ctest-args -R 'land_home'
 
 colcon test-result --all --verbose

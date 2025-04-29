@@ -1,28 +1,22 @@
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp/time.hpp>
+#include <gtest/gtest.h>
 
 #include <mrs_uav_testing/test_generic.h>
-
-using namespace std::chrono_literals;
 
 class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
-  Tester() : mrs_uav_testing::TestGeneric() {
-  }
-
-  bool test(void);
+  bool test();
 };
 
-bool Tester::test(void) {
+bool Tester::test() {
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
-    auto [uhopt, message] = getUAVHandler("uav1");
+    auto [uhopt, message] = getUAVHandler(_uav_name_);
 
     if (!uhopt) {
-      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler: '%s'", message.c_str());
+      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
       return false;
     }
 
@@ -33,7 +27,7 @@ bool Tester::test(void) {
 
   while (true) {
 
-    if (!rclcpp::ok()) {
+    if (!ros::ok()) {
       return false;
     }
 
@@ -53,7 +47,7 @@ bool Tester::test(void) {
     auto [success, message] = uh->takeoff();
 
     if (!success) {
-      RCLCPP_ERROR(node_->get_logger(), "takeoff failed with message: '%s'", message.c_str());
+      ROS_ERROR("[%s]: takeoff failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
     }
   }
@@ -66,7 +60,7 @@ bool Tester::test(void) {
     auto [success, message] = uh->gotoRel(8, 1, 2, 1.2);
 
     if (!success) {
-      RCLCPP_ERROR(node_->get_logger(), "goto failed with message: '%s'", message.c_str());
+      ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
     }
   }
@@ -77,7 +71,7 @@ bool Tester::test(void) {
     auto [success, message] = uh->landHome();
 
     if (!success) {
-      RCLCPP_ERROR(node_->get_logger(), "land home failed with message: '%s'", message.c_str());
+      ROS_ERROR("[%s]: land home failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
       return false;
     }
   }
@@ -87,22 +81,30 @@ bool Tester::test(void) {
   if (uh->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_pos.z, takeoff_hdg, 0.5)) {
     return true;
   } else {
-    RCLCPP_ERROR(node_->get_logger(), "land home did end in wrong place");
+    ROS_ERROR("[%s]: land home did end in wrong place", ros::this_node::getName().c_str());
     return false;
   }
 }
 
-int main(int argc, char* argv[]) {
 
-  rclcpp::init(argc, argv);
-
-  bool test_result = true;
+TEST(TESTSuite, test) {
 
   Tester tester;
 
-  test_result &= tester.test();
+  bool result = tester.test();
 
-  tester.reportTestResult(test_result);
+  if (result) {
+    GTEST_SUCCEED();
+  } else {
+    GTEST_FAIL();
+  }
+}
 
-  tester.join();
+int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
+
+  ros::init(argc, argv, "test");
+
+  testing::InitGoogleTest(&argc, argv);
+
+  return RUN_ALL_TESTS();
 }

@@ -35,6 +35,7 @@
   <depend>mrs_lib</depend>
   <depend>mrs_msgs</depend>
   <depend>mrs_uav_hw_api</depend>
+  <depend>mrs_uav_testing</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

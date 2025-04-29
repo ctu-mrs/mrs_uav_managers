@@ -1,16 +1,19 @@
 get_filename_component(TEST_NAME "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
 
-catkin_add_executable_with_gtest(test_${TEST_NAME}
+add_executable(test_${TEST_NAME}
   test.cpp
   )
 
-target_link_libraries(test_${TEST_NAME}
-  ${catkin_LIBRARIES}
+ament_target_dependencies(test_${TEST_NAME}
+  rclcpp
+  mrs_lib
+  mrs_msgs
+  mrs_uav_testing
   )
 
-add_dependencies(test_${TEST_NAME}
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
+install(TARGETS
+  test_${TEST_NAME}
+  DESTINATION lib/${PROJECT_NAME}
   )
 
-add_rostest(${TEST_NAME}.test)
+add_ros_isolated_launch_test(test.py)
