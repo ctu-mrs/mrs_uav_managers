@@ -24,6 +24,9 @@ def generate_test_description():
     uav_name="uav1"
     platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/"+uav_type+".yaml"
 
+    launch_file_path = os.path.abspath(__file__)
+    launch_dir = os.path.dirname(launch_file_path)
+
     ld.add_action(
         GroupAction([
             IncludeLaunchDescription(
@@ -55,7 +58,7 @@ def generate_test_description():
                         ])
                     ]),
                     launch_arguments={
-                        'custom_config': "./config/mrs_simulator.yaml",
+                        'custom_config': launch_dir+"/config/mrs_simulator.yaml",
                     }.items()
                 )
             ]
