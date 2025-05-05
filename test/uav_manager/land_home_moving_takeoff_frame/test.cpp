@@ -1,35 +1,36 @@
-#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
 
 #include <mrs_uav_testing/test_generic.h>
 
-#include <mrs_msgs/Float64Srv.h>
+#include <mrs_msgs/srv/float64_srv.hpp>
+
+using namespace std::chrono_literals;
 
 class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
-  bool test();
+  Tester() : mrs_uav_testing::TestGeneric() {
 
-  Tester();
+    sch_set_ground_z_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::Float64Srv>(node_, "/multirotor_simulator/uav1/set_ground_z");
+  }
+
+  bool test(void);
 
   bool asyncSetGroundZ();
 
-  mrs_lib::ServiceClientHandler<mrs_msgs::Float64Srv> sch_set_ground_z_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::srv::Float64Srv> sch_set_ground_z_;
 };
 
-Tester::Tester() {
-
-  sch_set_ground_z_ = mrs_lib::ServiceClientHandler<mrs_msgs::Float64Srv>(nh_, "/multirotor_simulator/uav1/set_ground_z");
-}
-
-bool Tester::test() {
+bool Tester::test(void) {
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
-    auto [uhopt, message] = getUAVHandler(_uav_name_);
+    auto [uhopt, message] = getUAVHandler("uav1");
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", "uav1", message.c_str());
       return false;
     }
 
@@ -40,7 +41,7 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -60,7 +61,7 @@ bool Tester::test() {
     auto [success, message] = uh->takeoff();
 
     if (!success) {
-      ROS_ERROR("[%s]: takeoff failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "takeoff failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -73,7 +74,7 @@ bool Tester::test() {
     auto [success, message] = uh->gotoRel(10, 0, 0, 0);
 
     if (!success) {
-      ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "goto failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -86,7 +87,7 @@ bool Tester::test() {
     auto [success, message] = uh->switchEstimator("gps_baro");
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to switch the estimator gps_baro, message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to switch the estimator gps_baro, message: '%s'", message.c_str());
       return false;
     }
   }
@@ -103,22 +104,24 @@ bool Tester::test() {
     auto [success, message] = uh->landHome();
 
     if (!success) {
-      ROS_ERROR("[%s]: land home failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "land home failed with message: '%s'", message.c_str());
       return false;
     }
   }
 
   if (!future_res.valid() || !future_res.get()) {
-    ROS_ERROR("[%s]: was not able to set ground z", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "was not able to set ground z");
     return false;
   }
 
   // | ---------------- check the final position ---------------- |
 
+  RCLCPP_INFO(node_->get_logger(), "pees");
+
   if (uh->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_hdg, 0.5)) {
     return true;
   } else {
-    ROS_ERROR("[%s]: land home did end in wrong place", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "land home did end in wrong place");
     return false;
   }
 }
@@ -127,37 +130,31 @@ bool Tester::asyncSetGroundZ() {
 
   this->sleep(1.5);
 
-  mrs_msgs::Float64Srv srv;
-  srv.request.value = -1.0;
+  std::shared_ptr<mrs_msgs::srv::Float64Srv::Request> request = std::make_shared<mrs_msgs::srv::Float64Srv::Request>();
 
-  bool service_call = sch_set_ground_z_.call(srv);
+  request->value = -1.0;
 
-  if (!service_call || !srv.response.success) {
-    ROS_ERROR("[%s]: failed to call the service for setting ground z", ros::this_node::getName().c_str());
+  auto response = sch_set_ground_z_.callSync(request);
+
+  if (!response || !response.value()->success) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to call the service for setting ground z");
     return false;
   } else {
     return true;
   }
 }
 
-TEST(TESTSuite, test) {
+int main(int argc, char* argv[]) {
+
+  rclcpp::init(argc, argv);
+
+  bool test_result = true;
 
   Tester tester;
 
-  bool result = tester.test();
+  test_result &= tester.test();
 
-  if (result) {
-    GTEST_SUCCEED();
-  } else {
-    GTEST_FAIL();
-  }
-}
+  tester.reportTestResult(test_result);
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
-
-  ros::init(argc, argv, "test");
-
-  testing::InitGoogleTest(&argc, argv);
-
-  return RUN_ALL_TESTS();
+  tester.join();
 }

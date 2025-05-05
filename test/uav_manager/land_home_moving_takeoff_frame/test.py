@@ -2,13 +2,14 @@ import time
 import unittest
 import os
 import sys
+import rclpy
 
 import launch
 import launch_ros
 import launch_testing.actions
 import launch_testing.asserts
+
 from launch.actions import IncludeLaunchDescription, GroupAction, SetEnvironmentVariable
-import rclpy
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution, TextSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -54,6 +55,8 @@ def generate_test_description():
                         'run_automatic_start': "true",
                         'uav_name': uav_name,
                         'platform_config': platform_config,
+                        'custom_config': launch_dir+"/config/custom_config.yaml",
+                        'automatic_start_config': launch_dir+"/config/automatic_start.yaml",
                     }.items()
                 )
             ]
