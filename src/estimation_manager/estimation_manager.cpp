@@ -351,6 +351,8 @@ private:
   rclcpp::TimerBase::SharedPtr timer_initialization_;
   void                         timerInitialization();
 
+  void shutdown();
+
   rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_change_estimator_;
   bool                                              callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
   int                                               estimator_switch_count_ = 0;
@@ -715,6 +717,8 @@ void EstimationManager::timerInitialization() {
 
   node_  = this->shared_from_this();
   clock_ = node_->get_clock();
+
+  rclcpp::on_shutdown([this]() { this->shutdown(); });
 
   cbkgrp_main_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -1103,6 +1107,23 @@ void EstimationManager::timerInitialization() {
   timer_initialization_->cancel();
 }
 /*//}*/
+
+/* shutdown() //{ */
+
+void EstimationManager::shutdown() {
+
+  RCLCPP_INFO(get_logger(), "shutdown(): called");
+
+  for (int i = 0; i < int(estimator_list_.size()); i++) {
+
+    estimator_list_.at(i).reset();
+  }
+
+  est_alt_agl_.reset();
+
+}
+
+//}
 
 // | -------------------- service callbacks ------------------- |
 

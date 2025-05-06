@@ -158,7 +158,7 @@ class PublisherHandlerTest(unittest.TestCase):
         finally:
             self.node.destroy_subscription(sub)
 
-# Post-shutdown tests
+# # Post-shutdown tests
 # @launch_testing.post_shutdown_test()
 # class PublisherHandlerTestShutdown(unittest.TestCase):
 #     def test_exit_codes(self, proc_info):

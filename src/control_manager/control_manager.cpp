@@ -283,6 +283,7 @@ private:
 
   void preinitialize(void);
   void initialize(void);
+  void shutdown();
 
   // | ------------ tracker and controller switching ------------ |
 
@@ -940,6 +941,8 @@ void ControlManager::timerPreInitialization() {
 
 void ControlManager::initialize(void) {
 
+  rclcpp::on_shutdown([this]() { this->shutdown(); });
+
   joystick_start_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
   joystick_failsafe_press_time_   = rclcpp::Time(0, 0, clock_->get_clock_type());
   joystick_eland_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
@@ -1345,12 +1348,12 @@ void ControlManager::initialize(void) {
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile        = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
-    private_handlers->name_space            = it->second.name_space;
-    private_handlers->runtime_name          = _tracker_names_.at(i);
-    private_handlers->param_loader          = std::make_unique<mrs_lib::ParamLoader>(subnode, _tracker_names_.at(i));
+    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
+    private_handlers->name_space     = it->second.name_space;
+    private_handlers->runtime_name   = _tracker_names_.at(i);
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _tracker_names_.at(i));
     private_handlers->param_loader->copyYamls(*param_loader);
-    private_handlers->parent_param_loader   = param_loader;
+    private_handlers->parent_param_loader = param_loader;
 
     bool success = false;
 
@@ -1644,12 +1647,12 @@ void ControlManager::initialize(void) {
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile        = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
-    private_handlers->name_space            = it->second.name_space;
-    private_handlers->runtime_name          = _controller_names_.at(i);
-    private_handlers->param_loader          = std::make_unique<mrs_lib::ParamLoader>(subnode, _controller_names_.at(i));
+    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
+    private_handlers->name_space     = it->second.name_space;
+    private_handlers->runtime_name   = _controller_names_.at(i);
+    private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _controller_names_.at(i));
     private_handlers->param_loader->copyYamls(*param_loader);
-    private_handlers->parent_param_loader   = param_loader;
+    private_handlers->parent_param_loader = param_loader;
 
     bool success = false;
 
@@ -2016,6 +2019,36 @@ void ControlManager::initialize(void) {
   is_initialized_ = true;
 
   RCLCPP_INFO(node_->get_logger(), "initialized");
+}
+
+//}
+
+/* shutdown() //{ */
+
+void ControlManager::shutdown() {
+
+  std::cout << "unloading trackers" << std::endl;
+
+  {
+    std::scoped_lock lock(mutex_tracker_list_);
+
+    for (int i = 0; i < int(tracker_list_.size()); i++) {
+
+      tracker_list_.at(i).reset();
+    }
+  }
+
+  std::cout << "unloading controllers" << std::endl;
+
+  {
+    std::scoped_lock lock(mutex_controller_list_);
+
+    for (int i = 0; i < int(controller_list_.size()); i++) {
+      controller_list_.at(i).reset();
+    }
+  }
+
+  std::cout << "finished shutdown()" << std::endl;
 }
 
 //}
