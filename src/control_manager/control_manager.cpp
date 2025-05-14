@@ -510,9 +510,9 @@ private:
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus> sh_hw_api_status_;
 
-  bool offboard_mode_          = false;
-  bool offboard_mode_was_true_ = false;  // if it was ever true
-  bool armed_                  = false;
+  std::atomic<bool> offboard_mode_          = false;
+  std::atomic<bool> offboard_mode_was_true_ = false;  // if it was ever true
+  std::atomic<bool> armed_                  = false;
 
   // | -------------------- throttle and mass ------------------- |
 
@@ -558,7 +558,7 @@ private:
   bool   _odometry_innovation_check_enabled_ = false;
   double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
 
-  bool callbacks_enabled_ = true;
+  std::atomic<bool> callbacks_enabled_ = true;
 
   // | ------------------------ parachute ----------------------- |
 
@@ -771,8 +771,7 @@ private:
   bool              _profiler_enabled_ = false;
 
   // diagnostics publishing
-  void       publishDiagnostics(void);
-  std::mutex mutex_diagnostics_;
+  void publishDiagnostics(void);
 
   void                                                  ungripSrv(void);
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_ungrip_;
@@ -6484,8 +6483,6 @@ void ControlManager::publishDiagnostics(void) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishDiagnostics");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
-  std::scoped_lock lock(mutex_diagnostics_);
-
   mrs_msgs::msg::ControlManagerDiagnostics diagnostics_msg;
 
   diagnostics_msg.stamp    = clock_->now();
@@ -6497,11 +6494,7 @@ void ControlManager::publishDiagnostics(void) {
 
   diagnostics_msg.joystick_active = rc_goto_active_;
 
-  {
-    std::scoped_lock lock(mutex_tracker_list_, mutex_controller_list_);
-
-    diagnostics_msg.flying_normally = isFlyingNormally();
-  }
+  diagnostics_msg.flying_normally = isFlyingNormally();
 
   diagnostics_msg.bumper_active = bumper_repulsing_;
 
@@ -6684,7 +6677,18 @@ std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> ControlManager::en
 
 bool ControlManager::isFlyingNormally(void) {
 
-  return callbacks_enabled_ && (output_enabled_) && (offboard_mode_) && (armed_) && (((active_tracker_idx_ != _ehover_tracker_idx_) && (active_controller_idx_ != _eland_controller_idx_) && (active_controller_idx_ != _failsafe_controller_idx_)) || _controller_names_.size() == 1) && (((active_tracker_idx_ != _null_tracker_idx_) && (active_tracker_idx_ != _landoff_tracker_idx_)) || _tracker_names_.size() == 1);
+  auto active_controller_idx = mrs_lib::get_mutexed(mutex_controller_list_, active_controller_idx_);
+  auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
+
+  // clang-format off
+  return
+      callbacks_enabled_
+      && output_enabled_
+      && offboard_mode_
+      && armed_
+      && (_controller_names_.size() == 1 || ((active_controller_idx != _eland_controller_idx_) && (active_controller_idx != _failsafe_controller_idx_)))
+      && (_tracker_names_.size() == 1 || ((active_tracker_idx != _null_tracker_idx_) && (active_tracker_idx != _landoff_tracker_idx_) && (active_tracker_idx != _ehover_tracker_idx_)));
+  // clang-format on
 }
 
 //}

@@ -1,22 +1,30 @@
-#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
 
 #include <mrs_uav_testing/test_generic.h>
+
+using namespace std::chrono_literals;
 
 class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
-  bool test();
+  Tester() : mrs_uav_testing::TestGeneric() {
+  }
+
+  bool test(void);
 };
 
-bool Tester::test() {
+bool Tester::test(void) {
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
+  const std::string uav_name = "uav1";
+
   {
-    auto [uhopt, message] = getUAVHandler(_uav_name_);
+    auto [uhopt, message] = getUAVHandler(uav_name);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", uav_name.c_str(), message.c_str());
       return false;
     }
 
@@ -27,7 +35,7 @@ bool Tester::test() {
     auto [success, message] = uh->activateMidAir();
 
     if (!success) {
-      ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "activation failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -38,7 +46,7 @@ bool Tester::test() {
     auto [success, message] = uh->gotoAbs(0, 0, 100, 0);
 
     if (success) {
-      ROS_ERROR("[%s]: goto should fail", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "goto should fail");
       return false;
     }
   }
@@ -47,7 +55,9 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1e3, "waiting till it flies normally again");
+
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -61,8 +71,8 @@ bool Tester::test() {
   sleep(1.0);
 
   if (!uh->sh_max_height_.hasMsg()) {
-    ROS_ERROR("[%s]: missing max height msgs", ros::this_node::getName().c_str());
-    return true;
+    RCLCPP_ERROR(node_->get_logger(), "missing max height msgs");
+    return false;
   }
 
   double max_height_agl = uh->sh_max_height_.getMsg()->value;
@@ -78,24 +88,17 @@ bool Tester::test() {
   return false;
 }
 
-TEST(TESTSuite, test) {
+int main(int argc, char* argv[]) {
+
+  rclcpp::init(argc, argv);
+
+  bool test_result = true;
 
   Tester tester;
 
-  bool result = tester.test();
+  test_result &= tester.test();
 
-  if (result) {
-    GTEST_SUCCEED();
-  } else {
-    GTEST_FAIL();
-  }
-}
+  tester.reportTestResult(test_result);
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
-
-  ros::init(argc, argv, "test");
-
-  testing::InitGoogleTest(&argc, argv);
-
-  return RUN_ALL_TESTS();
+  tester.join();
 }

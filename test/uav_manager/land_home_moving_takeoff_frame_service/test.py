@@ -56,6 +56,7 @@ def generate_test_description():
                         'uav_name': uav_name,
                         'platform_config': platform_config,
                         'custom_config': launch_dir+"/config/custom_config.yaml",
+                        # 'world_config': launch_dir+"/config/world_config.yaml",
                         'automatic_start_config': launch_dir+"/config/automatic_start.yaml",
                     }.items()
                 )

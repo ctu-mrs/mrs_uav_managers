@@ -988,7 +988,7 @@ void UavManager::timerMaxHeight() {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxHeight");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "UavManager::timerMaxHeight", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_odometry_.hasMsg()) {
+  if (!sh_max_height_.hasMsg() || !sh_height_.hasMsg() || !sh_control_manager_diag_.hasMsg() || !sh_odometry_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[UavManager]: maxHeightTimer() not spinning, missing data");
     return;
   }
@@ -1085,7 +1085,7 @@ void UavManager::timerMinHeight() {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMinHeight");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "UavManager::timerMinHeight", scope_timer_logger_, scope_timer_enabled_);
 
-  if (!sh_odometry_.hasMsg() || !sh_height_.hasMsg() || !sh_control_manager_diag_.hasMsg()) {
+  if (!sh_odometry_.hasMsg() || !sh_height_.hasMsg() || !sh_control_manager_diag_.hasMsg() || !sh_odometry_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[UavManager]: minHeightTimer() not spinning, missing data");
     return;
   }
@@ -2460,7 +2460,7 @@ void UavManager::setControlCallbacksSrv(const bool& input) {
 
   request->data = input;
 
-  auto response = sch_odometry_callbacks_.callSync(request);
+  auto response = sch_control_callbacks_.callSync(request);
 
   if (response) {
 
