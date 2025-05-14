@@ -11,6 +11,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --ctest-args -R 'max_height_check' --event-handlers console_direct+ console_stderr- console_start_end-
+colcon test --packages-select mrs_uav_managers --ctest-args -R 'min_height_check' --event-handlers console_direct+ console_stderr- console_start_end-
 
 colcon test-result --all --verbose

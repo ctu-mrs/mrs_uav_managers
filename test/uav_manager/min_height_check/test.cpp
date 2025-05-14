@@ -1,28 +1,33 @@
-#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
 
 #include <mrs_uav_testing/test_generic.h>
+
+using namespace std::chrono_literals;
 
 class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
-  bool test();
+  Tester() : mrs_uav_testing::TestGeneric() {
 
-  Tester();
+    _uav_name_ = "uav1";
+
+    sch_min_height_check_ = mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool>(node_, "/" + _uav_name_ + "/uav_manager/enable_min_height_check");
+  }
+
+  bool test(void);
 
   double _min_height_offset_;
   double _min_height_;
 
-  mrs_lib::ServiceClientHandler<std_srvs::SetBool> sch_min_height_check_;
+  std::string _uav_name_;
+
+  mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> sch_min_height_check_;
 
   bool toggleMinHeightCheck(const bool in);
 };
 
-Tester::Tester() : mrs_uav_testing::TestGeneric() {
-
-  sch_min_height_check_ = mrs_lib::ServiceClientHandler<std_srvs::SetBool>(nh_, "/" + _uav_name_ + "/uav_manager/enable_min_height_check");
-}
-
-bool Tester::test() {
+bool Tester::test(void) {
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
@@ -30,7 +35,7 @@ bool Tester::test() {
     auto [uhopt, message] = getUAVHandler(_uav_name_);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", _uav_name_.c_str(), message.c_str());
       return false;
     }
 
@@ -41,7 +46,7 @@ bool Tester::test() {
   pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/min_height", _min_height_);
 
   if (!pl_->loadedSuccessfully()) {
-    ROS_ERROR("[%s]: failed to load parameters", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "failed to load parameters");
     return false;
   }
 
@@ -49,7 +54,7 @@ bool Tester::test() {
     auto [success, message] = uh->activateMidAir();
 
     if (!success) {
-      ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -60,7 +65,7 @@ bool Tester::test() {
     bool success = toggleMinHeightCheck(false);
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to disable the min-height check", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to disable the min-height check");
       return false;
     }
   }
@@ -73,7 +78,7 @@ bool Tester::test() {
     auto [success, message] = uh->gotoAbs(0, 0, 0.1, 0);
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to descend", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to descend");
       return false;
     }
   }
@@ -84,7 +89,7 @@ bool Tester::test() {
     bool success = toggleMinHeightCheck(true);
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to enable the min-height check", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to enable the min-height check");
       return false;
     }
   }
@@ -94,7 +99,7 @@ bool Tester::test() {
   // | ------------- check if we are flying normally ------------ |
 
   if (uh->isFlyingNormally()) {
-    ROS_ERROR("[%s]: we are still flying normally", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "we are still flying normally");
     return false;
   }
 
@@ -102,7 +107,7 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -117,7 +122,7 @@ bool Tester::test() {
     auto [success, message] = uh->gotoAbs(0, 0, 0, 0);
 
     if (success) {
-      ROS_ERROR("[%s]: goto should fail", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "goto should fail");
       return false;
     }
   }
@@ -126,7 +131,7 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -150,38 +155,30 @@ bool Tester::test() {
 
 bool Tester::toggleMinHeightCheck(const bool in) {
 
-  std_srvs::SetBool srv;
-  srv.request.data = in;
+  std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
+  request->data = in;
 
-  bool service_call = sch_min_height_check_.call(srv);
+  auto response = sch_min_height_check_.callSync(request);
 
-  if (!service_call || !srv.response.success) {
-    ROS_ERROR("[%s]: failed to call the service for min height check", ros::this_node::getName().c_str());
+  if (!response || !response.value()->success) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to call the service for min height check");
     return false;
   } else {
     return true;
   }
 }
 
-TEST(TESTSuite, test) {
+int main(int argc, char* argv[]) {
+
+  rclcpp::init(argc, argv);
+
+  bool test_result = true;
 
   Tester tester;
 
-  bool result = tester.test();
+  test_result &= tester.test();
 
-  if (result) {
-    GTEST_SUCCEED();
-  } else {
-    GTEST_FAIL();
-  }
+  tester.reportTestResult(test_result);
+
+  tester.join();
 }
-
-int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv) {
-
-  ros::init(argc, argv, "test");
-
-  testing::InitGoogleTest(&argc, argv);
-
-  return RUN_ALL_TESTS();
-}
-

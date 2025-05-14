@@ -613,7 +613,7 @@ void UavManager::initialize() {
   }
 
   {
-    std::function<void()> callback_fcn = std::bind(&UavManager::timerMaxHeight, this);
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerMinHeight, this);
 
     mrs_lib::TimerHandlerOptions opts;
 
