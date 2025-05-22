@@ -17,3 +17,9 @@ add_subdirectory(./takeoff_service)
 add_subdirectory(./takeoff_service_fail_cause_controller)
 
 add_subdirectory(./takeoff_service_fail_cause_tracker)
+
+add_subdirectory(./midair_service_fail_cause_controller)
+
+add_subdirectory(./midair_service_fail_cause_tracker)
+
+add_subdirectory(./midair_service_fail_cause_enabling_output_failed)
