@@ -15,3 +15,5 @@ add_subdirectory(./max_throttle_check)
 add_subdirectory(./takeoff_service)
 
 add_subdirectory(./takeoff_service_fail_cause_controller)
+
+add_subdirectory(./takeoff_service_fail_cause_tracker)
