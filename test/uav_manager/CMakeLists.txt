@@ -1,6 +1,6 @@
 add_subdirectory(./land_home_service)
 
-add_subdirectory(./land_home_moving_takeoff_frame_service)
+add_subdirectory(./land_home_service_moving_takeoff_frame)
 
 add_subdirectory(./land_there_service)
 
@@ -14,4 +14,4 @@ add_subdirectory(./max_throttle_check)
 
 add_subdirectory(./takeoff_service)
 
-# add_subdirectory(./takeoff_fail_cause_controller_service)
+add_subdirectory(./takeoff_service_fail_cause_controller)

@@ -11,6 +11,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --ctest-args -R 'land_service' --event-handlers console_direct+ console_stderr- console_start_end-
+colcon test --packages-select mrs_uav_managers --ctest-args -R 'takeoff_service_fail_cause_controller' --event-handlers console_direct+ console_stderr- console_start_end-
 
 colcon test-result --all --verbose

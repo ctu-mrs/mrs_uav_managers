@@ -65,6 +65,7 @@ endforeach()
 
 include_directories(
   include
+  test/include
   ${rclcpp_INCLUDE_DIRS}
   ${mrs_lib_INCLUDE_DIRS}
   ${mrs_uav_testing_INCLUDE_DIRS}

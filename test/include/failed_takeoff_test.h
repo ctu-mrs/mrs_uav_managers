@@ -1,3 +1,6 @@
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
+
 #include <mrs_uav_testing/test_generic.h>
 
 class FailedTakeoffTest : public mrs_uav_testing::TestGeneric {
@@ -5,26 +8,22 @@ class FailedTakeoffTest : public mrs_uav_testing::TestGeneric {
 public:
   bool test();
 
-  FailedTakeoffTest();
+  FailedTakeoffTest() : mrs_uav_testing::TestGeneric() {
+  }
 
-private:
-  mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_takeoff_;
 };
-
-FailedTakeoffTest::FailedTakeoffTest() : mrs_uav_testing::TestGeneric() {
-
-  sch_takeoff_ = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "/" + _uav_name_ + "/uav_manager/takeoff");
-}
 
 bool FailedTakeoffTest::test() {
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
+  const std::string uav_name = "uav1";
+
   {
-    auto [uhopt, message] = getUAVHandler(_uav_name_);
+    auto [uhopt, message] = getUAVHandler(uav_name);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", uav_name.c_str(), message.c_str());
       return false;
     }
 
@@ -35,32 +34,32 @@ bool FailedTakeoffTest::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
-    ROS_INFO_THROTTLE(1.0, "[%s]: waiting for the MRS UAV System", name_.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for the MRS UAV System");
 
     if (uh->mrsSystemReady()) {
-      ROS_INFO("[%s]: MRS UAV System is ready", name_.c_str());
+      RCLCPP_INFO(node_->get_logger(), "MRS UAV System is ready");
       break;
     }
 
-    sleep(0.01);
+    uh->sleep(0.01);
   }
 
   // | ---------------------- arm the drone --------------------- |
 
-  ROS_INFO("[%s]: arming the drone", name_.c_str());
+  RCLCPP_INFO(node_->get_logger(), "arming the drone");
 
   {
-    std_srvs::SetBool srv;
-    srv.request.data = true;
+    std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = true;
 
     {
-      bool service_call = uh->sch_arming_.call(srv);
+      auto response = uh->sch_arming_.callSync(request);
 
-      if (!service_call || !srv.response.success) {
+      if (!response || !response.value()->success) {
         return false;
       }
     }
@@ -79,12 +78,12 @@ bool FailedTakeoffTest::test() {
   // | ------------------- switch to offboard ------------------- |
 
   {
-    std_srvs::Trigger srv;
+    std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
     {
-      bool service_call = uh->sch_offboard_.call(srv);
+      auto response = uh->sch_offboard_.callSync(request);
 
-      if (!service_call || !srv.response.success) {
+      if (!response || !response.value()->success) {
         return false;
       }
     }
@@ -105,13 +104,13 @@ bool FailedTakeoffTest::test() {
   // | ------------------------- takeoff ------------------------ |
 
   {
-    std_srvs::Trigger srv;
+    std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
     {
-      bool service_call = sch_takeoff_.call(srv);
+      auto response = uh->sch_takeoff_.callSync(request);
 
-      if (service_call && srv.response.success) {
-        ROS_ERROR("[%s]: takeoff call success, this should not happen", ros::this_node::getName().c_str());
+      if (!response || response.value()->success) {
+        RCLCPP_ERROR(node_->get_logger(), "takeoff call success, this should not happen");
         return false;
       }
     }
@@ -119,10 +118,10 @@ bool FailedTakeoffTest::test() {
 
   // | -------------------- check if disarmed ------------------- |
 
-  sleep(0.1);
+  sleep(2.0);
 
   if (uh->sh_hw_api_status_.getMsg()->armed) {
-    ROS_ERROR("[%s]: the uav is still armed", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "the uav is still armed");
     return false;
   }
 
