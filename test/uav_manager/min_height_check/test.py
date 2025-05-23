@@ -74,9 +74,9 @@ def generate_test_description():
                             'mrs_multirotor_simulator.py'
                         ])
                     ]),
-                    launch_arguments={
-                        'custom_config': launch_dir+"/config/mrs_simulator.yaml",
-                    }.items()
+                    # launch_arguments={
+                    #     'custom_config': launch_dir+"/config/mrs_simulator.yaml",
+                    # }.items()
                 )
             ]
         )
