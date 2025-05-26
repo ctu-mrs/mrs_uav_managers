@@ -2026,28 +2026,35 @@ void ControlManager::initialize(void) {
 
 void ControlManager::shutdown() {
 
-  std::cout << "unloading trackers" << std::endl;
+  std::cout << "ControlManager: shutdown(): called" << std::endl;
+
+  std::cout << "ControlManager: unloading trackers" << std::endl;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
 
     for (int i = 0; i < int(tracker_list_.size()); i++) {
 
+      std::cout << "ControlManager: unloading " << _tracker_names_[i] << std::endl;
+
       tracker_list_.at(i).reset();
     }
   }
 
-  std::cout << "unloading controllers" << std::endl;
+  std::cout << "ControlManager: unloading controllers" << std::endl;
 
   {
     std::scoped_lock lock(mutex_controller_list_);
 
     for (int i = 0; i < int(controller_list_.size()); i++) {
+
+      std::cout << "ControlManager: unloading " << _controller_names_[i] << std::endl;
+
       controller_list_.at(i).reset();
     }
   }
 
-  std::cout << "finished shutdown()" << std::endl;
+  std::cout << "ControlManager: finished shutdown()" << std::endl;
 }
 
 //}

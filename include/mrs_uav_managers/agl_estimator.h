@@ -55,9 +55,6 @@ public:
       : Estimator(agl::type, name, frame_id), package_name_(package_name) {
   }
 
-  virtual ~AglEstimator(void) {
-  }
-
   // virtual methods
   virtual mrs_msgs::msg::Float64Stamped getUavAglHeight() const     = 0;
   virtual std::vector<double>           getHeightCovariance() const = 0;

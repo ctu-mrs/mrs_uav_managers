@@ -1112,15 +1112,43 @@ void EstimationManager::timerInitialization() {
 
 void EstimationManager::shutdown() {
 
-  RCLCPP_INFO(get_logger(), "shutdown(): called");
+  std::cout << "EstimationManager: shutdown(): called" << std::endl;
+
+  std::cout << "EstimationManager: unloading estimators" << std::endl;
 
   for (int i = 0; i < int(estimator_list_.size()); i++) {
 
-    estimator_list_.at(i).reset();
+    /* std::cout << "EstimationManager: stopping " << estimator_names_[i] << std::endl; */
+
+    /* estimator_list_.at(i)->pause(); */
+
+    std::cout << "EstimationManager: reseting pointer to " << estimator_names_[i] << std::endl;
+
+    try {
+      estimator_list_.at(i).reset();
+    } catch (...) {
+      std::cout << "caught exception while resetting pointer" << std::endl;
+    }
+
+    std::cout << "EstimationManager: pointer to " << estimator_names_[i] << " was reset" << std::endl;
   }
 
-  est_alt_agl_.reset();
+  std::cout << "EstimationManager: unloading agl estimator" << std::endl;
 
+  if (est_alt_agl_) {
+
+    /* std::cout << "EstimationManager: stopping agl estimator" << std::endl; */
+
+    /* est_alt_agl_->pause(); */
+
+    std::cout << "EstimationManager: reseting pointer to agl estimator" << std::endl;
+
+    est_alt_agl_.reset();
+
+    std::cout << "EstimationManager: pointer to agl estimator was reset" << std::endl;
+  }
+
+  std::cout << "EstimationManager: shutdown() finished" << std::endl;
 }
 
 //}

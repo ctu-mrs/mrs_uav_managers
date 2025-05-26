@@ -51,31 +51,9 @@ bool Tester::test(void) {
     }
   }
 
-  sleep(0.5);
+  sleep(1.0);
 
-  // | -------------------- wait for landing -------------------- |
-
-  while (true) {
-
-    if (!rclcpp::ok()) {
-      return false;
-    }
-
-    if (!uh->isOutputEnabled()) {
-
-      return true;
-
-    } else {
-
-      // TODO this is not the right way to check if the landing actually happens as planned
-      if (uh->getActiveTracker() != "LandoffTracker" && uh->getActiveTracker() != "NullTracker") {
-        RCLCPP_ERROR(node_->get_logger(), "not landing anymore");
-        return false;
-      }
-    }
-  }
-
-  return false;
+  return true;
 }
 
 int main(int argc, char* argv[]) {

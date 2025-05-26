@@ -7,11 +7,12 @@ import launch
 import launch_ros
 import launch_testing.actions
 import launch_testing.asserts
-from launch.actions import IncludeLaunchDescription, GroupAction, SetEnvironmentVariable
+from launch.actions import IncludeLaunchDescription, GroupAction, SetEnvironmentVariable, DeclareLaunchArgument
 import rclpy
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution, TextSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 
 from std_msgs.msg import Bool
@@ -22,14 +23,16 @@ def generate_test_description():
 
     ld = launch.LaunchDescription()
 
-    uav_type="x500"
-    uav_name="uav1"
-    platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/"+uav_type+".yaml"
-
     launch_file_path = os.path.abspath(__file__)
     launch_dir = os.path.dirname(launch_file_path)
 
     test_name = os.path.basename(launch_dir)
+
+    uav_name="uav1"
+
+    network_config=get_package_share_directory("mrs_uav_testing")+"/config/default_network_config.yaml",
+    world_config=get_package_share_directory("mrs_uav_testing")+"/config/default_world_config.yaml",
+    platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/x500.yaml",
 
     ld.add_action(
             launch_ros.actions.Node(
@@ -45,53 +48,32 @@ def generate_test_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
-                        FindPackageShare('mrs_uav_testing'),
-                        'launch',
-                        'mrs_uav_system.py'
-                        ])
-                    ]),
-                    launch_arguments={
-                        'run_automatic_start': "false",
-                        'standalone': "true",
-                        'uav_name': uav_name,
-                        'platform_config': platform_config,
-                        # 'world_config': launch_dir+"/config/world_config.yaml",
-                        # 'custom_config': launch_dir+"/config/custom_config.yaml",
-                        # 'automatic_start_config': launch_dir+"/config/automatic_start.yaml",
-                    }.items()
-                )
-            ]
-        )
-    )
-
-    ld.add_action(
-        GroupAction([
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    PathJoinSubstitution([
-                        FindPackageShare('mrs_uav_testing'),
-                            'launch',
-                            'mrs_multirotor_simulator.py'
-                        ])
-                    ]),
-                    # launch_arguments={
-                    #     'custom_config': launch_dir+"/config/mrs_simulator.yaml",
-                    # }.items()
-                )
-            ]
-        )
-    )
-
-    ld.add_action(
-        GroupAction([
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    PathJoinSubstitution([
                         FindPackageShare('mrs_multirotor_simulator'),
                             'launch',
                             'hw_api.py'
                         ])
                     ]),
+                )
+            ]
+        )
+    )
+
+    ld.add_action(
+        GroupAction([
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
+                        FindPackageShare('mrs_uav_managers'),
+                            'launch',
+                            'control_manager.py'
+                        ])
+                    ]),
+                    launch_arguments={
+                        'uav_name': uav_name,
+                        'platform_config': platform_config,
+                        'world_config': world_config,
+                        'network_config': network_config,
+                    }.items()
                 )
             ]
         )
@@ -133,7 +115,7 @@ class PublisherHandlerTest(unittest.TestCase):
     def tearDown(self):
         self.node.destroy_node()
 
-    def test_interactor(self, proc_output, timeout=120):
+    def test_interactor(self, proc_output, timeout=60):
 
         """Check whether pose messages published"""
 
@@ -162,9 +144,9 @@ class PublisherHandlerTest(unittest.TestCase):
         finally:
             self.node.destroy_subscription(sub)
 
-# # Post-shutdown tests
-# @launch_testing.post_shutdown_test()
-# class PublisherHandlerTestShutdown(unittest.TestCase):
-#     def test_exit_codes(self, proc_info):
-#         """Check if the processes exited normally."""
-#         launch_testing.asserts.assertExitCodes(proc_info)
+# Post-shutdown tests
+@launch_testing.post_shutdown_test()
+class PublisherHandlerTestShutdown(unittest.TestCase):
+    def test_exit_codes(self, proc_info):
+        """Check if the processes exited normally."""
+        launch_testing.asserts.assertExitCodes(proc_info)

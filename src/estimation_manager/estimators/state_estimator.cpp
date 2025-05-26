@@ -3,7 +3,6 @@
 namespace mrs_uav_managers
 {
 
-
 /*//{ getUavState() */
 std::optional<mrs_msgs::msg::UavState> StateEstimator::getUavState() {
 

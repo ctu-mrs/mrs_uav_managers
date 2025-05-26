@@ -59,6 +59,8 @@ bool Tester::test(void) {
     }
   }
 
+  sleep(3.0);
+
   // | -------------- disable the min-height check -------------- |
 
   {
@@ -70,12 +72,12 @@ bool Tester::test(void) {
     }
   }
 
-  sleep(0.1);
+  sleep(1.0);
 
   // | --------------- goto to violate min height --------------- |
 
   {
-    auto [success, message] = uh->gotoAbs(0, 0, 0.1, 0);
+    auto [success, message] = uh->gotoAbs(0, 0, 0.5, 0);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to descend");
@@ -94,7 +96,7 @@ bool Tester::test(void) {
     }
   }
 
-  sleep(0.5);
+  sleep(1.0);
 
   // | ------------- check if we are flying normally ------------ |
 

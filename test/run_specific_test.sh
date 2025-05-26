@@ -11,6 +11,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --ctest-args -R 'midair_service_fail_cause_enabling_offboard_failed' --event-handlers console_direct+ console_stderr- console_start_end-
+colcon test --packages-select mrs_uav_managers --ctest-args -R 'control_manager_start_stop' --event-handlers console_direct+ console_stderr- console_start_end-
 
 colcon test-result --all --verbose

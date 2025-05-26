@@ -25,3 +25,5 @@ add_subdirectory(./midair_service_fail_cause_tracker)
 add_subdirectory(./midair_service_fail_cause_enabling_output_failed)
 
 add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed)
+
+add_subdirectory(./uav_manager_start_stop)

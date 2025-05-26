@@ -8,3 +8,5 @@ function(add_ros_isolated_launch_test path)
 endfunction()
 
 add_subdirectory(./uav_manager)
+
+add_subdirectory(./control_manager)

@@ -62,12 +62,11 @@ private:
   SMStates_t         current_sm_state_  = SMStates_t::UNINITIALIZED_STATE;
   mutable std::mutex mutex_current_state_;
 
-protected:
+public:
   Estimator(const std::string &type, const std::string &name, const std::string &frame_id) : type_(type), name_(name), frame_id_(frame_id) {
   }
 
-  virtual ~Estimator(void) {
-  }
+  virtual ~Estimator() = default;
 
 public:
   // virtual methods

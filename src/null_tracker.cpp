@@ -10,7 +10,6 @@ namespace mrs_uav_managers
 class NullTracker : public mrs_uav_managers::Tracker {
 
 public:
-  ~NullTracker(){};
 
   bool initialize(const rclcpp::Node::SharedPtr& node, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers, std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers);
 

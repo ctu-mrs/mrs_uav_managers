@@ -60,8 +60,7 @@ public:
       : Estimator(state::type, name, frame_id), package_name_(package_name) {
   }
 
-  virtual ~StateEstimator(void) {
-  }
+  virtual ~StateEstimator() = default;
 
   virtual bool setUavState(const mrs_msgs::msg::UavState &uav_state) = 0;
 
