@@ -27,6 +27,11 @@ def generate_test_description():
 
     test_name = os.path.basename(launch_dir)
 
+    uav_name="uav1"
+
+    world_config=get_package_share_directory("mrs_uav_testing")+"/config/default_world_config.yaml",
+    platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/x500.yaml",
+
     ld.add_action(
             launch_ros.actions.Node(
                 package='rmw_zenoh_cpp',
@@ -41,11 +46,31 @@ def generate_test_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
+                        FindPackageShare('mrs_multirotor_simulator'),
+                            'launch',
+                            'hw_api.py'
+                        ])
+                    ]),
+                )
+            ]
+        )
+    )
+
+    ld.add_action(
+        GroupAction([
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
                         FindPackageShare('mrs_uav_managers'),
                             'launch',
                             'uav_manager.py'
                         ])
                     ]),
+                    launch_arguments={
+                        'uav_name': uav_name,
+                        'platform_config': platform_config,
+                        'world_config': world_config,
+                    }.items()
                 )
             ]
         )

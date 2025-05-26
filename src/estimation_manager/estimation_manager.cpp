@@ -713,6 +713,7 @@ void EstimationManager::timerCheckHealth() {
 /*//}*/
 
 /*//{ timerInitialization() */
+
 void EstimationManager::timerInitialization() {
 
   node_  = this->shared_from_this();
@@ -1106,6 +1107,7 @@ void EstimationManager::timerInitialization() {
 
   timer_initialization_->cancel();
 }
+
 /*//}*/
 
 /* shutdown() //{ */
@@ -1114,13 +1116,17 @@ void EstimationManager::shutdown() {
 
   std::cout << "EstimationManager: shutdown(): called" << std::endl;
 
+  timer_check_health_->stop();
+  timer_publish_->stop();
+  timer_publish_diagnostics_->stop();
+
   std::cout << "EstimationManager: unloading estimators" << std::endl;
 
   for (int i = 0; i < int(estimator_list_.size()); i++) {
 
-    /* std::cout << "EstimationManager: stopping " << estimator_names_[i] << std::endl; */
+    std::cout << "EstimationManager: stopping " << estimator_names_[i] << std::endl;
 
-    /* estimator_list_.at(i)->pause(); */
+    estimator_list_.at(i)->pause();
 
     std::cout << "EstimationManager: reseting pointer to " << estimator_names_[i] << std::endl;
 
@@ -1137,9 +1143,9 @@ void EstimationManager::shutdown() {
 
   if (est_alt_agl_) {
 
-    /* std::cout << "EstimationManager: stopping agl estimator" << std::endl; */
+    std::cout << "EstimationManager: stopping agl estimator" << std::endl;
 
-    /* est_alt_agl_->pause(); */
+    est_alt_agl_->pause();
 
     std::cout << "EstimationManager: reseting pointer to agl estimator" << std::endl;
 

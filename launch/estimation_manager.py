@@ -137,6 +137,12 @@ def generate_launch_description():
 
     # #} end of env-based params
 
+    # #{ log_level
+
+    ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
+
+    # #} end of log_level
+
     # #{ estimation manager node
 
     estimation_manager_node = ComposableNode(

@@ -75,6 +75,8 @@ public:
   virtual bool initialize(const rclcpp::Node::SharedPtr &node, std::shared_ptr<mrs_uav_managers::control_manager::CommonHandlers_t> common_handlers,
                           std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers) = 0;
 
+  virtual void destroy(void) = 0;
+
   /**
    * @brief It is called before the controller output will be required and used. Should not take much time (within miliseconds).
    *

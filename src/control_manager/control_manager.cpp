@@ -2028,6 +2028,14 @@ void ControlManager::shutdown() {
 
   std::cout << "ControlManager: shutdown(): called" << std::endl;
 
+  timer_status_->stop();
+  timer_failsafe_->stop();
+  timer_eland_->stop();
+  timer_safety_->stop();
+  timer_pirouette_->stop();
+  timer_bumper_->stop();
+  timer_joystick_->stop();
+
   std::cout << "ControlManager: unloading trackers" << std::endl;
 
   {
