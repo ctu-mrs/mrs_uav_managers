@@ -1130,14 +1130,13 @@ void EstimationManager::shutdown() {
 
     std::cout << "EstimationManager: reseting pointer to " << estimator_names_[i] << std::endl;
 
-    try {
-      estimator_list_.at(i).reset();
-    } catch (...) {
-      std::cout << "caught exception while resetting pointer" << std::endl;
-    }
+    estimator_list_.at(i).reset();
 
     std::cout << "EstimationManager: pointer to " << estimator_names_[i] << " was reset" << std::endl;
   }
+
+  initial_estimator_.reset();
+  active_estimator_.reset();
 
   std::cout << "EstimationManager: unloading agl estimator" << std::endl;
 

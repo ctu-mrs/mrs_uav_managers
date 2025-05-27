@@ -102,7 +102,11 @@ int main(int argc, char* argv[]) {
 
   test_result &= tester.test();
 
+  tester.sleep(2.0);
+
   tester.reportTestResult(test_result);
 
-  tester.join();
+  rclcpp::shutdown();
+
+  exit(0);
 }
