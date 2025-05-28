@@ -51,7 +51,7 @@ def generate_test_description():
                         ])
                     ]),
                     launch_arguments={
-                        'run_automatic_start': "true",
+                        'run_automatic_start': "false",
                         'uav_name': uav_name,
                         'platform_config': platform_config,
                         # 'world_config': launch_dir+"/config/world_config.yaml",
