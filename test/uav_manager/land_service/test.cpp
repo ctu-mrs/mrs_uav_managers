@@ -66,15 +66,11 @@ int main(int argc, char* argv[]) {
 
   test_result &= tester.test();
 
+  tester.sleep(2.0);
+
   std::cout << "Test: reporting test results" << std::endl;
 
   tester.reportTestResult(test_result);
 
-  tester.sleep(2.0);
-
-  std::cout << "Test: exiting" << std::endl;
-
-  rclcpp::shutdown();
-
-  exit(0);
+  tester.join();
 }

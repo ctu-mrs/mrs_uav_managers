@@ -25,9 +25,9 @@ int main(int argc, char* argv[]) {
 
   tester.sleep(2.0);
 
+  std::cout << "Test: reporting test results" << std::endl;
+
   tester.reportTestResult(test_result);
 
-  rclcpp::shutdown();
-
-  exit(0);
+  tester.join();
 }
