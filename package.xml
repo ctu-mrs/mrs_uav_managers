@@ -37,6 +37,8 @@
   <depend>mrs_uav_hw_api</depend>
   <depend>mrs_uav_testing</depend>
 
+  <depend>backward_ros</depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

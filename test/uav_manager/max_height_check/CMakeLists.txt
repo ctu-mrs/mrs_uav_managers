@@ -9,6 +9,7 @@ ament_target_dependencies(test_${TEST_NAME}
   mrs_lib
   mrs_msgs
   mrs_uav_testing
+  backward_ros
   )
 
 install(TARGETS

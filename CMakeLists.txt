@@ -47,6 +47,7 @@ set(DEPENDENCIES
   tf2_geometry_msgs
   Eigen3
   mrs_uav_testing
+  backward_ros
   )
 
 set(LIBRARIES
