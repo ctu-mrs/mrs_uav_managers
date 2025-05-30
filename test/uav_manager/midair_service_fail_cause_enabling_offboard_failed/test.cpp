@@ -57,6 +57,12 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Test: tests finished" << std::endl;
 
+  std::cout << "Test: sleeping using std" << std::endl;
+
+  std::this_thread::sleep_for(std::chrono::duration<double>(5.0));
+
+  std::cout << "Test: sleeping using clock" << std::endl;
+
   tester.sleep(2.0);
 
   std::cout << "Test: reporting test results" << std::endl;
