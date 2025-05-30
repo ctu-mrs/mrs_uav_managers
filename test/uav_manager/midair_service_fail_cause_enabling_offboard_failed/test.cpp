@@ -55,6 +55,8 @@ int main(int argc, char* argv[]) {
 
   test_result &= tester.test();
 
+  std::cout << "Test: tests finished" << std::endl;
+
   tester.sleep(2.0);
 
   std::cout << "Test: reporting test results" << std::endl;

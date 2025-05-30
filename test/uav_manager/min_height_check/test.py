@@ -111,7 +111,8 @@ def generate_test_description():
                 name='test_'+test_name,
                 output="screen",
                 parameters=[
-                        {"config_files": config_files}
+                        {"config_files": config_files},
+                        {'test_name': test_name},
                     ],
             )
         )

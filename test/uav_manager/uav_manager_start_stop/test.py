@@ -85,6 +85,9 @@ def generate_test_description():
                 executable='test_'+test_name,
                 name='test_'+test_name,
                 output="screen",
+                parameters=[
+                        {'test_name': test_name},
+                ],
             )
         )
 
