@@ -34,12 +34,18 @@ bool Tester::test(void) {
   // | ---------- call midair activation in async task ---------- |
 
   {
+    std::cout << "Test: a" << std::endl;
+
     auto [success, message] = uh->activateMidAir();
+
+    std::cout << "Test: b" << std::endl;
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation succeeded, this should not happen: '%s'", message.c_str());
       return false;
     }
+
+    std::cout << "Test: z" << std::endl;
   }
 
   return true;
