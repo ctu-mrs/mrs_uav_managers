@@ -12,17 +12,17 @@ add_subdirectory(./min_height_check)
 
 add_subdirectory(./max_throttle_check)
 
-# add_subdirectory(./takeoff_service)
+add_subdirectory(./takeoff_service)
 
-# add_subdirectory(./takeoff_service_fail_cause_controller)
+add_subdirectory(./takeoff_service_fail_cause_controller)
 
-# add_subdirectory(./takeoff_service_fail_cause_tracker)
+add_subdirectory(./takeoff_service_fail_cause_tracker)
 
-# add_subdirectory(./midair_service_fail_cause_controller)
+add_subdirectory(./midair_service_fail_cause_controller)
 
-# add_subdirectory(./midair_service_fail_cause_tracker)
+add_subdirectory(./midair_service_fail_cause_tracker)
 
-# add_subdirectory(./midair_service_fail_cause_enabling_output_failed)
+add_subdirectory(./midair_service_fail_cause_enabling_output_failed)
 
 add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed)
 add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed_2)
@@ -30,4 +30,4 @@ add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed_3)
 add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed_4)
 add_subdirectory(./midair_service_fail_cause_enabling_offboard_failed_5)
 
-# add_subdirectory(./uav_manager_start_stop)
+add_subdirectory(./uav_manager_start_stop)
