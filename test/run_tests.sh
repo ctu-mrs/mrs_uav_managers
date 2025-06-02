@@ -13,6 +13,6 @@ done
 
 colcon test-result --delete-yes
 
-colcon test --paths $MY_PATH/.. --event-handlers console_direct+
+colcon test --paths $MY_PATH/.. -p 1 --event-handlers console_direct+
 
 colcon test-result --all --verbose
