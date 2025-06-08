@@ -12,3 +12,5 @@ add_subdirectory(./uav_manager)
 add_subdirectory(./control_manager)
 
 add_subdirectory(./gain_manager)
+
+add_subdirectory(./constraint_manager)

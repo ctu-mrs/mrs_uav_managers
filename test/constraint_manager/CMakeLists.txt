@@ -1,0 +1,5 @@
+add_subdirectory(./set_constraints_should_succeed_service)
+
+add_subdirectory(./set_constraints_should_fail_service)
+
+add_subdirectory(./constraints_override_service)
