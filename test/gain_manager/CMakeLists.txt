@@ -1,0 +1,3 @@
+add_subdirectory(./set_gains_should_succeed_service)
+
+add_subdirectory(./set_gains_should_fail_service)

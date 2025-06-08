@@ -1,3 +1,0 @@
-add_subdirectory(set_gains_should_succeed)
-
-add_subdirectory(set_gains_should_fail)
