@@ -1,0 +1,1 @@
+add_subdirectory(./switch_estimator_service)

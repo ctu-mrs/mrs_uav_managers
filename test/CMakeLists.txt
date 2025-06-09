@@ -14,3 +14,5 @@ add_subdirectory(./control_manager)
 add_subdirectory(./gain_manager)
 
 add_subdirectory(./constraint_manager)
+
+add_subdirectory(./estimation_manager)

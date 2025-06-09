@@ -8676,9 +8676,6 @@ void ControlManager::publish(void) {
   mrs_msgs::msg::HwApiAttitudeCmd attitude_target;
   attitude_target.stamp = clock_->now();
 
-  mrs_msgs::msg::HwApiAttitudeRateCmd attitude_rate_target;
-  attitude_rate_target.stamp = clock_->now();
-
   if (!output_enabled_) {
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[ControlManager]: output is disabled");
