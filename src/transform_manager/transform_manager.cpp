@@ -325,7 +325,9 @@ void TransformManager::timerInitialization() {
   param_loader.loadParam(yaml_prefix + "tf_sources", tf_source_names_);
 
   param_loader.loadParam(yaml_prefix + "utm_source_priority", utm_source_priority_list_);
+
   for (auto utm_source : utm_source_priority_list_) {
+
     if (Support::isStringInVector(utm_source, estimator_names_)) {
       RCLCPP_INFO(node_->get_logger(), "[%s]: the source for utm_origin and world origin is: %s", getPrintName().c_str(), utm_source.c_str());
       utm_source_name_ = utm_source;
@@ -367,6 +369,7 @@ void TransformManager::timerInitialization() {
 
     const std::string estimator_name = estimator_names_[i];
     const bool        is_utm_source  = estimator_name == utm_source_name_;
+
     RCLCPP_INFO(node_->get_logger(), "[%s]: loading tf source of estimator: %s", getPrintName().c_str(), estimator_name.c_str());
 
     auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/" + estimator_name);

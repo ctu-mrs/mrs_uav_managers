@@ -39,6 +39,13 @@
 
   <depend>backward_ros</depend>
 
+  <test_depend>ament_cmake_ros</test_depend>
+  <test_depend>launch</test_depend>
+  <test_depend>launch_ros</test_depend>
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>rclpy</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

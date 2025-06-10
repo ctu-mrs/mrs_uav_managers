@@ -35,102 +35,98 @@ class TfSource {
 
 public:
   /*//{ constructor */
-  TfSource(const std::string& name, const rclcpp::Node::SharedPtr& node, std::shared_ptr<mrs_lib::ParamLoader> param_loader,
-           const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch,
-           const bool is_utm_source)
-      : name_(name), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
+  TfSource(const std::string& name, const rclcpp::Node::SharedPtr& node, std::shared_ptr<mrs_lib::ParamLoader> param_loader, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch, const bool is_utm_source) : name_(name), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
 
     node_  = node;
     clock_ = node->get_clock();
 
     RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
-    if (name != "dummy") {
+    /*//{ load parameters */
 
-      /*//{ load parameters */
+    const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
-      const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
+    std::string odom_topic, attitude_topic, ns;
 
-      std::string odom_topic, attitude_topic, ns;
+    param_loader->loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
 
-      param_loader->loadParam(yaml_prefix + getName() + "/odom_topic", odom_topic);
-      param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
-      if (custom_frame_id_enabled_) {
-        param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
-      }
-      param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/enabled", custom_child_frame_id_enabled_, false);
-      if (custom_child_frame_id_enabled_) {
-        param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/frame_id", custom_child_frame_id_);
-      }
-      param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
-      if (tf_from_attitude_enabled_) {
-        param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
-      }
-      param_loader->loadParam(yaml_prefix + getName() + "/namespace", ns);
-      full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
-      full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
-      param_loader->loadParam(yaml_prefix + getName() + "/inverted", is_inverted_);
-      param_loader->loadParam(yaml_prefix + getName() + "/republish_in_frames", republish_in_frames_);
+    param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/enabled", custom_frame_id_enabled_, false);
+    if (custom_frame_id_enabled_) {
+      param_loader->loadParam(yaml_prefix + getName() + "/custom_frame_id/frame_id", custom_frame_id_);
+    }
 
-      /* coordinate frames origins //{ */
-      param_loader->loadParam(yaml_prefix + getName() + "/utm_based", is_utm_based_);
-      /* param_loader->loadParam(yaml_prefix + getName() + "/publish_local_tf", publish_local_tf_); */
+    param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/enabled", custom_child_frame_id_enabled_, false);
+    if (custom_child_frame_id_enabled_) {
+      param_loader->loadParam(yaml_prefix + getName() + "/custom_child_frame_id/frame_id", custom_child_frame_id_);
+    }
 
-      /*//{ utm source */
-      if (is_utm_based_) {
-        std::string utm_origin_parent_frame_id;
-        param_loader->loadParam(yaml_prefix + "utm_origin_tf/parent", utm_origin_parent_frame_id);
-        ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
+    param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/enabled", tf_from_attitude_enabled_);
+    if (tf_from_attitude_enabled_) {
+      param_loader->loadParam(yaml_prefix + getName() + "/tf_from_attitude/attitude_topic", attitude_topic);
+    }
 
-        std::string utm_origin_child_frame_id;
-        param_loader->loadParam(yaml_prefix + "utm_origin_tf/child", utm_origin_child_frame_id);
-        ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
-      }
-      /*//}*/
+    param_loader->loadParam(yaml_prefix + getName() + "/namespace", ns);
+    full_topic_odom_     = "/" + ch_->uav_name + "/" + ns + "/" + odom_topic;
+    full_topic_attitude_ = "/" + ch_->uav_name + "/" + ns + "/" + attitude_topic;
+    param_loader->loadParam(yaml_prefix + getName() + "/inverted", is_inverted_);
+    param_loader->loadParam(yaml_prefix + getName() + "/republish_in_frames", republish_in_frames_);
 
-      /*//{ world source */
-      if (is_utm_based_) {
-        std::string world_origin_parent_frame_id;
-        param_loader->loadParam(yaml_prefix + "world_origin_tf/parent", world_origin_parent_frame_id);
-        ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
+    /* coordinate frames origins //{ */
+    param_loader->loadParam(yaml_prefix + getName() + "/utm_based", is_utm_based_);
+    /* param_loader->loadParam(yaml_prefix + getName() + "/publish_local_tf", publish_local_tf_); */
 
-        std::string world_origin_child_frame_id;
-        param_loader->loadParam(yaml_prefix + "world_origin_tf/child", world_origin_child_frame_id);
-        ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
-      }
-      /*//}*/
+    /*//{ utm source */
+    if (is_utm_based_) {
+      std::string utm_origin_parent_frame_id;
+      param_loader->loadParam(yaml_prefix + "utm_origin_tf/parent", utm_origin_parent_frame_id);
+      ns_utm_origin_parent_frame_id_ = ch_->uav_name + "/" + utm_origin_parent_frame_id;
 
-      //}
+      std::string utm_origin_child_frame_id;
+      param_loader->loadParam(yaml_prefix + "utm_origin_tf/child", utm_origin_child_frame_id);
+      ns_utm_origin_child_frame_id_ = ch_->uav_name + "/" + utm_origin_child_frame_id;
+    }
+    /*//}*/
 
-      if (!param_loader->loadedSuccessfully()) {
-        RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-        rclcpp::shutdown();
-      }
+    /*//{ world source */
+    if (is_utm_based_) {
+      std::string world_origin_parent_frame_id;
+      param_loader->loadParam(yaml_prefix + "world_origin_tf/parent", world_origin_parent_frame_id);
+      ns_world_origin_parent_frame_id_ = ch_->uav_name + "/" + world_origin_parent_frame_id;
 
-      /*//}*/
+      std::string world_origin_child_frame_id;
+      param_loader->loadParam(yaml_prefix + "world_origin_tf/child", world_origin_child_frame_id);
+      ns_world_origin_child_frame_id_ = ch_->uav_name + "/" + world_origin_child_frame_id;
+    }
+    /*//}*/
 
-      /*//{ initialize subscribers */
-      mrs_lib::SubscriberHandlerOptions shopts;
+    //}
 
-      shopts.node               = node_;
-      shopts.node_name          = getPrintName();
-      shopts.no_message_timeout = mrs_lib::no_timeout;
-      shopts.threadsafe         = true;
-      shopts.autostart          = true;
-
-      sh_tf_source_odom_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this);
-
-      if (tf_from_attitude_enabled_) {
-        sh_tf_source_att_ =
-            mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this);
-      }
+    if (!param_loader->loadedSuccessfully()) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
+      rclcpp::shutdown();
     }
 
     /*//}*/
 
+    /*//{ initialize subscribers */
+    mrs_lib::SubscriberHandlerOptions shopts;
+
+    shopts.node               = node_;
+    shopts.node_name          = getPrintName();
+    shopts.no_message_timeout = mrs_lib::no_timeout;
+    shopts.threadsafe         = true;
+    shopts.autostart          = true;
+
+    sh_tf_source_odom_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, full_topic_odom_, &TfSource::callbackTfSourceOdom, this);
+
+    if (tf_from_attitude_enabled_) {
+      sh_tf_source_att_ = mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, full_topic_attitude_, &TfSource::callbackTfSourceAtt, this);
+    }
+
+    /* } */
+
     for (auto frame_id : republish_in_frames_) {
-      republishers_.push_back(std::make_pair(
-          frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, full_topic_odom_ + "/" + frame_id.substr(0, frame_id.find("_origin")))));
+      republishers_.push_back(std::make_pair(frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, full_topic_odom_ + "/" + frame_id.substr(0, frame_id.find("_origin")))));
     }
     is_initialized_ = true;
     RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
@@ -366,8 +362,7 @@ private:
       if (is_utm_source_) {
 
         if (!is_utm_origin_set_) {
-          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s utm_origin initialization", getPrintName().c_str(),
-                               Support::waiting_for_string.c_str());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s utm_origin initialization", getPrintName().c_str(), Support::waiting_for_string.c_str());
           return;
         }
 
@@ -435,11 +430,9 @@ private:
       /*//}*/
 
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
-                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(),
-                     tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
   }
   /*//}*/
 
@@ -484,11 +477,9 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
-                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(),
-                     tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_attitude_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_attitude_.c_str());
   }
   /*//}*/
 
@@ -513,11 +504,9 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
-                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
-                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_local_static_tf_published_ = true;
   }
   /*//}*/
@@ -548,11 +537,9 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
-                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
-                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_utm_static_tf_published_ = true;
   }
   /*//}*/
@@ -584,18 +571,15 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
-                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
-                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_world_static_tf_published_ = true;
   }
   /*//}*/
 
   /* republishInFrame() //{*/
-  void republishInFrame(const nav_msgs::msg::Odometry::ConstSharedPtr& msg, const std::string& frame_id,
-                        mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>& ph) {
+  void republishInFrame(const nav_msgs::msg::Odometry::ConstSharedPtr& msg, const std::string& frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>& ph) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::republishInFrame", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -611,8 +595,7 @@ private:
       msg_out.pose.pose = res->pose;
       ph.publish(msg_out);
     } else {
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform pose to %s. Not republishing odom in this frame.",
-                            getPrintName().c_str(), frame_id.c_str());
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform pose to %s. Not republishing odom in this frame.", getPrintName().c_str(), frame_id.c_str());
       return;
     }
   }

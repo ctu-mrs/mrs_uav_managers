@@ -115,3 +115,12 @@ mrs_uav_managers:
       utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+
+    dummy:
+      odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+      tf_from_attitude: # used for transforming velocities before full transform is available
+        enabled: false
+      namespace: "estimation_manager/dummy" # the namespace of the topic (usually the node that publishes the topic)
+      utm_based: false # if true, will publish tf to utm_origin
+      inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+      republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
