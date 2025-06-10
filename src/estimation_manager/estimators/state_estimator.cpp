@@ -11,6 +11,8 @@ std::optional<mrs_msgs::UavState> StateEstimator::getUavState() {
     ROS_ERROR_THROTTLE(1.0, "[%s]: getUavState() was called while estimator is not running", getPrintName().c_str());
     return {};
   }
+  
+  updateUavState();
 
   return mrs_lib::get_mutexed(mtx_uav_state_, uav_state_);
 }
