@@ -11,8 +11,9 @@ mrs_uav_managers:
     state_estimators: [
       "gps_baro",
       "gps_garmin",
-      "rtk",
-      "rtk_garmin",
+      # "rtk",
+      # "rtk_garmin",
+      "passthrough",
     ]
 
     initial_state_estimator: "gps_baro" # will be used as the first state estimator

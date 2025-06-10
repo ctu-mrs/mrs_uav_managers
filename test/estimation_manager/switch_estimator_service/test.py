@@ -30,8 +30,6 @@ def generate_test_description():
 
     uav_name="uav1"
 
-    network_config=get_package_share_directory("mrs_uav_testing")+"/config/default_network_config.yaml",
-    world_config=get_package_share_directory("mrs_uav_testing")+"/config/default_world_config.yaml",
     platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/x500.yaml",
 
     # ld.add_action(
@@ -48,11 +46,14 @@ def generate_test_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
-                        FindPackageShare('mrs_multirotor_simulator'),
+                        FindPackageShare('mrs_uav_testing'),
                             'launch',
-                            'hw_api.py'
+                            'mrs_multirotor_simulator.py'
                         ])
                     ]),
+                    launch_arguments={
+                        'custom_config': launch_dir+"/config/mrs_simulator.yaml",
+                    }.items()
                 )
             ]
         )
@@ -63,17 +64,35 @@ def generate_test_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
-                        FindPackageShare('mrs_uav_managers'),
-                            'launch',
-                            'control_manager.py'
+                        FindPackageShare('mrs_uav_testing'),
+                        'launch',
+                        'mrs_uav_system.py'
                         ])
                     ]),
                     launch_arguments={
+                        'run_automatic_start': "true",
+                        # 'standalone': "true",
                         'uav_name': uav_name,
                         'platform_config': platform_config,
-                        'world_config': world_config,
-                        'network_config': network_config,
+                        'world_config': launch_dir+"/config/world_config.yaml",
+                        'custom_config': launch_dir+"/config/custom_config.yaml",
+                        # 'automatic_start_config': launch_dir+"/config/automatic_start.yaml",
                     }.items()
+                )
+            ]
+        )
+    )
+
+    ld.add_action(
+        GroupAction([
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
+                        FindPackageShare('mrs_multirotor_simulator'),
+                            'launch',
+                            'hw_api.py'
+                        ])
+                    ]),
                 )
             ]
         )
@@ -151,7 +170,7 @@ class PublisherHandlerTest(unittest.TestCase):
         finally:
             self.node.destroy_subscription(sub)
 
-# #} end of 
+# #} end of
 
 # #{ Post-shutdown tests
 
