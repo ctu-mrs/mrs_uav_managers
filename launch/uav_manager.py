@@ -141,11 +141,17 @@ def generate_launch_description():
 
     # #} end of world_config
 
-    # #{ env-based params
+    # #{ use_sim_time
 
-    use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
-    # #} end of env-based params
+    ld.add_action(DeclareLaunchArgument(
+        'use_sim_time',
+        default_value=os.getenv('USE_SIM_TIME', "false"),
+        description="Should the node subscribe to sim time?",
+    ))
+
+    # #} end of custom_config
 
     # #{ log_level
 
