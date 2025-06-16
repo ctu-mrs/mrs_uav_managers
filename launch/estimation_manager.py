@@ -27,6 +27,18 @@ def generate_launch_description():
     this_pkg_path = get_package_share_directory(pkg_name)
     namespace='estimation_manager'
 
+    # #{ uav_name
+
+    uav_name = LaunchConfiguration('uav_name')
+
+    ld.add_action(DeclareLaunchArgument(
+        'uav_name',
+        default_value=os.getenv('UAV_NAME', "uav1"),
+        description="The uav name used for namespacing.",
+    ))
+
+    # #} end of custom_config
+
     # #{ standalone
 
     standalone = LaunchConfiguration('standalone')
@@ -132,7 +144,6 @@ def generate_launch_description():
 
     # #{ env-based params
 
-    uav_name=os.getenv('UAV_NAME', "uav1")
     use_sim_time=os.getenv('USE_SIM_TIME', "false") == "true"
 
     # #} end of env-based params
@@ -153,7 +164,7 @@ def generate_launch_description():
         name='estimation_manager',
         parameters=[
             {"uav_name": uav_name},
-            {"topic_prefix": "/" + uav_name},
+            {"topic_prefix": ["/", uav_name]},
             {"enable_profiler": False},
             {"use_sim_time": use_sim_time},
             {'private_config': this_pkg_path + '/config/private/estimation_manager/estimation_manager.yaml'},
