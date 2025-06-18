@@ -43,3 +43,5 @@ add_subdirectory(./hover_service)
 add_subdirectory(./failsafe_control_error)
 
 add_subdirectory(./trajectory_start_stop_resume_services)
+
+add_subdirectory(./escalating_failsafe_service)

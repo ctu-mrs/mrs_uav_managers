@@ -8,28 +8,30 @@ public:
   EscalatingFailsafeTest() : mrs_uav_testing::TestGeneric(){};
 
   virtual std::optional<std::tuple<bool, std::string>> escalatingFailsafe() = 0;
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
+
+  const std::string _uav_name_ = "uav1";
 };
 
 bool EscalatingFailsafeTest::test() {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler(_uav_name_);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", _uav_name_.c_str(), message.c_str());
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
-      ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -37,10 +39,10 @@ bool EscalatingFailsafeTest::test() {
   // | ----------------------- goto higher ---------------------- |
 
   {
-    auto [success, message] = uh->gotoAbs(0, 0, 15.0, 0);
+    auto [success, message] = uh_->gotoAbs(0, 0, 15.0, 0);
 
     if (!success) {
-      ROS_ERROR("[%s]: goto failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "goto failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -48,14 +50,14 @@ bool EscalatingFailsafeTest::test() {
   // | ------------------- trigger failsafe #1 ------------------ |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (!success) {
-        ROS_ERROR("[%s]: escalating failsafe call #1 failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #1 failed with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -66,14 +68,14 @@ bool EscalatingFailsafeTest::test() {
   // | ----------- try again quickly, this should fail ---------- |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (success) {
-        ROS_ERROR("[%s]: escalating failsafe call #1.5 suceeded with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #1.5 suceeded with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -83,11 +85,11 @@ bool EscalatingFailsafeTest::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
-    if (!uh->isFlyingNormally() && uh->getActiveController() == "EmergencyController" && uh->getActiveTracker() == "LandoffTracker") {
+    if (!uh_->isFlyingNormally() && uh_->getActiveController() == "EmergencyController" && uh_->getActiveTracker() == "LandoffTracker") {
       break;
     }
 
@@ -98,22 +100,22 @@ bool EscalatingFailsafeTest::test() {
 
   // check if we have not moved
 
-  if (!uh->isAtPosition(0, 0, 15.0, 0, 0.5)) {
-    ROS_ERROR("[%s]: we moved after ehover", ros::this_node::getName().c_str());
+  if (!uh_->isAtPosition(0, 0, 15.0, 0, 0.5)) {
+    RCLCPP_ERROR(node_->get_logger(), "we moved after ehover");
     return false;
   }
 
   // | ------------------- trigger failsafe #2 ------------------ |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (!success) {
-        ROS_ERROR("[%s]: escalating failsafe call #2 failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #2 failed with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -124,14 +126,14 @@ bool EscalatingFailsafeTest::test() {
   // | ----------- try again quickly, this should fail ---------- |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (success) {
-        ROS_ERROR("[%s]: escalating failsafe call #2.5 suceeded with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #2.5 suceeded with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -143,25 +145,24 @@ bool EscalatingFailsafeTest::test() {
 
   // | ---------------- check if we are elanding ---------------- |
 
-  auto uav_state = uh->sh_uav_state_.getMsg();
+  auto uav_state = uh_->sh_uav_state_.getMsg();
 
-  if (!(!uh->isFlyingNormally() && uh->getActiveController() == "EmergencyController" && uh->getActiveTracker() == "LandoffTracker" &&
-        uav_state->velocity.linear.z < -0.3)) {
-    ROS_ERROR("[%s]: we are not elanding", ros::this_node::getName().c_str());
+  if (!(!uh_->isFlyingNormally() && uh_->getActiveController() == "EmergencyController" && uh_->getActiveTracker() == "LandoffTracker" && uav_state->velocity.linear.z < -0.3)) {
+    RCLCPP_ERROR(node_->get_logger(), "we are not elanding");
     return false;
   }
 
   // | ------------------- trigger failsafe #3 ------------------ |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (!success) {
-        ROS_ERROR("[%s]: escalating failsafe call #3 failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #3 failed with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -172,14 +173,14 @@ bool EscalatingFailsafeTest::test() {
   // | ----------- try again quickly, this should fail ---------- |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (success) {
-        ROS_ERROR("[%s]: escalating failsafe call #3.5 suceeded with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #3.5 suceeded with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -189,8 +190,8 @@ bool EscalatingFailsafeTest::test() {
 
   sleep(1.5);
 
-  if (!(!uh->isFlyingNormally() && uh->getActiveController() == "FailsafeController" && uav_state->velocity.linear.z < -0.3)) {
-    ROS_ERROR("[%s]: we are not in failsafe", ros::this_node::getName().c_str());
+  if (!(!uh_->isFlyingNormally() && uh_->getActiveController() == "FailsafeController" && uav_state->velocity.linear.z < -0.3)) {
+    RCLCPP_ERROR(node_->get_logger(), "we are not in failsafe");
     return false;
   }
 
@@ -199,14 +200,14 @@ bool EscalatingFailsafeTest::test() {
   // | ----------- try again quickly, this should fail ---------- |
 
   {
-    auto result = escalatingFailsafe();
+    auto result = this->escalatingFailsafe();
 
     if (result) {
 
       auto [success, message] = result.value();
 
       if (success) {
-        ROS_ERROR("[%s]: escalating failsafe call #4 suceeded with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "escalating failsafe call #4 suceeded with message: '%s'", message.c_str());
         return false;
       }
     }
@@ -216,11 +217,11 @@ bool EscalatingFailsafeTest::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
-    if (!uh->isOutputEnabled()) {
+    if (!uh_->isOutputEnabled()) {
       return true;
     }
 
