@@ -17,3 +17,9 @@ add_subdirectory(./reference_topic)
 add_subdirectory(./set_heading_service)
 
 add_subdirectory(./set_heading_relative_service)
+
+add_subdirectory(./velocity_reference_topic)
+
+add_subdirectory(./validate_reference_service)
+
+add_subdirectory(./validate_reference_array_service)

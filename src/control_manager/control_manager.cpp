@@ -5426,40 +5426,50 @@ bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_ms
   auto last_tracker_cmd = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
 
   // get the transformer
-  auto ret = transformer_->getTransform(uav_state.header.frame_id, request->array.header.frame_id, request->array.header.stamp);
+  auto opt_tf = transformer_->getTransform(uav_state.header.frame_id, request->array.header.frame_id, request->array.header.stamp);
 
-  if (!ret) {
-
-    RCLCPP_DEBUG(node_->get_logger(), "could not find transform for the reference");
-    response->message = "could not find transform";
-    return false;
+  if (!opt_tf) {
+    RCLCPP_WARN(node_->get_logger(), "could not find transform for the reference's frame_id");
+    response->message = "could not find transform for the reference's frame_id";
+    return true;
   }
 
-  geometry_msgs::msg::TransformStamped tf = ret.value();
+  geometry_msgs::msg::TransformStamped tf = opt_tf.value();
 
   for (int i = 0; i < int(request->array.array.size()); i++) {
 
     response->success.push_back(true);
 
+    // | ---------- check if the "number" are valid first --------- |
+
     mrs_msgs::msg::ReferenceStamped original_reference;
     original_reference.header    = request->array.header;
     original_reference.reference = request->array.array.at(i);
 
-    response->success.at(i) = validateReference(node_, original_reference.reference, "callbackValidateReferenceArray(): original_reference.reference");
+    if (!validateReference(node_, original_reference.reference, "callbackValidateReferenceArray(): original_reference.reference")) {
 
-    auto ret = transformer_->transformSingle(original_reference, uav_state.header.frame_id);
+      RCLCPP_WARN(node_->get_logger(), "the reference for validation ([%d]) contains invalid numbers", i);
+      response->success.at(i) = false;
+    }
+
+    // | --- transform the reference into current control frame --- |
+
+    auto ret = transformer_->transform(original_reference, tf);
 
     if (!ret) {
-
-      RCLCPP_DEBUG(node_->get_logger(), "the reference could not be transformed");
+      RCLCPP_WARN(node_->get_logger(), "the reference for validation ([%d]) could not be transformed", i);
       response->success.at(i) = false;
     }
 
     mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
+    // | --- check transformed reference agains the safety area --- |
+
     if (!isPointInSafetyArea3d(transformed_reference)) {
       response->success.at(i) = false;
     }
+
+    // check the path from the current point (if flying) to the reference
 
     if (last_tracker_cmd) {
 
