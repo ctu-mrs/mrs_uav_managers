@@ -1,25 +1,28 @@
-#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
 
 #include <trajectory_tracking_test.h>
+
+using namespace std::chrono_literals;
 
 class Tester : public TrajectoryTrackingTest {
 
 public:
-  Tester();
+  Tester() : TrajectoryTrackingTest() {
+  }
 
-  bool test();
+  bool test(void);
 };
 
-Tester::Tester() {
-}
+bool Tester::test(void) {
 
-bool Tester::test() {
+  const std::string uav_name = "uav1";
 
   {
-    auto [uhopt, message] = getUAVHandler(_uav_name_);
+    auto [uhopt, message] = getUAVHandler(uav_name);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", uav_name.c_str(), message.c_str());
       return false;
     }
 
@@ -30,7 +33,7 @@ bool Tester::test() {
     auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
-      ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -46,14 +49,14 @@ bool Tester::test() {
   // | ----------------- publish the trajectory ----------------- |
 
   {
-    mrs_msgs::TrajectoryReference msg_out;
+    mrs_msgs::msg::TrajectoryReference msg_out;
 
     msg_out.dt          = dt;
     msg_out.use_heading = true;
 
     for (auto point : traj) {
 
-      mrs_msgs::Reference traj_point;
+      mrs_msgs::msg::Reference traj_point;
 
       traj_point.position.x = point(0);
       traj_point.position.y = point(1);
@@ -70,11 +73,7 @@ bool Tester::test() {
 
   // | --------------- start the trajectory check --------------- |
 
-  ROS_INFO("[%s]: pes", ros::this_node::getName().c_str());
-
   auto future_flythrough_check = std::async(std::launch::async, &Tester::checkTrajectoryFlythrough, this, traj, 1.0);
-
-  ROS_INFO("[%s]: kocka", ros::this_node::getName().c_str());
 
   // | --------- goto the first point of the trajectory --------- |
 
@@ -82,7 +81,7 @@ bool Tester::test() {
     auto [success, message] = uh_->gotoTrajectoryStart();
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to goto the first point of the trajectory: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to goto the first point of the trajectory: '%s'", message.c_str());
       return false;
     }
   }
@@ -91,7 +90,7 @@ bool Tester::test() {
 
   {
     if (!uh_->isAtPosition(from(0), from(1), from(2), from(3), 1.0)) {
-      ROS_ERROR("[%s]: failed to reach the first point of the trajectory", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to reach the first point of the trajectory");
       return false;
     }
   }
@@ -102,7 +101,7 @@ bool Tester::test() {
     auto [success, message] = uh_->startTrajectoryTracking();
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to start trajectory tracking: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to start trajectory tracking: '%s'", message.c_str());
       return false;
     }
   }
@@ -113,7 +112,7 @@ bool Tester::test() {
     auto [success, message] = uh_->stopTrajectoryTracking();
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to stop trajectory tracking: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to stop trajectory tracking: '%s'", message.c_str());
       return false;
     }
   }
@@ -122,9 +121,9 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
-      ROS_ERROR("[%s]: stopped from outside", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "stopped from outside");
     }
 
     std::optional<double> speed = uh_->getSpeed();
@@ -140,7 +139,7 @@ bool Tester::test() {
     auto [success, message] = uh_->resumeTrajectoryTracking();
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to stop trajectory tracking: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to stop trajectory tracking: '%s'", message.c_str());
       return false;
     }
   }
@@ -149,9 +148,9 @@ bool Tester::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
-      ROS_ERROR("[%s]: stopped from outside", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "stopped from outside");
     }
 
     if (future_flythrough_check.valid()) {
@@ -160,7 +159,7 @@ bool Tester::test() {
 
       if (!success) {
         return false;
-        ROS_ERROR("[%s]: the trajectory was not tracked: '%s'", ros::this_node::getName().c_str(), message.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "the trajectory was not tracked: '%s'", message.c_str());
       } else {
         break;
       }
@@ -172,29 +171,26 @@ bool Tester::test() {
   if (uh_->isFlyingNormally()) {
     return true;
   } else {
-    ROS_ERROR("[%s]: not flying normally", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "not flying normally");
     return false;
   }
 }
 
-TEST(TESTSuite, test) {
+int main(int argc, char* argv[]) {
+
+  rclcpp::init(argc, argv);
+
+  bool test_result = true;
 
   Tester tester;
 
-  bool result = tester.test();
+  test_result &= tester.test();
 
-  if (result) {
-    GTEST_SUCCEED();
-  } else {
-    GTEST_FAIL();
-  }
-}
+  tester.sleep(2.0);
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
+  std::cout << "Test: reporting test results" << std::endl;
 
-  ros::init(argc, argv, "test");
+  tester.reportTestResult(test_result);
 
-  testing::InitGoogleTest(&argc, argv);
-
-  return RUN_ALL_TESTS();
+  tester.join();
 }
