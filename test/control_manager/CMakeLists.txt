@@ -37,3 +37,5 @@ add_subdirectory(./eland_innovation)
 add_subdirectory(./eland_service)
 
 add_subdirectory(./trajectory_topic)
+
+add_subdirectory(./hover_service)
