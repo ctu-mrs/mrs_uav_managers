@@ -5,6 +5,12 @@
 
 #include <mrs_msgs/msg/hw_api_rc_channels.hpp>
 
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
 #define AIL 0
 #define THR 1
 #define ELE 2
