@@ -34,7 +34,7 @@ std::tuple<bool, std::string> TrajectoryTrackingTest::checkTrajectoryFlythrough(
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return {false, "terminated form outside"};
     }
 

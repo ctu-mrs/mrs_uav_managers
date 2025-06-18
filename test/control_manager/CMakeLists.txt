@@ -35,3 +35,5 @@ add_subdirectory(./eland_control_error)
 add_subdirectory(./eland_innovation)
 
 add_subdirectory(./eland_service)
+
+add_subdirectory(./trajectory_topic)
