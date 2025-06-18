@@ -23,3 +23,9 @@ add_subdirectory(./velocity_reference_topic)
 add_subdirectory(./validate_reference_service)
 
 add_subdirectory(./validate_reference_array_service)
+
+add_subdirectory(./transform_pose_service)
+
+add_subdirectory(./transform_reference_service)
+
+add_subdirectory(./transform_vector3_service)
