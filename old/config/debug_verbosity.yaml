@@ -1,4 +1,0 @@
-log4j.logger.ros.mrs_uav_managers=DEBUG
-log4j.logger.ros.mrs_uav_trackers=DEBUG
-log4j.logger.ros.mrs_uav_controllers=DEBUG
-log4j.logger.ros.mrs_uav_state_estimators=DEBUG
