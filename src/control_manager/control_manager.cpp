@@ -3178,7 +3178,16 @@ void ControlManager::timerFailsafe() {
 
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[ControlManager]: detecting zero throttle, disarming");
 
+    toggleOutput(false);
+
+    RCLCPP_INFO(node_->get_logger(), "calling for disarm");
     arming(false);
+
+    RCLCPP_WARN(node_->get_logger(), "failsafe landing finished");
+
+    RCLCPP_DEBUG(node_->get_logger(), "stopping failsafe timer");
+    timer_failsafe_->stop();
+    RCLCPP_DEBUG(node_->get_logger(), "failsafe timer stopped");
   }
 }
 

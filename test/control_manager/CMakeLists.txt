@@ -39,3 +39,5 @@ add_subdirectory(./eland_service)
 add_subdirectory(./trajectory_topic)
 
 add_subdirectory(./hover_service)
+
+add_subdirectory(./failsafe_control_error)
