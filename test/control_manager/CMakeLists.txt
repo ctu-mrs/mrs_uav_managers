@@ -47,3 +47,5 @@ add_subdirectory(./trajectory_start_stop_resume_services)
 add_subdirectory(./escalating_failsafe_service)
 
 add_subdirectory(./escalating_failsafe_rc)
+
+add_subdirectory(./rc_remote_control)

@@ -1,8 +1,9 @@
-#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/time.hpp>
 
 #include <remote_control_test.h>
 
-#include <mrs_msgs/HwApiRcChannels.h>
+#include <mrs_msgs/msg/hw_api_rc_channels.hpp>
 
 #define AIL 0
 #define THR 1
@@ -10,6 +11,8 @@
 #define RUD 3
 
 #define ACTIVATION 6
+
+using namespace std::chrono_literals;
 
 class Tester : public RemoteControlTest {
 
@@ -28,20 +31,56 @@ public:
   void rotateLeft();
   void rotateRight();
 
-  bool getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate);
-
   void stop();
 
-  mrs_lib::PublisherHandler<mrs_msgs::HwApiRcChannels> ph_rc_channels_;
+  bool getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate);
 
-  ros::Timer timer_rc_;
-  void       timerRc(const ros::TimerEvent &event);
+  mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiRcChannels> ph_rc_channels_;
 
-  mrs_msgs::HwApiRcChannels rc_;
-  std::mutex                mutex_rc_;
+  std::shared_ptr<TimerType> timer_rc_;
+  void                       timerRc();
+
+  mrs_msgs::msg::HwApiRcChannels rc_;
+  std::mutex                     mutex_rc_;
 };
 
+Tester::Tester() {
+
+  ph_rc_channels_ = mrs_lib::PublisherHandler<mrs_msgs::msg::HwApiRcChannels>(node_, "/" + _uav_name_ + "/hw_api/rc_channels");
+
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.5);
+  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.0);
+  rc_.channels.push_back(0.0);
+
+  std::function<void()> callback_fcn = std::bind(&Tester::timerRc, this);
+
+  mrs_lib::TimerHandlerOptions timer_opts_start;
+
+  timer_opts_start.node      = node_;
+  timer_opts_start.autostart = true;
+
+  timer_rc_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(100.0, clock_), callback_fcn);
+}
+
+void Tester::timerRc() {
+
+  {
+    std::scoped_lock lock(mutex_rc_);
+
+    ph_rc_channels_.publish(rc_);
+  }
+}
+
 bool Tester::getControllerDynamics(double &horizontal_speed, double &vertical_speed, double &heading_rate) {
+
+  pl_->addYamlFileFromParam("control_manager_config");
 
   pl_->loadParam("mrs_uav_managers/control_manager/rc_joystick/horizontal_speed", horizontal_speed);
   pl_->loadParam("mrs_uav_managers/control_manager/rc_joystick/vertical_speed", vertical_speed);
@@ -52,33 +91,6 @@ bool Tester::getControllerDynamics(double &horizontal_speed, double &vertical_sp
   }
 
   return true;
-}
-
-Tester::Tester() {
-
-  ph_rc_channels_ = mrs_lib::PublisherHandler<mrs_msgs::HwApiRcChannels>(nh_, "/" + _uav_name_ + "/hw_api/rc_channels");
-
-  rc_.channels.push_back(0.5);
-  rc_.channels.push_back(0.5);
-  rc_.channels.push_back(0.5);
-  rc_.channels.push_back(0.5);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-  rc_.channels.push_back(0.0);
-
-  timer_rc_ = nh_.createTimer(ros::Rate(100.0), &Tester::timerRc, this, false, true);
-}
-
-void Tester::timerRc([[maybe_unused]] const ros::TimerEvent &event) {
-
-  {
-    std::scoped_lock lock(mutex_rc_);
-
-    ph_rc_channels_.publish(rc_);
-  }
 }
 
 void Tester::activate() {
@@ -207,24 +219,21 @@ void Tester::stop() {
   }
 }
 
-TEST(TESTSuite, test) {
+int main(int argc, char *argv[]) {
+
+  rclcpp::init(argc, argv);
+
+  bool test_result = true;
 
   Tester tester;
 
-  bool result = tester.test();
+  test_result &= tester.test();
 
-  if (result) {
-    GTEST_SUCCEED();
-  } else {
-    GTEST_FAIL();
-  }
-}
+  tester.sleep(2.0);
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
+  std::cout << "Test: reporting test results" << std::endl;
 
-  ros::init(argc, argv, "test");
+  tester.reportTestResult(test_result);
 
-  testing::InitGoogleTest(&argc, argv);
-
-  return RUN_ALL_TESTS();
+  tester.join();
 }

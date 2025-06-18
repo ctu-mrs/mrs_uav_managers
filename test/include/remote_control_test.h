@@ -46,6 +46,8 @@ public:
   bool setGotoReference();
 
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
+
+  std::string _uav_name_ = "uav1";
 };
 
 /* constructor //{ */
@@ -60,7 +62,7 @@ Eigen::Vector3d RemoteControlTest::getFcuUntiltedVelocity() {
 
   auto uav_state = uh_->sh_uav_state_.getMsg();
 
-  geometry_msgs::Vector3Stamped vel_world;
+  geometry_msgs::msg::Vector3Stamped vel_world;
   vel_world.header = uav_state->header;
   vel_world.vector = uav_state->velocity.linear;
 
@@ -79,11 +81,11 @@ Eigen::Vector3d RemoteControlTest::getFcuUntiltedVelocity() {
 
 bool RemoteControlTest::testMoveForward() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -95,7 +97,7 @@ bool RemoteControlTest::testMoveForward() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -109,11 +111,11 @@ bool RemoteControlTest::testMoveForward() {
 
 bool RemoteControlTest::testMoveBackward() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -125,7 +127,7 @@ bool RemoteControlTest::testMoveBackward() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -139,11 +141,11 @@ bool RemoteControlTest::testMoveBackward() {
 
 bool RemoteControlTest::testMoveLeft() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -155,7 +157,7 @@ bool RemoteControlTest::testMoveLeft() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -169,11 +171,11 @@ bool RemoteControlTest::testMoveLeft() {
 
 bool RemoteControlTest::testMoveRight() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -185,7 +187,7 @@ bool RemoteControlTest::testMoveRight() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -199,11 +201,11 @@ bool RemoteControlTest::testMoveRight() {
 
 bool RemoteControlTest::testMoveUp() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -215,7 +217,7 @@ bool RemoteControlTest::testMoveUp() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -229,11 +231,11 @@ bool RemoteControlTest::testMoveUp() {
 
 bool RemoteControlTest::testMoveDown() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -245,7 +247,7 @@ bool RemoteControlTest::testMoveDown() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -259,11 +261,11 @@ bool RemoteControlTest::testMoveDown() {
 
 bool RemoteControlTest::testRotateLeft() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -275,7 +277,7 @@ bool RemoteControlTest::testRotateLeft() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -289,11 +291,11 @@ bool RemoteControlTest::testRotateLeft() {
 
 bool RemoteControlTest::testRotateRight() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -305,7 +307,7 @@ bool RemoteControlTest::testRotateRight() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 5.0) {
+    if ((clock_->now() - started).seconds() > 5.0) {
       return false;
     }
 
@@ -319,11 +321,11 @@ bool RemoteControlTest::testRotateRight() {
 
 bool RemoteControlTest::testStop() {
 
-  ros::Time started = ros::Time::now();
+  rclcpp::Time started = clock_->now();
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -336,7 +338,7 @@ bool RemoteControlTest::testStop() {
       return true;
     }
 
-    if ((ros::Time::now() - started).toSec() > 10.0) {
+    if ((clock_->now() - started).seconds() > 10.0) {
       return false;
     }
 
@@ -350,19 +352,20 @@ bool RemoteControlTest::testStop() {
 
 bool RemoteControlTest::setGotoReference() {
 
-  mrs_msgs::Vec4 srv;
-
-  srv.request.goal.at(0) = 1000;
-  srv.request.goal.at(1) = 0;
-  srv.request.goal.at(2) = 5;
-  srv.request.goal.at(3) = 0;
-
   {
-    bool service_call = uh_->sch_goto_relative_.call(srv);
+    std::shared_ptr<mrs_msgs::srv::Vec4::Request> request = std::make_shared<mrs_msgs::srv::Vec4::Request>();
 
-    if (!service_call || !srv.response.success) {
-      ROS_ERROR("[%s]: failed to call the service", ros::this_node::getName().c_str());
-      return false;
+    request->goal[0] = 1000;
+    request->goal[1] = 0;
+    request->goal[2] = 5;
+    request->goal[3] = 0;
+
+    {
+      auto response = uh_->sch_goto_relative_.callSync(request);
+
+      if (!response || !response.value()->success) {
+        return false;
+      }
     }
   }
 
@@ -375,20 +378,21 @@ bool RemoteControlTest::setGotoReference() {
   auto constraints = uh_->getCurrentConstraints();
 
   if (!constraints) {
-    ROS_ERROR("[%s]: could not get current constraints", ros::this_node::getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "could not get current constraints");
     return false;
   }
 
   if (uav_state->velocity.linear.x > 0.8 * constraints->horizontal_speed) {
     return true;
   } else {
-    ROS_ERROR("[%s]: velocity not reached, %.2f, %.2f, %.2f", ros::this_node::getName().c_str(), uav_state->velocity.linear.x, uav_state->velocity.linear.y,
-              uav_state->velocity.linear.z);
+    RCLCPP_ERROR(node_->get_logger(), "velocity not reached, %.2f, %.2f, %.2f", uav_state->velocity.linear.x, uav_state->velocity.linear.y, uav_state->velocity.linear.z);
     return false;
   }
 }
 
 //}
+
+/* test() //{ */
 
 bool RemoteControlTest::test() {
 
@@ -396,7 +400,7 @@ bool RemoteControlTest::test() {
     auto [uhopt, message] = getUAVHandler(_uav_name_);
 
     if (!uhopt) {
-      ROS_ERROR("[%s]: Failed obtain handler for '%s': '%s'", ros::this_node::getName().c_str(), _uav_name_.c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Failed obtain handler for '%s': '%s'", _uav_name_.c_str(), message.c_str());
       return false;
     }
 
@@ -407,7 +411,7 @@ bool RemoteControlTest::test() {
     bool success = getControllerDynamics(_horizontal_speed_, _vertical_speed_, _heading_rate_);
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to load the parameters", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load the parameters");
       return false;
     }
   }
@@ -416,7 +420,7 @@ bool RemoteControlTest::test() {
     auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
-      ROS_ERROR("[%s]: midair activation failed with message: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
       return false;
     }
   }
@@ -429,7 +433,7 @@ bool RemoteControlTest::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -446,7 +450,7 @@ bool RemoteControlTest::test() {
     bool success = testRotateLeft();
 
     if (!success) {
-      ROS_ERROR("[%s]: left rotation motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "left rotation motion test failed");
       return false;
     }
   }
@@ -455,7 +459,7 @@ bool RemoteControlTest::test() {
     bool success = testRotateRight();
 
     if (!success) {
-      ROS_ERROR("[%s]: right rotation motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "right rotation motion test failed");
       return false;
     }
   }
@@ -464,7 +468,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveForward();
 
     if (!success) {
-      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "forward motion test failed");
       return false;
     }
   }
@@ -473,7 +477,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveBackward();
 
     if (!success) {
-      ROS_ERROR("[%s]: backward motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "backward motion test failed");
       return false;
     }
   }
@@ -482,7 +486,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveLeft();
 
     if (!success) {
-      ROS_ERROR("[%s]: left motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "left motion test failed");
       return false;
     }
   }
@@ -491,7 +495,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveRight();
 
     if (!success) {
-      ROS_ERROR("[%s]: right motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "right motion test failed");
       return false;
     }
   }
@@ -500,7 +504,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveUp();
 
     if (!success) {
-      ROS_ERROR("[%s]: up motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "up motion test failed");
       return false;
     }
   }
@@ -509,7 +513,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveDown();
 
     if (!success) {
-      ROS_ERROR("[%s]: down motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "down motion test failed");
       return false;
     }
   }
@@ -522,7 +526,7 @@ bool RemoteControlTest::test() {
 
   while (true) {
 
-    if (!ros::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
 
@@ -541,7 +545,7 @@ bool RemoteControlTest::test() {
     bool success = setGotoReference();
 
     if (!success) {
-      ROS_ERROR("[%s]: failed to set goto reference", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to set goto reference");
       return false;
     }
   }
@@ -552,7 +556,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveUp();
 
     if (!success) {
-      ROS_ERROR("[%s]: up motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "up motion test failed");
       return false;
     }
   }
@@ -561,7 +565,7 @@ bool RemoteControlTest::test() {
     bool success = testStop();
 
     if (!success) {
-      ROS_ERROR("[%s]: stop motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "stop motion test failed");
       return false;
     }
   }
@@ -576,7 +580,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveForward();
 
     if (!success) {
-      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "forward motion test failed");
       return false;
     }
   }
@@ -585,7 +589,7 @@ bool RemoteControlTest::test() {
     auto [success, message] = uh_->switchController("Se3Controller");
 
     if (success) {
-      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "controller switched, this should not be allowed: '%s'", message.c_str());
       return false;
     }
   }
@@ -596,7 +600,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveForward();
 
     if (!success) {
-      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "forward motion test failed");
       return false;
     }
   }
@@ -605,7 +609,7 @@ bool RemoteControlTest::test() {
     auto [success, message] = uh_->switchController("MpcController");
 
     if (success) {
-      ROS_ERROR("[%s]: controller switched, this should not be allowed: '%s'", ros::this_node::getName().c_str(), message.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "controller switched, this should not be allowed: '%s'", message.c_str());
       return false;
     }
   }
@@ -616,7 +620,7 @@ bool RemoteControlTest::test() {
     bool success = testMoveForward();
 
     if (!success) {
-      ROS_ERROR("[%s]: forward motion test failed", ros::this_node::getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "forward motion test failed");
       return false;
     }
   }
@@ -627,3 +631,5 @@ bool RemoteControlTest::test() {
 
   return true;
 }
+
+//}
