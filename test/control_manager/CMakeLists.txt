@@ -31,3 +31,5 @@ add_subdirectory(./transform_reference_service)
 add_subdirectory(./transform_vector3_service)
 
 add_subdirectory(./eland_control_error)
+
+add_subdirectory(./eland_innovation)
