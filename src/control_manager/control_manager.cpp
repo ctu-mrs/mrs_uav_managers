@@ -864,8 +864,6 @@ private:
   // publishes
   void publish(void);
 
-  bool loadConfigFile(const std::string& file_path, const std::string ns);
-
   double getMass(void);
 
   // publishes rviz-visualizable control reference
@@ -1347,7 +1345,6 @@ void ControlManager::initialize(void) {
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _tracker_names_.at(i);
     private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _tracker_names_.at(i));
@@ -1646,7 +1643,6 @@ void ControlManager::initialize(void) {
     // create private handlers
     std::shared_ptr<mrs_uav_managers::control_manager::PrivateHandlers_t> private_handlers = std::make_shared<mrs_uav_managers::control_manager::PrivateHandlers_t>();
 
-    private_handlers->loadConfigFile = std::bind(&ControlManager::loadConfigFile, this, std::placeholders::_1, it->second.name_space);
     private_handlers->name_space     = it->second.name_space;
     private_handlers->runtime_name   = _controller_names_.at(i);
     private_handlers->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, _controller_names_.at(i));
@@ -6738,52 +6734,6 @@ double ControlManager::getMass(void) {
   } else {
     return _uav_mass_;
   }
-}
-
-//}
-
-/* loadConfigFile() //{ */
-
-bool ControlManager::loadConfigFile(const std::string& file_path, const std::string ns) {
-
-  const std::string name_space = std::string(node_->get_namespace()) + "/" + ns;
-
-  RCLCPP_INFO(node_->get_logger(), "loading '%s' under the namespace '%s'", file_path.c_str(), name_space.c_str());
-
-  // load the user-requested file
-  {
-    std::string command = "rosparam load " + file_path + " " + name_space;
-    int         result  = std::system(command.c_str());
-
-    if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "failed to load '%s'", file_path.c_str());
-      return false;
-    }
-  }
-
-  // load the platform config
-  if (_platform_config_ != "") {
-    std::string command = "rosparam load " + _platform_config_ + " " + name_space;
-    int         result  = std::system(command.c_str());
-
-    if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "failed to load the platform config file '%s'", _platform_config_.c_str());
-      return false;
-    }
-  }
-
-  // load the custom config
-  if (_custom_config_ != "") {
-    std::string command = "rosparam load " + _custom_config_ + " " + name_space;
-    int         result  = std::system(command.c_str());
-
-    if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "failed to load the custom config file '%s'", _custom_config_.c_str());
-      return false;
-    }
-  }
-
-  return true;
 }
 
 //}
