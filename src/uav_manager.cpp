@@ -2386,8 +2386,8 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
     }
   }
 
-  // 4. wait for 50 ms, that should be enough for the Pixhawk to start getting data
-  clock_->sleep_for(0.05s);
+  // 4. wait for 100 ms, that should be enough for the Pixhawk to start getting data
+  clock_->sleep_for(0.2s);
 
   // 5. turn on the OFFBOARD MODE
   // since now, the UAV should be under our control
