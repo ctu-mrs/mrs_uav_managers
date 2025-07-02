@@ -67,6 +67,8 @@ public:
 
   virtual bool setUavState(const mrs_msgs::UavState &uav_state) = 0;
 
+  virtual void updateUavState() = 0;
+
   // implemented methods
   std::optional<mrs_msgs::UavState>        getUavState();
   nav_msgs::Odometry                       getInnovation() const;
