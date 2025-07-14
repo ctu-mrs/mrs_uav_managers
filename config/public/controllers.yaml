@@ -6,23 +6,28 @@ mrs_uav_managers:
       eland_threshold: 1.5 # [m], position error triggering eland
       failsafe_threshold: 2.5 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 1.5 # [m], position odometry innovation threshold
+      human_switchable: false
 
     MpcController:
       eland_threshold: 3.5 # [m], position error triggering eland
       failsafe_threshold: 4.5 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 2.5 # [m], position odometry innovation threshold
+      human_switchable: false
 
     FailsafeController:
       eland_threshold: 0.0 # [m], position error triggering eland
       failsafe_threshold: 0.0 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 0.0 # [m], position odometry innovation threshold
+      human_switchable: false
 
     EmergencyController:
       eland_threshold: 3.0 # [m], position error triggering eland
       failsafe_threshold: 4.0 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+      human_switchable: false
 
     MidairActivationController:
       eland_threshold: 3.0 # [m], position error triggering eland
       failsafe_threshold: 4.0 # [m], position error triggering failsafe land
       odometry_innovation_threshold: 3.0 # [m], position odometry innovation threshold
+      human_switchable: false

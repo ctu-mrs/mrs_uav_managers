@@ -37,6 +37,9 @@ mrs_uav_managers:
       parent: "fcu_untilted" # fcu should be the parent if using the default inverted mrs tf tree convention with fcu as the root of the tf tree
       child: "amsl_origin"
 
+    mapping_origin_tf:
+      enabled: false # amsl tf should be published by default unless some other node already publishes it
+
     # frame_id with the frame defined by the position of the RTK antenna
     rtk_antenna:
       frame_id: "rtk_antenna"
@@ -56,6 +59,10 @@ mrs_uav_managers:
       utm_based: false # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     gps_garmin:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -67,6 +74,10 @@ mrs_uav_managers:
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       # republish_in_frames: ["local_origin", "world_origin"] # the odometry message will be transformed and republished in the specified frames
       republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     gps_baro:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -77,6 +88,10 @@ mrs_uav_managers:
       utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     rtk:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -87,6 +102,10 @@ mrs_uav_managers:
       utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     rtk_garmin:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -97,6 +116,10 @@ mrs_uav_managers:
       utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     passthrough:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -106,6 +129,10 @@ mrs_uav_managers:
       utm_based: false # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     ground_truth:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -115,6 +142,10 @@ mrs_uav_managers:
       utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
 
     dummy:
       odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
@@ -124,3 +155,7 @@ mrs_uav_managers:
       utm_based: false # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: [] # the odometry message will be transformed and republished in the specified frames
+      custom_frame_id:
+        enabled: false
+      custom_child_frame_id:
+        enabled: false
