@@ -508,6 +508,8 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
     param_loader.addYamlFile(platform_config);
   }
 
+  param_loader.addYamlFileFromParam("detailed_uav_dynamics_params_config");
+
   double mass;
   double arm_length;
   double body_height;
@@ -519,20 +521,35 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
   bool detailed_loaded = true;
 
-  detailed_loaded &= param_loader.loadParam("uav_mass", mass, 0.0);
+  bool enabled = false;
 
-  detailed_loaded &= param_loader.loadParam("model_params/arm_length", arm_length, 0.0);
-  detailed_loaded &= param_loader.loadParam("model_params/body_height", body_height, 0.0);
-
-  detailed_loaded &= param_loader.loadParam("model_params/propulsion/force_constant", force_constant, 0.0);
-  detailed_loaded &= param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant, 0.0);
-  detailed_loaded &= param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius, 0.0);
-  detailed_loaded &= param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min, 0.0);
-  detailed_loaded &= param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max, 0.0);
+  param_loader.loadParam("model_params/enabled", enabled);
 
   Eigen::MatrixXd allocation_matrix;
 
-  detailed_loaded &= param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
+  bool inertia_enabled = false;
+
+  if (enabled) {
+
+    param_loader.loadParam("uav_mass", mass);
+
+    param_loader.loadParam("model_params/arm_length", arm_length);
+    param_loader.loadParam("model_params/body_height", body_height);
+
+    param_loader.loadParam("model_params/propulsion/force_constant", force_constant);
+    param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant);
+    param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius);
+    param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min);
+    param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max);
+
+    param_loader.loadParam("model_params/inertia_matrix/enabled", inertia_enabled);
+
+    param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
+
+    if (!param_loader.loadedSuccessfully()) {
+      detailed_loaded = false;
+    }
+  }
 
   if (!detailed_loaded) {
     RCLCPP_WARN(node->get_logger(),
@@ -553,26 +570,29 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
   Eigen::Matrix3d inertia_matrix;
 
-  bool inertia_loaded = param_loader.loadMatrixStatic("model_params/inertia_matrix", inertia_matrix, Eigen::Matrix3d::Identity());
+  if (inertia_enabled) {
 
-  if (inertia_loaded) {
+    bool inertia_loaded = param_loader.loadMatrixStatic("model_params/inertia_matrix", inertia_matrix, Eigen::Matrix3d::Identity());
 
-    model_params.inertia = inertia_matrix;
-    RCLCPP_INFO(node->get_logger(), "inertia matrix loaded from config file:");
-    RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
+    if (inertia_loaded) {
 
-  } else {
+      model_params.inertia = inertia_matrix;
+      RCLCPP_INFO(node->get_logger(), "inertia matrix loaded from config file:");
+      RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
 
-    RCLCPP_INFO(node->get_logger(), "inertia matrix missing in the config file, computing it from the other params.");
+    } else {
 
-    // create the inertia matrix
-    model_params.inertia       = Eigen::Matrix3d::Zero();
-    model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-    model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-    model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+      RCLCPP_INFO(node->get_logger(), "inertia matrix missing in the config file, computing it from the other params.");
 
-    RCLCPP_INFO(node->get_logger(), "inertia computed form parameters:");
-    RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
+      // create the inertia matrix
+      model_params.inertia       = Eigen::Matrix3d::Zero();
+      model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+      model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+      model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+
+      RCLCPP_INFO(node->get_logger(), "inertia computed form parameters:");
+      RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
+    }
   }
 
   // create the force-torque allocation matrix

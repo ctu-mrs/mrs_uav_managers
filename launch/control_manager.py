@@ -211,6 +211,7 @@ def generate_launch_description():
             {'private_controllers': this_pkg_path + '/config/private/controllers.yaml'},
             {'public_controllers': this_pkg_path + '/config/public/controllers.yaml'},
             {'uav_manager_config': this_pkg_path + '/config/public/uav_manager.yaml'},
+            {'detailed_uav_dynamics_params_config': this_pkg_path + '/config/public/detailed_uav_dynamics_params.yaml'},
             {'platform_config': platform_config},
             {'custom_config': custom_config},
             {'world_config': world_config},
