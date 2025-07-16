@@ -519,8 +519,6 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
   double rpm_min;
   double rpm_max;
 
-  bool detailed_loaded = true;
-
   bool enabled = false;
 
   param_loader.loadParam("model_params/enabled", enabled);
@@ -529,29 +527,27 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
   bool inertia_enabled = false;
 
-  if (enabled) {
-
-    param_loader.loadParam("uav_mass", mass);
-
-    param_loader.loadParam("model_params/arm_length", arm_length);
-    param_loader.loadParam("model_params/body_height", body_height);
-
-    param_loader.loadParam("model_params/propulsion/force_constant", force_constant);
-    param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant);
-    param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius);
-    param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min);
-    param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max);
-
-    param_loader.loadParam("model_params/inertia_matrix/enabled", inertia_enabled);
-
-    param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
-
-    if (!param_loader.loadedSuccessfully()) {
-      detailed_loaded = false;
-    }
+  if (!enabled) {
+    RCLCPP_INFO(node->get_logger(), "detailed UAV model params were not provided");
+    return {};
   }
 
-  if (!detailed_loaded) {
+  param_loader.loadParam("uav_mass", mass);
+
+  param_loader.loadParam("model_params/arm_length", arm_length);
+  param_loader.loadParam("model_params/body_height", body_height);
+
+  param_loader.loadParam("model_params/propulsion/force_constant", force_constant);
+  param_loader.loadParam("model_params/propulsion/torque_constant", torque_constant);
+  param_loader.loadParam("model_params/propulsion/prop_radius", prop_radius);
+  param_loader.loadParam("model_params/propulsion/rpm/min", rpm_min);
+  param_loader.loadParam("model_params/propulsion/rpm/max", rpm_max);
+
+  param_loader.loadParam("model_params/inertia_matrix/enabled", inertia_enabled);
+
+  param_loader.loadMatrixDynamic("model_params/propulsion/allocation_matrix", allocation_matrix, Eigen::Matrix4d::Identity(), 4, -1);
+
+  if (!param_loader.loadedSuccessfully()) {
     RCLCPP_WARN(node->get_logger(),
                 "detailed UAV model params not loaded, missing some parameters. This will not permit operations when ACTUATORS or CONTROL_GROUP control "
                 "outputs would be possible.");
@@ -572,7 +568,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
   if (inertia_enabled) {
 
-    bool inertia_loaded = param_loader.loadMatrixStatic("model_params/inertia_matrix", inertia_matrix, Eigen::Matrix3d::Identity());
+    bool inertia_loaded = param_loader.loadMatrixStatic("model_params/inertia_matrix/matrix", inertia_matrix, Eigen::Matrix3d::Identity());
 
     if (inertia_loaded) {
 
