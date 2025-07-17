@@ -11,6 +11,8 @@ std::optional<mrs_msgs::msg::UavState> StateEstimator::getUavState() {
     return {};
   }
 
+  updateUavState();
+
   return mrs_lib::get_mutexed(mtx_uav_state_, uav_state_);
 }
 /*//}*/
