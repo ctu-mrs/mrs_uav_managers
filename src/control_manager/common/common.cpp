@@ -419,20 +419,17 @@ bool validateUavState(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::
   // check acceleration angular disturbance
 
   if (!std::isfinite(msg.acceleration_disturbance.angular.x)) {
-    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.x'!!!",
-                          var_name.c_str());
+    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.x'!!!", var_name.c_str());
     return false;
   }
 
   if (!std::isfinite(msg.acceleration_disturbance.angular.y)) {
-    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.y'!!!",
-                          var_name.c_str());
+    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.y'!!!", var_name.c_str());
     return false;
   }
 
   if (!std::isfinite(msg.acceleration_disturbance.angular.z)) {
-    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.z'!!!",
-                          var_name.c_str());
+    RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.acceleration_disturbance.angular.z'!!!", var_name.c_str());
     return false;
   }
 
@@ -495,8 +492,7 @@ double RCChannelToRange(double rc_value, double range, double deadband) {
 
 /* loadDetailedUavModelParams() //{ */
 
-std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& platform_config,
-                                                                const std::string& custom_config) {
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& platform_config, const std::string& custom_config) {
 
   mrs_lib::ParamLoader param_loader(node);
 
@@ -578,17 +574,23 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
     } else {
 
-      RCLCPP_INFO(node->get_logger(), "inertia matrix missing in the config file, computing it from the other params.");
-
-      // create the inertia matrix
-      model_params.inertia       = Eigen::Matrix3d::Zero();
-      model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-      model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
-      model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
-
-      RCLCPP_INFO(node->get_logger(), "inertia computed form parameters:");
-      RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
+      RCLCPP_ERROR(node->get_logger(), "inertia matrix should be loaded from yaml, but was not loaded sucessfully!");
+      rclcpp::shutdown();
+      exit(1);
     }
+
+  } else {
+
+    RCLCPP_INFO(node->get_logger(), "computing inertia it from the UAV detailed model params");
+
+    // create the inertia matrix
+    model_params.inertia       = Eigen::Matrix3d::Zero();
+    model_params.inertia(0, 0) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+    model_params.inertia(1, 1) = mass * (3.0 * arm_length * arm_length + body_height * body_height) / 12.0;
+    model_params.inertia(2, 2) = (mass * arm_length * arm_length) / 2.0;
+
+    RCLCPP_INFO(node->get_logger(), "inertia computed form parameters:");
+    RCLCPP_INFO_STREAM(node->get_logger(), model_params.inertia);
   }
 
   // create the force-torque allocation matrix
@@ -601,8 +603,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
   // | ------- create the control group allocation matrix ------- |
 
   // pseudoinverse of the force-torque matrix (maximum norm)
-  Eigen::MatrixXd alloc_tmp =
-      model_params.force_torque_mixer.transpose() * (model_params.force_torque_mixer * model_params.force_torque_mixer.transpose()).inverse();
+  Eigen::MatrixXd alloc_tmp = model_params.force_torque_mixer.transpose() * (model_params.force_torque_mixer * model_params.force_torque_mixer.transpose()).inverse();
 
   // | ------------- normalize the allocation matrix ------------ |
   // this will make it match the PX4 control group mixing
@@ -736,8 +737,7 @@ std::optional<double> extractThrottle(const Controller::ControlOutput& control_o
 
 /* validateControlOutput() //{ */
 
-bool validateControlOutput(const rclcpp::Node::SharedPtr& node, const Controller::ControlOutput& control_output,
-                           const ControlOutputModalities_t& output_modalities, const std::string& var_name) {
+bool validateControlOutput(const rclcpp::Node::SharedPtr& node, const Controller::ControlOutput& control_output, const ControlOutputModalities_t& output_modalities, const std::string& var_name) {
 
   if (!control_output.control_output) {
     RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "the optional variable '%s' is not set!!!", var_name.c_str());
@@ -871,8 +871,7 @@ bool validateHwApiAttitudeRateCmd(const rclcpp::Node::SharedPtr& node, const mrs
 
 /* validateHwApiAccelerationHdgRateCmd() //{ */
 
-bool validateHwApiAccelerationHdgRateCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg,
-                                         const std::string& var_name) {
+bool validateHwApiAccelerationHdgRateCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg, const std::string& var_name) {
 
   // | ----------------- check the acceleration ----------------- |
 
@@ -1039,8 +1038,7 @@ bool validateHwApiPositionCmd(const rclcpp::Node::SharedPtr& node, const mrs_msg
 
 /* initializeDefaultOutput() //{ */
 
-Controller::HwApiOutputVariant initializeDefaultOutput(const rclcpp::Node::SharedPtr& node, const ControlOutputModalities_t& possible_outputs,
-                                                       const mrs_msgs::msg::UavState& uav_state, const double& min_throttle, const double& n_motors) {
+Controller::HwApiOutputVariant initializeDefaultOutput(const rclcpp::Node::SharedPtr& node, const ControlOutputModalities_t& possible_outputs, const mrs_msgs::msg::UavState& uav_state, const double& min_throttle, const double& n_motors) {
 
   CONTROL_OUTPUT lowest_output = getLowestOuput(possible_outputs);
 
@@ -1140,8 +1138,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiAttitudeCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAttitudeCmd& msg, const mrs_msgs::msg::UavState& uav_state,
-                        const double& min_throttle) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAttitudeCmd& msg, const mrs_msgs::msg::UavState& uav_state, const double& min_throttle) {
 
   msg.stamp = node->get_clock()->now();
 
