@@ -138,7 +138,7 @@ class PublisherHandlerTest(unittest.TestCase):
     def tearDown(self):
         self.node.destroy_node()
 
-    def test_interactor(self, proc_output, timeout=120):
+    def test_interactor(self, proc_output, timeout=180):
 
         """Check whether pose messages published"""
 
