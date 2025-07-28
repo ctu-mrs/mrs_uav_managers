@@ -34,7 +34,7 @@ mrs_uav_managers:
 
       horizontal:
         kp: 6.0
-        kv: 4.0
+        kv: 3.0
         ka: 1.0
 
         kib: 0.1
