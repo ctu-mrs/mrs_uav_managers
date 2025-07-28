@@ -381,7 +381,7 @@ bool GainManager::setGains(std::string gains_name) {
     param.name = "mrs_uav_controllers/se3_controller/horizontal.kvxy";
 
     param.value.type         = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
-    param.value.double_value = it->second.kpxy;
+    param.value.double_value = it->second.kvxy;
 
     request->parameters.push_back(param);
   }
