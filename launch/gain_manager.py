@@ -189,6 +189,11 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         composable_node_descriptions=[gain_manager_node],
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
+        parameters=[
+            {'use_intra_process_comms': True},
+            {'thread_num': os.cpu_count()},
+            {'use_sim_time': use_sim_time},
+        ],
         condition=IfCondition(standalone)
     )
 

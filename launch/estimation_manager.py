@@ -227,7 +227,13 @@ def generate_launch_description():
         output="screen",
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
+        # prefix=["valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=/tmp/valgrind-out.txt"],
         composable_node_descriptions=[estimation_manager_node],
+        parameters=[
+            {'use_intra_process_comms': True},
+            {'thread_num': os.cpu_count()},
+            {'use_sim_time': use_sim_time},
+        ],
         condition=IfCondition(standalone)
     )
 
