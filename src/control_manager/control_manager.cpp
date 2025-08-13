@@ -780,8 +780,7 @@ private:
   bool              _profiler_enabled_ = false;
 
   // diagnostics publishing
-  void       publishDiagnostics(void);
-  std::mutex mutex_diagnostics_;
+  void publishDiagnostics(void);
 
   void                                             ungripSrv(void);
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_ungrip_;
@@ -6205,8 +6204,6 @@ void ControlManager::publishDiagnostics(void) {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishDiagnostics");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer("ControlManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
-  std::scoped_lock lock(mutex_diagnostics_);
-
   mrs_msgs::ControlManagerDiagnostics diagnostics_msg;
 
   diagnostics_msg.stamp    = ros::Time::now();
@@ -7294,7 +7291,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
     }
   }
-
+  publishDiagnostics();
   return std::tuple(true, "failsafe activated");
 }
 
@@ -7989,7 +7986,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
       ROS_ERROR("[ControlManager]: exception: '%s'", exrun.what());
     }
   }
-
+  publishDiagnostics();
   return std::tuple(true, ss.str());
 }
 
@@ -8104,6 +8101,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
   setConstraintsToControllers(sanitized_constraints);
 
+  publishDiagnostics();
   return std::tuple(true, ss.str());
 }
 
