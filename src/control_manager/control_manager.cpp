@@ -995,6 +995,13 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("body_frame", _body_frame_);
   param_loader_->loadParam("enable_profiler", _profiler_enabled_);
   param_loader_->loadParam("uav_mass", _uav_mass_);
+
+  if (_uav_mass_ <= 0.0) {
+    RCLCPP_ERROR(node_->get_logger(), "nominal uav mass should be > 0.0.");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
   param_loader_->loadParam("body_disturbance_x", _initial_body_disturbance_x_);
   param_loader_->loadParam("body_disturbance_y", _initial_body_disturbance_y_);
   param_loader_->loadParam("g", common_handlers_->g);

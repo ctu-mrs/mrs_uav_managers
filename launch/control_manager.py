@@ -179,6 +179,18 @@ def generate_launch_description():
 
     # #} end of custom_config
 
+    # #{ uav_mass
+
+    uav_mass = LaunchConfiguration('uav_mass')
+
+    ld.add_action(DeclareLaunchArgument(
+        'uav_mass',
+        default_value=os.getenv('UAV_MASS', "-1.0"),
+        description="Nominal UAV MASS.",
+    ))
+
+    # #} end of custom_config
+
     # #{ log_level
 
     ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
@@ -196,7 +208,7 @@ def generate_launch_description():
 
         parameters=[
             {"uav_name": uav_name},
-            {"uav_mass": 2.0},
+            {"uav_mass": uav_mass},
             {"topic_prefix": ["/", uav_name]},
             {"use_sim_time": use_sim_time},
             {"enable_profiler": False},
