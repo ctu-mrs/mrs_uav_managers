@@ -649,6 +649,7 @@ void EstimationManager::timerCheckHealth() {
     std::scoped_lock lock(mutex_active_estimator_);
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
     active_estimator_ = initial_estimator_;
+    active_estimator_->setActive(true);
     if (active_estimator_->getName() == "dummy") {
       sm_->changeState(StateMachine::DUMMY_STATE);
     } else {
@@ -1346,7 +1347,9 @@ void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers
 
   std::scoped_lock lock(mutex_active_estimator_);
   RCLCPP_INFO(node_->get_logger(), "[%s]: switching estimator from %s to %s", getName().c_str(), active_estimator_->getName().c_str(), target_estimator->getName().c_str());
+  active_estimator_->setActive(false);
   active_estimator_ = target_estimator;
+  active_estimator_->setActive(true);
   estimator_switch_count_++;
 }
 /*//}*/
