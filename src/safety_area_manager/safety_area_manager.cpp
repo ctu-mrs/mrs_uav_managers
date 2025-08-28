@@ -64,2371 +64,2213 @@ namespace bg = boost::geometry;
 namespace mrs_uav_managers
 {
 
-  namespace safety_area_manager
+namespace safety_area_manager
+{
+
+/* class SafetyAreaManager //{ */
+
+class SafetyAreaManager : public nodelet::Nodelet {
+private:
+  std::shared_ptr<mrs_lib::Transformer> transformer_;
+  ros::NodeHandle nh_;
+  std::atomic<bool> is_initialized_ = false;
+  std::atomic<bool> set_latlon_set_ = false;
+
+  // | ------------------- scope timer logger ------------------- |
+
+  bool scope_timer_enabled_ = false;
+  std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
+  std::string _uav_name_;
+  std::string _world_config_;
+  std::string _yaml_prefix_;
+
+  struct Obstacle
   {
+    std::vector<mrs_msgs::Point2D> data;
+    double max_z;
+    double min_z;
 
-    /* class SafetyAreaManager //{ */
-
-    class SafetyAreaManager : public nodelet::Nodelet
-    {
-    private:
-      std::shared_ptr<mrs_lib::Transformer> transformer_;
-      ros::NodeHandle nh_;
-      std::atomic<bool> is_initialized_ = false;
-      std::atomic<bool> set_latlon_set_ = false;
-
-      // | ------------------- scope timer logger ------------------- |
-
-      bool scope_timer_enabled_ = false;
-      std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
-      std::string _uav_name_;
-      std::string _world_config_;
-      std::string _yaml_prefix_;
-
-      struct Obstacle
-      {
-        std::vector<mrs_msgs::Point2D> data;
-        double max_z;
-        double min_z;
-
-        Obstacle(const std::vector<mrs_msgs::Point2D>& pts, double maxZ, double minZ) : data(pts), max_z(maxZ), min_z(minZ)
-        {
-        }
-      };
-
-      struct VisualizationComponents
-      {
-        std::vector<std::unique_ptr<mrs_lib::StaticEdgesVisualization>> static_edges;
-        std::vector<std::unique_ptr<mrs_lib::IntEdgesVisualization>> int_edges;
-        std::vector<std::unique_ptr<mrs_lib::VertexControl>> vertices;
-        std::vector<std::unique_ptr<mrs_lib::CenterControl>> centers;
-        std::vector<std::unique_ptr<mrs_lib::BoundsControl>> bounds;
-
-        void safeCleanup() {
-          bounds.clear();
-          centers.clear();
-          vertices.clear();
-          int_edges.clear();
-          static_edges.clear();
-        }
-      };
-
-      struct SafetyZoneParams
-      {
-        bool use_safety_area;
-        // TODO: Evaluate if make sense to take care of world_origin or delegate from estimation manager
-        std::string world_origin_units;
-        double origin_x;
-        double origin_y;
-        bool safety_area_enabled;
-        std::string horizontal_frame;
-        std::string vertical_frame;
-      };
-
-      struct SafetyZoneHandler
-      {
-        std::shared_ptr<mrs_lib::SafetyZone> safety_zone;
-        VisualizationComponents visualization_components;
-        SafetyZoneParams parameters;
-
-        SafetyZoneHandler()                                = default;
-        SafetyZoneHandler(SafetyZoneHandler &&)            = default;
-        SafetyZoneHandler &operator=(SafetyZoneHandler &&) = default;
-      } safety_zone_handler_;
-
-      std::mutex mutex_safety_area_;
-
-      struct SafetyAreaDiagnosticsData
-      {
-        geometry_msgs::TransformStamped tf_fcu_to_world_origin;
-        std::vector<mrs_msgs::Point2D> safety_border_points;
-        double safety_border_max_z;
-        double safety_border_min_z;
-        bool obstacles_present;
-        std::vector<mrs_msgs::Point2D> obstacles_points;
-        std::vector<int> obstacles_rows;
-        std::vector<double> obstacles_max_z;
-        std::vector<double> obstacles_min_z;
-
-        void cleanup() {
-          safety_border_points.clear();
-          obstacles_points.clear();
-          obstacles_rows.clear();
-          obstacles_max_z.clear();
-          obstacles_min_z.clear();
-        }
-      } diagnostics_data_;
-
-      // Useful to check if world origin changed
-      geometry_msgs::TransformStamped tf_fcu_to_world_origin_;
-      geometry_msgs::TransformStamped tf_viz_;
-
-      // profiling
-      mrs_lib::Profiler profiler_;
-      bool profiler_enabled_ = false;
-      int status_timer_rate_ = 0;
-
-      // diagnostics publishing
-      void publishDiagnostics(void);
-      void getSafetyZoneData(void);
-      std::mutex mutex_diagnostics_;
-
-      std::tuple<bool, bool> isPositionValid(mrs_msgs::UavState);
-      bool position_valid_2d_ = true;
-      bool position_valid_3d_ = true;
-
-      void preinitialize();
-      void initialize();
-
-      // | -------------- uav_state/odometry subscriber ------------- |
-
-      mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
-      mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
-      mrs_msgs::UavState uav_state_;
-      std::mutex mutex_uav_state_;
-
-      mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
-
-
-      // | --------------------- service servers -------------------- |
-
-      // safety area services
-      ros::ServiceServer service_server_get_safety_zone_at_height_;
-      ros::ServiceServer service_server_point_in_safety_area_3d_;
-      ros::ServiceServer service_server_point_in_safety_area_2d_;
-      ros::ServiceServer service_server_path_in_safety_area_3d_;
-      ros::ServiceServer service_server_path_in_safety_area_2d_;
-      ros::ServiceServer service_server_save_world_config_;
-      ros::ServiceServer service_server_load_world_config_;
-      ros::ServiceServer service_server_set_safety_area_;
-      ros::ServiceServer service_server_set_safety_border_;
-      ros::ServiceServer service_server_set_world_config_;
-      ros::ServiceServer service_server_get_world_config_;
-      ros::ServiceServer service_server_use_safety_area_;
-      ros::ServiceServer service_server_add_obstacle_;
-      ros::ServiceServer service_server_set_obstacle_;
-      ros::ServiceServer service_server_get_max_z_;
-      ros::ServiceServer service_server_get_min_z_;
-      ros::ServiceServer service_server_get_use_;
-
-      // | --------------------- service clients -------------------- |
-
-      ros::ServiceClient service_client_set_world_origin_;
-
-      // | ----------------------- subscribers ----------------------- |
-
-      mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>         sh_hw_api_capabilities_;
-      mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
-      mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>     sh_estimation_diag_;
-
-      // | ----------------------- publishers ----------------------- |
-
-      mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics> ph_diagnostics_;
-
-      // contains handlers that are used with the safety area visualization/interactive tools
-      std::shared_ptr<mrs_uav_managers::safety_area_manager::CommonHandlers_t> common_handlers_;
-
-      // | ----------------------- timers ----------------------- |
-
-      // this timer will check till we already got the hardware api diagnostics
-      // then it will trigger the initialization of the controllers and finish
-      // the initialization of the SafetyAreaManager
-      ros::Timer timer_hw_api_capabilities_;
-      void timerHwApiCapabilities([[maybe_unused]] const ros::TimerEvent& event);
-
-      // timer for regular status publishing
-      ros::Timer timer_status_;
-      void timerStatus(const ros::TimerEvent& event);
-
-      // | ----------------------- callbacks ----------------------- |
-      // topic callbacks
-      void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
-      void callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg);
-
-      // services
-      bool callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
-      bool callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res);
-      bool callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res);
-      bool callbackSaveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool callbackLoadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool callbackSetSafetyArea(mrs_msgs::SetSafetyAreaSrv::Request& req, mrs_msgs::SetSafetyAreaSrv::Response& res);
-      bool callbackSetSafetyBorder(mrs_msgs::SetSafetyBorderSrv::Request& req, mrs_msgs::SetSafetyBorderSrv::Response& res);
-      bool callbackSetWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res);
-      bool callbackToggleSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res);
-      bool callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res);
-      bool callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request& req, mrs_msgs::SetObstacleSrv::Response& res);
-      bool callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
-      bool callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res);
-      bool callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res);
-
-      // | ----------------------- routines ----------------------- |
-
-      // Safety area building
-      std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string& horizontal_frame);
-      std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z,
-                                                const std::string& horizontal_frame);
-      std::vector<mrs_lib::Point2d> transformPoints(const std::vector<mrs_lib::Point2d>& points, const std::string& from_frame, const std::string& to_frame);
-
-      double transformZ(const std::string& current_frame, const std::string& target_frame, const double z);
-      bool initializationFromFile(mrs_lib::ParamLoader& param_loader, const std::string& filename);
-      std::vector<std::unique_ptr<mrs_lib::Prism>> copyExistingObstacles();
-      bool initializationFromMsg(const mrs_msgs::SafetyBorder& safety_border_msg, bool keep_obstacles);
-      bool initializationFromMsg(const mrs_msgs::SafetyArea& safety_area_msg);
-      std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::Prism>& border);
-      std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::Prism>& border, std::vector<std::unique_ptr<mrs_lib::Prism>>&& obstacle_prisms);
-      std::tuple<bool, std::string> validateMsg(const mrs_msgs::SafetyBorder& safety_border_msg);
-      std::tuple<bool, std::string> validateMsg(const mrs_msgs::SafetyArea& safety_area_msg);
-
-      // Reference validation
-      // those are passed to trackers using the common_handlers object  TODO
-      bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point);
-      bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point);
-      bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
-      bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& from, const mrs_msgs::ReferenceStamped& to);
-      double getMaxZ(const std::string& frame_id);
-      double getMinZ(const std::string& frame_id);
-
-    public:
-      virtual void onInit();
-
-      ~SafetyAreaManager() = default;
-
-    };  // class SafetyAreaManager
-
-    //}
-
-    /* onInit() //{ */
-    void SafetyAreaManager::onInit()
-    {
-      preinitialize();
+    Obstacle(const std::vector<mrs_msgs::Point2D> &pts, double maxZ, double minZ) : data(pts), max_z(maxZ), min_z(minZ) {
     }
-    //}
+  };
 
-    /* preinitialize() //{ */
+  struct VisualizationComponents
+  {
+    std::vector<std::unique_ptr<mrs_lib::StaticEdgesVisualization>> static_edges;
+    std::vector<std::unique_ptr<mrs_lib::IntEdgesVisualization>> int_edges;
+    std::vector<std::unique_ptr<mrs_lib::VertexControl>> vertices;
+    std::vector<std::unique_ptr<mrs_lib::CenterControl>> centers;
+    std::vector<std::unique_ptr<mrs_lib::BoundsControl>> bounds;
 
-    void SafetyAreaManager::preinitialize()
-    {
-      nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-
-      ros::Time::waitForValid();
-
-      mrs_lib::SubscribeHandlerOptions shopts;
-      shopts.nh = nh_;
-      shopts.node_name = "SafetyAreaManager";
-      shopts.no_message_timeout = mrs_lib::no_timeout;
-      shopts.threadsafe = true;
-      shopts.autostart = true;
-      shopts.queue_size = 10;
-      shopts.transport_hints = ros::TransportHints().tcpNoDelay();
-
-      // --------------------------------------------------------------
-      // |         common handler for visualization and control tools |
-      // --------------------------------------------------------------
-
-      common_handlers_ = std::make_shared<mrs_uav_managers::safety_area_manager::CommonHandlers_t>();
-
-      mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
-      param_loader.loadParam("world_config", _world_config_);
-      param_loader.addYamlFile(_world_config_);
-
-      param_loader.loadParam("world_origin/units", safety_zone_handler_.parameters.world_origin_units);
-      param_loader.loadParam("world_origin/origin_x", safety_zone_handler_.parameters.origin_x);
-      param_loader.loadParam("world_origin/origin_y", safety_zone_handler_.parameters.origin_x);
-      param_loader.loadParam("safety_area/enabled", safety_zone_handler_.parameters.safety_area_enabled);
-      param_loader.loadParam("safety_area/horizontal_frame", safety_zone_handler_.parameters.horizontal_frame);
-      param_loader.loadParam("safety_area/vertical_frame", safety_zone_handler_.parameters.vertical_frame);
-
-      param_loader.addYamlFileFromParam("private_config");
-      param_loader.addYamlFileFromParam("public_config");
-
-      param_loader.loadParam("uav_name", _uav_name_);
-      param_loader.loadParam("enable_profiler", profiler_enabled_);
-
-      _yaml_prefix_ = "mrs_uav_managers/safety_area_manager/";
-      param_loader.loadParam(_yaml_prefix_ + "status_timer_rate", status_timer_rate_);
-
-      // | ---------------------- tf-transformer ----------------------- |
-
-      transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
-      transformer_->setDefaultPrefix(_uav_name_);
-      transformer_->retryLookupNewest(true);
-
-      // | ----------------------- Subscribers ----------------------- |
-      sh_hw_api_capabilities_  = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
-      sh_gnss_                 = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
-      sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-      sh_estimation_diag_      = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
-
-      // | ------------------------- timers ------------------------- |
-      timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
-
-      // | ------------------------ profiler ------------------------ |
-
-      profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
-
-      // | ------------------- scope timer logger ------------------- |
-
-      const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
-      scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
-
-      // binding of common handlers
-      common_handlers_->transformer = transformer_;
-      common_handlers_->scope_timer.enabled = scope_timer_enabled_;
-      common_handlers_->scope_timer.logger = scope_timer_logger_;
-      common_handlers_->safety_area.use_safety_area = safety_zone_handler_.parameters.safety_area_enabled;
-      common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&SafetyAreaManager::isPointInSafetyArea2d, this, _1);
-      common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&SafetyAreaManager::isPointInSafetyArea3d, this, _1);
-      common_handlers_->safety_area.getMinZ = boost::bind(&SafetyAreaManager::getMinZ, this, _1);
-      common_handlers_->safety_area.getMaxZ = boost::bind(&SafetyAreaManager::getMaxZ, this, _1);
-      common_handlers_->uav_name = _uav_name_;
-      common_handlers_->parent_nh = nh_;
-
-      // | ----------------------- finish init ---------------------- |
-
-      if (!param_loader.loadedSuccessfully())
-      {
-        ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
-        ros::shutdown();
-      }
+    void safeCleanup() {
+      bounds.clear();
+      centers.clear();
+      vertices.clear();
+      int_edges.clear();
+      static_edges.clear();
     }
+  };
 
+  struct SafetyZoneParams
+  {
+    bool use_safety_area;
+    // TODO: Evaluate if make sense to take care of world_origin or delegate from estimation manager
+    std::string world_origin_units;
+    double origin_x;
+    double origin_y;
+    bool safety_area_enabled;
+    std::string horizontal_frame;
+    std::string vertical_frame;
+  };
 
-    //}
+  struct SafetyZoneHandler
+  {
+    std::shared_ptr<mrs_lib::SafetyZone> safety_zone;
+    VisualizationComponents visualization_components;
+    SafetyZoneParams parameters;
 
-    /* initialize() //{ */
+    SafetyZoneHandler()                                = default;
+    SafetyZoneHandler(SafetyZoneHandler &&)            = default;
+    SafetyZoneHandler &operator=(SafetyZoneHandler &&) = default;
+  } safety_zone_handler_;
 
-    void SafetyAreaManager::initialize()
-    {
-      ROS_INFO("[SafetyAreaManager]: initializing");
+  std::mutex mutex_safety_area_;
 
-      // | --------------------- parameters ---------------------- |
+  struct SafetyAreaDiagnosticsData
+  {
+    geometry_msgs::TransformStamped tf_fcu_to_world_origin;
+    std::vector<mrs_msgs::Point2D> safety_border_points;
+    double safety_border_max_z;
+    double safety_border_min_z;
+    bool obstacles_present;
+    std::vector<mrs_msgs::Point2D> obstacles_points;
+    std::vector<int> obstacles_rows;
+    std::vector<double> obstacles_max_z;
+    std::vector<double> obstacles_min_z;
 
-      mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
-
-      // | ---------------------- safety zone ----------------------- |
-      // Note: safety_zone is initialized even if the use_safety_area_ is false
-      // The manager will just always return true untill it's turned on
-      bool safety_zone_inited = false;
-      try
-      {
-        safety_zone_inited = initializationFromFile(param_loader, _world_config_);
-      }
-      catch (std::invalid_argument& e)
-      {
-        ROS_ERROR("[SafetyAreaManager]: Wrong configuration for the safety zone polygons. %s", e.what());
-        ros::shutdown();
-      }
-      catch (XmlRpc::XmlRpcException& e)
-      {
-        ROS_ERROR("[SafetyAreaManager]: Error during parsing parameters. Please make sure parameters are written correctly");
-        ros::shutdown();
-      }
-      catch (...)
-      {
-        ROS_ERROR("[SafetyAreaManager]: Unhandled exception!");
-        ros::shutdown();
-      }
-
-      // | ----------------------- publishers ----------------------- |
-
-      // TODO we need to specify a rate?
-      ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics>(nh_, "diagnostics_out", 1, true);
-
-
-      mrs_lib::SubscribeHandlerOptions shopts;
-      shopts.nh = nh_;
-      shopts.node_name = "SafetyAreaManager";
-      shopts.no_message_timeout = mrs_lib::no_timeout;
-      shopts.threadsafe = true;
-      shopts.autostart = true;
-      shopts.queue_size = 10;
-      shopts.transport_hints = ros::TransportHints().tcpNoDelay();
-
-
-      // | ----------------------- Subscribers ----------------------- |
-
-      sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
-      sh_max_z_ = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
-      // | ------------------------ services ------------------------ |
-
-      service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::callbackGetSafeZoneAtHeight, this);
-      service_server_point_in_safety_area_3d_ = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePoint3d, this);
-      service_server_point_in_safety_area_2d_ = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePoint2d, this);
-      service_server_path_in_safety_area_3d_ = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePathToPoint3d, this);
-      service_server_path_in_safety_area_2d_ = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePathToPoint2d, this);
-      service_server_save_world_config_ = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::callbackSaveWorldConfig, this);
-      service_server_load_world_config_ = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::callbackLoadWorldConfig, this);
-      service_server_set_safety_area_ = nh_.advertiseService("set_safety_area_in", &SafetyAreaManager::callbackSetSafetyArea, this);
-      service_server_set_safety_border_ = nh_.advertiseService("set_safety_border_in", &SafetyAreaManager::callbackSetSafetyBorder, this);
-      service_server_set_world_config_ = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::callbackSetWorldConfig, this);
-      service_server_get_world_config_ = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
-      service_server_use_safety_area_ = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
-      service_server_add_obstacle_ = nh_.advertiseService("add_obstacle_in", &SafetyAreaManager::callbackAddObstacle, this);
-      service_server_set_obstacle_ = nh_.advertiseService("set_obstacle_in", &SafetyAreaManager::callbackSetObstacle, this);
-      service_server_get_max_z_ = nh_.advertiseService("get_max_z_in", &SafetyAreaManager::callbackGetMaxZ, this);
-      service_server_get_min_z_ = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::callbackGetMinZ, this);
-      service_server_get_use_ = nh_.advertiseService("get_use_in", &SafetyAreaManager::callbackGetUse, this);
-
-      // | --------------------- service clients -------------------- |
-
-      // clients to communicate with SafetyAreaManager
-      service_client_set_world_origin_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("set_world_origin");
-
-      // | ------------------------- timers ------------------------- |
-
-      timer_status_ = nh_.createTimer(ros::Rate(status_timer_rate_), &SafetyAreaManager::timerStatus, this);
-
-      // | ----------------------- finish init ---------------------- |
-
-      if (!safety_zone_inited)
-      {
-        ROS_ERROR("[SafetyAreaManager]: Failed to initialize safety area.");
-        ros::shutdown();
-      }
-
-      is_initialized_ = true;
-
-      ROS_INFO("[SafetyAreaManager]: Safety area initialized.");
+    void cleanup() {
+      safety_border_points.clear();
+      obstacles_points.clear();
+      obstacles_rows.clear();
+      obstacles_max_z.clear();
+      obstacles_min_z.clear();
     }
+  } diagnostics_data_;
 
-    //}
+  // Useful to check if world origin changed
+  geometry_msgs::TransformStamped tf_fcu_to_world_origin_;
+  geometry_msgs::TransformStamped tf_viz_;
 
-    // --------------------------------------------------------------
-    // |                          timers                            |
-    // --------------------------------------------------------------
+  // profiling
+  mrs_lib::Profiler profiler_;
+  bool profiler_enabled_ = false;
+  int status_timer_rate_ = 0;
 
-    /* timerHwApiCapabilities() //{ */
+  // diagnostics publishing
+  void publishDiagnostics(void);
+  void getSafetyZoneData(void);
+  std::mutex mutex_diagnostics_;
 
-    void SafetyAreaManager::timerHwApiCapabilities([[maybe_unused]] const ros::TimerEvent& event)
-    {
-      mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+  std::tuple<bool, bool> isPositionValid(mrs_msgs::UavState);
+  bool position_valid_2d_ = true;
+  bool position_valid_3d_ = true;
 
-      bool got_hw_api_capabilities  = sh_hw_api_capabilities_.hasMsg();
-      bool got_control_manager_diag = sh_control_manager_diag_.hasMsg();
-      bool got_estimation_diag      = sh_estimation_diag_.hasMsg();
+  void preinitialize();
+  void initialize();
 
-      if (!got_hw_api_capabilities || !got_control_manager_diag || !got_estimation_diag)
-      {
-        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: ControlManager=%s, HW Api=%s EstimationManager=%s", got_control_manager_diag ? "true" : "FALSE",
-                          got_hw_api_capabilities ? "true" : "FALSE", got_estimation_diag ? "true" : "FALSE");
-        return;
-      }
+  // | -------------- uav_state/odometry subscriber ------------- |
 
-      auto ret = transformer_->getTransform(safety_zone_handler_.parameters.horizontal_frame, "local_origin", ros::Time(0));
-      if (ret)
-      {
-        ROS_INFO_ONCE("[SafetyAreaManager]: got TFs, can publish safety area markers");
-        tf_viz_ = ret.value();
-      } else
-      {
-        ROS_INFO_ONCE("[SafetyAreaManager]: Did not got TFs, can't publish safety area markers");
-        return;
-      }
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_odometry_;
+  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped> sh_max_z_;
+  mrs_msgs::UavState uav_state_;
+  std::mutex mutex_uav_state_;
 
-      // We need to have the UTM zone established to be able to transform 'latlon_origin' input points
-      if (!set_latlon_set_)
-      {
-        ROS_INFO_ONCE("[SafetyAreaManager]: Waiting for UTM Zone.");
-        return;
-      }
+  mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix> sh_gnss_;
 
-      // Note: all the hw_ap_capabilities seemed to be useless
 
-      initialize();
-      timer_hw_api_capabilities_.stop();
+  // | --------------------- service servers -------------------- |
+
+  // safety area services
+  ros::ServiceServer service_server_get_safety_zone_at_height_;
+  ros::ServiceServer service_server_point_in_safety_area_3d_;
+  ros::ServiceServer service_server_point_in_safety_area_2d_;
+  ros::ServiceServer service_server_path_in_safety_area_3d_;
+  ros::ServiceServer service_server_path_in_safety_area_2d_;
+  ros::ServiceServer service_server_save_world_config_;
+  ros::ServiceServer service_server_load_world_config_;
+  ros::ServiceServer service_server_set_safety_area_;
+  ros::ServiceServer service_server_set_safety_border_;
+  ros::ServiceServer service_server_set_world_config_;
+  ros::ServiceServer service_server_get_world_config_;
+  ros::ServiceServer service_server_use_safety_area_;
+  ros::ServiceServer service_server_add_obstacle_;
+  ros::ServiceServer service_server_set_obstacle_;
+  ros::ServiceServer service_server_get_max_z_;
+  ros::ServiceServer service_server_get_min_z_;
+  ros::ServiceServer service_server_get_use_;
+
+  // | --------------------- service clients -------------------- |
+
+  ros::ServiceClient service_client_set_world_origin_;
+
+  // | ----------------------- subscribers ----------------------- |
+
+  mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities> sh_hw_api_capabilities_;
+  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
+  mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics> sh_estimation_diag_;
+
+  // | ----------------------- publishers ----------------------- |
+
+  mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics> ph_diagnostics_;
+
+  // contains handlers that are used with the safety area visualization/interactive tools
+  std::shared_ptr<mrs_uav_managers::safety_area_manager::CommonHandlers_t> common_handlers_;
+
+  // | ----------------------- timers ----------------------- |
+
+  // this timer will check till we already got the hardware api diagnostics
+  // then it will trigger the initialization of the controllers and finish
+  // the initialization of the SafetyAreaManager
+  ros::Timer timer_hw_api_capabilities_;
+  void timerHwApiCapabilities([[maybe_unused]] const ros::TimerEvent &event);
+
+  // timer for regular status publishing
+  ros::Timer timer_status_;
+  void timerStatus(const ros::TimerEvent &event);
+
+  // | ----------------------- callbacks ----------------------- |
+  // topic callbacks
+  void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
+  void callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg);
+
+  // services
+  bool callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  bool callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  bool callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request &req, mrs_msgs::PathToPointInSafetyArea::Response &res);
+  bool callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request &req, mrs_msgs::PathToPointInSafetyArea::Response &res);
+  bool callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request &req, mrs_msgs::GetSafeZoneAtHeight::Response &res);
+  bool callbackSaveWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackLoadWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackSetSafetyArea(mrs_msgs::SetSafetyAreaSrv::Request &req, mrs_msgs::SetSafetyAreaSrv::Response &res);
+  bool callbackSetSafetyBorder(mrs_msgs::SetSafetyBorderSrv::Request &req, mrs_msgs::SetSafetyBorderSrv::Response &res);
+  bool callbackSetWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res);
+  bool callbackToggleSafetyArea(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+  bool callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res);
+  bool callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request &req, mrs_msgs::SetObstacleSrv::Response &res);
+  bool callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request &req, mrs_msgs::GetPointStamped::Response &res);
+  bool callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request &req, mrs_msgs::GetPointStamped::Response &res);
+  bool callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request &req, mrs_msgs::GetBool::Response &res);
+
+  // | ----------------------- routines ----------------------- |
+
+  // Safety area building
+  std::unique_ptr<mrs_lib::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z, const std::string &horizontal_frame);
+  std::unique_ptr<mrs_lib::Prism> makePrism(const std::vector<mrs_msgs::Point2D> &points, const double max_z, const double min_z,
+                                            const std::string &horizontal_frame);
+  std::vector<mrs_lib::Point2d> transformPoints(const std::vector<mrs_lib::Point2d> &points, const std::string &from_frame, const std::string &to_frame);
+
+  double transformZ(const std::string &current_frame, const std::string &target_frame, const double z);
+  bool initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
+  std::vector<std::unique_ptr<mrs_lib::Prism>> copyExistingObstacles();
+  bool initializationFromMsg(const mrs_msgs::SafetyBorder &safety_border_msg, bool keep_obstacles);
+  bool initializationFromMsg(const mrs_msgs::SafetyArea &safety_area_msg);
+  std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border);
+  std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border,
+                                                    std::vector<std::unique_ptr<mrs_lib::Prism>> &&obstacle_prisms);
+  std::tuple<bool, std::string> validateMsg(const mrs_msgs::SafetyBorder &safety_border_msg);
+  std::tuple<bool, std::string> validateMsg(const mrs_msgs::SafetyArea &safety_area_msg);
+
+  // Reference validation
+  // those are passed to trackers using the common_handlers object  TODO
+  bool isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped &point);
+  bool isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped &point);
+  bool isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped &from, const mrs_msgs::ReferenceStamped &to);
+  bool isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped &from, const mrs_msgs::ReferenceStamped &to);
+  double getMaxZ(const std::string &frame_id);
+  double getMinZ(const std::string &frame_id);
+
+public:
+  virtual void onInit();
+
+  ~SafetyAreaManager() = default;
+
+}; // class SafetyAreaManager
+
+//}
+
+/* onInit() //{ */
+void SafetyAreaManager::onInit() {
+  preinitialize();
+}
+//}
+
+/* preinitialize() //{ */
+
+void SafetyAreaManager::preinitialize() {
+  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+
+  ros::Time::waitForValid();
+
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = "SafetyAreaManager";
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  // --------------------------------------------------------------
+  // |         common handler for visualization and control tools |
+  // --------------------------------------------------------------
+
+  common_handlers_ = std::make_shared<mrs_uav_managers::safety_area_manager::CommonHandlers_t>();
+
+  mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+  param_loader.loadParam("world_config", _world_config_);
+  param_loader.addYamlFile(_world_config_);
+
+  param_loader.loadParam("world_origin/units", safety_zone_handler_.parameters.world_origin_units);
+  param_loader.loadParam("world_origin/origin_x", safety_zone_handler_.parameters.origin_x);
+  param_loader.loadParam("world_origin/origin_y", safety_zone_handler_.parameters.origin_x);
+  param_loader.loadParam("safety_area/enabled", safety_zone_handler_.parameters.safety_area_enabled);
+  param_loader.loadParam("safety_area/horizontal_frame", safety_zone_handler_.parameters.horizontal_frame);
+  param_loader.loadParam("safety_area/vertical_frame", safety_zone_handler_.parameters.vertical_frame);
+
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+
+  param_loader.loadParam("uav_name", _uav_name_);
+  param_loader.loadParam("enable_profiler", profiler_enabled_);
+
+  _yaml_prefix_ = "mrs_uav_managers/safety_area_manager/";
+  param_loader.loadParam(_yaml_prefix_ + "status_timer_rate", status_timer_rate_);
+
+  // | ---------------------- tf-transformer ----------------------- |
+
+  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "SafetyAreaManager");
+  transformer_->setDefaultPrefix(_uav_name_);
+  transformer_->retryLookupNewest(true);
+
+  // | ----------------------- Subscribers ----------------------- |
+  sh_hw_api_capabilities_  = mrs_lib::SubscribeHandler<mrs_msgs::HwApiCapabilities>(shopts, "hw_api_capabilities_in");
+  sh_gnss_                 = mrs_lib::SubscribeHandler<sensor_msgs::NavSatFix>(shopts, "gnss_in", &SafetyAreaManager::callbackGNSS, this);
+  sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  sh_estimation_diag_      = mrs_lib::SubscribeHandler<mrs_msgs::EstimationDiagnostics>(shopts, "estimation_diagnostics_in");
+
+  // | ------------------------- timers ------------------------- |
+  timer_hw_api_capabilities_ = nh_.createTimer(ros::Rate(1.0), &SafetyAreaManager::timerHwApiCapabilities, this);
+
+  // | ------------------------ profiler ------------------------ |
+
+  profiler_ = mrs_lib::Profiler(nh_, "SafetyAreaManager", profiler_enabled_);
+
+  // | ------------------- scope timer logger ------------------- |
+
+  const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
+  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
+
+  // binding of common handlers
+  common_handlers_->transformer                       = transformer_;
+  common_handlers_->scope_timer.enabled               = scope_timer_enabled_;
+  common_handlers_->scope_timer.logger                = scope_timer_logger_;
+  common_handlers_->safety_area.use_safety_area       = safety_zone_handler_.parameters.safety_area_enabled;
+  common_handlers_->safety_area.isPointInSafetyArea2d = boost::bind(&SafetyAreaManager::isPointInSafetyArea2d, this, _1);
+  common_handlers_->safety_area.isPointInSafetyArea3d = boost::bind(&SafetyAreaManager::isPointInSafetyArea3d, this, _1);
+  common_handlers_->safety_area.getMinZ               = boost::bind(&SafetyAreaManager::getMinZ, this, _1);
+  common_handlers_->safety_area.getMaxZ               = boost::bind(&SafetyAreaManager::getMaxZ, this, _1);
+  common_handlers_->uav_name                          = _uav_name_;
+  common_handlers_->parent_nh                         = nh_;
+
+  // | ----------------------- finish init ---------------------- |
+
+  if (!param_loader.loadedSuccessfully()) {
+    ROS_ERROR("[SafetyAreaManager]: could not load all parameters!");
+    ros::shutdown();
+  }
+}
+
+
+//}
+
+/* initialize() //{ */
+
+void SafetyAreaManager::initialize() {
+  ROS_INFO("[SafetyAreaManager]: initializing");
+
+  // | --------------------- parameters ---------------------- |
+
+  mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+
+  // | ---------------------- safety zone ----------------------- |
+  // Note: safety_zone is initialized even if the use_safety_area_ is false
+  // The manager will just always return true untill it's turned on
+  bool safety_zone_inited = false;
+  try {
+    safety_zone_inited = initializationFromFile(param_loader, _world_config_);
+  }
+  catch (std::invalid_argument &e) {
+    ROS_ERROR("[SafetyAreaManager]: Wrong configuration for the safety zone polygons. %s", e.what());
+    ros::shutdown();
+  }
+  catch (XmlRpc::XmlRpcException &e) {
+    ROS_ERROR("[SafetyAreaManager]: Error during parsing parameters. Please make sure parameters are written correctly");
+    ros::shutdown();
+  }
+  catch (...) {
+    ROS_ERROR("[SafetyAreaManager]: Unhandled exception!");
+    ros::shutdown();
+  }
+
+  // | ----------------------- publishers ----------------------- |
+
+  // TODO we need to specify a rate?
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::SafetyAreaManagerDiagnostics>(nh_, "diagnostics_out", 1, true);
+
+
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh                 = nh_;
+  shopts.node_name          = "SafetyAreaManager";
+  shopts.no_message_timeout = mrs_lib::no_timeout;
+  shopts.threadsafe         = true;
+  shopts.autostart          = true;
+  shopts.queue_size         = 10;
+  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+
+  // | ----------------------- Subscribers ----------------------- |
+
+  sh_odometry_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, "odometry_in", &SafetyAreaManager::callbackOdometry, this);
+  sh_max_z_    = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "max_z_in");
+  // | ------------------------ services ------------------------ |
+
+  service_server_get_safety_zone_at_height_ = nh_.advertiseService("get_safety_zone_at_height_in", &SafetyAreaManager::callbackGetSafeZoneAtHeight, this);
+  service_server_point_in_safety_area_3d_   = nh_.advertiseService("point_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePoint3d, this);
+  service_server_point_in_safety_area_2d_   = nh_.advertiseService("point_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePoint2d, this);
+  service_server_path_in_safety_area_3d_    = nh_.advertiseService("path_in_safety_area_3d_in", &SafetyAreaManager::callbackValidatePathToPoint3d, this);
+  service_server_path_in_safety_area_2d_    = nh_.advertiseService("path_in_safety_area_2d_in", &SafetyAreaManager::callbackValidatePathToPoint2d, this);
+  service_server_save_world_config_         = nh_.advertiseService("save_world_config_in", &SafetyAreaManager::callbackSaveWorldConfig, this);
+  service_server_load_world_config_         = nh_.advertiseService("load_world_config_in", &SafetyAreaManager::callbackLoadWorldConfig, this);
+  service_server_set_safety_area_           = nh_.advertiseService("set_safety_area_in", &SafetyAreaManager::callbackSetSafetyArea, this);
+  service_server_set_safety_border_         = nh_.advertiseService("set_safety_border_in", &SafetyAreaManager::callbackSetSafetyBorder, this);
+  service_server_set_world_config_          = nh_.advertiseService("set_world_config_in", &SafetyAreaManager::callbackSetWorldConfig, this);
+  service_server_get_world_config_          = nh_.advertiseService("get_world_config_in", &SafetyAreaManager::callbackGetWorldConfig, this);
+  service_server_use_safety_area_           = nh_.advertiseService("set_use_safety_area_in", &SafetyAreaManager::callbackToggleSafetyArea, this);
+  service_server_add_obstacle_              = nh_.advertiseService("add_obstacle_in", &SafetyAreaManager::callbackAddObstacle, this);
+  service_server_set_obstacle_              = nh_.advertiseService("set_obstacle_in", &SafetyAreaManager::callbackSetObstacle, this);
+  service_server_get_max_z_                 = nh_.advertiseService("get_max_z_in", &SafetyAreaManager::callbackGetMaxZ, this);
+  service_server_get_min_z_                 = nh_.advertiseService("get_min_z_in", &SafetyAreaManager::callbackGetMinZ, this);
+  service_server_get_use_                   = nh_.advertiseService("get_use_in", &SafetyAreaManager::callbackGetUse, this);
+
+  // | --------------------- service clients -------------------- |
+
+  // clients to communicate with SafetyAreaManager
+  service_client_set_world_origin_ = nh_.serviceClient<mrs_msgs::ReferenceStampedSrv>("set_world_origin");
+
+  // | ------------------------- timers ------------------------- |
+
+  timer_status_ = nh_.createTimer(ros::Rate(status_timer_rate_), &SafetyAreaManager::timerStatus, this);
+
+  // | ----------------------- finish init ---------------------- |
+
+  if (!safety_zone_inited) {
+    ROS_ERROR("[SafetyAreaManager]: Failed to initialize safety area.");
+    ros::shutdown();
+  }
+
+  is_initialized_ = true;
+
+  ROS_INFO("[SafetyAreaManager]: Safety area initialized.");
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                          timers                            |
+// --------------------------------------------------------------
+
+/* timerHwApiCapabilities() //{ */
+
+void SafetyAreaManager::timerHwApiCapabilities([[maybe_unused]] const ros::TimerEvent &event) {
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerHwApiCapabilities", status_timer_rate_, 1.0, event);
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer("SafetyAreaManager::timerHwApiCapabilities", scope_timer_logger_, scope_timer_enabled_);
+
+  bool got_hw_api_capabilities  = sh_hw_api_capabilities_.hasMsg();
+  bool got_control_manager_diag = sh_control_manager_diag_.hasMsg();
+  bool got_estimation_diag      = sh_estimation_diag_.hasMsg();
+
+  if (!got_hw_api_capabilities || !got_control_manager_diag || !got_estimation_diag) {
+    ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: ControlManager=%s, HW Api=%s EstimationManager=%s",
+                      got_control_manager_diag ? "true" : "FALSE", got_hw_api_capabilities ? "true" : "FALSE", got_estimation_diag ? "true" : "FALSE");
+    return;
+  }
+
+  auto ret = transformer_->getTransform(safety_zone_handler_.parameters.horizontal_frame, "local_origin", ros::Time(0));
+  if (ret) {
+    ROS_INFO_ONCE("[SafetyAreaManager]: got TFs, can publish safety area markers");
+    tf_viz_ = ret.value();
+  } else {
+    ROS_INFO_ONCE("[SafetyAreaManager]: Did not got TFs, can't publish safety area markers");
+    return;
+  }
+
+  // We need to have the UTM zone established to be able to transform 'latlon_origin' input points
+  if (!set_latlon_set_) {
+    ROS_INFO_ONCE("[SafetyAreaManager]: Waiting for UTM Zone.");
+    return;
+  }
+
+  // Note: all the hw_ap_capabilities seemed to be useless
+
+  initialize();
+  timer_hw_api_capabilities_.stop();
+}
+//}
+
+/* timerStatus //{ */
+
+void SafetyAreaManager::timerStatus(const ros::TimerEvent &event) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", status_timer_rate_, 0.1, event);
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer("SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+
+  bool got_odom = sh_odometry_.hasMsg();
+
+  if (!got_odom) {
+    ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: Odometry=%s", got_odom ? "true" : "FALSE");
+    return;
+  }
+
+  // Get the current SafetyZone data
+  getSafetyZoneData();
+
+  // Publishing
+  publishDiagnostics();
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                          callbacks                          |
+// --------------------------------------------------------------
+// | --------------------- topic callbacks -------------------- |
+
+/* //{ callbackOdometry() */
+
+void SafetyAreaManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer("SafetyAreaManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
+
+  nav_msgs::OdometryConstPtr odom = msg;
+
+  // | ------------------ check for time stamp ------------------ |
+
+  {
+    std::scoped_lock lock(mutex_uav_state_);
+
+    if (uav_state_.header.stamp == odom->header.stamp) {
+      return;
     }
-    //}
+  }
 
-    /* timerStatus //{ */
+  // | ----------- copy the odometry to the uav_state ----------- |
 
-    void SafetyAreaManager::timerStatus(const ros::TimerEvent& event)
-    {
+  {
+    std::scoped_lock lock(mutex_uav_state_);
 
-      if (!is_initialized_)
-      {
-        return;
-      }
+    uav_state_                  = mrs_msgs::UavState();
+    uav_state_.header           = odom->header;
+    uav_state_.pose             = odom->pose.pose;
+    uav_state_.velocity.angular = odom->twist.twist.angular;
+  }
+}
 
-      mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus", status_timer_rate_, 0.1, event);
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+//}
 
-      bool got_odom = sh_odometry_.hasMsg();
+/* //{ callbackGNSS() */
 
-      if (!got_odom)
-      {
-        ROS_WARN_THROTTLE(5.0, "[SafetyAreaManager]: waiting for data: Odometry=%s", got_odom ? "true" : "FALSE");
-        return;
-      }
+void SafetyAreaManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg) {
 
-      // Get the current SafetyZone data
-      getSafetyZoneData();
+  /* if (!is_initialized_) */
+  /* { */
+  /*   return; */
+  /* } */
 
-      // Publishing
-      publishDiagnostics();
-    }
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGNSS");
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer("SafetyAreaManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
 
-    //}
+  transformer_->setLatLon(msg->latitude, msg->longitude);
+  set_latlon_set_ = true;
+}
 
-    // --------------------------------------------------------------
-    // |                          callbacks                          |
-    // --------------------------------------------------------------
-    // | --------------------- topic callbacks -------------------- |
+//}
 
-    /* //{ callbackOdometry() */
+// | -------------------- service callbacks ------------------- |
 
-    void SafetyAreaManager::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg)
-    {
+/* callbackAddObstacle() //{ */
 
-      if (!is_initialized_)
-      {
-        return;
-      }
+bool SafetyAreaManager::callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
 
-      mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
+    return true;
+  }
 
-      nav_msgs::OdometryConstPtr odom = msg;
+  std::scoped_lock lock(mutex_safety_area_);
 
-      // | ------------------ check for time stamp ------------------ |
+  mrs_msgs::ReferenceStamped point;
+  point.header         = req.header;
+  point.reference      = req.reference;
+  auto tfed_horizontal = transformer_->transformSingle(point, safety_zone_handler_.parameters.horizontal_frame);
 
-      {
-        std::scoped_lock lock(mutex_uav_state_);
+  if (!tfed_horizontal) {
+    ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
 
-        if (uav_state_.header.stamp == odom->header.stamp)
-        {
-          return;
-        }
-      }
+  double offset_x = tfed_horizontal->reference.position.x;
+  double offset_y = tfed_horizontal->reference.position.y;
 
-      // | ----------- copy the odometry to the uav_state ----------- |
+  std::vector<mrs_lib::Point2d> points = {
+      mrs_lib::Point2d{2.5 + offset_x, 2.5 + offset_y},
+      mrs_lib::Point2d{2.5 + offset_x, -2.5 + offset_y},
+      mrs_lib::Point2d{-2.5 + offset_x, -2.5 + offset_y},
+      mrs_lib::Point2d{-2.5 + offset_x, 2.5 + offset_y},
+  };
 
-      {
-        std::scoped_lock lock(mutex_uav_state_);
+  int id = safety_zone_handler_.safety_zone->addObstacle(std::make_unique<mrs_lib::Prism>(points, 5, 0));
 
-        uav_state_ = mrs_msgs::UavState();
-        uav_state_.header = odom->header;
-        uav_state_.pose = odom->pose.pose;
-        uav_state_.velocity.angular = odom->twist.twist.angular;
-      }
-    }
-
-    //}
-
-    /* //{ callbackGNSS() */
-
-    void SafetyAreaManager::callbackGNSS(const sensor_msgs::NavSatFix::ConstPtr msg)
-    {
-
-      /* if (!is_initialized_) */
-      /* { */
-      /*   return; */
-      /* } */
-
-      mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGNSS");
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
-
-      transformer_->setLatLon(msg->latitude, msg->longitude);
-      set_latlon_set_ = true;
-    }
-
-    //}
-
-    // | -------------------- service callbacks ------------------- |
-
-    /* callbackAddObstacle() //{ */
-
-    bool SafetyAreaManager::callbackAddObstacle(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
-        return true;
-      }
-
-      std::scoped_lock lock(mutex_safety_area_);
-
-      mrs_msgs::ReferenceStamped point;
-      point.header = req.header;
-      point.reference = req.reference;
-      auto tfed_horizontal = transformer_->transformSingle(point, safety_zone_handler_.parameters.horizontal_frame);
-
-      if (!tfed_horizontal)
-      {
-        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-        res.message = "Could not transform the point to the safety area horizontal frame";
-        res.success = false;
-        return true;
-      }
-
-      double offset_x = tfed_horizontal->reference.position.x;
-      double offset_y = tfed_horizontal->reference.position.y;
-
-      std::vector<mrs_lib::Point2d> points = {
-          mrs_lib::Point2d{2.5 + offset_x, 2.5 + offset_y},
-          mrs_lib::Point2d{2.5 + offset_x, -2.5 + offset_y},
-          mrs_lib::Point2d{-2.5 + offset_x, -2.5 + offset_y},
-          mrs_lib::Point2d{-2.5 + offset_x, 2.5 + offset_y},
-      };
-
-      int id = safety_zone_handler_.safety_zone->addObstacle(std::make_unique<mrs_lib::Prism>(points, 5, 0));
-
-      safety_zone_handler_.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
-      safety_zone_handler_.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.vertices.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.centers.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.bounds.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
+      safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
+  safety_zone_handler_.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(
+      safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.vertices.push_back(
+      std::make_unique<mrs_lib::VertexControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.centers.push_back(
+      std::make_unique<mrs_lib::CenterControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.bounds.push_back(
+      std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
 
 
-      ROS_INFO("[SafetyAreaManager]: Obstacle loaded successfully");
+  ROS_INFO("[SafetyAreaManager]: Obstacle loaded successfully");
 
+  return true;
+}
+
+//}
+
+/* callbackSetObstacle() //{ */
+
+bool SafetyAreaManager::callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request &req, mrs_msgs::SetObstacleSrv::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
+    return true;
+  }
+
+  std::scoped_lock lock(mutex_safety_area_);
+
+  std::string vertical_frame = req.vertical_frame.empty() ? safety_zone_handler_.parameters.vertical_frame : req.vertical_frame;
+
+  const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", req.max_z);
+  const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", req.min_z);
+
+  int id = safety_zone_handler_.safety_zone->addObstacle(makePrism(req.points, transformed_obs_max_z, transformed_obs_min_z, req.horizontal_frame));
+
+  safety_zone_handler_.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
+      safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
+  safety_zone_handler_.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(
+      safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.vertices.push_back(
+      std::make_unique<mrs_lib::VertexControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.centers.push_back(
+      std::make_unique<mrs_lib::CenterControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler_.visualization_components.bounds.push_back(
+      std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+
+  ROS_INFO("[SafetyAreaManager]: Service request succesfully, obstacle loaded");
+
+  res.message = "Succesfully added the obstacle";
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackToggleSafetyArea() //{ */
+
+bool SafetyAreaManager::callbackToggleSafetyArea(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res) {
+  if (!is_initialized_) {
+    res.success = false;
+    return true;
+  }
+  safety_zone_handler_.parameters.safety_area_enabled = req.data;
+  safety_zone_handler_.safety_zone->enableSafetyZone(req.data);
+  res.success = true;
+  ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (safety_zone_handler_.parameters.safety_area_enabled ? "on" : "off"));
+  return true;
+}
+
+//}
+
+/* callbackLoadWorldConfig() //{ */
+
+bool SafetyAreaManager::callbackLoadWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+
+  auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+  if (control_manager_diagnostics->tracker_status.have_goal) {
+
+    ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
+    res.message = "Can only modify safety area in IDLE state.";
+    res.success = false;
+    return true;
+  }
+
+  std::scoped_lock lock(mutex_safety_area_);
+  mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
+  bool success = initializationFromFile(param_loader, req.value);
+
+  if (!success) {
+    ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
+    res.message = "Could not read the file. Probably data format is not correct.";
+    res.success = false;
+  }
+
+  res.message = "Successfully loaded world config.";
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackSetSafetyBorder() //{ */
+
+bool SafetyAreaManager::callbackSetSafetyBorder(mrs_msgs::SetSafetyBorderSrv::Request &req, mrs_msgs::SetSafetyBorderSrv::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+  if (control_manager_diagnostics->tracker_status.have_goal) {
+
+    ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
+    res.message = "Can only modify safety area in IDLE state.";
+    res.success = false;
+    return true;
+  }
+
+  std::scoped_lock lock(mutex_safety_area_);
+
+  bool success = initializationFromMsg(req.safety_border, req.keep_obstacles);
+
+  if (!success) {
+    ROS_WARN("[SafetyAreaManager]: Failed to set border.");
+    res.message = "Failed to set border";
+    res.success = false;
+    return false;
+  }
+
+  ROS_INFO("[SafetyAreaManager]: Succesfull service request, safety border loaded.");
+  res.message = "Succesfully loaded safety border msg.";
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackSetSafetyArea() //{ */
+
+bool SafetyAreaManager::callbackSetSafetyArea(mrs_msgs::SetSafetyAreaSrv::Request &req, mrs_msgs::SetSafetyAreaSrv::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+  if (control_manager_diagnostics->tracker_status.have_goal) {
+
+    ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
+    res.message = "Can only modify safety area in IDLE state.";
+    res.success = false;
+    return true;
+  }
+
+  std::scoped_lock lock(mutex_safety_area_);
+  bool success = initializationFromMsg(req.safety_area);
+
+  if (!success) {
+    ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
+    res.message = "Could not load world config. Please, check the config file.";
+    res.success = false;
+    return false;
+  }
+
+  ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
+  res.message = "Succesfully loaded safety area msg.";
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackSetWorldConfig() //{ */
+bool SafetyAreaManager::callbackSetWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+
+  if (control_manager_diagnostics->tracker_status.have_goal) {
+    ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
+    res.message = "Can only modify safety area in IDLE state.";
+    res.success = false;
+    return true;
+  }
+
+  std::string filename = "/tmp/cur_world_config.yaml";
+  std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
+  if (!ofs.is_open()) {
+    ROS_WARN("[SafetyAreaManager]: Could not open file %s", filename.c_str());
+    res.success = false;
+    res.message = "Could not open file " + filename;
+    return true;
+  }
+
+  ofs << req.value;
+  ofs.close();
+
+  mrs_msgs::String load_config_srv;
+  load_config_srv.request.value = filename;
+  callbackLoadWorldConfig(load_config_srv.request, load_config_srv.response);
+  res = load_config_srv.response;
+  return true;
+}
+
+//}
+
+/* callbackSaveWorldConfig() //{ */
+
+bool SafetyAreaManager::callbackSaveWorldConfig(mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  /* std::scoped_lock lock(mutex_safety_area_); */
+
+  mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.horizontal_frame,
+                                     safety_zone_handler_.parameters.vertical_frame, safety_zone_handler_.parameters.world_origin_units,
+                                     safety_zone_handler_.parameters.origin_x, safety_zone_handler_.parameters.origin_x, transformer_);
+
+  safety_zone_handler_.safety_zone->accept(visitor);
+
+  if (!visitor.isSuccessful()) {
+    res.message = "Something went wrong during exporting parameters";
+    res.success = false;
+    return true;
+  }
+
+  std::ofstream ofs(req.value, std::ofstream::out | std::ofstream::trunc);
+  if (!ofs.is_open()) {
+    ROS_WARN("[SafetyAreaManager]: Could not open file %s", req.value.c_str());
+    res.success = false;
+    res.message = "Could not open file " + req.value;
+    return true;
+  }
+
+  ofs << visitor.getResult();
+  ofs.close();
+  res.success = true;
+  ROS_INFO("[SafetyAreaManager]: world config has been saved to %s", req.value.c_str());
+  return true;
+}
+
+//}
+
+/* callbackGetWorldConfig() //{ */
+
+bool SafetyAreaManager::callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request &req, mrs_msgs::String::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+
+  std::scoped_lock lock(mutex_safety_area_);
+
+  mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.horizontal_frame,
+                                     safety_zone_handler_.parameters.vertical_frame, safety_zone_handler_.parameters.world_origin_units,
+                                     safety_zone_handler_.parameters.origin_x, safety_zone_handler_.parameters.origin_x, transformer_);
+
+  safety_zone_handler_.safety_zone->accept(visitor);
+
+  if (!visitor.isSuccessful()) {
+    res.message = "Something went wrong during exporting parameters";
+    res.success = false;
+    return true;
+  }
+
+  res.success = true;
+  res.message = visitor.getResult();
+  ROS_INFO("[SafetyAreaManager]: world config has been extracted");
+  return true;
+}
+
+//}
+// TODO check if need of mutex when validating
+/* callbackValidatePoint3d() //{ */
+bool SafetyAreaManager::callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped point;
+  point.header    = req.header;
+  point.reference = req.reference;
+
+  // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+
+
+  if (!tfed_horizontal) {
+    ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
+
+  // As the vertical frame can be different from horizontal frame
+  /* auto transformed_pos_z = transformZ(safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.vertical_frame,
+   * tfed_horizontal->reference.position.z); */
+
+  /* ROS_INFO_STREAM("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed z value : " << transformed_pos_z); */
+
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y,
+                                                      tfed_horizontal->reference.position.z)) {
+    res.success = false;
+    return true;
+  }
+
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackValidatePoint2d() //{ */
+bool SafetyAreaManager::callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request &req, mrs_msgs::ReferenceStampedSrv::Response &res) {
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped point;
+  point.reference = req.reference;
+  point.header    = req.header;
+
+  // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+
+  if (!tfed_horizontal) {
+    ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+    res.message = "Could not transform the point to the safety area horizontal frame";
+    res.success = false;
+    return true;
+  }
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    res.success = false;
+
+    return true;
+  }
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackValidatePathtoPoint3d() //{ */
+
+bool SafetyAreaManager::callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request &req, mrs_msgs::PathToPointInSafetyArea::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+
+  geometry_msgs::PointStamped start = req.start;
+  geometry_msgs::PointStamped end   = req.end;
+
+  // transform points
+  geometry_msgs::PointStamped start_transformed, end_transformed;
+
+  {
+    auto resp = transformer_->transformSingle(start, "world_origin");
+
+    if (!resp) {
+      ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
       return true;
     }
 
-    //}
+    start_transformed = resp.value();
+  }
 
-    /* callbackSetObstacle() //{ */
+  {
+    auto resp = transformer_->transformSingle(end, "world_origin");
 
-    bool SafetyAreaManager::callbackSetObstacle(mrs_msgs::SetObstacleSrv::Request& req, mrs_msgs::SetObstacleSrv::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        ROS_WARN("[SafetyAreaManager]: Service request not possible, not initialized");
-        return true;
-      }
-
-      std::scoped_lock lock(mutex_safety_area_);
-
-      std::string vertical_frame = req.vertical_frame.empty() ? safety_zone_handler_.parameters.vertical_frame : req.vertical_frame;
-
-      const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", req.max_z);
-      const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", req.min_z);
-
-      int id = safety_zone_handler_.safety_zone->addObstacle(makePrism(req.points, transformed_obs_max_z, transformed_obs_min_z, req.horizontal_frame));
-
-      safety_zone_handler_.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
-      safety_zone_handler_.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.vertices.push_back(std::make_unique<mrs_lib::VertexControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.centers.push_back(std::make_unique<mrs_lib::CenterControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-      safety_zone_handler_.visualization_components.bounds.push_back(std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-
-      ROS_INFO("[SafetyAreaManager]: Service request succesfully, obstacle loaded");
-
-      res.message = "Succesfully added the obstacle";
-      res.success = true;
+    if (!resp) {
+      ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
       return true;
     }
 
-    //}
+    end_transformed = resp.value();
+  }
 
-    /* callbackToggleSafetyArea() //{ */
+  // verify the whole path
+  mrs_lib::Point3d start_point, end_point;
+  start_point.set<0>(start_transformed.point.x);
+  start_point.set<1>(start_transformed.point.y);
+  start_point.set<2>(start_transformed.point.z);
+  end_point.set<0>(end_transformed.point.x);
+  end_point.set<1>(end_transformed.point.y);
+  end_point.set<2>(end_transformed.point.z);
 
-    bool SafetyAreaManager::callbackToggleSafetyArea(std_srvs::SetBool::Request& req, std_srvs::SetBool::Response& res)
-    {
-      if (!is_initialized_)
-      {
-        res.success = false;
-        return true;
-      }
-      safety_zone_handler_.parameters.safety_area_enabled = req.data;
-      safety_zone_handler_.safety_zone->enableSafetyZone(req.data);
-      res.success = true;
-      ROS_INFO("[SafetyAreaManager]: safety area usage has been turned %s", (safety_zone_handler_.parameters.safety_area_enabled ? "on" : "off"));
+  if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point)) {
+    res.message = "The path is not valid";
+    res.success = false;
+    return true;
+  }
+
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackValidatePathtoPoint2d() //{ */
+
+bool SafetyAreaManager::callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request &req, mrs_msgs::PathToPointInSafetyArea::Response &res) {
+
+  if (!is_initialized_) {
+    res.message = "not initialized";
+    res.success = false;
+    return true;
+  }
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    res.success = true;
+    res.message = "Safety area is disabled";
+    return true;
+  }
+
+  geometry_msgs::PointStamped start = req.start;
+  geometry_msgs::PointStamped end   = req.end;
+
+  // transform points
+  geometry_msgs::PointStamped start_transformed, end_transformed;
+
+  {
+    auto resp = transformer_->transformSingle(start, "world_origin");
+
+    if (!resp) {
+      ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
+      res.success = false;
       return true;
     }
 
-    //}
+    start_transformed = resp.value();
+  }
 
-    /* callbackLoadWorldConfig() //{ */
+  {
+    auto resp = transformer_->transformSingle(end, "world_origin");
 
-    bool SafetyAreaManager::callbackLoadWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-
-      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-
-      if (control_manager_diagnostics->tracker_status.have_goal)
-      {
-
-        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
-        res.message = "Can only modify safety area in IDLE state.";
-        res.success = false;
-        return true;
-      }
-
-      std::scoped_lock lock(mutex_safety_area_);
-      mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
-      bool success = initializationFromFile(param_loader, req.value);
-
-      if (!success)
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
-        res.message = "Could not read the file. Probably data format is not correct.";
-        res.success = false;
-      }
-
-      res.message = "Successfully loaded world config.";
-      res.success = true;
+    if (!resp) {
+      ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
+      res.message = "Could not transform the first point in the path";
       return true;
     }
 
-    //}
+    end_transformed = resp.value();
+  }
 
-    /* callbackSetSafetyBorder() //{ */
+  // verify the whole path
+  mrs_lib::Point2d start_point, end_point;
+  start_point.set<0>(start_transformed.point.x);
+  start_point.set<1>(start_transformed.point.y);
+  end_point.set<0>(end_transformed.point.x);
+  end_point.set<1>(end_transformed.point.y);
 
-    bool SafetyAreaManager::callbackSetSafetyBorder(mrs_msgs::SetSafetyBorderSrv::Request &req, mrs_msgs::SetSafetyBorderSrv::Response &res) {
+  if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point)) {
+    res.message = "The path is not valid";
+    res.success = false;
+    return true;
+  }
 
-      if (!is_initialized_) {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
+  res.success = true;
+  return true;
+}
 
-      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
+//}
 
-      if (control_manager_diagnostics->tracker_status.have_goal) {
+/* callbackGetSafeZoneAtHeight() //{ */
 
-        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
-        res.message = "Can only modify safety area in IDLE state.";
-        res.success = false;
-        return true;
-      }
+bool SafetyAreaManager::callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request &req, mrs_msgs::GetSafeZoneAtHeight::Response &res) {
 
-      std::scoped_lock lock(mutex_safety_area_);
+  if (!is_initialized_) {
+    return true;
+  }
 
-      bool success = initializationFromMsg(req.safety_border, req.keep_obstacles);
+  // Transform height to the current frame
+  double height = transformZ(req.header.frame_id, safety_zone_handler_.parameters.horizontal_frame, req.height);
 
-      if (!success) {
-        ROS_WARN("[SafetyAreaManager]: Failed to set border.");
-        res.message = "Failed to set border";
-        res.success = false;
+  // If main prism is on different height, safety zone is empty
+  if (safety_zone_handler_.safety_zone->getBorder()->getMaxZ() < height || height < safety_zone_handler_.safety_zone->getBorder()->getMinZ()) {
+    return true;
+  }
+
+
+  std::scoped_lock lock(mutex_safety_area_);
+
+  // Set response header
+  res.header.frame_id = _uav_name_ + "/" + safety_zone_handler_.parameters.horizontal_frame;
+
+  // Add polygon of main prism
+  auto border = safety_zone_handler_.safety_zone->getBorder()->getPolygon().outer();
+  geometry_msgs::Polygon border_polygon;
+  for (size_t i = 0; i < border.size(); i++) {
+    geometry_msgs::Point32 p;
+    p.x = bg::get<0>(border[i]);
+    p.y = bg::get<1>(border[i]);
+    border_polygon.points.push_back(p);
+  }
+  res.safety_zone.push_back(border_polygon);
+
+  // Add polygons of required obstacles
+  for (auto it = safety_zone_handler_.safety_zone->getObstaclesBegin(); it != safety_zone_handler_.safety_zone->getObstaclesEnd(); it++) {
+    if (it->second->getMaxZ() < height || height < it->second->getMinZ()) {
+      continue;
+    }
+
+    geometry_msgs::Polygon polygon;
+    auto outer_ring = it->second->getPolygon().outer();
+    for (size_t i = 0; i < outer_ring.size(); i++) {
+      geometry_msgs::Point32 p;
+      p.x = bg::get<0>(outer_ring[i]);
+      p.y = bg::get<1>(outer_ring[i]);
+      polygon.points.push_back(p);
+    }
+    res.safety_zone.push_back(polygon);
+  }
+
+  return true;
+}
+
+//}
+
+/* callbackGetMaxZ() //{ */
+
+bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request &req, mrs_msgs::GetPointStamped::Response &res) {
+
+  if (!is_initialized_) {
+    res.success = false;
+    return true;
+  }
+
+  res.result.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
+  res.result.point.x         = 0;
+  res.result.point.y         = 0;
+  if (safety_zone_handler_.parameters.safety_area_enabled) {
+    res.result.point.z = safety_zone_handler_.safety_zone->getBorder()->getMaxZ();
+  } else {
+    res.result.point.z = std::numeric_limits<double>::max();
+  }
+
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackGetMinZ() //{ */
+
+bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request &req, mrs_msgs::GetPointStamped::Response &res) {
+
+  if (!is_initialized_) {
+    res.success = false;
+    return true;
+  }
+
+  res.result.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
+  res.result.point.x         = 0;
+  res.result.point.y         = 0;
+  if (safety_zone_handler_.parameters.safety_area_enabled) {
+    res.result.point.z = safety_zone_handler_.safety_zone->getBorder()->getMinZ();
+  } else {
+    res.result.point.z = std::numeric_limits<double>::lowest();
+  }
+
+  res.success = true;
+  return true;
+}
+
+//}
+
+/* callbackGetUse() //{ */
+
+bool SafetyAreaManager::callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request &req, mrs_msgs::GetBool::Response &res) {
+  if (!is_initialized_) {
+    return true;
+  }
+
+  res.result = safety_zone_handler_.parameters.safety_area_enabled;
+  return true;
+}
+
+//}
+
+// --------------------------------------------------------------
+// |                          routines                          |
+// --------------------------------------------------------------
+
+/* initializationFromFile() //{ */
+
+bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename) {
+  if (!param_loader.addYamlFile(filename)) {
+    return false;
+  }
+
+  // Reload parameters for every call, it can be called multiple times if using the Rviz plugin and loading different world configurations
+  // safety_zone_handler_.parameters.
+  std::string world_origin_units;
+  double origin_x;
+  double origin_y;
+  std::string horizontal_frame;
+  std::string vertical_frame;
+  bool safety_area_enabled;
+  param_loader.loadParam("world_origin/units", world_origin_units);
+  param_loader.loadParam("world_origin/origin_x", origin_x);
+  param_loader.loadParam("world_origin/origin_y", origin_y);
+  param_loader.loadParam("safety_area/enabled", safety_area_enabled);
+  param_loader.loadParam("safety_area/horizontal_frame", horizontal_frame);
+  param_loader.loadParam("safety_area/vertical_frame", vertical_frame);
+
+  // As this routine will be called pre-initialization to load safety area directly from world config
+  if (is_initialized_) {
+    mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+    /* TODO: Support for UTM */
+    SetOriginSrv.request.header.frame_id      = "latlon_origin";
+    SetOriginSrv.request.header.stamp         = ros::Time::now();
+    SetOriginSrv.request.reference.position.x = origin_x;
+    SetOriginSrv.request.reference.position.y = origin_x;
+
+    if (!service_client_set_world_origin_.call(SetOriginSrv)) {
+      ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+      return false;
+    }
+  }
+
+  // Make border prism
+  const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
+  const auto max_z                    = param_loader.loadParam2<double>("safety_area/border/max_z");
+  const auto min_z                    = param_loader.loadParam2<double>("safety_area/border/min_z");
+  const auto transformed_max_z        = transformZ(vertical_frame, "world_origin", max_z);
+  const auto transformed_min_z        = transformZ(vertical_frame, "world_origin", min_z);
+
+  auto border = makePrism(border_points, transformed_max_z, transformed_min_z, horizontal_frame);
+
+  // Making obstacle prisms
+  std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles;
+
+  // bool obstacles_present;
+  param_loader.loadParam("safety_area/obstacles/present", diagnostics_data_.obstacles_present);
+
+  // If any is present, fill obstacles
+  if (diagnostics_data_.obstacles_present) {
+    // Read parameters for obstacles
+    std::vector<Eigen::MatrixXd> obstacles_mat;
+    Eigen::MatrixXd max_z_mat;
+    Eigen::MatrixXd min_z_mat;
+    param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
+    param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
+
+    Eigen::MatrixXd current_mat = param_loader.loadMatrixDynamic2("safety_area/obstacles/data", -1, 2);
+    Eigen::MatrixXd rows        = param_loader.loadMatrixDynamic2("safety_area/obstacles/rows", -1, 1);
+
+    obstacles.reserve(current_mat.size());
+
+    int start_row = 0;
+    obstacles_mat.reserve(rows.rows());
+
+    // Iterate over obstacles matrix and extract points based on rows matrix
+    //"rows" matrix define the points for every obstacle
+    for (int i = 0; i < rows.rows(); i++) {
+      int row_num = static_cast<int>(rows(i, 0));
+
+      if (row_num < 0 || start_row + row_num > current_mat.rows()) {
+        ROS_WARN("[SafetyAreaManager]: Invalid obstacle rows!, check your config file");
         return false;
       }
 
-      ROS_INFO("[SafetyAreaManager]: Succesfull service request, safety border loaded.");
-      res.message = "Succesfully loaded safety border msg.";
-      res.success = true;
-      return true;
+      Eigen::MatrixXd obstacle_mat = current_mat.block(start_row, 0, row_num, current_mat.cols());
+      obstacles_mat.push_back(obstacle_mat);
+      start_row += row_num;
     }
 
-    //}
-    
-    /* callbackSetSafetyArea() //{ */
-
-    bool SafetyAreaManager::callbackSetSafetyArea(mrs_msgs::SetSafetyAreaSrv::Request& req, mrs_msgs::SetSafetyAreaSrv::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-
-      if (control_manager_diagnostics->tracker_status.have_goal)
-      {
-
-        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
-        res.message = "Can only modify safety area in IDLE state.";
-        res.success = false;
-        return true;
-      }
-
-      std::scoped_lock lock(mutex_safety_area_);
-      bool success = initializationFromMsg(req.safety_area);
-
-      if (!success)
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not load world config. Please, check the config file.");
-        res.message = "Could not load world config. Please, check the config file.";
-        res.success = false;
-        return false;
-      }
-
-      ROS_INFO("[SafetyAreaManager]: Succesfull service call, world config loaded.");
-      res.message = "Succesfully loaded safety area msg.";
-      res.success = true;
-      return true;
+    if (start_row != current_mat.rows()) {
+      ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
+      return false;
     }
 
-    //}
-
-    /* callbackSetWorldConfig() //{ */
-    bool SafetyAreaManager::callbackSetWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-      auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
-
-      if (control_manager_diagnostics->tracker_status.have_goal)
-      {
-        ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
-        res.message = "Can only modify safety area in IDLE state.";
-        res.success = false;
-        return true;
-      }
-
-      std::string filename = "/tmp/cur_world_config.yaml";
-      std::ofstream ofs(filename, std::ofstream::out | std::ofstream::trunc);
-      if (!ofs.is_open())
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not open file %s", filename.c_str());
-        res.success = false;
-        res.message = "Could not open file " + filename;
-        return true;
-      }
-
-      ofs << req.value;
-      ofs.close();
-
-      mrs_msgs::String load_config_srv;
-      load_config_srv.request.value = filename;
-      callbackLoadWorldConfig(load_config_srv.request, load_config_srv.response);
-      res = load_config_srv.response;
-      return true;
+    if (!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == static_cast<long int>(obstacles_mat.size()))) {
+      ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
+      return false;
     }
 
-    //}
+    // Make obstacle prisms
+    for (size_t i = 0; i < obstacles_mat.size(); i++) {
+      const auto obs_max_z             = max_z_mat(i, 0);
+      const auto obs_min_z             = min_z_mat(i, 0);
+      const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", obs_max_z);
+      const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", obs_min_z);
+      auto prism                       = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z, horizontal_frame);
 
-    /* callbackSaveWorldConfig() //{ */
-
-    bool SafetyAreaManager::callbackSaveWorldConfig(mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
-    {
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
+      if (prism) {
+        obstacles.push_back(std::move(prism));
+      } else {
+        ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
       }
+    }
+  }
 
-      /* std::scoped_lock lock(mutex_safety_area_); */
+  auto new_safety_zone = createSafetyZone(std::move(border), std::move(obstacles));
 
-      mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.vertical_frame,
-                                         safety_zone_handler_.parameters.world_origin_units, safety_zone_handler_.parameters.origin_x, safety_zone_handler_.parameters.origin_x, transformer_);
+  if (!new_safety_zone) {
+    ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
+    return false;
+  }
 
-      safety_zone_handler_.safety_zone->accept(visitor);
+  ROS_INFO("[SafetyAreaManager] New safety zone created");
 
-      if (!visitor.isSuccessful())
-      {
-        res.message = "Something went wrong during exporting parameters";
-        res.success = false;
-        return true;
-      }
+  safety_zone_handler_.visualization_components.safeCleanup();
+  safety_zone_handler_                                = std::move(*new_safety_zone);
+  safety_zone_handler_.parameters.safety_area_enabled = true;
+  safety_zone_handler_.parameters.horizontal_frame    = horizontal_frame;
+  safety_zone_handler_.parameters.vertical_frame      = vertical_frame;
+  safety_zone_handler_.parameters.world_origin_units  = world_origin_units;
+  safety_zone_handler_.parameters.origin_x            = origin_x;
+  safety_zone_handler_.parameters.origin_y            = origin_y;
 
-      std::ofstream ofs(req.value, std::ofstream::out | std::ofstream::trunc);
-      if (!ofs.is_open())
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not open file %s", req.value.c_str());
-        res.success = false;
-        res.message = "Could not open file " + req.value;
-        return true;
-      }
+  return true;
+}
 
-      ofs << visitor.getResult();
-      ofs.close();
-      res.success = true;
-      ROS_INFO("[SafetyAreaManager]: world config has been saved to %s", req.value.c_str());
-      return true;
+//}
+
+/* initializionFromMsg(Border) //{ */
+
+std::vector<std::unique_ptr<mrs_lib::Prism>> SafetyAreaManager::copyExistingObstacles() {
+  if (!safety_zone_handler_.safety_zone) {
+    return {};
+  }
+
+  const auto &obstacles_map = safety_zone_handler_.safety_zone->getObstacles();
+  std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles_copy;
+  obstacles_copy.reserve(obstacles_map.size());
+
+  for (const auto &[id, obstacle_ptr] : obstacles_map) {
+    obstacles_copy.push_back(std::make_unique<mrs_lib::Prism>(*obstacle_ptr));
+  }
+
+  return obstacles_copy;
+}
+
+bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::SafetyBorder &safety_border_msg, bool keep_obstacles) {
+
+  auto [res, message] = validateMsg(safety_border_msg);
+
+  if (!res) {
+    ROS_WARN_STREAM("[SafetyAreaManager]: Message not valid, error message: " << message);
+    return false;
+  }
+
+  // Make border prism
+  std::vector<mrs_msgs::Point2D> border_points = safety_border_msg.points;
+
+  const auto transformed_max_z = transformZ(safety_border_msg.vertical_frame, "world_origin", safety_border_msg.max_z);
+  const auto transformed_min_z = transformZ(safety_border_msg.vertical_frame, "world_origin", safety_border_msg.min_z);
+
+  auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_border_msg.horizontal_frame);
+
+  auto new_safety_zone = keep_obstacles ? createSafetyZone(std::move(border), copyExistingObstacles()) : createSafetyZone(std::move(border));
+
+  ROS_INFO("[SafetyAreaManager] New safety zone created");
+
+  if (!new_safety_zone) {
+    ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
+    return false;
+  }
+
+  // Update values of new safety zone
+  safety_zone_handler_.visualization_components.safeCleanup();
+  safety_zone_handler_                                = std::move(*new_safety_zone);
+  safety_zone_handler_.parameters.safety_area_enabled = safety_border_msg.enabled;
+  safety_zone_handler_.parameters.horizontal_frame    = safety_border_msg.horizontal_frame;
+  safety_zone_handler_.parameters.vertical_frame      = safety_border_msg.vertical_frame;
+
+  return true;
+}
+
+//}
+
+/* initializationFromMsg(Area) //{ */
+
+bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::SafetyArea &safety_area_msg) {
+
+  auto [res, message] = validateMsg(safety_area_msg);
+
+  if (!res) {
+    ROS_WARN_STREAM("[SafetyAreaManager]: Message not valid, error message: " << message);
+    return false;
+  }
+
+  // If world origin not defined take the current origin values TODO
+  if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0) {
+    ROS_INFO("[SafetyAreaManager]: World origin not defined, using current saved value.");
+    mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+    SetOriginSrv.request.header.frame_id      = "latlon_origin";
+    SetOriginSrv.request.header.stamp         = ros::Time::now();
+    SetOriginSrv.request.reference.position.x = safety_zone_handler_.parameters.origin_x;
+    SetOriginSrv.request.reference.position.y = safety_zone_handler_.parameters.origin_x;
+
+    if (!service_client_set_world_origin_.call(SetOriginSrv)) {
+      ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+      return false;
     }
 
-    //}
+  } else {
+    mrs_msgs::ReferenceStampedSrv SetOriginSrv;
+    SetOriginSrv.request.header.frame_id      = "latlon_origin";
+    SetOriginSrv.request.header.stamp         = ros::Time::now();
+    SetOriginSrv.request.reference.position.x = safety_area_msg.origin_x;
+    SetOriginSrv.request.reference.position.y = safety_area_msg.origin_y;
 
-    /* callbackGetWorldConfig() //{ */
-
-    bool SafetyAreaManager::callbackGetWorldConfig([[maybe_unused]] mrs_msgs::String::Request& req, mrs_msgs::String::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-
-      std::scoped_lock lock(mutex_safety_area_);
-
-      mrs_lib::YamlExportVisitor visitor(_uav_name_, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.vertical_frame,
-                                         safety_zone_handler_.parameters.world_origin_units, safety_zone_handler_.parameters.origin_x, safety_zone_handler_.parameters.origin_x, transformer_);
-
-      safety_zone_handler_.safety_zone->accept(visitor);
-
-      if (!visitor.isSuccessful())
-      {
-        res.message = "Something went wrong during exporting parameters";
-        res.success = false;
-        return true;
-      }
-
-      res.success = true;
-      res.message = visitor.getResult();
-      ROS_INFO("[SafetyAreaManager]: world config has been extracted");
-      return true;
+    if (!service_client_set_world_origin_.call(SetOriginSrv)) {
+      ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
+      return false;
     }
 
-    //}
-    // TODO check if need of mutex when validating
-    /* callbackValidatePoint3d() //{ */
-    bool SafetyAreaManager::callbackValidatePoint3d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
-    {
+    safety_zone_handler_.parameters.world_origin_units = safety_area_msg.units;
+    safety_zone_handler_.parameters.origin_x           = safety_area_msg.origin_x;
+    safety_zone_handler_.parameters.origin_x           = safety_area_msg.origin_y;
+  }
 
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
+  // Make border prism
+  const auto safety_border                     = safety_area_msg.border;
+  std::vector<mrs_msgs::Point2D> border_points = safety_border.points;
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.success = true;
-        res.message = "Safety area is disabled";
-        return true;
-      }
+  const auto transformed_max_z = transformZ(safety_border.vertical_frame, "world_origin", safety_border.max_z);
+  const auto transformed_min_z = transformZ(safety_border.vertical_frame, "world_origin", safety_border.min_z);
 
-      mrs_msgs::ReferenceStamped point;
-      point.header = req.header;
-      point.reference = req.reference;
+  auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_border.horizontal_frame);
 
-      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
-      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+  // Making obstacle prisms
+  std::vector<std::unique_ptr<mrs_lib::Prism>> obstacle_prisms;
 
+  // Get obstacles data
+  const auto obstacles_msg                      = safety_area_msg.obstacles;
+  diagnostics_data_.obstacles_present           = obstacles_msg.present;
+  std::vector<mrs_msgs::Point2D> obstacles_data = obstacles_msg.data;
+  std::vector<int> rows                         = obstacles_msg.rows;
+  std::vector<double> max_z_values              = obstacles_msg.max_z;
+  std::vector<double> min_z_values              = obstacles_msg.min_z;
+  std::vector<Obstacle> obstacles;
 
-      if (!tfed_horizontal)
-      {
-        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-        res.message = "Could not transform the point to the safety area horizontal frame";
-        res.success = false;
-        return true;
-      }
+  // If any is present, fill obstacles
+  if (diagnostics_data_.obstacles_present) {
 
-      // As the vertical frame can be different from horizontal frame
-      /* auto transformed_pos_z = transformZ(safety_zone_handler_.parameters.horizontal_frame, safety_zone_handler_.parameters.vertical_frame, tfed_horizontal->reference.position.z); */
-
-      /* ROS_INFO_STREAM("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed z value : " << transformed_pos_z); */
-
-
-      if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
-      {
-        res.success = false;
-        return true;
-      }
-
-      res.success = true;
-      return true;
+    if (rows.size() != max_z_values.size() || rows.size() != min_z_values.size()) {
+      ROS_WARN("[SafetyAreaManager]: Mismatch between size of rows, max_z and min_z values");
+      return false;
     }
 
-    //}
-
-    /* callbackValidatePoint2d() //{ */
-    bool SafetyAreaManager::callbackValidatePoint2d(mrs_msgs::ReferenceStampedSrv::Request& req, mrs_msgs::ReferenceStampedSrv::Response& res)
-    {
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.success = true;
-        res.message = "Safety area is disabled";
-        return true;
-      }
-
-      mrs_msgs::ReferenceStamped point;
-      point.reference = req.reference;
-      point.header = req.header;
-
-      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
-      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
-
-      if (!tfed_horizontal)
-      {
-        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-        res.message = "Could not transform the point to the safety area horizontal frame";
-        res.success = false;
-        return true;
-      }
-
-      if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y))
-      {
-        res.success = false;
-
-        return true;
-      }
-      res.success = true;
-      return true;
+    // Calculate the total number of points expected
+    int total_expected_points = 0;
+    for (const auto &row : rows) {
+      total_expected_points += row;
     }
 
-    //}
-
-    /* callbackValidatePathtoPoint3d() //{ */
-
-    bool SafetyAreaManager::callbackValidatePathToPoint3d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
-
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.success = true;
-        res.message = "Safety area is disabled";
-        return true;
-      }
-
-      geometry_msgs::PointStamped start = req.start;
-      geometry_msgs::PointStamped end = req.end;
-
-      // transform points
-      geometry_msgs::PointStamped start_transformed, end_transformed;
-
-      {
-        auto resp = transformer_->transformSingle(start, "world_origin");
-
-        if (!resp)
-        {
-          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-          res.message = "Could not transform the first point in the path";
-          res.success = false;
-          return true;
-        }
-
-        start_transformed = resp.value();
-      }
-
-      {
-        auto resp = transformer_->transformSingle(end, "world_origin");
-
-        if (!resp)
-        {
-          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-          res.message = "Could not transform the first point in the path";
-          return true;
-        }
-
-        end_transformed = resp.value();
-      }
-
-      // verify the whole path
-      mrs_lib::Point3d start_point, end_point;
-      start_point.set<0>(start_transformed.point.x);
-      start_point.set<1>(start_transformed.point.y);
-      start_point.set<2>(start_transformed.point.z);
-      end_point.set<0>(end_transformed.point.x);
-      end_point.set<1>(end_transformed.point.y);
-      end_point.set<2>(end_transformed.point.z);
-
-      if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point))
-      {
-        res.message = "The path is not valid";
-        res.success = false;
-        return true;
-      }
-
-      res.success = true;
-      return true;
+    // Validate that the total number of points matches the size of obstacles_data
+    if (total_expected_points != static_cast<int>(obstacles_data.size())) {
+      ROS_WARN("[SafetyAreaManager]: Total number of points in obstacles_data does not match the sum of rows.");
+      return false;
     }
 
-    //}
+    obstacles.reserve(rows.size());
 
-    /* callbackValidatePathtoPoint2d() //{ */
+    // Fill up the obstacles from the msg data and row values
+    int current_idx = 0;
 
-    bool SafetyAreaManager::callbackValidatePathToPoint2d(mrs_msgs::PathToPointInSafetyArea::Request& req, mrs_msgs::PathToPointInSafetyArea::Response& res)
-    {
+    for (size_t i = 0; i < rows.size(); i++) {
 
-      if (!is_initialized_)
-      {
-        res.message = "not initialized";
-        res.success = false;
-        return true;
-      }
+      // Extracting subset of points for current obstacle
+      int num_points = rows.at(i);
+      std::vector<mrs_msgs::Point2D> obstacle_points(obstacles_data.begin() + current_idx, obstacles_data.begin() + current_idx + num_points
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.success = true;
-        res.message = "Safety area is disabled";
-        return true;
-      }
+      );
 
-      geometry_msgs::PointStamped start = req.start;
-      geometry_msgs::PointStamped end = req.end;
+      // Create obstacle
+      Obstacle obstacle(obstacle_points, max_z_values.at(i), min_z_values.at(i));
 
-      // transform points
-      geometry_msgs::PointStamped start_transformed, end_transformed;
+      // Add obstacle to obstacles vector
+      obstacles.emplace_back(obstacle);
 
-      {
-        auto resp = transformer_->transformSingle(start, "world_origin");
-
-        if (!resp)
-        {
-          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-          res.message = "Could not transform the first point in the path";
-          res.success = false;
-          return true;
-        }
-
-        start_transformed = resp.value();
-      }
-
-      {
-        auto resp = transformer_->transformSingle(end, "world_origin");
-
-        if (!resp)
-        {
-          ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: Could not transform the point to the safety area horizontal frame");
-          res.message = "Could not transform the first point in the path";
-          return true;
-        }
-
-        end_transformed = resp.value();
-      }
-
-      // verify the whole path
-      mrs_lib::Point2d start_point, end_point;
-      start_point.set<0>(start_transformed.point.x);
-      start_point.set<1>(start_transformed.point.y);
-      end_point.set<0>(end_transformed.point.x);
-      end_point.set<1>(end_transformed.point.y);
-
-      if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point))
-      {
-        res.message = "The path is not valid";
-        res.success = false;
-        return true;
-      }
-
-      res.success = true;
-      return true;
+      current_idx += num_points;
     }
 
-    //}
+    // Make obstacle prism
+    for (const auto &obstacle : obstacles) {
+      const auto transformed_obs_max_z = transformZ(safety_border.vertical_frame, "world_origin", obstacle.max_z);
+      const auto transformed_obs_min_z = transformZ(safety_border.vertical_frame, "world_origin", obstacle.min_z);
+      auto prism                       = makePrism(obstacle.data, transformed_obs_max_z, transformed_obs_min_z, safety_border.horizontal_frame);
 
-    /* callbackGetSafeZoneAtHeight() //{ */
-
-    bool SafetyAreaManager::callbackGetSafeZoneAtHeight(mrs_msgs::GetSafeZoneAtHeight::Request& req, mrs_msgs::GetSafeZoneAtHeight::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        return true;
+      if (prism) {
+        obstacle_prisms.push_back(std::move(prism));
+      } else {
+        ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
       }
-
-      // Transform height to the current frame
-      double height = transformZ(req.header.frame_id, safety_zone_handler_.parameters.horizontal_frame, req.height);
-
-      // If main prism is on different height, safety zone is empty
-      if (safety_zone_handler_.safety_zone->getBorder()->getMaxZ() < height || height < safety_zone_handler_.safety_zone->getBorder()->getMinZ())
-      {
-        return true;
-      }
-
-
-      std::scoped_lock lock(mutex_safety_area_);
-
-      // Set response header
-      res.header.frame_id = _uav_name_ + "/" + safety_zone_handler_.parameters.horizontal_frame;
-
-      // Add polygon of main prism
-      auto border = safety_zone_handler_.safety_zone->getBorder()->getPolygon().outer();
-      geometry_msgs::Polygon border_polygon;
-      for (size_t i = 0; i < border.size(); i++)
-      {
-        geometry_msgs::Point32 p;
-        p.x = bg::get<0>(border[i]);
-        p.y = bg::get<1>(border[i]);
-        border_polygon.points.push_back(p);
-      }
-      res.safety_zone.push_back(border_polygon);
-
-      // Add polygons of required obstacles
-      for (auto it = safety_zone_handler_.safety_zone->getObstaclesBegin(); it != safety_zone_handler_.safety_zone->getObstaclesEnd(); it++)
-      {
-        if (it->second->getMaxZ() < height || height < it->second->getMinZ())
-        {
-          continue;
-        }
-
-        geometry_msgs::Polygon polygon;
-        auto outer_ring = it->second->getPolygon().outer();
-        for (size_t i = 0; i < outer_ring.size(); i++)
-        {
-          geometry_msgs::Point32 p;
-          p.x = bg::get<0>(outer_ring[i]);
-          p.y = bg::get<1>(outer_ring[i]);
-          polygon.points.push_back(p);
-        }
-        res.safety_zone.push_back(polygon);
-      }
-
-      return true;
     }
+  }
+
+  auto new_safety_zone = createSafetyZone(std::move(border), std::move(obstacle_prisms));
+
+  if (!new_safety_zone) {
+    ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
+    return false;
+  }
+
+  ROS_INFO("[SafetyAreaManager] New safety zone created");
+
+  safety_zone_handler_.visualization_components.safeCleanup();
+  safety_zone_handler_                                = std::move(*new_safety_zone);
+  safety_zone_handler_.parameters.safety_area_enabled = true;
+  safety_zone_handler_.parameters.horizontal_frame    = safety_border.horizontal_frame;
+  safety_zone_handler_.parameters.vertical_frame      = safety_border.vertical_frame;
 
-    //}
-
-    /* callbackGetMaxZ() //{ */
-
-    bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.success = false;
-        return true;
-      }
-
-      res.result.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
-      res.result.point.x = 0;
-      res.result.point.y = 0;
-      if (safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.result.point.z = safety_zone_handler_.safety_zone->getBorder()->getMaxZ();
-      } else
-      {
-        res.result.point.z = std::numeric_limits<double>::max();
-      }
-
-      res.success = true;
-      return true;
-    }
-
-    //}
-
-    /* callbackGetMinZ() //{ */
-
-    bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] mrs_msgs::GetPointStamped::Request& req, mrs_msgs::GetPointStamped::Response& res)
-    {
-
-      if (!is_initialized_)
-      {
-        res.success = false;
-        return true;
-      }
-
-      res.result.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
-      res.result.point.x = 0;
-      res.result.point.y = 0;
-      if (safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        res.result.point.z = safety_zone_handler_.safety_zone->getBorder()->getMinZ();
-      } else
-      {
-        res.result.point.z = std::numeric_limits<double>::lowest();
-      }
-
-      res.success = true;
-      return true;
-    }
-
-    //}
-
-    /* callbackGetUse() //{ */
-
-    bool SafetyAreaManager::callbackGetUse([[maybe_unused]] mrs_msgs::GetBool::Request& req, mrs_msgs::GetBool::Response& res)
-    {
-      if (!is_initialized_)
-      {
-        return true;
-      }
-
-      res.result = safety_zone_handler_.parameters.safety_area_enabled;
-      return true;
-    }
-
-    //}
-
-    // --------------------------------------------------------------
-    // |                          routines                          |
-    // --------------------------------------------------------------
-
-    /* initializationFromFile() //{ */
-
-    bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader& param_loader, const std::string& filename)
-    {
-      if (!param_loader.addYamlFile(filename))
-      {
-        return false;
-      }
-
-      // Reload parameters for every call, it can be called multiple times if using the Rviz plugin and loading different world configurations
-      // safety_zone_handler_.parameters.
-      std::string world_origin_units;
-      double origin_x;
-      double origin_y;
-      std::string horizontal_frame;
-      std::string vertical_frame;
-      bool safety_area_enabled;
-      param_loader.loadParam("world_origin/units", world_origin_units);
-      param_loader.loadParam("world_origin/origin_x", origin_x);
-      param_loader.loadParam("world_origin/origin_y", origin_y);
-      param_loader.loadParam("safety_area/enabled", safety_area_enabled);
-      param_loader.loadParam("safety_area/horizontal_frame", horizontal_frame);
-      param_loader.loadParam("safety_area/vertical_frame", vertical_frame);
-
-      //As this routine will be called pre-initialization to load safety area directly from world config
-      if (is_initialized_) 
-      {
-        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
-        /* TODO: Support for UTM */
-        SetOriginSrv.request.header.frame_id = "latlon_origin";
-        SetOriginSrv.request.header.stamp = ros::Time::now();
-        SetOriginSrv.request.reference.position.x = origin_x; 
-        SetOriginSrv.request.reference.position.y = origin_x; 
-
-        if (!service_client_set_world_origin_.call(SetOriginSrv))
-        {
-          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
-          return false;
-        }  
-      }
-
-      // Make border prism
-      const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
-      const auto max_z = param_loader.loadParam2<double>("safety_area/border/max_z");
-      const auto min_z = param_loader.loadParam2<double>("safety_area/border/min_z");
-      const auto transformed_max_z = transformZ(vertical_frame, "world_origin", max_z);
-      const auto transformed_min_z = transformZ(vertical_frame, "world_origin", min_z);
-
-      auto border = makePrism(border_points, transformed_max_z, transformed_min_z, horizontal_frame);
-
-      // Making obstacle prisms
-      std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles;
-
-      // bool obstacles_present;
-      param_loader.loadParam("safety_area/obstacles/present", diagnostics_data_.obstacles_present);
-
-      // If any is present, fill obstacles
-      if (diagnostics_data_.obstacles_present)
-      {
-        // Read parameters for obstacles
-        std::vector<Eigen::MatrixXd> obstacles_mat;
-        Eigen::MatrixXd max_z_mat;
-        Eigen::MatrixXd min_z_mat;
-        param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
-        param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
-
-        Eigen::MatrixXd current_mat = param_loader.loadMatrixDynamic2("safety_area/obstacles/data", -1, 2);
-        Eigen::MatrixXd rows = param_loader.loadMatrixDynamic2("safety_area/obstacles/rows", -1, 1);
-
-        obstacles.reserve(current_mat.size());
-
-        int start_row = 0;
-        obstacles_mat.reserve(rows.rows());
-
-        // Iterate over obstacles matrix and extract points based on rows matrix
-        //"rows" matrix define the points for every obstacle
-        for (int i = 0; i < rows.rows(); i++)
-        {
-          int row_num = static_cast<int>(rows(i, 0));
-
-          if (row_num < 0 || start_row + row_num > current_mat.rows())
-          {
-            ROS_WARN("[SafetyAreaManager]: Invalid obstacle rows!, check your config file");
-            return false;
-          }
-
-          Eigen::MatrixXd obstacle_mat = current_mat.block(start_row, 0, row_num, current_mat.cols());
-          obstacles_mat.push_back(obstacle_mat);
-          start_row += row_num;
-        }
-
-        if (start_row != current_mat.rows())
-        {
-          ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
-          return false;
-        }
-
-        if (!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == static_cast<long int>(obstacles_mat.size())))
-        {
-          ROS_WARN("[SafetyAreaManager]: The number of obstacles is not consistent! No obstacle has been added");
-          return false;
-        }
-
-        // Make obstacle prisms
-        for (size_t i = 0; i < obstacles_mat.size(); i++)
-        {
-          const auto obs_max_z = max_z_mat(i, 0);
-          const auto obs_min_z = min_z_mat(i, 0);
-          const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", obs_max_z);
-          const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", obs_min_z);
-          auto prism = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z, horizontal_frame);
-
-          if (prism)
-          {
-            obstacles.push_back(std::move(prism));
-          } else
-          {
-            ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
-          }
-        }
-      }
-
-      auto new_safety_zone = createSafetyZone(std::move(border), std::move(obstacles)); 
-
-      if (!new_safety_zone) {
-        ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
-        return false;
-      }
-
-      ROS_INFO("[SafetyAreaManager] New safety zone created");
-
-      safety_zone_handler_.visualization_components.safeCleanup();
-      safety_zone_handler_ = std::move(*new_safety_zone);
-      safety_zone_handler_.parameters.safety_area_enabled = true;
-      safety_zone_handler_.parameters.horizontal_frame    = horizontal_frame;
-      safety_zone_handler_.parameters.vertical_frame      = vertical_frame;
-      safety_zone_handler_.parameters.world_origin_units  = world_origin_units;
-      safety_zone_handler_.parameters.origin_x            = origin_x;
-      safety_zone_handler_.parameters.origin_y            = origin_y;
-
-      return true;
-    }
-
-    //}
-
-    /* initializionFromMsg(Border) //{ */
-
-    std::vector<std::unique_ptr<mrs_lib::Prism>> SafetyAreaManager::copyExistingObstacles() {
-      if (!safety_zone_handler_.safety_zone) {
-        return {};
-      }
-
-      const auto &obstacles_map = safety_zone_handler_.safety_zone->getObstacles();
-      std::vector<std::unique_ptr<mrs_lib::Prism>> obstacles_copy;
-      obstacles_copy.reserve(obstacles_map.size());
-
-      for (const auto &[id, obstacle_ptr] : obstacles_map) {
-        obstacles_copy.push_back(std::make_unique<mrs_lib::Prism>(*obstacle_ptr));
-      }
-
-      return obstacles_copy;
-    }
-
-    bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::SafetyBorder& safety_border_msg, bool keep_obstacles)
-    {
-
-      auto [res, message] = validateMsg(safety_border_msg);
-
-      if (!res)
-      {
-        ROS_WARN_STREAM("[SafetyAreaManager]: Message not valid, error message: " << message);
-        return false;
-      }
-
-      // Make border prism
-      std::vector<mrs_msgs::Point2D> border_points = safety_border_msg.points;
-
-      const auto transformed_max_z = transformZ(safety_border_msg.vertical_frame, "world_origin", safety_border_msg.max_z);
-      const auto transformed_min_z = transformZ(safety_border_msg.vertical_frame, "world_origin", safety_border_msg.min_z);
-
-      auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_border_msg.horizontal_frame);
-
-      auto new_safety_zone = keep_obstacles ? createSafetyZone(std::move(border), copyExistingObstacles()) : createSafetyZone(std::move(border));
-
-      ROS_INFO("[SafetyAreaManager] New safety zone created");
-
-      if (!new_safety_zone) {
-        ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
-        return false;
-      }
-
-      // Update values of new safety zone
-      safety_zone_handler_.visualization_components.safeCleanup();
-      safety_zone_handler_ = std::move(*new_safety_zone);
-      safety_zone_handler_.parameters.safety_area_enabled = safety_border_msg.enabled;
-      safety_zone_handler_.parameters.horizontal_frame    = safety_border_msg.horizontal_frame;
-      safety_zone_handler_.parameters.vertical_frame      = safety_border_msg.vertical_frame;
-
-      return true;
-    }
-
-    //}
-    
-    /* initializationFromMsg(Area) //{ */
-
-    bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::SafetyArea& safety_area_msg)
-    {
-
-      auto [res, message] = validateMsg(safety_area_msg);
-
-      if (!res)
-      {
-        ROS_WARN_STREAM("[SafetyAreaManager]: Message not valid, error message: " << message);
-        return false;
-      }
-
-      // If world origin not defined take the current origin values TODO
-      if (safety_area_msg.units.empty() || safety_area_msg.origin_x == 0.0 || safety_area_msg.origin_y == 0.0)
-      {
-        ROS_INFO("[SafetyAreaManager]: World origin not defined, using current saved value.");
-        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
-        SetOriginSrv.request.header.frame_id = "latlon_origin";
-        SetOriginSrv.request.header.stamp = ros::Time::now();
-        SetOriginSrv.request.reference.position.x = safety_zone_handler_.parameters.origin_x; 
-        SetOriginSrv.request.reference.position.y = safety_zone_handler_.parameters.origin_x; 
-
-        if (!service_client_set_world_origin_.call(SetOriginSrv))
-        {
-          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
-          return false;
-        }
-
-      } else
-      {
-        mrs_msgs::ReferenceStampedSrv SetOriginSrv;
-        SetOriginSrv.request.header.frame_id = "latlon_origin";
-        SetOriginSrv.request.header.stamp = ros::Time::now();
-        SetOriginSrv.request.reference.position.x = safety_area_msg.origin_x;
-        SetOriginSrv.request.reference.position.y = safety_area_msg.origin_y;
-
-        if (!service_client_set_world_origin_.call(SetOriginSrv))
-        {
-          ROS_WARN("[SafetyAreaManager]: Failed to set world_origin.");
-          return false;
-        }
-
-        safety_zone_handler_.parameters.world_origin_units = safety_area_msg.units;
-        safety_zone_handler_.parameters.origin_x = safety_area_msg.origin_x;
-        safety_zone_handler_.parameters.origin_x = safety_area_msg.origin_y;
-      }
-
-      // Make border prism
-      const auto safety_border = safety_area_msg.border;
-      std::vector<mrs_msgs::Point2D> border_points = safety_border.points;
-
-      const auto transformed_max_z = transformZ(safety_border.vertical_frame,"world_origin",safety_border.max_z);
-      const auto transformed_min_z = transformZ(safety_border.vertical_frame,"world_origin",safety_border.min_z);
-
-      auto border = makePrism(border_points, transformed_max_z, transformed_min_z, safety_border.horizontal_frame);
-
-      // Making obstacle prisms
-      std::vector<std::unique_ptr<mrs_lib::Prism>> obstacle_prisms;
-
-      // Get obstacles data
-      const auto obstacles_msg = safety_area_msg.obstacles;
-      diagnostics_data_.obstacles_present = obstacles_msg.present;
-      std::vector<mrs_msgs::Point2D> obstacles_data = obstacles_msg.data;
-      std::vector<int> rows = obstacles_msg.rows;
-      std::vector<double> max_z_values = obstacles_msg.max_z;
-      std::vector<double> min_z_values = obstacles_msg.min_z;
-      std::vector<Obstacle> obstacles;
-
-      // If any is present, fill obstacles
-      if (diagnostics_data_.obstacles_present)
-      {
-
-        if (rows.size() != max_z_values.size() || rows.size() != min_z_values.size())
-        {
-          ROS_WARN("[SafetyAreaManager]: Mismatch between size of rows, max_z and min_z values");
-          return false;
-        }
-
-        // Calculate the total number of points expected
-        int total_expected_points = 0;
-        for (const auto& row : rows)
-        {
-          total_expected_points += row;
-        }
-
-        // Validate that the total number of points matches the size of obstacles_data
-        if (total_expected_points != static_cast<int>(obstacles_data.size()))
-        {
-          ROS_WARN("[SafetyAreaManager]: Total number of points in obstacles_data does not match the sum of rows.");
-          return false;
-        }
-
-        obstacles.reserve(rows.size());
-
-        // Fill up the obstacles from the msg data and row values
-        int current_idx = 0;
-
-        for (size_t i = 0; i < rows.size(); i++)
-        {
-
-          // Extracting subset of points for current obstacle
-          int num_points = rows.at(i);
-          std::vector<mrs_msgs::Point2D> obstacle_points(obstacles_data.begin() + current_idx, obstacles_data.begin() + current_idx + num_points
-
-          );
-
-          // Create obstacle
-          Obstacle obstacle(obstacle_points, max_z_values.at(i), min_z_values.at(i));
-
-          // Add obstacle to obstacles vector
-          obstacles.emplace_back(obstacle);
-
-          current_idx += num_points;
-        }
-
-        // Make obstacle prism
-        for (const auto& obstacle : obstacles)
-        {
-          const auto transformed_obs_max_z = transformZ(safety_border.vertical_frame,"world_origin", obstacle.max_z);
-          const auto transformed_obs_min_z = transformZ(safety_border.vertical_frame,"world_origin", obstacle.min_z);
-          auto prism = makePrism(obstacle.data, transformed_obs_max_z, transformed_obs_min_z, safety_border.horizontal_frame);
-
-          if (prism)
-          {
-            obstacle_prisms.push_back(std::move(prism));
-          } else
-          {
-            ROS_WARN("[SafetyAreaManager]: Failed to create obstacle prism!");
-          }
-        }
-      }
-
-     auto new_safety_zone = createSafetyZone(std::move(border), std::move(obstacle_prisms)); 
-
-      if (!new_safety_zone) {
-        ROS_WARN("[SafetyAreaManager]: Failed to create new safety zone.");
-        return false;
-      }
-
-      ROS_INFO("[SafetyAreaManager] New safety zone created");
-
-      safety_zone_handler_.visualization_components.safeCleanup();
-      safety_zone_handler_ = std::move(*new_safety_zone);
-      safety_zone_handler_.parameters.safety_area_enabled = true;
-      safety_zone_handler_.parameters.horizontal_frame    = safety_border.horizontal_frame;
-      safety_zone_handler_.parameters.vertical_frame      = safety_border.vertical_frame;
-
-      return true;
-    }
-
-    //}
-
-   /* createSafetyZone () //{ */
-
-   std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border,
-                                                                                           std::vector<std::unique_ptr<mrs_lib::Prism>> &&obstacle_prisms) {
-     SafetyZoneHandler safety_zone_handler;
-     safety_zone_handler.safety_zone = std::make_shared<mrs_lib::SafetyZone>(*border, std::move(obstacle_prisms));
-
-     if (!safety_zone_handler.safety_zone) {
-       return std::nullopt;
-     }
-     
-     safety_zone_handler.safety_zone->enableSafetyZone(true);
-
-     // RViz Visualizations
-     safety_zone_handler.visualization_components.static_edges.push_back(
-         std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
-     safety_zone_handler.visualization_components.int_edges.push_back(
-         std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.vertices.push_back(
-         std::make_unique<mrs_lib::VertexControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.centers.push_back(
-         std::make_unique<mrs_lib::CenterControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.bounds.push_back(
-         std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-
-     /* // Obstacles, overloading for obstacles */
-     for (auto it = safety_zone_handler.safety_zone->getObstaclesBegin(); it != safety_zone_handler.safety_zone->getObstaclesEnd(); it++) {
-       safety_zone_handler.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
-           safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
-       safety_zone_handler.visualization_components.int_edges.push_back(
-           std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-       safety_zone_handler.visualization_components.vertices.push_back(
-           std::make_unique<mrs_lib::VertexControl>(safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-       safety_zone_handler.visualization_components.centers.push_back(
-           std::make_unique<mrs_lib::CenterControl>(safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-       safety_zone_handler.visualization_components.bounds.push_back(
-           std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     }
-
-     return safety_zone_handler;
-   }
-
-   std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border) {
-
-     SafetyZoneHandler safety_zone_handler;
-     safety_zone_handler.safety_zone = std::make_shared<mrs_lib::SafetyZone>(*border);
-
-     if (!safety_zone_handler.safety_zone) {
-       return std::nullopt;
-     }
-
-     safety_zone_handler.safety_zone->enableSafetyZone(true);
-
-     // RViz Visualizations
-     safety_zone_handler.visualization_components.static_edges.push_back(
-         std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
-     safety_zone_handler.visualization_components.int_edges.push_back(
-         std::make_unique<mrs_lib::IntEdgesVisualization>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.vertices.push_back(
-         std::make_unique<mrs_lib::VertexControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.centers.push_back(
-         std::make_unique<mrs_lib::CenterControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-     safety_zone_handler.visualization_components.bounds.push_back(
-         std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
-
-     return safety_zone_handler;
-   }
-   //} 
-   
-    /* validateMsg() //{ */
-
-    std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyBorder& safety_border_msg)
-    {
-
-      if (safety_border_msg.points.empty())
-      {
-        return std::make_tuple(false, "Border points are empty");
-      }
-
-      if (safety_border_msg.horizontal_frame.empty() || safety_border_msg.vertical_frame.empty())
-      {
-        return std::make_tuple(false, "Frame units (horizontal_frame and vertical_frame) are empty");
-      }
-
-      return std::make_tuple(true, "Valid message");
-    }
-
-    //}
-    
-    /* validateMsg() //{ */
-
-    std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyArea& safety_area_msg)
-    {
-
-      if (safety_area_msg.border.points.empty())
-      {
-        return std::make_tuple(false, "Border points are empty");
-      }
-
-      if (safety_area_msg.border.horizontal_frame.empty() || safety_area_msg.border.vertical_frame.empty())
-      {
-        return std::make_tuple(false, "Frame units (horizontal_frame and vertical_frame) are empty");
-      }
-
-      if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.data.empty())
-      {
-        return std::make_tuple(false, "Obstacles present is true but obstacles data are empty");
-      }
-
-      if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.rows.empty())
-      {
-        return std::make_tuple(false, "Obstacles row are empty");
-      }
-
-      return std::make_tuple(true, "Valid message");
-    }
-
-    //}
-
-    /* makePrism(matrix) //{ */
-
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z,
-                                                                 const std::string& horizontal_frame)
-    {
-
-      if (matrix.rows() < 3)
-      {
-        ROS_WARN_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(matrix.rows()));
-      }
-
-      std::vector<mrs_lib::Point2d> points;
-      points.reserve(matrix.rows());
-
-      for (int i = 0; i < matrix.rows(); i++)
-      {
-        points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
-      }
-
-      auto transformed_points = transformPoints(points, horizontal_frame, "world_origin");
-
-      return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
-    }
-
-    //}
-
-    /* makePrism(points) //{ */
-
-    std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D>& points, const double max_z, const double min_z,
-                                                                 const std::string& horizontal_frame)
-    {
-
-      if (points.size() < 3)
-      {
-        ROS_WARN_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(points.size()));
-      }
-
-      std::vector<mrs_lib::Point2d> tmp_points;
-
-      tmp_points.reserve(points.size());
-
-      for (const auto& point : points)
-      {
-        tmp_points.emplace_back(mrs_lib::Point2d{point.x, point.y});
-      }
-
-      auto transformed_points = transformPoints(tmp_points, horizontal_frame, "world_origin");
-      return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
-    }
-
-    //}
-
-    /* transformPoints() //{ */
-
-    std::vector<mrs_lib::Point2d> SafetyAreaManager::transformPoints(const std::vector<mrs_lib::Point2d>& points, const std::string& from_frame,
-                                                                     const std::string& to_frame)
-    {
-
-      // Transforming into local origin for visualization
-      std::vector<mrs_lib::Point2d> transformed_points;
-      mrs_msgs::ReferenceStamped reference_tmp;
-
-      for (const auto& point : points)
-      {
-        reference_tmp.header.frame_id = from_frame; 
-        reference_tmp.header.stamp = ros::Time(0);
-        reference_tmp.reference.position.x = boost::geometry::get<0>(point);
-        reference_tmp.reference.position.y = boost::geometry::get<1>(point);
-        reference_tmp.reference.position.z = 0;
-
-        auto ret = transformer_->getTransform(from_frame, to_frame, ros::Time(0));
-        if (!ret)
-        {
-          ROS_WARN("[SafetyAreaManager]: Transformation failed!");
-          return transformed_points;
-        }
-
-        if (auto transformed_reference = transformer_->transform(reference_tmp, ret.value()))
-        {
-          reference_tmp = transformed_reference.value();
-          transformed_points.emplace_back(mrs_lib::Point2d{reference_tmp.reference.position.x, reference_tmp.reference.position.y});
-        }
-      }
+  return true;
+}
+
+//}
+
+/* createSafetyZone () //{ */
+
+std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border,
+                                                                                        std::vector<std::unique_ptr<mrs_lib::Prism>> &&obstacle_prisms) {
+  SafetyZoneHandler safety_zone_handler;
+  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::SafetyZone>(*border, std::move(obstacle_prisms));
 
+  if (!safety_zone_handler.safety_zone) {
+    return std::nullopt;
+  }
+
+  safety_zone_handler.safety_zone->enableSafetyZone(true);
+
+  // RViz Visualizations
+  safety_zone_handler.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
+      safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
+  safety_zone_handler.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(
+      safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.vertices.push_back(
+      std::make_unique<mrs_lib::VertexControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.centers.push_back(
+      std::make_unique<mrs_lib::CenterControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.bounds.push_back(
+      std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+
+  /* // Obstacles, overloading for obstacles */
+  for (auto it = safety_zone_handler.safety_zone->getObstaclesBegin(); it != safety_zone_handler.safety_zone->getObstaclesEnd(); it++) {
+    safety_zone_handler.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
+        safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
+    safety_zone_handler.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(
+        safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+    safety_zone_handler.visualization_components.vertices.push_back(std::make_unique<mrs_lib::VertexControl>(
+        safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+    safety_zone_handler.visualization_components.centers.push_back(std::make_unique<mrs_lib::CenterControl>(
+        safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+    safety_zone_handler.visualization_components.bounds.push_back(std::make_unique<mrs_lib::BoundsControl>(
+        safety_zone_handler.safety_zone.get(), it->first, _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  }
+
+  return safety_zone_handler;
+}
+
+std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::Prism> &border) {
+
+  SafetyZoneHandler safety_zone_handler;
+  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::SafetyZone>(*border);
+
+  if (!safety_zone_handler.safety_zone) {
+    return std::nullopt;
+  }
+
+  safety_zone_handler.safety_zone->enableSafetyZone(true);
+
+  // RViz Visualizations
+  safety_zone_handler.visualization_components.static_edges.push_back(std::make_unique<mrs_lib::StaticEdgesVisualization>(
+      safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_, 2));
+  safety_zone_handler.visualization_components.int_edges.push_back(std::make_unique<mrs_lib::IntEdgesVisualization>(
+      safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.vertices.push_back(
+      std::make_unique<mrs_lib::VertexControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.centers.push_back(
+      std::make_unique<mrs_lib::CenterControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+  safety_zone_handler.visualization_components.bounds.push_back(
+      std::make_unique<mrs_lib::BoundsControl>(safety_zone_handler.safety_zone.get(), _uav_name_, safety_zone_handler_.parameters.horizontal_frame, nh_));
+
+  return safety_zone_handler;
+}
+//}
+
+/* validateMsg() //{ */
+
+std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyBorder &safety_border_msg) {
+
+  if (safety_border_msg.points.empty()) {
+    return std::make_tuple(false, "Border points are empty");
+  }
+
+  if (safety_border_msg.horizontal_frame.empty() || safety_border_msg.vertical_frame.empty()) {
+    return std::make_tuple(false, "Frame units (horizontal_frame and vertical_frame) are empty");
+  }
+
+  return std::make_tuple(true, "Valid message");
+}
+
+//}
+
+/* validateMsg() //{ */
+
+std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::SafetyArea &safety_area_msg) {
+
+  if (safety_area_msg.border.points.empty()) {
+    return std::make_tuple(false, "Border points are empty");
+  }
+
+  if (safety_area_msg.border.horizontal_frame.empty() || safety_area_msg.border.vertical_frame.empty()) {
+    return std::make_tuple(false, "Frame units (horizontal_frame and vertical_frame) are empty");
+  }
+
+  if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.data.empty()) {
+    return std::make_tuple(false, "Obstacles present is true but obstacles data are empty");
+  }
+
+  if (safety_area_msg.obstacles.present && safety_area_msg.obstacles.rows.empty()) {
+    return std::make_tuple(false, "Obstacles row are empty");
+  }
+
+  return std::make_tuple(true, "Valid message");
+}
+
+//}
+
+/* makePrism(matrix) //{ */
+
+std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z,
+                                                             const std::string &horizontal_frame) {
+
+  if (matrix.rows() < 3) {
+    ROS_WARN_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(matrix.rows()));
+  }
+
+  std::vector<mrs_lib::Point2d> points;
+  points.reserve(matrix.rows());
+
+  for (int i = 0; i < matrix.rows(); i++) {
+    points.emplace_back(mrs_lib::Point2d{matrix(i, 0), matrix(i, 1)});
+  }
+
+  auto transformed_points = transformPoints(points, horizontal_frame, "world_origin");
+
+  return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
+}
+
+//}
+
+/* makePrism(points) //{ */
+
+std::unique_ptr<mrs_lib::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::Point2D> &points, const double max_z, const double min_z,
+                                                             const std::string &horizontal_frame) {
+
+  if (points.size() < 3) {
+    ROS_WARN_STREAM("[SafetyAreaManager]: Invalid polygon, must have at least 3 points. Provided:  " << std::to_string(points.size()));
+  }
+
+  std::vector<mrs_lib::Point2d> tmp_points;
+
+  tmp_points.reserve(points.size());
+
+  for (const auto &point : points) {
+    tmp_points.emplace_back(mrs_lib::Point2d{point.x, point.y});
+  }
+
+  auto transformed_points = transformPoints(tmp_points, horizontal_frame, "world_origin");
+  return std::make_unique<mrs_lib::Prism>(transformed_points, max_z, min_z);
+}
+
+//}
+
+/* transformPoints() //{ */
+
+std::vector<mrs_lib::Point2d> SafetyAreaManager::transformPoints(const std::vector<mrs_lib::Point2d> &points, const std::string &from_frame,
+                                                                 const std::string &to_frame) {
+
+  // Transforming into local origin for visualization
+  std::vector<mrs_lib::Point2d> transformed_points;
+  mrs_msgs::ReferenceStamped reference_tmp;
+
+  for (const auto &point : points) {
+    reference_tmp.header.frame_id      = from_frame;
+    reference_tmp.header.stamp         = ros::Time(0);
+    reference_tmp.reference.position.x = boost::geometry::get<0>(point);
+    reference_tmp.reference.position.y = boost::geometry::get<1>(point);
+    reference_tmp.reference.position.z = 0;
+
+    auto ret = transformer_->getTransform(from_frame, to_frame, ros::Time(0));
+    if (!ret) {
+      ROS_WARN("[SafetyAreaManager]: Transformation failed!");
       return transformed_points;
     }
 
-    //}
+    if (auto transformed_reference = transformer_->transform(reference_tmp, ret.value())) {
+      reference_tmp = transformed_reference.value();
+      transformed_points.emplace_back(mrs_lib::Point2d{reference_tmp.reference.position.x, reference_tmp.reference.position.y});
+    }
+  }
 
-    /* transformZ() //{ */
+  return transformed_points;
+}
 
-    double SafetyAreaManager::transformZ(const std::string& current_frame, const std::string& target_frame, const double z)
-    {
-      geometry_msgs::Point point;
-      point.x = 0;
-      point.y = 0;
-      point.z = z;
+//}
 
-      const auto res = transformer_->transformSingle(current_frame, point, target_frame);
-      if (!res)
-      {
-        ROS_WARN("[SafetyAreaManager]: Could not transform point from %s to %s.", current_frame.c_str(), target_frame.c_str());
-        return 0;
-      }
+/* transformZ() //{ */
 
-      return res.value().z;
+double SafetyAreaManager::transformZ(const std::string &current_frame, const std::string &target_frame, const double z) {
+  geometry_msgs::Point point;
+  point.x = 0;
+  point.y = 0;
+  point.z = z;
+
+  const auto res = transformer_->transformSingle(current_frame, point, target_frame);
+  if (!res) {
+    ROS_WARN("[SafetyAreaManager]: Could not transform point from %s to %s.", current_frame.c_str(), target_frame.c_str());
+    return 0;
+  }
+
+  return res.value().z;
+}
+
+//}
+
+/* //{ isPointInSafetyArea2d() */
+bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped &point) {
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    return true;
+  }
+
+  // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+
+  if (!tfed_horizontal) {
+    ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+    return false;
+  }
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ isPointInSafetyArea3d() */
+
+bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped &point) {
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    return true;
+  }
+
+  // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
+  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+
+
+  if (!tfed_horizontal) {
+    ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
+    return false;
+  }
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y,
+                                                      tfed_horizontal->reference.position.z)) {
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+/* //{ isPathToPointInSafetyArea2d() */
+
+bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped &start, const mrs_msgs::ReferenceStamped &end) {
+
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    return true;
+  }
+
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end)) {
+    return false;
+  }
+
+  {
+    auto ret = transformer_->transformSingle(start, safety_zone_handler_.parameters.horizontal_frame);
+
+    if (!ret) {
+
+      ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
     }
 
-    //}
+    start_transformed = ret.value();
+  }
 
-    /* //{ isPointInSafetyArea2d() */
-    bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& point)
-    {
+  {
+    auto ret = transformer_->transformSingle(end, safety_zone_handler_.parameters.horizontal_frame);
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        return true;
-      }
+    if (!ret) {
 
-      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
-      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+      ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
 
-      if (!tfed_horizontal)
-      {
-        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
-        return false;
-      }
-
-      if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y))
-      {
-        return false;
-      }
-
-      return true;
+      return false;
     }
 
-    //}
+    end_transformed = ret.value();
+  }
 
-    /* //{ isPointInSafetyArea3d() */
+  // verify the whole path
+  mrs_lib::Point2d start_point, end_point;
+  start_point.set<0>(start_transformed.reference.position.x);
+  start_point.set<1>(start_transformed.reference.position.y);
+  end_point.set<0>(end_transformed.reference.position.x);
+  end_point.set<1>(end_transformed.reference.position.y);
 
-    bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& point)
-    {
+  return safety_zone_handler_.safety_zone->isPathValid(start_point, end_point);
+}
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        return true;
-      }
+//}
 
-      // Transform to "world_origin" as is the default frame we use for easier validation and interaction with safety area border points.
-      auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+/* //{ isPathToPointInSafetyArea3d() */
 
+bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped &start, const mrs_msgs::ReferenceStamped &end) {
 
-      if (!tfed_horizontal)
-      {
-        ROS_WARN_THROTTLE(1.0, "[SafetyAreaManager]: SafetyArea: Could not transform the point to the safety area horizontal frame");
-        return false;
-      }
+  if (!safety_zone_handler_.parameters.safety_area_enabled) {
+    return true;
+  }
 
-      if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, tfed_horizontal->reference.position.z))
-      {
-        return false;
-      }
+  if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end)) {
+    return false;
+  }
 
-      return true;
+  mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+
+  {
+    auto ret = transformer_->transformSingle(start, safety_zone_handler_.parameters.horizontal_frame);
+
+    if (!ret) {
+
+      ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
+
+      return false;
     }
 
-    //}
+    start_transformed = ret.value();
+  }
 
-    /* //{ isPathToPointInSafetyArea2d() */
+  {
+    auto ret = transformer_->transformSingle(end, safety_zone_handler_.parameters.horizontal_frame);
 
-    bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end)
-    {
+    if (!ret) {
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        return true;
-      }
+      ROS_WARN("[ControlManager]: SafetyArea: Could not transform the first point in the path");
 
-      mrs_msgs::ReferenceStamped start_transformed, end_transformed;
-
-      if (!isPointInSafetyArea2d(start) || !isPointInSafetyArea2d(end))
-      {
-        return false;
-      }
-
-      {
-        auto ret = transformer_->transformSingle(start, safety_zone_handler_.parameters.horizontal_frame);
-
-        if (!ret)
-        {
-
-          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
-
-          return false;
-        }
-
-        start_transformed = ret.value();
-      }
-
-      {
-        auto ret = transformer_->transformSingle(end, safety_zone_handler_.parameters.horizontal_frame);
-
-        if (!ret)
-        {
-
-          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
-
-          return false;
-        }
-
-        end_transformed = ret.value();
-      }
-
-      // verify the whole path
-      mrs_lib::Point2d start_point, end_point;
-      start_point.set<0>(start_transformed.reference.position.x);
-      start_point.set<1>(start_transformed.reference.position.y);
-      end_point.set<0>(end_transformed.reference.position.x);
-      end_point.set<1>(end_transformed.reference.position.y);
-
-      return safety_zone_handler_.safety_zone->isPathValid(start_point, end_point);
+      return false;
     }
 
-    //}
+    end_transformed = ret.value();
+  }
 
-    /* //{ isPathToPointInSafetyArea3d() */
+  // verify the whole path
+  mrs_lib::Point3d start_point, end_point;
+  start_point.set<0>(start_transformed.reference.position.x);
+  start_point.set<1>(start_transformed.reference.position.y);
+  start_point.set<2>(start_transformed.reference.position.z);
+  end_point.set<0>(end_transformed.reference.position.x);
+  end_point.set<1>(end_transformed.reference.position.y);
+  end_point.set<2>(end_transformed.reference.position.z);
 
-    bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::ReferenceStamped& start, const mrs_msgs::ReferenceStamped& end)
-    {
+  return safety_zone_handler_.safety_zone->isPathValid(start_point, end_point);
+}
 
-      if (!safety_zone_handler_.parameters.safety_area_enabled)
-      {
-        return true;
-      }
+//}
 
-      if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end))
-      {
-        return false;
-      }
+/* //{ getMaxZ() */
 
-      mrs_msgs::ReferenceStamped start_transformed, end_transformed;
+double SafetyAreaManager::getMaxZ(const std::string &frame_id) {
 
-      {
-        auto ret = transformer_->transformSingle(start, safety_zone_handler_.parameters.horizontal_frame);
+  // | ---------- first, get max_z from the safety area --------- |
 
-        if (!ret)
-        {
+  double safety_area_max_z = std::numeric_limits<float>::max();
 
-          ROS_WARN("[SafetyAreaManager]: SafetyArea: Could not transform the first point in the path");
+  geometry_msgs::PointStamped point;
+  point.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
+  point.point.x         = 0;
+  point.point.y         = 0;
+  point.point.z         = safety_zone_handler_.safety_zone->getBorder()->getMaxZ();
 
-          return false;
-        }
+  auto ret = transformer_->transformSingle(point, frame_id);
 
-        start_transformed = ret.value();
-      }
+  if (!ret) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+  }
+  // | ------------ overwrite from estimation manager ----------- |
 
-      {
-        auto ret = transformer_->transformSingle(end, safety_zone_handler_.parameters.horizontal_frame);
+  double estimation_manager_max_z = std::numeric_limits<float>::max();
 
-        if (!ret)
-        {
+  {
+    // if possible, override it with max z from the estimation manager
+    if (sh_max_z_.hasMsg()) {
 
-          ROS_WARN("[ControlManager]: SafetyArea: Could not transform the first point in the path");
+      auto msg = sh_max_z_.getMsg();
 
-          return false;
-        }
-
-        end_transformed = ret.value();
-      }
-
-      // verify the whole path
-      mrs_lib::Point3d start_point, end_point;
-      start_point.set<0>(start_transformed.reference.position.x);
-      start_point.set<1>(start_transformed.reference.position.y);
-      start_point.set<2>(start_transformed.reference.position.z);
-      end_point.set<0>(end_transformed.reference.position.x);
-      end_point.set<1>(end_transformed.reference.position.y);
-      end_point.set<2>(end_transformed.reference.position.z);
-
-      return safety_zone_handler_.safety_zone->isPathValid(start_point, end_point);
-    }
-
-    //}
-
-    /* //{ getMaxZ() */
-
-    double SafetyAreaManager::getMaxZ(const std::string& frame_id)
-    {
-
-      // | ---------- first, get max_z from the safety area --------- |
-
-      double safety_area_max_z = std::numeric_limits<float>::max();
-
+      // transform it into the safety area frame
       geometry_msgs::PointStamped point;
-      point.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
+      point.header  = msg->header;
       point.point.x = 0;
       point.point.y = 0;
-      point.point.z = safety_zone_handler_.safety_zone->getBorder()->getMaxZ();
+      point.point.z = msg->value;
 
       auto ret = transformer_->transformSingle(point, frame_id);
 
-      if (!ret)
-      {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
-      }
-      // | ------------ overwrite from estimation manager ----------- |
-
-      double estimation_manager_max_z = std::numeric_limits<float>::max();
-
-      {
-        // if possible, override it with max z from the estimation manager
-        if (sh_max_z_.hasMsg())
-        {
-
-          auto msg = sh_max_z_.getMsg();
-
-          // transform it into the safety area frame
-          geometry_msgs::PointStamped point;
-          point.header = msg->header;
-          point.point.x = 0;
-          point.point.y = 0;
-          point.point.z = msg->value;
-
-          auto ret = transformer_->transformSingle(point, frame_id);
-
-          if (!ret)
-          {
-            ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
-          }
-
-          estimation_manager_max_z = ret->point.z;
-        }
+      if (!ret) {
+        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform estimation manager's max_z to the current control frame");
       }
 
-      if (estimation_manager_max_z < safety_area_max_z)
-      {
-        return estimation_manager_max_z;
-      } else
-      {
-        return safety_area_max_z;
+      estimation_manager_max_z = ret->point.z;
+    }
+  }
+
+  if (estimation_manager_max_z < safety_area_max_z) {
+    return estimation_manager_max_z;
+  } else {
+    return safety_area_max_z;
+  }
+}
+
+//}
+
+/* //{ getMinZ() */
+
+double SafetyAreaManager::getMinZ(const std::string &frame_id) {
+
+  // | ---------- first, get max_z from the safety area --------- |
+
+  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
+    return std::numeric_limits<float>::lowest();
+  }
+
+  geometry_msgs::PointStamped point;
+  point.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
+  point.point.x         = 0;
+  point.point.y         = 0;
+  point.point.z         = safety_zone_handler_.safety_zone->getBorder()->getMinZ();
+
+  auto ret = transformer_->transformSingle(point, frame_id);
+
+  if (!ret) {
+    ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
+    return std::numeric_limits<float>::lowest();
+  }
+
+  return ret->point.z;
+}
+
+//}
+
+/* publishDiagnostics() //{ */
+// TODO: Refactor diagnostics
+void SafetyAreaManager::publishDiagnostics(void) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer("SafetyAreaManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+
+  mrs_msgs::SafetyAreaManagerDiagnostics diagnostics_msg;
+
+  std::scoped_lock lock(mutex_diagnostics_);
+
+  // copy member variables
+  auto uav_name                     = mrs_lib::get_mutexed(mutex_safety_area_, _uav_name_);
+  auto uav_state                    = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+  auto use_safety_area              = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.safety_area_enabled);
+  auto world_origin_units           = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.world_origin_units);
+  auto origin_x                     = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.origin_x);
+  auto origin_y                     = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.origin_x);
+  auto safety_area_horizontal_frame = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.horizontal_frame);
+  auto safety_area_vertical_frame   = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.vertical_frame);
+  auto obstacles_present            = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_present);
+
+  auto safety_border_points = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_points);
+  auto safety_border_max_z  = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_max_z);
+  auto safety_border_min_z  = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_min_z);
+  auto obstacles_points     = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_points);
+  auto obstacles_rows       = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_rows);
+  auto obstacles_max_z      = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_max_z);
+  auto obstacles_min_z      = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_min_z);
+
+  // | ------------------------- Fill in the diagnostics msg ------------------------ |
+
+  diagnostics_msg.stamp                             = ros::Time::now();
+  diagnostics_msg.uav_name                          = uav_name;
+  diagnostics_msg.safety_area_enabled               = use_safety_area;
+  auto [is_position_valid_2d, is_position_valid_3d] = isPositionValid(uav_state);
+  diagnostics_msg.position_valid_2d                 = is_position_valid_2d;
+  diagnostics_msg.position_valid_3d                 = is_position_valid_3d;
+  position_valid_2d_                                = is_position_valid_2d;
+  position_valid_3d_                                = is_position_valid_3d;
+
+  // Fill world origin
+  diagnostics_msg.safety_area.units    = world_origin_units;
+  diagnostics_msg.safety_area.origin_x = origin_x;
+  diagnostics_msg.safety_area.origin_y = origin_y;
+
+  // Fill safety border data
+  diagnostics_msg.safety_area.border.horizontal_frame = safety_area_horizontal_frame;
+  diagnostics_msg.safety_area.border.vertical_frame   = safety_area_vertical_frame;
+  diagnostics_msg.safety_area.border.points           = safety_border_points;
+  diagnostics_msg.safety_area.border.max_z            = safety_border_max_z;
+  diagnostics_msg.safety_area.border.min_z            = safety_border_min_z;
+
+  // Fill obstacles data
+  diagnostics_msg.safety_area.obstacles.present = obstacles_present;
+  diagnostics_msg.safety_area.obstacles.data    = obstacles_points;
+  diagnostics_msg.safety_area.obstacles.rows    = obstacles_rows;
+  diagnostics_msg.safety_area.obstacles.max_z   = diagnostics_data_.obstacles_max_z;
+  diagnostics_msg.safety_area.obstacles.min_z   = diagnostics_data_.obstacles_min_z;
+
+  // | ------------------------- publish ------------------------ |
+
+  ph_diagnostics_.publish(diagnostics_msg);
+}
+
+//}
+
+/* getSafetyZoneData() //{ */
+void SafetyAreaManager::getSafetyZoneData(void) {
+  if (!is_initialized_) {
+    return;
+  }
+
+  auto estimation_sm_state = sh_estimation_diag_.getMsg()->sm_state;
+  if (estimation_sm_state == "INITIALIZED_STATE" || estimation_sm_state == "READY_FOR_FLIGHT_STATE") {
+    auto fcu_tf = transformer_->getTransform("fcu", "world_origin", ros::Time(0));
+
+    // Check if the world origin changed, through the estimation Mgr service
+    //  TODO change this, add estimation manager to call a service to update the origin, as its doing with transform manager
+    bool translation_x_change = std::abs(fcu_tf.value().transform.translation.x - tf_fcu_to_world_origin_.transform.translation.x) > 1e-2; // more than mm
+    bool translation_y_change = std::abs(fcu_tf.value().transform.translation.y - tf_fcu_to_world_origin_.transform.translation.y) > 1e-2; // more than mm
+
+    if (translation_x_change || translation_y_change) {
+
+      ROS_INFO("[SafetyAreaManager]: The world origin changed, updating value");
+      auto world_tf = transformer_->getTransform("world_origin", "latlon_origin", ros::Time(0));
+      mrs_msgs::ReferenceStamped temp_ref;
+
+      temp_ref.header.frame_id      = "latlon_origin";
+      temp_ref.reference.position.x = 0;
+      temp_ref.reference.position.y = 0;
+
+      if (auto ret = transformer_->transform(temp_ref, world_tf.value())) {
+        temp_ref = ret.value();
+        ROS_INFO_STREAM("[SafetyAreaManager]: Transformed point x: " << temp_ref.reference.position.x << " y: " << temp_ref.reference.position.y);
+        safety_zone_handler_.parameters.origin_x = temp_ref.reference.position.x;
+        safety_zone_handler_.parameters.origin_x = temp_ref.reference.position.y;
       }
+      tf_fcu_to_world_origin_ = fcu_tf.value();
+    }
+  }
+
+  std::scoped_lock lock(mutex_safety_area_);
+  {
+    const auto safety_border = safety_zone_handler_.safety_zone->getBorder();
+    const auto border_points = safety_border->getPoints();
+
+    auto transformed_border_points = transformPoints(border_points, "world_origin", safety_zone_handler_.parameters.horizontal_frame);
+
+    // Clearing to store the new points
+    diagnostics_data_.cleanup();
+
+    diagnostics_data_.safety_border_points.reserve(transformed_border_points.size());
+    mrs_msgs::Point2D tmp_point;
+
+    // Get safety border points
+    for (const auto &point : transformed_border_points) {
+      tmp_point.x = boost::geometry::get<0>(point);
+      tmp_point.y = boost::geometry::get<1>(point);
+      diagnostics_data_.safety_border_points.push_back(tmp_point);
     }
 
-    //}
+    // Get safety_border max and min z
+    auto safety_border_max_z              = safety_border->getMaxZ();
+    diagnostics_data_.safety_border_max_z = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, safety_border_max_z);
+    auto safety_border_min_z              = safety_border->getMinZ();
+    diagnostics_data_.safety_border_min_z = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, safety_border_min_z);
 
-    /* //{ getMinZ() */
+    // getObstacles return a vector with the obstacle ptr's
+    const auto &obstacles_ptrs = safety_zone_handler_.safety_zone->getObstacles();
 
-    double SafetyAreaManager::getMinZ(const std::string& frame_id)
-    {
+    diagnostics_data_.obstacles_present = obstacles_ptrs.size() == 0 ? false : true;
 
-      // | ---------- first, get max_z from the safety area --------- |
+    // Saving the obstacle rows vector
+    diagnostics_data_.obstacles_rows.reserve(obstacles_ptrs.size());
 
-      if (!safety_zone_handler_.safety_zone->safetyZoneEnabled())
-      {
-        return std::numeric_limits<float>::lowest();
-      }
+    // Iterate over vector of ObstaclePtr
+    for (const auto &[key, obstaclePtr] : obstacles_ptrs) {
+      const auto &obstacle = obstaclePtr->getPoints();
 
-      geometry_msgs::PointStamped point;
-      point.header.frame_id = safety_zone_handler_.parameters.horizontal_frame;
-      point.point.x = 0;
-      point.point.y = 0;
-      point.point.z = safety_zone_handler_.safety_zone->getBorder()->getMinZ();
+      auto transformed_obstacle = transformPoints(obstacle, "world_origin", safety_zone_handler_.parameters.horizontal_frame);
 
-      auto ret = transformer_->transformSingle(point, frame_id);
+      // Saving the data per obstacle
+      diagnostics_data_.obstacles_rows.push_back(transformed_obstacle.size());
+      diagnostics_data_.obstacles_max_z.push_back(transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMaxZ()));
+      diagnostics_data_.obstacles_min_z.push_back(transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMinZ()));
 
-      if (!ret)
-      {
-        ROS_ERROR_THROTTLE(1.0, "[ControlManager]: SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
-        return std::numeric_limits<float>::lowest();
-      }
-
-      return ret->point.z;
-    }
-
-    //}
-
-    /* publishDiagnostics() //{ */
-    // TODO: Refactor diagnostics
-    void SafetyAreaManager::publishDiagnostics(void)
-    {
-
-      if (!is_initialized_)
-      {
-        return;
-      }
-
-      mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("SafetyAreaManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
-
-      mrs_msgs::SafetyAreaManagerDiagnostics diagnostics_msg;
-
-      std::scoped_lock lock(mutex_diagnostics_);
-
-      // copy member variables
-      auto uav_name = mrs_lib::get_mutexed(mutex_safety_area_, _uav_name_);
-      auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
-      auto use_safety_area = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.safety_area_enabled);
-      auto world_origin_units = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.world_origin_units);
-      auto origin_x = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.origin_x);
-      auto origin_y = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.origin_x);
-      auto safety_area_horizontal_frame = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.horizontal_frame);
-      auto safety_area_vertical_frame = mrs_lib::get_mutexed(mutex_safety_area_, safety_zone_handler_.parameters.vertical_frame);
-      auto obstacles_present = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_present);
-
-      auto safety_border_points = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_points);
-      auto safety_border_max_z = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_max_z);
-      auto safety_border_min_z = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.safety_border_min_z);
-      auto obstacles_points = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_points);
-      auto obstacles_rows = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_rows);
-      auto obstacles_max_z = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_max_z);
-      auto obstacles_min_z = mrs_lib::get_mutexed(mutex_safety_area_, diagnostics_data_.obstacles_min_z);
-
-      // | ------------------------- Fill in the diagnostics msg ------------------------ |
-
-      diagnostics_msg.stamp = ros::Time::now();
-      diagnostics_msg.uav_name = uav_name;
-      diagnostics_msg.safety_area_enabled = use_safety_area;
-      auto [is_position_valid_2d, is_position_valid_3d] = isPositionValid(uav_state);
-      diagnostics_msg.position_valid_2d = is_position_valid_2d;
-      diagnostics_msg.position_valid_3d = is_position_valid_3d;
-      position_valid_2d_ = is_position_valid_2d;
-      position_valid_3d_ = is_position_valid_3d;
-
-      // Fill world origin
-      diagnostics_msg.safety_area.units = world_origin_units;
-      diagnostics_msg.safety_area.origin_x = origin_x;
-      diagnostics_msg.safety_area.origin_y = origin_y;
-
-      // Fill safety border data
-      diagnostics_msg.safety_area.border.horizontal_frame = safety_area_horizontal_frame;
-      diagnostics_msg.safety_area.border.vertical_frame = safety_area_vertical_frame;
-      diagnostics_msg.safety_area.border.points = safety_border_points;
-      diagnostics_msg.safety_area.border.max_z = safety_border_max_z;
-      diagnostics_msg.safety_area.border.min_z = safety_border_min_z;
-
-      // Fill obstacles data
-      diagnostics_msg.safety_area.obstacles.present = obstacles_present;
-      diagnostics_msg.safety_area.obstacles.data = obstacles_points;
-      diagnostics_msg.safety_area.obstacles.rows = obstacles_rows;
-      diagnostics_msg.safety_area.obstacles.max_z = diagnostics_data_.obstacles_max_z;
-      diagnostics_msg.safety_area.obstacles.min_z = diagnostics_data_.obstacles_min_z;
-
-      // | ------------------------- publish ------------------------ |
-
-      ph_diagnostics_.publish(diagnostics_msg);
-    }
-
-    //}
-
-    /* getSafetyZoneData() //{ */
-    void SafetyAreaManager::getSafetyZoneData(void)
-    {
-      if (!is_initialized_)
-      {
-        return;
-      }
-
-      auto estimation_sm_state = sh_estimation_diag_.getMsg()->sm_state; 
-      if (estimation_sm_state == "INITIALIZED_STATE" || estimation_sm_state == "READY_FOR_FLIGHT_STATE") {
-        auto fcu_tf = transformer_->getTransform("fcu","world_origin", ros::Time(0));
-
-        //Check if the world origin changed, through the estimation Mgr service
-        // TODO change this, add estimation manager to call a service to update the origin, as its doing with transform manager
-        bool translation_x_change = std::abs(fcu_tf.value().transform.translation.x - tf_fcu_to_world_origin_.transform.translation.x) > 1e-2; //more than mm
-        bool translation_y_change = std::abs(fcu_tf.value().transform.translation.y - tf_fcu_to_world_origin_.transform.translation.y) > 1e-2; //more than mm
-        
-        if (translation_x_change || translation_y_change) {
-
-          ROS_INFO("[SafetyAreaManager]: The world origin changed, updating value");
-          auto world_tf = transformer_->getTransform("world_origin","latlon_origin", ros::Time(0));
-          mrs_msgs::ReferenceStamped temp_ref;
-
-          temp_ref.header.frame_id = "latlon_origin";
-          temp_ref.reference.position.x = 0;
-          temp_ref.reference.position.y = 0;
-
-          if (auto ret = transformer_->transform(temp_ref, world_tf.value()))
-          {
-            temp_ref = ret.value();
-            ROS_INFO_STREAM("[SafetyAreaManager]: Transformed point x: " << temp_ref.reference.position.x << " y: " << temp_ref.reference.position.y);
-            safety_zone_handler_.parameters.origin_x = temp_ref.reference.position.x;
-            safety_zone_handler_.parameters.origin_x = temp_ref.reference.position.y;
-          }
-          tf_fcu_to_world_origin_ = fcu_tf.value();
-        }
-      }
-
-      std::scoped_lock lock(mutex_safety_area_);
-      {
-        const auto safety_border = safety_zone_handler_.safety_zone->getBorder();
-        const auto border_points = safety_border->getPoints();
-
-        auto transformed_border_points = transformPoints(border_points, "world_origin", safety_zone_handler_.parameters.horizontal_frame);
-
-        // Clearing to store the new points
-        diagnostics_data_.cleanup();
-
-        diagnostics_data_.safety_border_points.reserve(transformed_border_points.size());
-        mrs_msgs::Point2D tmp_point;
-
-        // Get safety border points
-        for (const auto& point : transformed_border_points)
-        {
-          tmp_point.x = boost::geometry::get<0>(point);
-          tmp_point.y = boost::geometry::get<1>(point);
-          diagnostics_data_.safety_border_points.push_back(tmp_point);
-        }
-
-        // Get safety_border max and min z 
-        auto safety_border_max_z = safety_border->getMaxZ();
-        diagnostics_data_.safety_border_max_z = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, safety_border_max_z);
-        auto safety_border_min_z = safety_border->getMinZ();
-        diagnostics_data_.safety_border_min_z = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, safety_border_min_z);
-
-        // getObstacles return a vector with the obstacle ptr's
-        const auto& obstacles_ptrs = safety_zone_handler_.safety_zone->getObstacles();
-
-        diagnostics_data_.obstacles_present = obstacles_ptrs.size() == 0 ? false : true;
-
-        // Saving the obstacle rows vector
-        diagnostics_data_.obstacles_rows.reserve(obstacles_ptrs.size());
-
-        // Iterate over vector of ObstaclePtr
-        for (const auto& [key, obstaclePtr] : obstacles_ptrs)
-        {
-          const auto& obstacle = obstaclePtr->getPoints();
-
-          auto transformed_obstacle = transformPoints(obstacle, "world_origin", safety_zone_handler_.parameters.horizontal_frame);
-
-          // Saving the data per obstacle
-          diagnostics_data_.obstacles_rows.push_back(transformed_obstacle.size());
-          diagnostics_data_.obstacles_max_z.push_back(transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMaxZ()));
-          diagnostics_data_.obstacles_min_z.push_back(transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMinZ()));
-
-          // Extract the points of the osbstacle
-          for (const auto& point : transformed_obstacle)
-          {
-            tmp_point.x = boost::geometry::get<0>(point);
-            tmp_point.y = boost::geometry::get<1>(point);
-            diagnostics_data_.obstacles_points.push_back(tmp_point);
-          }
-        }
+      // Extract the points of the osbstacle
+      for (const auto &point : transformed_obstacle) {
+        tmp_point.x = boost::geometry::get<0>(point);
+        tmp_point.y = boost::geometry::get<1>(point);
+        diagnostics_data_.obstacles_points.push_back(tmp_point);
       }
     }
+  }
+}
 
-    //}
+//}
 
-    /* isPositionValid() //{ */
+/* isPositionValid() //{ */
 
-    std::tuple<bool, bool> SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state)
-    {
+std::tuple<bool, bool> SafetyAreaManager::isPositionValid(mrs_msgs::UavState uav_state) {
 
-      if (!is_initialized_)
-      {
-        return std::make_tuple(false, false);
-      }
+  if (!is_initialized_) {
+    return std::make_tuple(false, false);
+  }
 
-      mrs_msgs::ReferenceStamped current_position;
+  mrs_msgs::ReferenceStamped current_position;
 
-      current_position.header.frame_id = uav_state.header.frame_id;
-      current_position.reference.position = uav_state.pose.position;
+  current_position.header.frame_id    = uav_state.header.frame_id;
+  current_position.reference.position = uav_state.pose.position;
 
-      ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Initial current position x:  " << current_position.reference.position.x
-                                                                                << " y: " << current_position.reference.position.y
-                                                                                << " z: " << current_position.reference.position.z);
+  ROS_INFO_STREAM_ONCE("[SafetyAreaManager]: Initial current position x:  " << current_position.reference.position.x
+                                                                            << " y: " << current_position.reference.position.y
+                                                                            << " z: " << current_position.reference.position.z);
 
-      auto is_position_valid_2d = isPointInSafetyArea2d(current_position);
-      auto is_position_valid_3d = isPointInSafetyArea3d(current_position);
+  auto is_position_valid_2d = isPointInSafetyArea2d(current_position);
+  auto is_position_valid_3d = isPointInSafetyArea3d(current_position);
 
-      if (!is_position_valid_3d && position_valid_3d_)
-      {
+  if (!is_position_valid_3d && position_valid_3d_) {
 
-        ROS_WARN("[SafetyAreaManager]: UAV outside safety area (3D validation) ");
-      }
+    ROS_WARN("[SafetyAreaManager]: UAV outside safety area (3D validation) ");
+  }
 
-      return std::make_tuple(is_position_valid_2d, is_position_valid_3d);
-    }
+  return std::make_tuple(is_position_valid_2d, is_position_valid_3d);
+}
 
-    //}
+//}
 
-  }  // namespace safety_area_manager
+} // namespace safety_area_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(mrs_uav_managers::safety_area_manager::SafetyAreaManager, nodelet::Nodelet)
