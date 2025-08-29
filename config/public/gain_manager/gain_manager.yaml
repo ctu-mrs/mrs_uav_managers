@@ -10,6 +10,7 @@ mrs_uav_managers:
       "other",
       "ground_truth",
       "passthrough",
+      "f9p",
       "dummy",
     ]
 
@@ -27,6 +28,7 @@ mrs_uav_managers:
       other: ["supersoft", "soft"]
       ground_truth: ["supersoft", "soft"]
       passthrough: ["supersoft", "soft"]
+      f9p: ["supersoft", "soft"]
       dummy: ["supersoft"]
 
     # those gains will be used automatically when a localization mode switches
@@ -39,4 +41,5 @@ mrs_uav_managers:
       other: "supersoft"
       ground_truth: "soft"
       passthrough: "soft"
+      f9p: "soft"
       dummy: "supersoft"

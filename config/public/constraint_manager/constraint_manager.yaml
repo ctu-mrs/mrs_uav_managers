@@ -10,6 +10,7 @@ mrs_uav_managers:
       "other",
       "ground_truth",
       "passthrough",
+      "f9p",
       "dummy",
     ]
 
@@ -28,6 +29,7 @@ mrs_uav_managers:
       other: ["slow"]
       ground_truth: ["slow", "medium", "fast"]
       passthrough: ["slow", "medium", "fast"]
+      f9p: ["slow", "medium", "fast"]
       dummy: ["slow"]
 
     # those constraints will be used automatically when a localization mode switches
@@ -40,4 +42,5 @@ mrs_uav_managers:
       other: "slow"
       ground_truth: "slow"
       passthrough: "slow"
+      f9p: "slow"
       dummy: "slow"
