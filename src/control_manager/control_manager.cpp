@@ -1897,7 +1897,7 @@ void ControlManager::initialize(void) {
 
   timer_status_    = nh_.createTimer(ros::Rate(_status_timer_rate_), &ControlManager::timerStatus, this);
   timer_safety_    = nh_.createTimer(ros::Rate(_safety_timer_rate_), &ControlManager::timerSafety, this);
-  timer_bumper_    = nh_.createTimer(ros::Rate(1.0), &ControlManager::timerBumper, this);
+  timer_bumper_    = nh_.createTimer(ros::Rate(_bumper_timer_rate_), &ControlManager::timerBumper, this);
   timer_eland_     = nh_.createTimer(ros::Rate(_elanding_timer_rate_), &ControlManager::timerEland, this, false, false);
   timer_failsafe_  = nh_.createTimer(ros::Rate(_failsafe_timer_rate_), &ControlManager::timerFailsafe, this, false, false);
   timer_pirouette_ = nh_.createTimer(ros::Rate(_pirouette_timer_rate_), &ControlManager::timerPirouette, this, false, false);

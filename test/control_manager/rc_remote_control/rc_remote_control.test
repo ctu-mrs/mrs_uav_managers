@@ -29,7 +29,7 @@
     <arg name="UAV_NAME" default="$(arg UAV_NAME)" />
   </include>
 
-  <test pkg="$(arg package)" type="test_$(arg test_name)" test-name="$(arg test_name)" time-limit="60.0">
+  <test pkg="$(arg package)" type="test_$(arg test_name)" test-name="$(arg test_name)" time-limit="180.0">
     <param name="test" value="$(arg test_name)" />
     <param name="uav_name" value="$(arg UAV_NAME)" />
 

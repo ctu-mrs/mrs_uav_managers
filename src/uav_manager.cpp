@@ -386,6 +386,10 @@ void UavManager::initialize() {
   param_loader.loadParam("uav_name", _uav_name_);
   param_loader.loadParam("enable_profiler", _profiler_enabled_);
   param_loader.loadParam("uav_mass", _uav_mass_);
+
+  // preinitialize the uav mass for landing detection, important!
+  landing_uav_mass_ = _uav_mass_;
+
   param_loader.loadParam("g", _g_);
 
   // motor params are also not prefixed, since they are common to more nodes
@@ -579,12 +583,19 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
     case LANDING_STATE: {
 
-      if (sh_mass_estimate_.hasMsg() && (ros::Time::now() - sh_mass_estimate_.lastMsgTime()).toSec() < 1.0) {
+      // we used to have a check here for freshness of the data.. this was removed,
+      // since even old data on the mass estimate might be better than the nominal mass
+      // from the parameter
+      if (sh_mass_estimate_.hasMsg()) {
 
         // copy member variables
         auto mass_esimtate = sh_mass_estimate_.getMsg();
 
         landing_uav_mass_ = mass_esimtate->data;
+
+      } else {
+
+        landing_uav_mass_ = _uav_mass_;
       }
 
       break;

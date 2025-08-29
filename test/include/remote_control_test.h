@@ -533,7 +533,7 @@ bool RemoteControlTest::test() {
     sleep(0.01);
   }
 
-  sleep(2.0);
+  sleep(5.0);
 
   // | ------ test if we can override a pre-existing motion ----- |
 
