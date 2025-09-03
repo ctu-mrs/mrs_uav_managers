@@ -12,6 +12,8 @@ mrs_uav_managers:
       address: "mrs_uav_state_estimators::rtk_garmin::RtkGarmin"
     passthrough:
       address: "mrs_uav_state_estimators::passthrough::Passthrough"
+    f9p:
+      address: "mrs_uav_state_estimators::f9p::F9P"
     ground_truth:
       address: "mrs_uav_state_estimators::ground_truth::GroundTruth"
     dummy:
