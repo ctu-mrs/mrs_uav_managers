@@ -1,6 +1,7 @@
 
 # ignore temp files
 *~
+doc/*
 
 # ignore vim temp files
 *.swp
