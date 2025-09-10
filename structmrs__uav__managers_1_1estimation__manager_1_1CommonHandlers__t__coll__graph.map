@@ -1,0 +1,11 @@
+<map id="mrs_uav_managers::estimation_manager::CommonHandlers_t" name="mrs_uav_managers::estimation_manager::CommonHandlers_t">
+<area shape="rect" id="Node000001" title=" " alt="" coords="372,101,600,141"/>
+<area shape="rect" id="Node000002" href="$structmrs__uav__managers_1_1estimation__manager_1_1CommonFrames__t.html" title=" " alt="" coords="5,5,233,45"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="216,46,349,80,416,99,415,104,347,85,215,51"/>
+<area shape="rect" id="Node000003" href="$structmrs__uav__managers_1_1estimation__manager_1_1WorldOrigin__t.html" title=" " alt="" coords="5,69,233,109"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="247,98,372,109,372,114,247,103"/>
+<area shape="rect" id="Node000004" href="$structmrs__uav__managers_1_1estimation__manager_1_1ScopeTimer__t.html" title=" " alt="" coords="5,133,233,173"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="247,140,372,129,372,134,247,145"/>
+<area shape="rect" id="Node000005" href="$structmrs__uav__managers_1_1estimation__manager_1_1DebugTopics__t.html" title=" " alt="" coords="5,197,233,237"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="218,192,347,159,418,139,419,144,349,164,220,197"/>
+</map>
