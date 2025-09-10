@@ -36,6 +36,12 @@ std::vector<double> StateEstimator::getTwistCovariance() const {
 }
 /*//}*/
 
+/*//{ setActive() */
+void StateEstimator::setActive(const bool active) {
+  is_active_ = active;
+}
+/*//}*/
+
 /*//{ publishUavState() */
 void StateEstimator::publishUavState() const {
 
