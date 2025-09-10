@@ -7614,6 +7614,8 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     }
   }
 
+  publishDiagnostics();
+
   return std::tuple(true, "failsafe activated");
 }
 
@@ -8304,6 +8306,8 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
     }
   }
 
+  publishDiagnostics();
+
   return std::tuple(true, ss.str());
 }
 
@@ -8416,6 +8420,8 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   }
 
   setConstraintsToControllers(sanitized_constraints);
+
+  publishDiagnostics();
 
   return std::tuple(true, ss.str());
 }
