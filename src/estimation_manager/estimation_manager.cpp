@@ -654,6 +654,7 @@ void EstimationManager::timerCheckHealth([[maybe_unused]] const ros::TimerEvent&
     std::scoped_lock lock(mutex_active_estimator_);
     ROS_INFO_THROTTLE(1.0, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
     active_estimator_ = initial_estimator_;
+    active_estimator_->setActive(true);
     if (active_estimator_->getName() == "dummy") {
       sm_->changeState(StateMachine::DUMMY_STATE);
     } else {
@@ -1256,7 +1257,9 @@ void EstimationManager::switchToEstimator(const boost::shared_ptr<mrs_uav_manage
 
   std::scoped_lock lock(mutex_active_estimator_);
   ROS_INFO("[%s]: switching estimator from %s to %s", getName().c_str(), active_estimator_->getName().c_str(), target_estimator->getName().c_str());
+  active_estimator_->setActive(false);
   active_estimator_ = target_estimator;
+  active_estimator_->setActive(true);
   estimator_switch_count_++;
 }
 /*//}*/

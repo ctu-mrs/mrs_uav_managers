@@ -50,6 +50,8 @@ protected:
 
   bool is_override_frame_id_ = false;
 
+  bool is_active_ = false;
+
 protected:
   mutable mrs_lib::PublisherHandler<mrs_msgs::UavState>               ph_uav_state_;
   mutable mrs_lib::PublisherHandler<nav_msgs::Odometry>               ph_odom_;
@@ -74,6 +76,7 @@ public:
   nav_msgs::Odometry                       getInnovation() const;
   std::vector<double>                      getPoseCovariance() const;
   std::vector<double>                      getTwistCovariance() const;
+  void                                     setActive(const bool active);
   void                                     publishUavState() const;
   void                                     publishOdom() const;
   void                                     publishCovariance() const;
