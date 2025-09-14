@@ -64,12 +64,16 @@ bool Tester::test(void) {
   // | -------------- disable the min-height check -------------- |
 
   {
+    RCLCPP_INFO(node_->get_logger(), "disabling min height check");
+
     bool success = toggleMinHeightCheck(false);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to disable the min-height check");
       return false;
     }
+
+    RCLCPP_INFO(node_->get_logger(), "min height check disabled");
   }
 
   sleep(1.0);
@@ -77,7 +81,11 @@ bool Tester::test(void) {
   // | --------------- goto to violate min height --------------- |
 
   {
+    RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0.5, 0]");
+
     auto [success, message] = uh->gotoAbs(0, 0, 0.5, 0);
+
+    RCLCPP_INFO(node_->get_logger(), "goto suceeded");
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to descend");
@@ -88,12 +96,16 @@ bool Tester::test(void) {
   // | --------------- enable the min-height check -------------- |
 
   {
+    RCLCPP_INFO(node_->get_logger(), "enabling min height check");
+
     bool success = toggleMinHeightCheck(true);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to enable the min-height check");
       return false;
     }
+
+    RCLCPP_INFO(node_->get_logger(), "min height check enabled");
   }
 
   sleep(1.0);
@@ -109,6 +121,8 @@ bool Tester::test(void) {
 
   while (true) {
 
+    RCLCPP_INFO(node_->get_logger(), "waiting till flying normally");
+
     if (!rclcpp::ok()) {
       return false;
     }
@@ -116,22 +130,32 @@ bool Tester::test(void) {
     if (uh->isFlyingNormally()) {
       break;
     }
+
+    sleep(0.1);
   }
+
+  RCLCPP_INFO(node_->get_logger(), "we are flying normally again");
 
   // | --------------- goto to violate min height --------------- |
 
   {
+    RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0, 0]");
+
     auto [success, message] = uh->gotoAbs(0, 0, 0, 0);
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "goto should fail");
       return false;
     }
+
+    RCLCPP_INFO(node_->get_logger(), "goto sucessfully failed");
   }
 
   // | --------- wait till we are flying normally again --------- |
 
   while (true) {
+
+    RCLCPP_INFO(node_->get_logger(), "waiting till flying normally");
 
     if (!rclcpp::ok()) {
       return false;
@@ -140,16 +164,40 @@ bool Tester::test(void) {
     if (uh->isFlyingNormally()) {
       break;
     }
+
+    sleep(0.1);
   }
 
+  RCLCPP_INFO(node_->get_logger(), "we are flying normally again");
+
   // | ------------------- check the altitude ------------------- |
+
+  RCLCPP_INFO(node_->get_logger(), "checking our AGL");
 
   auto height = uh->getHeightAgl();
 
   if (height) {
+
+    RCLCPP_INFO(node_->get_logger(), "AGL obtained");
+
     if (height.value() > _min_height_) {
+
+      RCLCPP_INFO(node_->get_logger(), "AGL ok");
+
       return true;
+
+    } else {
+
+      RCLCPP_ERROR(node_->get_logger(), "AGL bad");
+
+      return false;
     }
+
+  } else {
+
+    RCLCPP_ERROR(node_->get_logger(), "AGL cound not be obtained");
+
+    return false;
   }
 
   return false;
@@ -158,7 +206,7 @@ bool Tester::test(void) {
 bool Tester::toggleMinHeightCheck(const bool in) {
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
-  request->data = in;
+  request->data                                            = in;
 
   auto response = sch_min_height_check_.callSync(request);
 
