@@ -45,7 +45,7 @@ mrs_uav_managers:
     tf_sources: []
 
     # first available tf source from this list will produce the utm and world origin tfs
-    utm_source_priority: ["rtk_garmin", "rtk", "gps_garmin", "gps_baro"]
+    utm_source_priority: ["f9p", "rtk_garmin", "rtk", "gps_garmin", "gps_baro"]
 
     # configuration of individual tf sources
     hw_api_raw:
@@ -104,6 +104,15 @@ mrs_uav_managers:
         enabled: false
       namespace: "estimation_manager/passthrough" # the namespace of the topic (usually the node that publishes the topic)
       utm_based: false # if true, will publish tf to utm_origin
+      inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
+      republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
+
+    f9p:
+      odom_topic: "odom" # name of the topic (expects nav_msgs/Odometry topic type)
+      tf_from_attitude: # used for transforming velocities before full transform is available
+        enabled: false
+      namespace: "estimation_manager/f9p" # the namespace of the topic (usually the node that publishes the topic)
+      utm_based: true # if true, will publish tf to utm_origin
       inverted: true # publish as inverted tf (the default for inverted mrs tf tree convention)
       republish_in_frames: ["local_origin"] # the odometry message will be transformed and republished in the specified frames
 

@@ -7291,6 +7291,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       ROS_ERROR_THROTTLE(1.0, "[ControlManager]: exception: '%s'", exrun.what());
     }
   }
+
   publishDiagnostics();
   return std::tuple(true, "failsafe activated");
 }
@@ -7986,6 +7987,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
       ROS_ERROR("[ControlManager]: exception: '%s'", exrun.what());
     }
   }
+
   publishDiagnostics();
   return std::tuple(true, ss.str());
 }

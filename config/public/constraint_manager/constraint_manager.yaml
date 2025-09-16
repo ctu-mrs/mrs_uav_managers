@@ -10,6 +10,7 @@ mrs_uav_managers:
       "other",
       "ground_truth",
       "passthrough",
+      "f9p",
     ]
 
     constraints: [
@@ -27,6 +28,7 @@ mrs_uav_managers:
       other: ["slow"]
       ground_truth: ["slow", "medium", "fast"]
       passthrough: ["slow", "medium", "fast"]
+      f9p: ["slow", "medium", "fast"]
 
     # those constraints will be used automatically when a localization mode switches
     # and the current constraints are not in the allowed list (next paragraphs)
@@ -38,3 +40,4 @@ mrs_uav_managers:
       other: "slow"
       ground_truth: "slow"
       passthrough: "slow"
+      f9p: "slow"
