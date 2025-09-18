@@ -1815,7 +1815,10 @@ void ControlManager::initialize(void) {
 
   // | -------------------- general services -------------------- |
 
-  service_server_switch_tracker_             = node_->create_service<mrs_msgs::srv::String>("~/switch_tracker_in", std::bind(&ControlManager::callbackSwitchTracker, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  // service_server_switch_tracker_             = node_->create_service<mrs_msgs::srv::String>("~/switch_tracker_in", std::bind(&ControlManager::callbackSwitchTracker, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  //
+service_server_switch_tracker_ = node_->create_service<mrs_msgs::srv::String>("~/switch_tracker_in",[this](std::shared_ptr<mrs_msgs::srv::String::Request> request, 
+           std::shared_ptr<mrs_msgs::srv::String::Response> response) {callbackSwitchTracker(request, response);},rclcpp::SystemDefaultsQoS(),cbkgrp_ss_);
   service_server_switch_controller_          = node_->create_service<mrs_msgs::srv::String>("~/switch_controller_in", std::bind(&ControlManager::callbackSwitchController, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_reset_tracker_              = node_->create_service<std_srvs::srv::Trigger>("~/tracker_reset_static_in", std::bind(&ControlManager::callbackTrackerResetStatic, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_hover_                      = node_->create_service<std_srvs::srv::Trigger>("~/hover_in", std::bind(&ControlManager::callbackHover, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -1834,7 +1837,7 @@ void ControlManager::initialize(void) {
   service_server_transform_pose_             = node_->create_service<mrs_msgs::srv::TransformPoseSrv>("~/transform_pose_in", std::bind(&ControlManager::callbackTransformPose, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_transform_vector3_          = node_->create_service<mrs_msgs::srv::TransformVector3Srv>("~/transform_vector3_in", std::bind(&ControlManager::callbackTransformVector3, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_bumper_enabler_             = node_->create_service<std_srvs::srv::SetBool>("~/bumper_in", std::bind(&ControlManager::callbackEnableBumper, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_get_min_z_                  = node_->create_service<mrs_msgs::srv::GetFloat64>("~/get_min_z_in", std::bind(&ControlManager::callbackGetMinZ, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  // service_server_get_min_z_                  = node_->create_service<mrs_msgs::srv::GetFloat64>("~/get_min_z_in", std::bind(&ControlManager::callbackGetMinZ, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_validate_reference_         = node_->create_service<mrs_msgs::srv::ValidateReference>("~/validate_reference_in", std::bind(&ControlManager::callbackValidateReference, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_validate_reference_2d_      = node_->create_service<mrs_msgs::srv::ValidateReference>("~/validate_reference_2d_in", std::bind(&ControlManager::callbackValidateReference2d, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   service_server_validate_reference_array_   = node_->create_service<mrs_msgs::srv::ValidateReferenceArray>("~/validate_reference_array_in", std::bind(&ControlManager::callbackValidateReferenceArray, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -4941,6 +4944,24 @@ bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::S
 
   return true;
 }
+
+//}
+
+/* //{ callbackGetMinZ() */
+
+// bool ControlManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request, const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response) {
+//
+//   if (!is_initialized_) {
+//     return false;
+//   }
+//
+//   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
+//
+//   response->success = true;
+//   response->value   = getMinZ(uav_state.header.frame_id);
+//
+//   return true;
+// }
 
 //}
 

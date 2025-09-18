@@ -56,6 +56,7 @@ set(LIBRARIES
   MrsUavManagers_UavManager
   MrsUavManagers_ConstraintManager
   MrsUavManagers_GainManager
+  MrsUavManagers_SafetyAreaManager
   )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -162,6 +163,20 @@ ament_target_dependencies(MrsUavManagers_GainManager
 rclcpp_components_register_nodes(MrsUavManagers_GainManager PLUGIN "mrs_uav_managers::gain_manager::GainManager" EXECUTABLE MrsUavManagers_GainManager)
 
 target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# # Safety Area Manager
+
+add_library(MrsUavManagers_SafetyAreaManager SHARED
+  src/safety_area_manager.cpp
+  )
+
+  ament_target_dependencies(MrsUavManagers_SafetyAreaManager
+  ${DEPENDENCIES}
+  )
+
+  rclcpp_components_register_nodes(MrsUavManagers_SafetyAreaManager PLUGIN "mrs_uav_managers::safety_area_manager::SafetyAreaManager" EXECUTABLE MrsUavManagers_SafetyAreaManager)
+
+  target_compile_definitions(MrsUavManagers_SafetyAreaManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 
