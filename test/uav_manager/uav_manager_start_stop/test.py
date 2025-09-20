@@ -48,7 +48,7 @@ def generate_test_description():
                     PathJoinSubstitution([
                         FindPackageShare('mrs_multirotor_simulator'),
                             'launch',
-                            'hw_api.py'
+                            'hw_api.launch.py'
                         ])
                     ]),
                 )
@@ -63,7 +63,7 @@ def generate_test_description():
                     PathJoinSubstitution([
                         FindPackageShare('mrs_uav_managers'),
                             'launch',
-                            'uav_manager.py'
+                            'uav_manager.launch.py'
                         ])
                     ]),
                     launch_arguments={
