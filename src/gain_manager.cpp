@@ -70,6 +70,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   rclcpp::TimerBase::SharedPtr timer_preinitialization_;
   void                         timerPreInitialization();
@@ -157,9 +158,10 @@ void GainManager::timerPreInitialization() {
   node_  = this->shared_from_this();
   clock_ = node_->get_clock();
 
-  cbkgrp_subs_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   initialize();
 
@@ -284,18 +286,20 @@ void GainManager::initialize() {
 
   // | ------------------------ services ------------------------ |
 
-  service_server_set_gains_ = node_->create_service<mrs_msgs::srv::String>("~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2));
+  service_server_set_gains_ = node_->create_service<mrs_msgs::srv::String>(
+      "~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out");
+  sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out", cbkgrp_sc_);
 
   // | ----------------------- subscribers ---------------------- |
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
-  shopts.node               = node_;
-  shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
+  shopts.node                                = node_;
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
 
   sh_estimation_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>(shopts, "~/estimation_diagnostics_in");
 
@@ -309,9 +313,9 @@ void GainManager::initialize() {
   //
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
-  timer_opts_start.node      = node_;
-  timer_opts_start.autostart = true;
-
+  timer_opts_start.node           = node_;
+  timer_opts_start.autostart      = true;
+  timer_opts_start.callback_group = cbkgrp_timers_;
 
   {
     std::function<void()> callback_fcn = std::bind(&GainManager::timerGainManagement, this);
@@ -550,7 +554,8 @@ bool GainManager::setGains(std::string gains_name) {
 
 /* //{ callbackSetGains() */
 
-bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                   const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
     return false;
@@ -651,14 +656,16 @@ void GainManager::timerGainManagement() {
   // | --- automatically set _gains_ when currrent state estimator changes -- |
   if (estimation_diagnostics->current_state_estimator != last_estimator_name) {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(), estimation_diagnostics->current_state_estimator.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
+                         estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
     it = _map_type_default_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_default_gains_.end()) {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
+                           estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
 
@@ -670,7 +677,8 @@ void GainManager::timerGainManagement() {
         // else, try to set the default gains
       } else {
 
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(), estimation_diagnostics->current_state_estimator.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'",
+                             current_gains.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
         if (setGains(it->second)) {
 
@@ -732,7 +740,8 @@ void GainManager::timerDiagnostics() {
     it = _map_type_allowed_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_gains_.end()) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!", estimation_diagnostics->current_state_estimator.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!",
+                           estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
     }

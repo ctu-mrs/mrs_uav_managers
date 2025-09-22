@@ -105,12 +105,14 @@ public:
 
   bool isInPublishableState() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
-    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE || current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
+    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+           current_state == LANDING_STATE || current_state == DUMMY_STATE || current_state == FAILSAFE_STATE;
   }
 
   bool isInSwitchableState() const {
     const SMState_t current_state = mrs_lib::get_mutexed(mtx_state_, current_state_);
-    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE || current_state == LANDING_STATE;
+    return current_state == READY_FOR_FLIGHT_STATE || current_state == TAKING_OFF_STATE || current_state == HOVER_STATE || current_state == FLYING_STATE ||
+           current_state == LANDING_STATE;
   }
 
   bool isInTheAir() const {
@@ -135,21 +137,24 @@ public:
 
     if (target_state == current_state_) {
 
-      RCLCPP_WARN(node_->get_logger(), "[%s]: requested change to same state %s -> %s", getPrintName().c_str(), getStateAsString(current_state_).c_str(), getStateAsString(target_state).c_str());
+      RCLCPP_WARN(node_->get_logger(), "[%s]: requested change to same state %s -> %s", getPrintName().c_str(), getStateAsString(current_state_).c_str(),
+                  getStateAsString(target_state).c_str());
       return true;
     }
 
     switch (target_state) {
 
       case UNINITIALIZED_STATE: {
-        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is not possible from any state", getPrintName().c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is not possible from any state", getPrintName().c_str(),
+                              getStateAsString(UNINITIALIZED_STATE).c_str());
         return false;
         break;
       }
 
       case INITIALIZED_STATE: {
         if (current_state_ != UNINITIALIZED_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                                getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
           return false;
         }
         break;
@@ -157,7 +162,9 @@ public:
 
       case READY_FOR_FLIGHT_STATE: {
         if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
+                                getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
+                                getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -165,15 +172,20 @@ public:
 
       case TAKING_OFF_STATE: {
         if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                                getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
+                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case FLYING_STATE: {
-        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE &&
+            current_state_ != ESTIMATOR_SWITCHING_STATE) {
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(),
+                                getStateAsString(FLYING_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -181,15 +193,21 @@ public:
 
       case HOVER_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                                getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
+                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
       }
 
       case ESTIMATOR_SWITCHING_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE && current_state_ != LANDING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str());
+        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE &&
+            current_state_ != LANDING_STATE) {
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
+                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
+                                getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                                getStateAsString(FLYING_STATE).c_str());
           return false;
         }
         pre_switch_state_ = current_state_;
@@ -198,7 +216,9 @@ public:
 
       case LANDING_STATE: {
         if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(), getStateAsString(LANDING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
+                                getStateAsString(LANDING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
           return false;
         }
         break;
@@ -206,7 +226,8 @@ public:
 
       case LANDED_STATE: {
         if (current_state_ != LANDING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(LANDED_STATE).c_str(), getStateAsString(LANDING_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                                getStateAsString(LANDED_STATE).c_str(), getStateAsString(LANDING_STATE).c_str());
           return false;
         }
         break;
@@ -214,7 +235,8 @@ public:
 
       case DUMMY_STATE: {
         if (current_state_ != INITIALIZED_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(), getStateAsString(DUMMY_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                                getStateAsString(DUMMY_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str());
           return false;
         }
         break;
@@ -247,7 +269,8 @@ public:
       current_state_  = target_state;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "[%s]: successfully changed states %s -> %s", getPrintName().c_str(), getStateAsString(previous_state_).c_str(), getStateAsString(current_state_).c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: successfully changed states %s -> %s", getPrintName().c_str(), getStateAsString(previous_state_).c_str(),
+                getStateAsString(current_state_).c_str());
 
     return true;
   }
@@ -311,7 +334,10 @@ private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
-  rclcpp::CallbackGroup::SharedPtr cbkgrp_main_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -354,16 +380,17 @@ private:
   void shutdown();
 
   rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_change_estimator_;
-  bool                                              callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
-  int                                               estimator_switch_count_ = 0;
+  bool callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  int  estimator_switch_count_ = 0;
 
   rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_reset_estimator_;
-  bool                                              callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
 
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srvs_toggle_callbacks_;
 
-  bool callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                      const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbacks_enabled_             = false;
   bool callbacks_disabled_by_service_ = false;
 
@@ -593,7 +620,9 @@ void EstimationManager::timerPublishDiagnostics() {
 
   ph_diagnostics_.publish(diagnostics);
 
-  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.", getName().c_str(), sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z, active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.",
+                       getName().c_str(), sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
+                       active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
 }
 /*//}*/
 
@@ -637,7 +666,8 @@ void EstimationManager::timerCheckHealth() {
 
   /*//}*/
 
-  if (!callbacks_disabled_by_service_ && (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE))) {
+  if (!callbacks_disabled_by_service_ &&
+      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE))) {
     callbacks_enabled_ = true;
   } else {
     callbacks_enabled_ = false;
@@ -647,7 +677,8 @@ void EstimationManager::timerCheckHealth() {
   // activate initial estimator
   if (sm_->isInState(StateMachine::INITIALIZED_STATE) && initial_estimator_->isRunning()) {
     std::scoped_lock lock(mutex_active_estimator_);
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: activating the initial estimator %s", getName().c_str(), initial_estimator_->getName().c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: activating the initial estimator %s", getName().c_str(),
+                         initial_estimator_->getName().c_str());
     active_estimator_ = initial_estimator_;
     active_estimator_->setActive(true);
     if (active_estimator_->getName() == "dummy") {
@@ -656,7 +687,8 @@ void EstimationManager::timerCheckHealth() {
       if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
         sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
       } else {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: %s agl estimator: %s to be running", getName().c_str(), Support::waiting_for_string.c_str(), est_alt_agl_->getName().c_str());
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: %s agl estimator: %s to be running", getName().c_str(),
+                             Support::waiting_for_string.c_str(), est_alt_agl_->getName().c_str());
       }
     }
   }
@@ -705,9 +737,11 @@ void EstimationManager::timerCheckHealth() {
 
   if (sm_->isInState(StateMachine::FLYING_STATE)) {
     if (!sh_control_input_.hasMsg()) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
+                           "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
     } else if ((clock_->now() - sh_control_input_.lastMsgTime()).seconds() > 0.1) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable", getName().c_str(), (clock_->now() - sh_control_input_.lastMsgTime()).seconds());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable",
+                           getName().c_str(), (clock_->now() - sh_control_input_.lastMsgTime()).seconds());
     }
   }
 }
@@ -722,7 +756,10 @@ void EstimationManager::timerInitialization() {
 
   rclcpp::on_shutdown([this]() { this->shutdown(); });
 
-  cbkgrp_main_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   sm_ = std::make_shared<StateMachine>(node_, nodelet_name_);
 
@@ -839,14 +876,16 @@ void EstimationManager::timerInitialization() {
   shopts.no_message_timeout                  = mrs_lib::no_timeout;
   shopts.threadsafe                          = true;
   shopts.autostart                           = true;
-  shopts.subscription_options.callback_group = cbkgrp_main_;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
 
   /*//{ wait for hw api message */
 
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_ =
+      mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
 
   while (!sh_hw_api_capabilities_.hasMsg()) {
-    RCLCPP_INFO(node_->get_logger(), "[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_hw_api_capabilities_.topicName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
+                sh_hw_api_capabilities_.topicName().c_str());
 
     clock_->sleep_for(1s);
   }
@@ -863,7 +902,8 @@ void EstimationManager::timerInitialization() {
 
   for (int i = 0; i < 10; i++) {
 
-    RCLCPP_INFO(node_->get_logger(), "[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(), sh_control_manager_diag_.topicName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
+                sh_control_manager_diag_.topicName().c_str());
 
     if (sh_control_manager_diag_.hasMsg()) {
 
@@ -971,7 +1011,8 @@ void EstimationManager::timerInitialization() {
   }
 
   if (!initial_estimator_found) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(), initial_estimator_name_.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(),
+                 initial_estimator_name_.c_str());
     rclcpp::shutdown();
   }
   /*//}*/
@@ -999,7 +1040,8 @@ void EstimationManager::timerInitialization() {
     }
 
     if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), estimator->getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(),
+                   estimator->getName().c_str());
       rclcpp::shutdown();
     }
   }
@@ -1026,7 +1068,8 @@ void EstimationManager::timerInitialization() {
     }
 
     if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(), est_alt_agl_->getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(),
+                   est_alt_agl_->getName().c_str());
       rclcpp::shutdown();
     }
   }
@@ -1049,8 +1092,9 @@ void EstimationManager::timerInitialization() {
 
   mrs_lib::TimerHandlerOptions opts;
 
-  opts.node      = node_;
-  opts.autostart = true;
+  opts.node           = node_;
+  opts.autostart      = true;
+  opts.callback_group = cbkgrp_timers_;
 
   {
     std::function<void()> callback_fcn = std::bind(&EstimationManager::timerPublish, this);
@@ -1074,17 +1118,23 @@ void EstimationManager::timerInitialization() {
 
   /*//{ initialize service clients */
 
-  srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out");
+  srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
 
   /*//}*/
 
   /*//{ initialize service servers */
 
-  srvs_change_estimator_ = node_->create_service<mrs_msgs::srv::String>("~/change_estimator_in", std::bind(&EstimationManager::callbackChangeEstimator, this, std::placeholders::_1, std::placeholders::_2));
+  srvs_change_estimator_ = node_->create_service<mrs_msgs::srv::String>(
+      "~/change_estimator_in", std::bind(&EstimationManager::callbackChangeEstimator, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  srvs_reset_estimator_ = node_->create_service<mrs_msgs::srv::String>("~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2));
+  srvs_reset_estimator_ = node_->create_service<mrs_msgs::srv::String>(
+      "~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  srvs_toggle_callbacks_ = node_->create_service<std_srvs::srv::SetBool>("~/toggle_service_callbacks_in", std::bind(&EstimationManager::callbackToggleServiceCallbacks, this, std::placeholders::_1, std::placeholders::_2));
+  srvs_toggle_callbacks_ = node_->create_service<std_srvs::srv::SetBool>(
+      "~/toggle_service_callbacks_in", std::bind(&EstimationManager::callbackToggleServiceCallbacks, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   /*//}*/
 
@@ -1107,7 +1157,7 @@ void EstimationManager::timerInitialization() {
   RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getName().c_str());
 
   timer_initialization_->cancel();
-}
+}  // namespace estimation_manager
 
 /*//}*/
 
@@ -1162,7 +1212,8 @@ void EstimationManager::shutdown() {
 // | -------------------- service callbacks ------------------- |
 
 /*//{ callbackChangeEstimator() */
-bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!sm_->isInitialized()) {
     return false;
@@ -1230,7 +1281,8 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
 /*//}*/
 
 /*//{ callbackResetEstimator() */
-bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                               const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!sm_->isInitialized()) {
     return false;
@@ -1297,7 +1349,8 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 /*//}*/
 
 /* //{ callbackToggleServiceCallbacks() */
-bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                                       const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!sm_->isInitialized()) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: service for toggling callbacks is not available before initialization.", getName().c_str());
@@ -1346,7 +1399,8 @@ bool EstimationManager::switchToHealthyEstimator() {
 void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator) {
 
   std::scoped_lock lock(mutex_active_estimator_);
-  RCLCPP_INFO(node_->get_logger(), "[%s]: switching estimator from %s to %s", getName().c_str(), active_estimator_->getName().c_str(), target_estimator->getName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "[%s]: switching estimator from %s to %s", getName().c_str(), active_estimator_->getName().c_str(),
+              target_estimator->getName().c_str());
   active_estimator_->setActive(false);
   active_estimator_ = target_estimator;
   active_estimator_->setActive(true);

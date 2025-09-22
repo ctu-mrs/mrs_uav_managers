@@ -66,6 +66,8 @@ private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+
   rclcpp::TimerBase::SharedPtr timer_initialization_;
   void                         timerInitialization();
 
@@ -171,6 +173,8 @@ void TransformManager::timerInitialization() {
 
   node_  = this->shared_from_this();
   clock_ = node_->get_clock();
+
+  cbkgrp_subs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
@@ -425,11 +429,12 @@ void TransformManager::timerInitialization() {
   /*//{ initialize subscribers */
   mrs_lib::SubscriberHandlerOptions shopts;
 
-  shopts.node               = node_;
-  shopts.node_name          = getPrintName();
-  shopts.no_message_timeout = mrs_lib::no_timeout;
-  shopts.threadsafe         = true;
-  shopts.autostart          = true;
+  shopts.node                                = node_;
+  shopts.node_name                           = getPrintName();
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
 
   sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "~/uav_state_in", &TransformManager::callbackUavState, this);
 
