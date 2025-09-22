@@ -434,8 +434,6 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_hover_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_eland_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_ehover_;
-
-  rclcpp::CallbackGroup::SharedPtr                   ss_failsafe_cbkgrp_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_server_failsafe_;
 
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr                service_server_failsafe_escalating_;
