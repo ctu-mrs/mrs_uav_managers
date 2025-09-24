@@ -240,6 +240,7 @@ def generate_launch_description():
             ("~/local_odometry_in", "hw_api/odometry"),
             ("~/gnss_in", "hw_api/gnss"),
             ("~/max_z_in", "estimation_manager/max_flight_z_agl"),
+            ("~/safety_area_diag_in", "safety_area_manager/diagnostics"),
             ("~/joystick_in", "joy"),
             ("~/bumper_sectors_in", "bumper/obstacle_sectors"),
             ("~/hw_api_rc_in", "hw_api/rc_channels"),
@@ -326,6 +327,13 @@ def generate_launch_description():
             ("~/use_safety_area_in", "~/use_safety_area"),
             ("~/parachute_out", "parachute_driver/fire_parachute"),
             ("~/parachute_in", "~/parachute"),
+            ("~/point_in_safety_area_2d_out", "safety_area_manager/point_in_safety_area_2d"),
+            ("~/point_in_safety_area_3d_out", "safety_area_manager/point_in_safety_area_3d"),
+            ("~/path_in_safety_area_2d_out", "safety_area_manager/path_in_safety_area_2d"),
+            ("~/path_in_safety_area_3d_out", "safety_area_manager/path_in_safety_area_3d"),
+            ("~/get_min_z_out", "safety_area_manager/get_min_z"),
+            ("~/get_max_z_out", "safety_area_manager/get_max_z"),
+            ("~/is_safety_area_enabled_out", "safety_area_manager/is_safety_zone_enabled"),
         ],
     )
 

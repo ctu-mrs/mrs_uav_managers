@@ -3,7 +3,6 @@
 #include <rclcpp/logging.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-// #include <mrs_uav_managers/safety_area_manager/common_handlers.h>
 #include <geometry_msgs/msg/point32.hpp>
 #include <geometry_msgs/msg/polygon.hpp>
 #include <mrs_lib/mutex.h>
@@ -19,8 +18,6 @@
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/estimation_diagnostics.hpp>
 #include <mrs_msgs/msg/float64_stamped.hpp>
-// #include <mrs_msgs/GetBoolSrv.h>
-// #include <mrs_msgs/msg/GetPointStamped.h>
 #include <mrs_msgs/msg/hw_api_capabilities.hpp>
 #include <mrs_msgs/msg/reference_stamped.hpp>
 #include <mrs_msgs/msg/uav_state.hpp>
@@ -377,7 +374,7 @@ void SafetyAreaManager::initialize() {
   }
 
   // | ----------------------- publishers ----------------------- |
-  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(node_, "~/safety_area_diagnostics_out"); 
+  ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(node_, "~/diagnostics_out"); 
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -529,12 +526,11 @@ void SafetyAreaManager::timerPrerequisites() {
   // mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_,"SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_hw_api_capabilities  = sh_hw_api_capabilities_.hasMsg();
-  bool got_control_manager_diag = sh_control_manager_diag_.hasMsg();
   bool got_estimation_diag      = sh_estimation_diag_.hasMsg();
 
-  if (!got_hw_api_capabilities || !got_control_manager_diag || !got_estimation_diag) {
-    RCLCPP_WARN(node_->get_logger(),"waiting for data: ControlManager=%s, HW Api=%s EstimationManager=%s",
-                         got_control_manager_diag ? "true" : "FALSE", got_hw_api_capabilities ? "true" : "FALSE", got_estimation_diag ? "true" : "FALSE");
+  if (!got_hw_api_capabilities || !got_estimation_diag) {
+    RCLCPP_WARN(node_->get_logger(),"waiting for data: HW Api=%s EstimationManager=%s",
+                         got_hw_api_capabilities ? "true" : "FALSE", got_estimation_diag ? "true" : "FALSE");
     return;
   }
 
@@ -805,6 +801,13 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 
   if (!is_initialized_) {
     return false;
+  }
+
+  if(!sh_control_manager_diag_.hasMsg()) {
+    RCLCPP_WARN(node_->get_logger(), "No control manager diagnostics received yet.");
+    response->message = "No control manager diagnostics received yet.";
+    response->success = false;
+    return true;
   }
 
   auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
