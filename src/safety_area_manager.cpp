@@ -1020,53 +1020,42 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   // If any is present, fill obstacles
   if (obstacles_present) {
     // Read parameters for obstacles
-    std::vector<Eigen::MatrixXd> obstacles_mat;
-    Eigen::MatrixXd max_z_mat;
-    Eigen::MatrixXd min_z_mat;
-    param_loader.loadMatrixDynamic("safety_area/obstacles/max_z", max_z_mat, -1, 1);
-    param_loader.loadMatrixDynamic("safety_area/obstacles/min_z", min_z_mat, -1, 1);
+    int obstacles_count = 0;
+    param_loader.loadParam("safety_area/obstacles/count", obstacles_count); 
+    // std::vector<Eigen::MatrixXd> obstacles;
+    obstacles.reserve(obstacles_count);
+    for(int i = 0; i < obstacles_count; i++) {
+      double max_z, min_z;
+      std::string horizontal_frame, vertical_frame;
 
-    Eigen::MatrixXd current_mat = param_loader.loadMatrixDynamic2("safety_area/obstacles/data", -1, 2);
-    Eigen::MatrixXd rows        = param_loader.loadMatrixDynamic2("safety_area/obstacles/rows", -1, 1);
+      std::string obstacle_path = "safety_area/obstacles/obstacle_" + std::to_string(i);
 
-    obstacles.reserve(current_mat.size());
+      std::string points_path = obstacle_path + "/points";
+      Eigen::MatrixXd obstacle = param_loader.loadMatrixDynamic2(points_path, -1, 2);
 
-    int start_row = 0;
-    obstacles_mat.reserve(rows.rows());
+      std::string horizontal_frame_path = obstacle_path + "/horizontal_frame";
+      param_loader.loadParam(horizontal_frame_path, horizontal_frame);
 
-    // Iterate over obstacles matrix and extract points based on rows matrix
-    //"rows" matrix define the points for every obstacle
-    for (int i = 0; i < rows.rows(); i++) {
-      int row_num = static_cast<int>(rows(i, 0));
+      std::string vertical_frame_path = obstacle_path + "/vertical_frame";
+      param_loader.loadParam(vertical_frame_path, vertical_frame);
 
-      if (row_num < 0 || start_row + row_num > current_mat.rows()) {
-        RCLCPP_WARN(node_->get_logger(), "Invalid obstacle rows!, check your config file");
+      std::string max_z_path = obstacle_path + "/max_z";
+      param_loader.loadParam(max_z_path, max_z);
+
+      std::string min_z_path = obstacle_path + "/min_z";
+      param_loader.loadParam(min_z_path, min_z);
+
+      if (!param_loader.loadedSuccessfully()) {
+        RCLCPP_ERROR(node_->get_logger(), "could not load safety area obstacle %d parameters!", i);
         return false;
-      }
+      }     
 
-      Eigen::MatrixXd obstacle_mat = current_mat.block(start_row, 0, row_num, current_mat.cols());
-      obstacles_mat.push_back(obstacle_mat);
-      start_row += row_num;
-    }
-
-    if (start_row != current_mat.rows()) {
-      RCLCPP_WARN(node_->get_logger(), "Invalid obstacle rows!, check your config file");
-      return false;
-    }
-
-    if (!(max_z_mat.rows() == min_z_mat.rows() && min_z_mat.rows() == static_cast<long int>(obstacles_mat.size()))) {
-      RCLCPP_WARN(node_->get_logger(), "Inconsistent obstacles data: max_z rows: %ld, min_z rows: %ld, obstacles number: %ld", max_z_mat.rows(), min_z_mat.rows(),
-                  obstacles_mat.size());
-      return false;
-    }
-
-    // Make obstacle prisms
-    for (size_t i = 0; i < obstacles_mat.size(); i++) {
-      const auto obs_max_z             = max_z_mat(i, 0);
-      const auto obs_min_z             = min_z_mat(i, 0);
-      const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", obs_max_z);
-      const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", obs_min_z);
-      auto prism                       = makePrism(obstacles_mat[i], transformed_obs_max_z, transformed_obs_min_z, horizontal_frame);
+      //Transform into world_origin
+      const auto transformed_obs_max_z = transformZ(vertical_frame, "world_origin", max_z);
+      const auto transformed_obs_min_z = transformZ(vertical_frame, "world_origin", min_z);
+     
+      //Make obstacle prism
+      auto prism = makePrism(obstacle, transformed_obs_max_z, transformed_obs_min_z, horizontal_frame);
 
       if (prism) {
         obstacles.push_back(std::move(prism));
@@ -1074,14 +1063,15 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
         RCLCPP_WARN(node_->get_logger(), "Failed to create obstacle prism!");
       }
     }
-  }
+   }
 
-  auto new_safety_zone = createSafetyZone(std::move(border), std::move(obstacles));
+    auto new_safety_zone =
+        createSafetyZone(std::move(border), std::move(obstacles));
 
-  if (!new_safety_zone) {
-    RCLCPP_WARN(node_->get_logger(), "Failed to create new safety zone.");
-    return false;
-  }
+    if (!new_safety_zone) {
+      RCLCPP_WARN(node_->get_logger(), "Failed to create new safety zone.");
+      return false;
+    }
 
   RCLCPP_INFO(node_->get_logger(), "New safety zone created");
 
@@ -1608,7 +1598,10 @@ void SafetyAreaManager::publishDiagnostics(void) {
       tmp_obstacle.max_z   = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMaxZ());
       tmp_obstacle.min_z   = transformZ("world_origin", safety_zone_handler_.parameters.vertical_frame, obstaclePtr->getMinZ());
 
-      // Extract the points of the osbstacle
+      tmp_obstacle.horizontal_frame = safety_zone_handler_.parameters.horizontal_frame;
+      tmp_obstacle.vertical_frame   = safety_zone_handler_.parameters.vertical_frame;
+
+      // Extract the points of the obstacle
       for (const auto &point : transformed_obstacle) {
         tmp_point.x = boost::geometry::get<0>(point);
         tmp_point.y = boost::geometry::get<1>(point);
