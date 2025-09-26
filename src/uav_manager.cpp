@@ -101,6 +101,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   rclcpp::TimerBase::SharedPtr timer_preinitialization_;
   void                         timerPreInitialization();
@@ -162,7 +163,8 @@ public:
   bool callbackTakeoff(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackLand(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackLandHome(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                         const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   // service clients
   mrs_lib::ServiceClientHandler<mrs_msgs::srv::Vec1>                sch_takeoff_;
@@ -316,7 +318,8 @@ public:
 
   // midair activation
   void         timerMidairActivation();
-  bool         callbackMidairActivation(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool         callbackMidairActivation(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                        const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   rclcpp::Time midair_activation_started_;
 
   bool callbackMinHeightCheck(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
@@ -348,9 +351,10 @@ void UavManager::timerPreInitialization() {
   node_  = this->shared_from_this();
   clock_ = node_->get_clock();
 
-  cbkgrp_subs_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
@@ -532,12 +536,21 @@ void UavManager::initialize() {
 
   // | --------------------- service servers -------------------- |
 
-  service_server_takeoff_           = node_->create_service<std_srvs::srv::Trigger>("~/takeoff_in", std::bind(&UavManager::callbackTakeoff, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_land_              = node_->create_service<std_srvs::srv::Trigger>("~/land_in", std::bind(&UavManager::callbackLand, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_land_home_         = node_->create_service<std_srvs::srv::Trigger>("~/land_home_in", std::bind(&UavManager::callbackLandHome, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_land_there_        = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>("~/land_there_in", std::bind(&UavManager::callbackLandThere, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_midair_activation_ = node_->create_service<std_srvs::srv::Trigger>("~/midair_activation_in", std::bind(&UavManager::callbackMidairActivation, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  service_server_min_height_check_  = node_->create_service<std_srvs::srv::SetBool>("~/enable_min_height_check_in", std::bind(&UavManager::callbackMinHeightCheck, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  service_server_takeoff_ = node_->create_service<std_srvs::srv::Trigger>(
+      "~/takeoff_in", std::bind(&UavManager::callbackTakeoff, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  service_server_land_ = node_->create_service<std_srvs::srv::Trigger>(
+      "~/land_in", std::bind(&UavManager::callbackLand, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  service_server_land_home_ = node_->create_service<std_srvs::srv::Trigger>(
+      "~/land_home_in", std::bind(&UavManager::callbackLandHome, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  service_server_land_there_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
+      "~/land_there_in", std::bind(&UavManager::callbackLandThere, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
+  service_server_midair_activation_ = node_->create_service<std_srvs::srv::Trigger>(
+      "~/midair_activation_in", std::bind(&UavManager::callbackMidairActivation, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  service_server_min_height_check_ = node_->create_service<std_srvs::srv::SetBool>(
+      "~/enable_min_height_check_in", std::bind(&UavManager::callbackMinHeightCheck, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   // | --------------------- service clients -------------------- |
 
@@ -567,13 +580,15 @@ void UavManager::initialize() {
 
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
-  timer_opts_start.node      = node_;
-  timer_opts_start.autostart = true;
+  timer_opts_start.node           = node_;
+  timer_opts_start.autostart      = true;
+  timer_opts_start.callback_group = cbkgrp_timers_;
 
   mrs_lib::TimerHandlerOptions timer_opts_no_start;
 
-  timer_opts_no_start.node      = node_;
-  timer_opts_no_start.autostart = false;
+  timer_opts_no_start.node           = node_;
+  timer_opts_no_start.autostart      = false;
+  timer_opts_no_start.callback_group = cbkgrp_timers_;
 
   {
     std::function<void()> callback_fcn = std::bind(&UavManager::timerLanding, this);
@@ -633,7 +648,8 @@ void UavManager::initialize() {
     mrs_lib::TimerHandlerOptions opts;
 
     opts.node      = node_;
-    opts.autostart = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd || hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
+    opts.autostart = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
+                     hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
 
     timer_maxthrottle_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_maxthrottle_timer_rate_, clock_), callback_fcn);
   }
@@ -775,7 +791,8 @@ void UavManager::timerLanding() {
       return;
     }
 
-    if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < _landing_tracking_tolerance_translation_ && fabs(radians::diff(pos_heading, ref_heading)) < _landing_tracking_tolerance_heading_) {
+    if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < _landing_tracking_tolerance_translation_ &&
+        fabs(radians::diff(pos_heading, ref_heading)) < _landing_tracking_tolerance_heading_) {
 
       auto [success, message] = landWithDescendImpl();
 
@@ -833,7 +850,8 @@ void UavManager::timerLanding() {
 
         // recalculate the mass based on the throttle
         throttle_mass_estimate_ = mrs_lib::quadratic_throttle_model::throttleToForce(_throttle_model_, desired_throttle.value()) / _g_;
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_, throttle_mass_estimate_);
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: landing: initial mass: %.2f throttle_mass_estimate: %.2f", landing_uav_mass_,
+                             throttle_mass_estimate_);
 
         // condition for automatic motor turn off
         if (((throttle_mass_estimate_ < _landing_cutoff_mass_factor_ * landing_uav_mass_) || desired_throttle < 0.01)) {
@@ -844,7 +862,8 @@ void UavManager::timerLanding() {
             throttle_under_threshold_          = true;
           }
 
-          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 500, "[UavManager]: throttle is under cutoff factor for %.2f s", (clock_->now() - throttle_mass_estimate_first_time_).seconds());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 500, "[UavManager]: throttle is under cutoff factor for %.2f s",
+                               (clock_->now() - throttle_mass_estimate_first_time_).seconds());
 
         } else {
 
@@ -888,7 +907,8 @@ void UavManager::timerLanding() {
             velocity_under_threshold_            = true;
           }
 
-          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 500, "[UavManager]: velocity over threshold for %.2f s", (clock_->now() - velocity_under_threshold_first_time_).seconds());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 500, "[UavManager]: velocity over threshold for %.2f s",
+                               (clock_->now() - velocity_under_threshold_first_time_).seconds());
 
         } else {
 
@@ -1042,7 +1062,8 @@ void UavManager::timerMaxHeight() {
 
   if (height > max_z_in_height) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height, max_z_in_height);
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: max height exceeded: %.2f >  %.2f, triggering safety goto", height,
+                         max_z_in_height);
 
     mrs_msgs::msg::ReferenceStamped reference_out;
     reference_out.header.frame_id = odometry->header.frame_id;
@@ -1226,11 +1247,13 @@ void UavManager::timerMaxthrottle() {
 
       maxthrottle_first_time_      = clock_->now();
       maxthrottle_above_threshold_ = true;
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: max throttle exceeded threshold (%.2f/%.2f)", desired_throttle, _maxthrottle_max_throttle_);
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: max throttle exceeded threshold (%.2f/%.2f)", desired_throttle,
+                           _maxthrottle_max_throttle_);
 
     } else {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 100, "[UavManager]: throttle over threshold (%.2f/%.2f) for %.2f s", desired_throttle, _maxthrottle_max_throttle_, (clock_->now() - maxthrottle_first_time_).seconds());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 100, "[UavManager]: throttle over threshold (%.2f/%.2f) for %.2f s", desired_throttle,
+                           _maxthrottle_max_throttle_, (clock_->now() - maxthrottle_first_time_).seconds());
     }
 
   } else {
@@ -1240,7 +1263,8 @@ void UavManager::timerMaxthrottle() {
 
   if (maxthrottle_above_threshold_ && (clock_->now() - maxthrottle_first_time_).seconds() > _maxthrottle_ungrip_timeout_) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: throttle over threshold (%.2f/%.2f) for more than %.2f s, ungripping payload", desired_throttle, _maxthrottle_max_throttle_, _maxthrottle_ungrip_timeout_);
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: throttle over threshold (%.2f/%.2f) for more than %.2f s, ungripping payload",
+                         desired_throttle, _maxthrottle_max_throttle_, _maxthrottle_ungrip_timeout_);
 
     ungripSrv();
   }
@@ -1249,7 +1273,9 @@ void UavManager::timerMaxthrottle() {
 
     timer_maxthrottle_->stop();
 
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: throttle over threshold (%.2f/%.2f) for more than %.2f s, calling for emergency landing", desired_throttle, _maxthrottle_max_throttle_, _maxthrottle_eland_timeout_);
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "[UavManager]: throttle over threshold (%.2f/%.2f) for more than %.2f s, calling for emergency landing", desired_throttle,
+                          _maxthrottle_max_throttle_, _maxthrottle_eland_timeout_);
 
     elandSrv();
   }
@@ -1275,7 +1301,8 @@ void UavManager::timerDiagnostics() {
     auto                     estimation_diag  = sh_estimation_diagnostics_.getMsg();
     std::vector<std::string> state_estimators = estimation_diag.get()->switchable_state_estimators;
 
-    got_gps_est = std::find(state_estimators.begin(), state_estimators.end(), "gps_garmin") != state_estimators.end() || std::find(state_estimators.begin(), state_estimators.end(), "gps_baro") != state_estimators.end();
+    got_gps_est = std::find(state_estimators.begin(), state_estimators.end(), "gps_garmin") != state_estimators.end() ||
+                  std::find(state_estimators.begin(), state_estimators.end(), "gps_baro") != state_estimators.end();
     got_rtk_est = std::find(state_estimators.begin(), state_estimators.end(), "rtk") != state_estimators.end();
   }
 
@@ -1428,7 +1455,8 @@ void UavManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr 
 
 /* //{ callbackTakeoff() */
 
-bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                 const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_)
     return false;
@@ -1671,7 +1699,8 @@ bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs
 
 /* //{ callbackLand() */
 
-bool UavManager::callbackLand([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool UavManager::callbackLand([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                              const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
     return false;
@@ -1741,7 +1770,8 @@ bool UavManager::callbackLand([[maybe_unused]] const std::shared_ptr<std_srvs::s
 
 /* //{ callbackLandHome() */
 
-bool UavManager::callbackLandHome([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool UavManager::callbackLandHome([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                  const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
     return false;
@@ -1905,7 +1935,8 @@ bool UavManager::callbackLandHome([[maybe_unused]] const std::shared_ptr<std_srv
 
 /* //{ callbackLandThere() */
 
-bool UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                   const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_)
     return false;
@@ -2039,7 +2070,8 @@ bool UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs::srv::Referenc
 
 /* //{ callbackMidairActivation() */
 
-bool UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+bool UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                          const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
     return false;
@@ -2149,7 +2181,8 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr
 
 /* //{ callbackMinHeightCheck() */
 
-bool UavManager::callbackMinHeightCheck(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+bool UavManager::callbackMinHeightCheck(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                        const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_)
     return false;
@@ -2499,7 +2532,8 @@ void UavManager::ungripSrv(void) {
   if (response) {
 
     if (!response.value()->success) {
-      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for ungripping payload returned: %s.", response.value()->message.c_str());
+      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for ungripping payload returned: %s.",
+                            response.value()->message.c_str());
     }
 
   } else {
@@ -2524,7 +2558,8 @@ bool UavManager::toggleControlOutput(const bool& input) {
   if (response) {
 
     if (!response.value()->success) {
-      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output returned: %s.", response.value()->message.c_str());
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for control output returned: %s.",
+                           response.value()->message.c_str());
       return false;
     } else {
       return true;
@@ -2551,7 +2586,8 @@ bool UavManager::offboardSrv(const bool in) {
   if (response) {
 
     if (!response.value()->success) {
-      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for offboard failed, returned: %s", response.value()->message.c_str());
+      RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for offboard failed, returned: %s",
+                            response.value()->message.c_str());
       return false;
     } else {
       return true;
@@ -2778,7 +2814,8 @@ bool UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped& go
   if (response) {
 
     if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for emergency reference returned: '%s'", response.value()->message.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[UavManager]: service call for emergency reference returned: '%s'",
+                           response.value()->message.c_str());
     }
 
     return response.value()->success;
