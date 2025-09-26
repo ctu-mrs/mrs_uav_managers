@@ -18,6 +18,7 @@
 #include <mrs_msgs/msg/estimation_diagnostics.hpp>
 #include <mrs_msgs/msg/hw_api_capabilities.hpp>
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
+#include <mrs_msgs/srv/reference_stamped_srv.hpp>
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
@@ -386,6 +387,9 @@ private:
   rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_reset_estimator_;
   bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
+  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr srvs_set_world_origin_;
+  bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, 
+      const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srvs_toggle_callbacks_;
 
@@ -397,6 +401,9 @@ private:
   bool                                                  callFailsafeService();
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvch_failsafe_;
   bool                                                  failsafe_call_succeeded_ = false;
+
+
+  mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv> srvch_set_world_origin_;
 
   // TODO service clients
   /* mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvc_hover_; */
@@ -1119,6 +1126,7 @@ void EstimationManager::timerInitialization() {
   /*//{ initialize service clients */
 
   srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
+  srvch_set_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out", cbkgrp_sc_);
 
   /*//}*/
 
@@ -1130,6 +1138,10 @@ void EstimationManager::timerInitialization() {
 
   srvs_reset_estimator_ = node_->create_service<mrs_msgs::srv::String>(
       "~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+
+  srvs_set_world_origin_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
+      "~/set_world_origin_in", std::bind(&EstimationManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   srvs_toggle_callbacks_ = node_->create_service<std_srvs::srv::SetBool>(
@@ -1348,6 +1360,103 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 }
 /*//}*/
 
+/*//{ callbackSetWorldOrigin() */
+bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+    const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+
+  if (!sm_->isInitialized()) {
+    return false;
+  }
+
+  if (!callbacks_enabled_) {
+    response->success = false;
+    response->message = ("Service callbacks are disabled");
+    RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    return true;
+  }
+
+  if (sm_->isInState(StateMachine::INITIALIZED_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+
+    double world_origin_x, world_origin_y;
+
+    if (request->header.frame_id.find("latlon_origin") != std::string::npos) {
+      const double lat = request->reference.position.x;
+      const double lon = request->reference.position.y;
+      mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+
+      RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Setting world origin to lat: %.6f lon: %.6f by service callback",
+          request->reference.position.x, request->reference.position.y);
+
+    } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
+      world_origin_x = request->reference.position.x;
+      world_origin_y = request->reference.position.y;
+
+      RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM by service callback",
+          request->reference.position.x, request->reference.position.y);
+
+    } else {
+      RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+                request->header.frame_id.c_str());
+      response->success = false;
+      response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
+      return true;
+    }
+
+    ch_->world_origin.x = world_origin_x;
+    ch_->world_origin.y = world_origin_y;
+
+    for (auto estimator : estimator_list_) {
+
+      estimator->reset();
+      RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Estimator %s reset", estimator->getName().c_str());
+
+      double t_wait_left = 5;
+      while (t_wait_left > 0) {
+        RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Attempting starting %s estimator", estimator->getName().c_str());
+        estimator->start();
+
+        if (estimator->isRunning()) {
+          RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Reset of %s estimator successful", estimator->getName().c_str());
+          break;
+        }
+
+        const double start_period = 0.2;
+        clock_->sleep_for(std::chrono::duration<double>(start_period));
+        t_wait_left -= start_period;
+      }
+    }
+
+  auto res = srvch_set_world_origin_.callSync(request);
+
+  if (!res.has_value() || !res.value()->success) {
+    RCLCPP_WARN(node_->get_logger(),"[EstimationManager]: Could not call TransformManager set_world_origin service.");
+    response->success = false;
+    response->message = "Could not call TransformManager set_world_origin service.";
+    return true;
+  }
+
+  if (!res.value()->success) {
+    RCLCPP_WARN(node_->get_logger(), "[EstimationManager]: TransformManager could not set world origin.");
+    response->success = false;
+    response->message = "TransformManager could not set world origin.";
+    return true;
+  }
+
+  response->success = true;
+  response->message = "World origin set successfully";
+
+  } else {
+
+  response->success = false;
+  response->message = "Cannot set world origin while flying";
+
+  }
+
+
+  return true;
+}
+/*//}*/
+
 /* //{ callbackToggleServiceCallbacks() */
 bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
                                                        const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
@@ -1415,7 +1524,7 @@ bool EstimationManager::callFailsafeService() {
 
   auto response = srvch_failsafe_.callSync(request);
 
-  if (!response.has_value() || response.value()->success) {
+  if (!response.has_value() || !response.value()->success) {
     return false;
   }
 

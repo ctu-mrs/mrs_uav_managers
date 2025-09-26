@@ -14,6 +14,7 @@
 #include <mrs_msgs/msg/float64_stamped.hpp>
 #include <mrs_msgs/msg/hw_api_altitude.hpp>
 #include <mrs_msgs/msg/rtk_gps.hpp>
+#include <mrs_msgs/srv/reference_stamped_srv.hpp>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -67,6 +68,7 @@ private:
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
 
   rclcpp::TimerBase::SharedPtr timer_initialization_;
   void                         timerInitialization();
@@ -102,6 +104,10 @@ private:
 
   std::string               world_origin_units_;
   geometry_msgs::msg::Point world_origin_;
+
+  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr srvs_set_world_origin_;
+  bool               callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request, 
+      const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
@@ -175,6 +181,7 @@ void TransformManager::timerInitialization() {
   clock_ = node_->get_clock();
 
   cbkgrp_subs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
@@ -451,6 +458,12 @@ void TransformManager::timerInitialization() {
     sh_gnss_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &TransformManager::callbackGnss, this);
   }
   /*//}*/
+
+/*//{ initialize service servers*/
+  srvs_set_world_origin_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
+      "~/set_world_origin_in", std::bind(&TransformManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+/*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
@@ -865,6 +878,48 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
   }
 
   got_utm_offset_ = true;
+}
+/*//}*/
+
+/*//{ callbackSetWorldOrigin() */
+bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+
+  if (!is_initialized_) {
+    response->success = false;
+    response->message = "Could not set world origin";
+    return true;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::callbackSetWorldOrigin", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+
+  geometry_msgs::msg::Point world_origin;
+
+  if (request->header.frame_id.find("latlon_origin") != std::string::npos) {
+    const double lat = request->reference.position.x;
+    const double lon = request->reference.position.y;
+    mrs_lib::UTM(lat, lon, &world_origin.x, &world_origin.y);
+    RCLCPP_INFO(node_->get_logger(),"[TransformManager]: Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
+  } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
+    world_origin.x = request->reference.position.x;
+    world_origin.y = request->reference.position.y;
+    RCLCPP_INFO(node_->get_logger(),"[TransformManager]: Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
+  } else {
+    RCLCPP_WARN(node_->get_logger(),"[TransformManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+              request->header.frame_id.c_str());
+    response->success = false;
+    response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
+    return true;
+  }
+
+  for (size_t i = 0; i < tf_sources_.size(); i++) {
+    tf_sources_[i]->setWorldOrigin(world_origin);
+  }
+
+  response->success = true;
+  response->message = "World origin set successfully";
+
+  return true;
 }
 /*//}*/
 
