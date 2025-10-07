@@ -208,8 +208,8 @@ private:
   bool initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> copyExistingObstacles();
   bool initializationFromMsg(const mrs_msgs::msg::Prism &prism_msg, bool keep_obstacles);
-  std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::safety_zone::Prism> &border);
-  std::optional<SafetyZoneHandler> createSafetyZone(const std::unique_ptr<mrs_lib::safety_zone::Prism> &border,
+  std::optional<SafetyZoneHandler> createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border);
+  std::optional<SafetyZoneHandler> createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border,
                                                     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> &&obstacle_prisms);
 
   std::tuple<bool, std::string> validateMsg(const mrs_msgs::msg::Prism &prism_msg);
@@ -1149,10 +1149,10 @@ bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::msg::Prism &prism_
 
 /* createSafetyZone () //{ */
 
-std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::safety_zone::Prism> &border,
+std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border,
                                                                                         std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> &&obstacle_prisms) {
   SafetyZoneHandler safety_zone_handler;
-  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(*border, std::move(obstacle_prisms));
+  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(std::move(border), std::move(obstacle_prisms));
 
   if (!safety_zone_handler.safety_zone) {
     return std::nullopt;
@@ -1177,10 +1177,10 @@ std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSaf
   return safety_zone_handler;
 }
 
-std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(const std::unique_ptr<mrs_lib::safety_zone::Prism> &border) {
+std::optional<SafetyAreaManager::SafetyZoneHandler> SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border) {
 
   SafetyZoneHandler safety_zone_handler;
-  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(*border);
+  safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(std::move(border));
 
   if (!safety_zone_handler.safety_zone) {
     return std::nullopt;
