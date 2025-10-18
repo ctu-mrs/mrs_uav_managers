@@ -335,6 +335,7 @@ private:
   const std::string nodelet_name_ = "EstimationManager";
   const std::string package_name_ = "mrs_uav_managers";
 
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -448,6 +449,7 @@ public:
 
 EstimationManager::EstimationManager(rclcpp::NodeOptions options) : mrs_lib::Node("estimation_manager", options) {
 
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

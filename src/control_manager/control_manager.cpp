@@ -234,6 +234,7 @@ public:
 private:
   rclcpp::Node::SharedPtr  trackers_subnode_;
   rclcpp::Node::SharedPtr  controllers_subnode_;
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -924,6 +925,7 @@ private:
 
 ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("control_manager", options) {
 
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

@@ -66,6 +66,7 @@ public:
   GainManager(rclcpp::NodeOptions options);
 
 private:
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -153,8 +154,7 @@ GainManager::GainManager(rclcpp::NodeOptions options) : mrs_lib::Node("control_m
 
 void GainManager::initialize() {
 
-  RCLCPP_INFO(node_->get_logger(), "initializing");
-
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

@@ -52,6 +52,7 @@ public:
   ConstraintManager(rclcpp::NodeOptions options);
 
 private:
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -149,8 +150,7 @@ ConstraintManager::ConstraintManager(rclcpp::NodeOptions options) : mrs_lib::Nod
 
 void ConstraintManager::initialize() {
 
-  RCLCPP_INFO(node_->get_logger(), "initializing");
-
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -245,8 +245,7 @@ void ConstraintManager::initialize() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _constraint_names_)) {
-        RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(),
-                     it->c_str());
+        RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
         rclcpp::shutdown();
         exit(1);
       }
@@ -262,8 +261,7 @@ void ConstraintManager::initialize() {
     param_loader.loadParam(yaml_prefix + "default_constraints/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
-      RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(),
-                   it->c_str());
+      RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
       rclcpp::shutdown();
       exit(1);
     }
@@ -402,8 +400,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
     } else {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "set service for setting constraints returned: '%s'",
-                           response.value()->message.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "set service for setting constraints returned: '%s'", response.value()->message.c_str());
       return false;
     }
   }
@@ -553,8 +550,7 @@ void ConstraintManager::timerConstraintManagement() {
 
     if (it == _map_type_default_constraints_.end()) {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                           "the state estimator type '%s' was not specified in the constraint_manager's config!",
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the state estimator type '%s' was not specified in the constraint_manager's config!",
                            estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
@@ -567,9 +563,8 @@ void ConstraintManager::timerConstraintManagement() {
         // else, try to set the initial constraints
       } else {
 
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                             "the current constraints '%s' are not within the allowed constraints for '%s'", current_constraints.c_str(),
-                             estimation_diagnostics->current_state_estimator.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the current constraints '%s' are not within the allowed constraints for '%s'",
+                             current_constraints.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
         if (setConstraints(it->second)) {
 
@@ -640,8 +635,7 @@ void ConstraintManager::timerDiagnostics() {
     it = _map_type_allowed_constraints_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_constraints_.end()) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                           "the state estimator '%s' was not specified in the constraint_manager's config!",
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the state estimator '%s' was not specified in the constraint_manager's config!",
                            estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;

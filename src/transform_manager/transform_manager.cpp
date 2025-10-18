@@ -63,6 +63,7 @@ public:
   std::string getPrintName() const;
 
 private:
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -165,8 +166,7 @@ TransformManager::TransformManager(rclcpp::NodeOptions options) : mrs_lib::Node(
 
 void TransformManager::initialize() {
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getName().c_str());
-
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
   ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
