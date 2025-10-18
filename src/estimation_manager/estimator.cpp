@@ -135,7 +135,7 @@ std::string Estimator::getName(void) const {
 /* getPrintName() //{ */
 
 std::string Estimator::getPrintName(void) const {
-  return ch_->nodelet_name + "/" + name_;
+  return name_;
 }
 
 //}
