@@ -1679,7 +1679,6 @@ void ControlManager::initialize(void) {
     bool success = false;
 
     try {
-
       RCLCPP_INFO(node_->get_logger(), "initializing the controller '%s'", it->second.address.c_str());
       success = controller_list_.at(i)->initialize(subnode, common_handlers_, private_handlers);
     }

@@ -754,7 +754,7 @@ void EstimationManager::initialize() {
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + estimator->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, estimator->getName());
     ph->param_loader->copyYamls(param_loader);
     ph->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
 
@@ -782,7 +782,7 @@ void EstimationManager::initialize() {
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + est_alt_agl_->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, est_alt_agl_->getName());
     ph->param_loader->copyYamls(param_loader);
     ph->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
 
