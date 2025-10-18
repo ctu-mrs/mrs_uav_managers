@@ -972,7 +972,7 @@ void ControlManager::initialize(void) {
   // |                           params                           |
   // --------------------------------------------------------------
 
-  param_loader_ = std::make_shared<mrs_lib::ParamLoader>(node_, "ControlManager");
+  param_loader_ = std::make_shared<mrs_lib::ParamLoader>(node_);
 
   param_loader_->loadParam("custom_config", _custom_config_);
   param_loader_->loadParam("platform_config", _platform_config_);

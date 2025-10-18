@@ -184,7 +184,7 @@ void TransformManager::initialize() {
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
   ch_->transformer->retryLookupNewest(true);
 
-  mrs_lib::ParamLoader param_loader(node_, getPrintName());
+  mrs_lib::ParamLoader param_loader(node_);
 
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);

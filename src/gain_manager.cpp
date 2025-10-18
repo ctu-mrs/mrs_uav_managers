@@ -164,7 +164,7 @@ void GainManager::initialize() {
 
   // | ------------------------- params ------------------------- |
 
-  mrs_lib::ParamLoader param_loader(node_, "GainManager");
+  mrs_lib::ParamLoader param_loader(node_);
 
   std::string custom_config_path;
   std::string platform_config_path;
