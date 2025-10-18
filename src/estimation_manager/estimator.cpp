@@ -3,8 +3,8 @@
 namespace mrs_uav_managers
 {
 
-/*//{ method implementations */
-/*//{ changeState() */
+/* changeState() //{ */
+
 bool Estimator::changeState(SMStates_t new_state) {
 
   if (new_state == getCurrentSmState()) {
@@ -18,77 +18,102 @@ bool Estimator::changeState(SMStates_t new_state) {
               getCurrentSmStateString().c_str());
   return true;
 }
-/*//}*/
 
-/*//{ isInState() */
+//}
+
+/* isInState() //{ */
+
 bool Estimator::isInState(const SMStates_t& state_in) const {
   return state_in == getCurrentSmState();
 }
-/*//}*/
 
-/*//{ isInitialized() */
+//}
+
+/* isInitialized() //{ */
+
 bool Estimator::isInitialized() const {
   return !isInState(UNINITIALIZED_STATE);
 }
-/*//}*/
 
-/*//{ isReady() */
+//}
+
+/* isReady() //{ */
+
 bool Estimator::isReady() const {
   return isInState(READY_STATE);
 }
-/*//}*/
 
-/*//{ isStarted() */
+//}
+
+/* isStarted() //{ */
+
 bool Estimator::isStarted() const {
   return isInState(STARTED_STATE);
 }
-/*//}*/
 
-/*//{ isRunning() */
+//}
+
+/* isRunning() //{ */
+
 bool Estimator::isRunning() const {
   return isInState(SMStates_t::RUNNING_STATE);
 }
-/*//}*/
 
-/*//{ isStopped() */
+//}
+
+/* isStopped() //{ */
+
 bool Estimator::isStopped() const {
   return isInState(STOPPED_STATE);
 }
-/*//}*/
 
-/*//{ isError() */
+//}
+
+/* isError() //{ */
+
 bool Estimator::isError() const {
   return isInState(ERROR_STATE);
 }
-/*//}*/
 
-/*//{ getCurrentSmState() */
+//}
+
+/* getCurrentSmState() //{ */
+
 SMStates_t Estimator::getCurrentSmState() const {
   return current_sm_state_;
 }
-/*//}*/
 
-/*//{ setCurrentSmState() */
+//}
+
+/* setCurrentSmState() //{ */
+
 void Estimator::setCurrentSmState(const SMStates_t& new_state) {
   std::scoped_lock lock(mutex_current_state_);
   current_sm_state_ = new_state;
 }
-/*//}*/
 
-/*//{ getSmStateString() */
+//}
+
+/* getSmStateString() //{ */
+
 std::string Estimator::getSmStateString(const SMStates_t& state) const {
   return sm::state_names[state];
 }
-/*//}*/
 
-/*//{ getCurrentSmStateName() */
+//}
+
+/* getCurrentSmStateString() //{ */
+
 std::string Estimator::getCurrentSmStateString(void) const {
   return getSmStateString(getCurrentSmState());
 }
-/*//}*/
 
-/*//{ isMitigatingJump() */
+//}
+
+/* isMitigatingJump() //{ */
+
 bool Estimator::isMitigatingJump(void) {
+
   if (is_mitigating_jump_) {
     is_mitigating_jump_ = false;
     return true;
@@ -96,39 +121,51 @@ bool Estimator::isMitigatingJump(void) {
     return false;
   }
 }
-/*//}*/
 
-/*//{ getName() */
+//}
+
+/* getName() //{ */
+
 std::string Estimator::getName(void) const {
   return name_;
 }
-/*//}*/
 
-/*//{ getPrintName() */
+//}
+
+/* getPrintName() //{ */
+
 std::string Estimator::getPrintName(void) const {
   return ch_->nodelet_name + "/" + name_;
 }
-/*//}*/
 
-/*//{ getType() */
+//}
+
+/* getType() //{ */
+
 std::string Estimator::getType(void) const {
   return type_;
 }
-/*//}*/
 
-/*//{ getFrameId() */
+//}
+
+/* getFrameId() //{ */
+
 std::string Estimator::getFrameId(void) const {
   return ns_frame_id_;
 }
-/*//}*/
 
-/*//{ getMaxFlightZ() */
+//}
+
+/* getMaxFlightZ() //{ */
+
 double Estimator::getMaxFlightZ(void) const {
   return max_flight_z_;
 }
-/*//}*/
 
-/*//{ publishDiagnostics() */
+//}
+
+/* publishDiagnostics() //{ */
+
 void Estimator::publishDiagnostics() const {
 
   if (!ch_->debug_topics.diag) {
@@ -144,14 +181,17 @@ void Estimator::publishDiagnostics() const {
 
   ph_diagnostics_.publish(msg);
 }
-/*//}*/
 
-/*//{ getAccGlobal() */
+//}
+
+/* getAccGlobal() //{ */
+
 tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr& input_msg, const double hdg) {
 
   geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->linear_acceleration;
   acc_stamped.header = input_msg->header;
+
   return getAccGlobal(acc_stamped, hdg);
 }
 
@@ -160,6 +200,7 @@ tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstS
   geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->control_acceleration;
   acc_stamped.header = input_msg->header;
+
   return getAccGlobal(acc_stamped, hdg);
 }
 
@@ -173,14 +214,15 @@ tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped& a
   des_acc.vector.z        = acc_stamped.vector.z;
   des_acc.header.frame_id = ch_->frames.ns_fcu;
   des_acc.header.stamp    = acc_stamped.header.stamp;
-  auto response_acc       = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);
+
+  auto response_acc = ch_->transformer->transformSingle(des_acc, ch_->frames.ns_fcu_untilted);
 
   if (response_acc) {
     des_acc_untilted.x = response_acc.value().vector.x;
     des_acc_untilted.y = response_acc.value().vector.y;
     des_acc_untilted.z = response_acc.value().vector.z;
   } else {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transform from %s to %s failed", getPrintName().c_str(), des_acc.header.frame_id.c_str(),
                          ch_->frames.ns_fcu_untilted.c_str());
   }
 
@@ -189,12 +231,15 @@ tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped& a
 
   return des_acc_global;
 }
-/*//}*/
 
-/*//{ getHeadingRate() */
+//}
+
+/* getHeadingRate() //{ */
+
 std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr& odom_msg) {
 
   double hdg_rate;
+
   try {
     hdg_rate = mrs_lib::AttitudeConverter(odom_msg->pose.pose.orientation).getHeadingRate(odom_msg->twist.twist.angular);
   }
@@ -202,12 +247,10 @@ std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::C
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: failed getting heading rate", getPrintName().c_str());
     return {};
   }
+
   return hdg_rate;
 }
-/*//}*/
 
-
-/*//}*/
+//}
 
 }  // namespace mrs_uav_managers
-
