@@ -287,20 +287,6 @@ void SafetyAreaManager::initialize() {
   param_loader.loadParam("world_config", _world_config_);
   param_loader.addYamlFile(_world_config_);
 
-  // param_loader.loadParam("world_origin/units",
-  // safety_zone_handler_.parameters.world_origin_units);
-  // param_loader.loadParam("world_origin/origin_x",
-  // safety_zone_handler_.parameters.origin_x);
-  // param_loader.loadParam("world_origin/origin_y",
-  // safety_zone_handler_.parameters.origin_x);
-  // param_loader.loadParam("safety_area/enabled",
-  // safety_zone_handler_.parameters.safety_area_enabled);
-  // // TODO this might be extended for obstacles as well
-  // param_loader.loadParam("safety_area/border/horizontal_frame",
-  // safety_zone_handler_.parameters.horizontal_frame);
-  // param_loader.loadParam("safety_area/border/vertical_frame",
-  // safety_zone_handler_.parameters.vertical_frame);
-
   param_loader.addYamlFileFromParam("private_config");
   // param_loader.addYamlFileFromParam("public_config");
 
@@ -723,9 +709,9 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
   point.header    = request->header;
   point.reference = request->reference;
 
-  // Transform to "world_origin" as is the default frame we use for easier
-  // validation and interaction with safety area border points.
-  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+  std::string border_horizontal_frame   = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  std::string border_vertical_frame = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
+  auto tfed_horizontal       = transformer_->transformSingle(point, border_horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -734,18 +720,12 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
     return true;
   }
 
-  // TODO consider if need to transform the z value
   // As the vertical frame can be different from horizontal frame
-  /* auto transformed_pos_z =
-   * transformZ(safety_zone_handler_.parameters.horizontal_frame,
-   * safety_zone_handler_.parameters.vertical_frame,
-   * tfed_horizontal->reference.position.z); */
-
-  /* ROS_INFO_STREAM("[SafetyAreaManager/isPointInSafetyArea3d]: Transformed z
-   * value : " << transformed_pos_z); */
+  auto transformed_pos_z =
+      transformZ(point.header.frame_id, border_vertical_frame , tfed_horizontal->reference.position.z);
 
   if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y,
-                                                      tfed_horizontal->reference.position.z)) {
+                                                      transformed_pos_z)) {
     response->message = "The point is not in the safety area";
     return true;
   }
@@ -767,9 +747,8 @@ bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::
   point.reference = request->reference;
   point.header    = request->header;
 
-  // Transform to "world_origin" as is the default frame we use for easier
-  // validation and interaction with safety area border points.
-  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+  std::string border_horizontal_frame   = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto tfed_horizontal       = transformer_->transformSingle(point, border_horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -806,8 +785,10 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
   // transform points
   geometry_msgs::msg::PointStamped start_transformed, end_transformed;
 
+  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+
   {
-    auto resp = transformer_->transformSingle(start, "world_origin");
+    auto resp = transformer_->transformSingle(start, border_horizontal_frame); 
 
     if (!resp) {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1.0,
@@ -822,7 +803,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
   }
 
   {
-    auto resp = transformer_->transformSingle(end, "world_origin");
+    auto resp = transformer_->transformSingle(end, border_horizontal_frame); 
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -871,8 +852,10 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
   // transform points
   geometry_msgs::msg::PointStamped start_transformed, end_transformed;
 
+  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+
   {
-    auto resp = transformer_->transformSingle(start, "world_origin");
+    auto resp = transformer_->transformSingle(start, border_horizontal_frame); 
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -885,7 +868,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
   }
 
   {
-    auto resp = transformer_->transformSingle(end, "world_origin");
+    auto resp = transformer_->transformSingle(end, border_horizontal_frame); 
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1337,9 +1320,8 @@ double SafetyAreaManager::transformZ(const std::string &current_frame, const std
 /* //{ isPointInSafetyArea2d() */
 bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
-  // Transform to "world_origin" as is the default frame we use for easier
-  // validation and interaction with safety area border points.
-  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto tfed_horizontal = transformer_->transformSingle(point, horizontal_frame); 
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1359,9 +1341,8 @@ bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStam
 
 bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
 
-  // Transform to "world_origin" as is the default frame we use for easier
-  // validation and interaction with safety area border points.
-  auto tfed_horizontal = transformer_->transformSingle(point, "world_origin");
+  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto tfed_horizontal = transformer_->transformSingle(point, horizontal_frame); 
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
