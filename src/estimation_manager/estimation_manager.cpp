@@ -20,9 +20,11 @@
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/srv/reference_stamped_srv.hpp>
 
+#include <mrs_lib/node.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
+#include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/gps_conversions.h>
@@ -64,7 +66,8 @@ namespace estimation_manager
 // |                           classes                          |
 // --------------------------------------------------------------
 
-/*//{ class StateMachine */
+/* class StateMachine //{ */
+
 class StateMachine {
 
   /*//{ states */
@@ -301,7 +304,7 @@ private:
   }
 
   std::string getPrintName() const {
-    return nodelet_name_ + "/" + name_;
+    return name_;
   }
 
   // clang-format off
@@ -322,11 +325,12 @@ private:
   };
   // clang-format on
 };
-/*//}*/
 
-/*//{ class EstimationManager */
+//}
 
-class EstimationManager : public rclcpp::Node {
+/* class EstimationManager //{ */
+
+class EstimationManager : public mrs_lib::Node {
 
 private:
   const std::string nodelet_name_ = "EstimationManager";
@@ -366,6 +370,10 @@ private:
 
   mrs_lib::PublisherHandler<geometry_msgs::msg::QuaternionStamped> ph_orientation_;
 
+  rclcpp::Time                 time_preinit_started_;
+  rclcpp::TimerBase::SharedPtr timer_preinit_;
+  void                         timerPreinit();
+
   std::shared_ptr<TimerType> timer_publish_;
   void                       timerPublish();
 
@@ -375,23 +383,24 @@ private:
   std::shared_ptr<TimerType> timer_check_health_;
   void                       timerCheckHealth();
 
-  rclcpp::TimerBase::SharedPtr timer_initialization_;
-  void                         timerInitialization();
+  void initialize();
 
   void shutdown();
 
-  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_change_estimator_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_;
+
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> srvs_change_estimator_;
   bool callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
   int  estimator_switch_count_ = 0;
 
-  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr srvs_reset_estimator_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> srvs_reset_estimator_;
   bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr srvs_set_world_origin_;
   bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, 
       const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srvs_toggle_callbacks_;
+  mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> srvs_toggle_callbacks_;
 
   bool callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
                                       const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
@@ -412,6 +421,7 @@ private:
   /* mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> srvc_enable_callbacks_; */
 
   // | ------------- dynamic loading of estimators ------------- |
+
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
   std::vector<std::string>                                                  estimator_names_;         // list of estimator names
   std::vector<std::shared_ptr<mrs_uav_managers::StateEstimator>>            estimator_list_;          // list of estimators
@@ -440,333 +450,78 @@ public:
 
   std::string getName() const;
 };
-/*//}*/
 
-/*//{ EstimationManager() */
-EstimationManager::EstimationManager(rclcpp::NodeOptions options) : Node("estimation_manager", options) {
+//}
 
-  RCLCPP_INFO(get_logger(), "[%s]: initializing", getName().c_str());
+/* EstimationManager() //{ */
 
-  timer_initialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&EstimationManager::timerInitialization, this));
-}
-/*//}*/
+EstimationManager::EstimationManager(rclcpp::NodeOptions options) : mrs_lib::Node("estimation_manager", options) {
 
-// --------------------------------------------------------------
-// |                          callbacks                         |
-// --------------------------------------------------------------
-
-// | --------------------- timer callbacks -------------------- |
-
-/*//{ timerPublish() */
-void EstimationManager::timerPublish() {
-
-  if (!sm_->isInitialized()) {
-    return;
-  }
-
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Not publishing during estimator switching.", getName().c_str());
-    return;
-  }
-
-  if (!sm_->isInPublishableState()) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
-    return;
-  }
-
-  mrs_msgs::msg::UavState uav_state;
-  auto                    ret = active_estimator_->getUavState();
-  if (ret) {
-    uav_state = ret.value();
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
-    return;
-  }
-
-  if (!Support::noNans(uav_state.pose.orientation)) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: nan in uav state orientation", getName().c_str());
-    return;
-  }
-
-
-  if (active_estimator_->isMitigatingJump()) {
-    estimator_switch_count_++;
-  }
-  uav_state.estimator_iteration = estimator_switch_count_;
-
-  scope_timer.checkpoint("get uav state");
-  // TODO state health checks
-
-  ph_uav_state_.publish(uav_state);
-
-  scope_timer.checkpoint("pub uav state");
-  nav_msgs::msg::Odometry odom_main = Support::uavStateToOdom(uav_state);
-
-  scope_timer.checkpoint("uav state to odom");
-  const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
-  for (size_t i = 0; i < pose_covariance.size(); i++) {
-    odom_main.pose.covariance[i] = pose_covariance[i];
-  }
-
-  const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
-  for (size_t i = 0; i < twist_covariance.size(); i++) {
-    odom_main.twist.covariance[i] = twist_covariance[i];
-  }
-
-  scope_timer.checkpoint("get covariance");
-  ph_odom_main_.publish(odom_main);
-
-  nav_msgs::msg::Odometry innovation = active_estimator_->getInnovation();
-  ph_innovation_.publish(innovation);
-
-
-  mrs_msgs::msg::Float64Stamped agl_height;
-
-  if (is_using_agl_estimator_) {
-    agl_height = est_alt_agl_->getUavAglHeight();
-    ph_altitude_agl_.publish(agl_height);
-  }
-}
-/*//}*/
-
-/*//{ timerPublishDiagnostics() */
-void EstimationManager::timerPublishDiagnostics() {
-
-  if (!sm_->isInitialized()) {
-    return;
-  }
-
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerPublishDiagnostics", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Not publishing diagnostics during estimator switching.", getName().c_str());
-    return;
-  }
-
-  if (!sm_->isInPublishableState()) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not publishing uav state in %s", getName().c_str(), sm_->getCurrentStateString().c_str());
-    return;
-  }
-
-  mrs_msgs::msg::UavState uav_state;
-  auto                    ret = active_estimator_->getUavState();
-  if (ret) {
-    uav_state = ret.value();
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Active estimator did not provide uav_state.", getName().c_str());
-    return;
-  }
-
-  if (!Support::noNans(uav_state.pose.orientation)) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: nan in uav state orientation", getName().c_str());
-    return;
-  }
-
-  mrs_msgs::msg::Float64Stamped agl_height;
-
-  if (is_using_agl_estimator_) {
-    agl_height = est_alt_agl_->getUavAglHeight();
-    ph_altitude_agl_.publish(agl_height);
-  }
-
-  mrs_msgs::msg::Float64Stamped max_flight_z_msg;
-  max_flight_z_msg.header.stamp = clock_->now();
-  if (active_estimator_ && active_estimator_->isInitialized()) {
-    max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
-    max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
-  }
-  max_flight_z_ = max_flight_z_msg.value;
-  ph_max_flight_z_.publish(max_flight_z_msg);
-
-  // publish diagnostics
-  mrs_msgs::msg::EstimationDiagnostics diagnostics;
-
-  diagnostics.header.stamp   = uav_state.header.stamp;
-  diagnostics.child_frame_id = uav_state.child_frame_id;
-
-  diagnostics.pose         = uav_state.pose;
-  diagnostics.velocity     = uav_state.velocity;
-  diagnostics.acceleration = uav_state.acceleration;
-
-  diagnostics.sm_state                 = sm_->getCurrentStateString();
-  diagnostics.max_flight_z             = max_flight_z_msg.value;
-  diagnostics.estimator_iteration      = estimator_switch_count_;
-  diagnostics.estimation_rate          = ch_->desired_uav_state_rate;
-  diagnostics.running_state_estimators = estimator_names_;
-
-  {
-    std::scoped_lock lock(mutex_switchable_estimator_names_);
-    diagnostics.switchable_state_estimators = switchable_estimator_names_;
-  }
-
-
-  if (active_estimator_ && active_estimator_->isInitialized()) {
-    diagnostics.header.frame_id         = active_estimator_->getFrameId();
-    diagnostics.current_state_estimator = active_estimator_->getName();
-  } else {
-    diagnostics.header.frame_id         = "";
-    diagnostics.current_state_estimator = "";
-  }
-
-  diagnostics.estimator_horizontal = uav_state.estimator_horizontal;
-  diagnostics.estimator_vertical   = uav_state.estimator_vertical;
-  diagnostics.estimator_heading    = uav_state.estimator_heading;
-
-  if (is_using_agl_estimator_) {
-    diagnostics.estimator_agl_height = est_alt_agl_name_;
-    diagnostics.agl_height           = agl_height.value;
-  } else {
-    diagnostics.estimator_agl_height = "NOT_USED";
-    diagnostics.agl_height           = std::nanf("");
-  }
-
-  diagnostics.platform_config = _platform_config_;
-  diagnostics.custom_config   = _custom_config_;
-
-  ph_diagnostics_.publish(diagnostics);
-
-  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.",
-                       getName().c_str(), sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
-                       active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
-}
-/*//}*/
-
-/*//{ timerCheckHealth() */
-void EstimationManager::timerCheckHealth() {
-
-  if (!sm_->isInitialized()) {
-    return;
-  }
-
-  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerCheckHealth", ch_->scope_timer.logger, ch_->scope_timer.enabled);
-
-  /*//{ start ready estimators, check switchable estimators */
-  std::vector<std::string> switchable_estimator_names;
-  for (auto estimator : estimator_list_) {
-
-    if (estimator->isReady()) {
-      try {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: starting the estimator '%s'", getName().c_str(), estimator->getName().c_str());
-        estimator->start();
-      }
-      catch (std::runtime_error& ex) {
-        RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught during estimator starting: '%s'", getName().c_str(), ex.what());
-        rclcpp::shutdown();
-      }
-    }
-
-    if (estimator->isRunning() && estimator->getName() != "dummy" && estimator->getName() != "ground_truth") {
-      switchable_estimator_names.push_back(estimator->getName());
-    }
-  }
-
-  {
-    std::scoped_lock lock(mutex_switchable_estimator_names_);
-    switchable_estimator_names_ = switchable_estimator_names;
-  }
-
-  if (is_using_agl_estimator_ && est_alt_agl_->isReady()) {
-    est_alt_agl_->start();
-  }
-
-  /*//}*/
-
-  if (!callbacks_disabled_by_service_ &&
-      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE))) {
-    callbacks_enabled_ = true;
-  } else {
-    callbacks_enabled_ = false;
-  }
-
-  // TODO fuj if, zmenit na switch
-  // activate initial estimator
-  if (sm_->isInState(StateMachine::INITIALIZED_STATE) && initial_estimator_->isRunning()) {
-    std::scoped_lock lock(mutex_active_estimator_);
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: activating the initial estimator %s", getName().c_str(),
-                         initial_estimator_->getName().c_str());
-    active_estimator_ = initial_estimator_;
-    active_estimator_->setActive(true);
-    if (active_estimator_->getName() == "dummy") {
-      sm_->changeState(StateMachine::DUMMY_STATE);
-    } else {
-      if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
-        sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
-      } else {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: %s agl estimator: %s to be running", getName().c_str(),
-                             Support::waiting_for_string.c_str(), est_alt_agl_->getName().c_str());
-      }
-    }
-  }
-
-  // active estimator is in faulty state, we need to switch to healthy estimator
-  if (sm_->isInSwitchableState() && active_estimator_->isError()) {
-    sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
-  }
-
-  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
-    if (switchToHealthyEstimator()) {
-      sm_->changeToPreSwitchState();
-    } else {  // cannot switch to healthy estimator - failsafe necessary
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Cannot switch to any healthy estimator. Triggering failsafe.", getName().c_str());
-      sm_->changeState(StateMachine::FAILSAFE_STATE);
-    }
-  }
-
-  if (sm_->isInState(StateMachine::FAILSAFE_STATE)) {
-    if (!failsafe_call_succeeded_ && callFailsafeService()) {
-      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: failsafe called successfully", getName().c_str());
-      failsafe_call_succeeded_ = true;
-    }
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: we are in failsafe state", getName().c_str());
-  }
-
-  // standard takeoff
-  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
-    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_) {
-      sm_->changeState(StateMachine::TAKING_OFF_STATE);
-    }
-  }
-
-  // midair activation
-  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
-    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == after_midair_activation_tracker_name_) {
-      sm_->changeState(StateMachine::FLYING_STATE);
-    }
-  }
-
-  if (sm_->isInState(StateMachine::TAKING_OFF_STATE)) {
-    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker != takeoff_tracker_name_) {
-      sm_->changeState(StateMachine::FLYING_STATE);
-    }
-  }
-
-  if (sm_->isInState(StateMachine::FLYING_STATE)) {
-    if (!sh_control_input_.hasMsg()) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                           "[%s]: not received control input since starting EstimationManager, estimation suboptimal, potentially unstable", getName().c_str());
-    } else if ((clock_->now() - sh_control_input_.lastMsgTime()).seconds() > 0.1) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: not received control input for %.4fs, estimation suboptimal, potentially unstable",
-                           getName().c_str(), (clock_->now() - sh_control_input_.lastMsgTime()).seconds());
-    }
-  }
-}
-/*//}*/
-
-/*//{ timerInitialization() */
-
-void EstimationManager::timerInitialization() {
-
-  node_  = this->shared_from_this();
+  node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  cbkgrp_subs_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  mrs_lib::SubscriberHandlerOptions shopts;
+
+  shopts.node                                = node_;
+  shopts.node_name                           = getName();
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
+
+  sh_hw_api_capabilities_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
+
+  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
+
+  time_preinit_started_ = clock_->now();
+
+  timer_preinit_ = node_->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&EstimationManager::timerPreinit, this));
+}
+
+//}
+
+/* timerPreinit() //{ */
+
+void EstimationManager::timerPreinit() {
+
+  bool got_data = true;
+
+  if (!sh_hw_api_capabilities_.hasMsg()) {
+    RCLCPP_INFO(node_->get_logger(), "%s hw_api_capabilities message at topic: %s", Support::waiting_for_string.c_str(),
+                sh_hw_api_capabilities_.topicName().c_str());
+
+    got_data = false;
+  }
+
+  // let's wait for the diagnostics 10 seconds and then pass to fallback
+  if (!sh_control_manager_diag_.hasMsg() && (clock_->now() - time_preinit_started_).seconds() < 10.0) {
+
+    RCLCPP_INFO(node_->get_logger(), "%s control_manager_diagnostics message at topic: %s", Support::waiting_for_string.c_str(),
+                sh_control_manager_diag_.topicName().c_str());
+
+    got_data = false;
+  }
+
+  if (got_data) {
+
+    timer_preinit_->cancel();
+
+    initialize();
+  }
+}
+
+//}
+
+/* initialize() //{ */
+
+void EstimationManager::initialize() {
+
+  rclcpp::on_shutdown([this]() { this->shutdown(); });
 
   sm_ = std::make_shared<StateMachine>(node_, nodelet_name_);
 
@@ -775,7 +530,7 @@ void EstimationManager::timerInitialization() {
   ch_->nodelet_name = nodelet_name_;
   ch_->package_name = package_name_;
 
-  mrs_lib::ParamLoader param_loader(node_, getName());
+  mrs_lib::ParamLoader param_loader(node_);
 
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);
@@ -811,29 +566,31 @@ void EstimationManager::timerInitialization() {
   param_loader.loadParam("world_origin/units", world_origin_units);
 
   if (Support::toLowercase(world_origin_units) == "utm") {
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in UTM units.", getName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "Loading world origin in UTM units.");
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units) == "latlon") {
     double lat, lon;
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in LatLon units.", getName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "Loading world origin in LatLon units.");
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
     is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Converted to UTM x: %f, y: %f.", getName().c_str(), world_origin_x, world_origin_y);
+    RCLCPP_INFO(node_->get_logger(), "Converted to UTM x: %f, y: %f.", world_origin_x, world_origin_y);
 
   } else {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", getName().c_str(), world_origin_units.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", world_origin_units.c_str());
     rclcpp::shutdown();
+    exit(1);
   }
 
   ch_->world_origin.x = world_origin_x;
   ch_->world_origin.y = world_origin_y;
 
   if (!is_origin_param_ok) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "Could not load all mandatory parameters from world file. Please check your world file.");
     rclcpp::shutdown();
+    exit(1);
   }
   /*//}*/
 
@@ -887,51 +644,25 @@ void EstimationManager::timerInitialization() {
 
   /*//{ wait for hw api message */
 
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_ =
-      mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
-
-  while (!sh_hw_api_capabilities_.hasMsg()) {
-    RCLCPP_INFO(node_->get_logger(), "[%s]: %s hw_api_capabilities message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
-                sh_hw_api_capabilities_.topicName().c_str());
-
-    clock_->sleep_for(1s);
-  }
-
   mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr hw_api_capabilities = sh_hw_api_capabilities_.getMsg();
 
   /*//}*/
 
   /*//{ wait for desired uav_state rate */
 
-  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
-
-  bool desired_rate_set = false;
-
-  for (int i = 0; i < 10; i++) {
-
-    RCLCPP_INFO(node_->get_logger(), "[%s]: %s control_manager_diagnostics message at topic: %s", getName().c_str(), Support::waiting_for_string.c_str(),
-                sh_control_manager_diag_.topicName().c_str());
-
-    if (sh_control_manager_diag_.hasMsg()) {
-
-      RCLCPP_INFO(node_->get_logger(), "[%s]: received control_manager_diagnostics", Support::waiting_for_string.c_str());
-
-      mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
-      ch_->desired_uav_state_rate                                                       = control_manager_diag_msg->desired_uav_state_rate;
-      desired_rate_set                                                                  = true;
-      break;
-    }
-
-    clock_->sleep_for(1s);
-  }
-
-  if (!desired_rate_set) {
+  if (!sh_control_manager_diag_.hasMsg()) {
 
     RCLCPP_WARN(node_->get_logger(), "Not received control_manager_diagnostics, setting fallback estimation rate");
     ch_->desired_uav_state_rate = 100;
+
+  } else {
+
+    RCLCPP_INFO(node_->get_logger(), "[%s]: received control_manager_diagnostics", Support::waiting_for_string.c_str());
+    mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag_msg = sh_control_manager_diag_.getMsg();
+    ch_->desired_uav_state_rate                                                       = control_manager_diag_msg->desired_uav_state_rate;
   }
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: The estimation is running at: %.2f Hz", getName().c_str(), ch_->desired_uav_state_rate);
+  RCLCPP_INFO(node_->get_logger(), "The estimation is running at: %.2f Hz", ch_->desired_uav_state_rate);
 
   /*//}*/
 
@@ -955,18 +686,20 @@ void EstimationManager::timerInitialization() {
     param_loader.loadParam(estimator_name + "/address", address);
 
     try {
-      RCLCPP_INFO(node_->get_logger(), "[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+      RCLCPP_INFO(node_->get_logger(), "loading the estimator '%s'", address.c_str());
       estimator_list_.push_back(state_estimator_loader_->createSharedInstance(address.c_str()));
     }
     catch (pluginlib::CreateClassException& ex1) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: Error: %s", getName().c_str(), ex1.what());
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the estimator '%s'", address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
+      exit(1);
     }
     catch (pluginlib::PluginlibException& ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: Error: %s", getName().c_str(), ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the estimator '%s'", address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
+      exit(1);
     }
   }
 
@@ -975,7 +708,7 @@ void EstimationManager::timerInitialization() {
   is_using_agl_estimator_ = est_alt_agl_name_ != "";
 
   if (!is_using_agl_estimator_) {
-    RCLCPP_WARN(node_->get_logger(), "[%s]: not using AGL estimator for min height safe checking", getName().c_str());
+    RCLCPP_WARN(node_->get_logger(), "not using AGL estimator for min height safe checking");
   }
 
   if (is_using_agl_estimator_) {
@@ -987,23 +720,25 @@ void EstimationManager::timerInitialization() {
     param_loader.loadParam(est_alt_agl_name_ + "/address", address);
 
     try {
-      RCLCPP_INFO(node_->get_logger(), "[%s]: loading the estimator '%s'", getName().c_str(), address.c_str());
+      RCLCPP_INFO(node_->get_logger(), "loading the estimator '%s'", address.c_str());
       est_alt_agl_ = agl_estimator_loader_->createSharedInstance(address.c_str());
     }
     catch (pluginlib::CreateClassException& ex1) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: CreateClassException for the estimator '%s'", getName().c_str(), address.c_str());
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: Error: %s", getName().c_str(), ex1.what());
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the estimator '%s'", address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
+      exit(1);
     }
     catch (pluginlib::PluginlibException& ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: PluginlibException for the estimator '%s'", getName().c_str(), address.c_str());
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: Error: %s", getName().c_str(), ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the estimator '%s'", address.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
+      exit(1);
     }
   }
   /*//}*/
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: estimators were loaded", getName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "estimators were loaded");
   /*//}*/
 
   /*//{ check whether initial estimator was loaded */
@@ -1018,70 +753,70 @@ void EstimationManager::timerInitialization() {
   }
 
   if (!initial_estimator_found) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: initial estimator %s could not be found among loaded estimators. shutting down", getName().c_str(),
-                 initial_estimator_name_.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "initial estimator %s could not be found among loaded estimators. shutting down", initial_estimator_name_.c_str());
     rclcpp::shutdown();
+    exit(1);
   }
   /*//}*/
 
   /*//{ initialize estimators */
   for (auto estimator : estimator_list_) {
-
     rclcpp::Node::SharedPtr subnode = node_->create_sub_node(estimator->getName());
 
     // create private handlers
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + estimator->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, estimator->getName());
     ph->param_loader->copyYamls(param_loader);
     ph->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
 
     try {
-      RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), estimator->getName().c_str());
+      RCLCPP_INFO(node_->get_logger(), "initializing the estimator '%s'", estimator->getName().c_str());
       estimator->initialize(subnode, ch_, ph);
     }
     catch (std::runtime_error& ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator initialization: '%s'", ex.what());
       rclcpp::shutdown();
+      exit(1);
     }
 
     if (!estimator->isCompatibleWithHwApi(hw_api_capabilities)) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(),
-                   estimator->getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "estimator %s is not compatible with the hw api. Shutting down.", estimator->getName().c_str());
       rclcpp::shutdown();
+      exit(1);
     }
   }
 
   // | ----------- agl height estimator initialization ---------- |
   if (is_using_agl_estimator_) {
-
     rclcpp::Node::SharedPtr subnode = node_->create_sub_node(est_alt_agl_->getName());
 
     std::shared_ptr<mrs_uav_managers::estimation_manager::PrivateHandlers_t> ph = std::make_shared<mrs_uav_managers::estimation_manager::PrivateHandlers_t>();
 
     ph->loadConfigFile = std::bind(&EstimationManager::loadConfigFile, this, std::placeholders::_1);
-    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, "EstimationManager/" + est_alt_agl_->getName());
+    ph->param_loader   = std::make_unique<mrs_lib::ParamLoader>(subnode, est_alt_agl_->getName());
     ph->param_loader->copyYamls(param_loader);
     ph->param_loader->setPrefix(ch_->package_name + "/" + Support::toSnakeCase(ch_->nodelet_name) + "/");
 
     try {
-      RCLCPP_INFO(node_->get_logger(), "[%s]: initializing the estimator '%s'", getName().c_str(), est_alt_agl_->getName().c_str());
+      RCLCPP_INFO(node_->get_logger(), "initializing the estimator '%s'", est_alt_agl_->getName().c_str());
       est_alt_agl_->initialize(subnode, ch_, ph);
     }
     catch (std::runtime_error& ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: exception caught during estimator initialization: '%s'", getName().c_str(), ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator initialization: '%s'", ex.what());
       rclcpp::shutdown();
+      exit(1);
     }
 
     if (!est_alt_agl_->isCompatibleWithHwApi(hw_api_capabilities)) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: estimator %s is not compatible with the hw api. Shutting down.", getName().c_str(),
-                   est_alt_agl_->getName().c_str());
+      RCLCPP_ERROR(node_->get_logger(), "estimator %s is not compatible with the hw api. Shutting down.", est_alt_agl_->getName().c_str());
       rclcpp::shutdown();
+      exit(1);
     }
   }
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: estimators were initialized", getName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "estimators were initialized");
 
   /*//}*/
 
@@ -1132,12 +867,12 @@ void EstimationManager::timerInitialization() {
 
   /*//{ initialize service servers */
 
-  srvs_change_estimator_ = node_->create_service<mrs_msgs::srv::String>(
-      "~/change_estimator_in", std::bind(&EstimationManager::callbackChangeEstimator, this, std::placeholders::_1, std::placeholders::_2),
+  srvs_change_estimator_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
+      node_, "~/change_estimator_in", std::bind(&EstimationManager::callbackChangeEstimator, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  srvs_reset_estimator_ = node_->create_service<mrs_msgs::srv::String>(
-      "~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2),
+  srvs_reset_estimator_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
+      node_, "~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   srvs_set_world_origin_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
@@ -1160,18 +895,325 @@ void EstimationManager::timerInitialization() {
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "Could not load all non-optional parameters. Shutting down.");
     rclcpp::shutdown();
+    exit(1);
   }
 
   sm_->changeState(StateMachine::INITIALIZED_STATE);
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getName().c_str());
+  RCLCPP_INFO(node_->get_logger(), "initialized");
+}
 
-  timer_initialization_->cancel();
-}  // namespace estimation_manager
+//}
 
-/*//}*/
+// --------------------------------------------------------------
+// |                          callbacks                         |
+// --------------------------------------------------------------
+
+// | --------------------- timer callbacks -------------------- |
+
+/* timerPublish() //{ */
+
+void EstimationManager::timerPublish() {
+
+  if (!sm_->isInitialized()) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerPublish", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+    RCLCPP_WARN(node_->get_logger(), "Not publishing during estimator switching.");
+    return;
+  }
+
+  if (!sm_->isInPublishableState()) {
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not publishing uav state in %s", sm_->getCurrentStateString().c_str());
+    return;
+  }
+
+  mrs_msgs::msg::UavState uav_state;
+  auto                    ret = active_estimator_->getUavState();
+  if (ret) {
+    uav_state = ret.value();
+  } else {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
+    return;
+  }
+
+  if (!Support::noNans(uav_state.pose.orientation)) {
+    RCLCPP_ERROR(node_->get_logger(), "NaN in uav state orientation");
+    return;
+  }
+
+  if (active_estimator_->isMitigatingJump()) {
+    estimator_switch_count_++;
+  }
+  uav_state.estimator_iteration = estimator_switch_count_;
+
+  scope_timer.checkpoint("get uav state");
+  // TODO state health checks
+
+  ph_uav_state_.publish(uav_state);
+
+  scope_timer.checkpoint("pub uav state");
+  nav_msgs::msg::Odometry odom_main = Support::uavStateToOdom(uav_state);
+
+  scope_timer.checkpoint("uav state to odom");
+  const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
+  for (size_t i = 0; i < pose_covariance.size(); i++) {
+    odom_main.pose.covariance[i] = pose_covariance[i];
+  }
+
+  const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
+  for (size_t i = 0; i < twist_covariance.size(); i++) {
+    odom_main.twist.covariance[i] = twist_covariance[i];
+  }
+
+  scope_timer.checkpoint("get covariance");
+  ph_odom_main_.publish(odom_main);
+
+  nav_msgs::msg::Odometry innovation = active_estimator_->getInnovation();
+  ph_innovation_.publish(innovation);
+
+
+  mrs_msgs::msg::Float64Stamped agl_height;
+
+  if (is_using_agl_estimator_) {
+    agl_height = est_alt_agl_->getUavAglHeight();
+    ph_altitude_agl_.publish(agl_height);
+  }
+}
+
+//}
+
+/* timerPublishDiagnostics() //{ */
+
+void EstimationManager::timerPublishDiagnostics() {
+
+  if (!sm_->isInitialized()) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerPublishDiagnostics", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+    RCLCPP_WARN(node_->get_logger(), "Not publishing diagnostics during estimator switching.");
+    return;
+  }
+
+  if (!sm_->isInPublishableState()) {
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not publishing uav state in %s", sm_->getCurrentStateString().c_str());
+    return;
+  }
+
+  mrs_msgs::msg::UavState uav_state;
+  auto                    ret = active_estimator_->getUavState();
+  if (ret) {
+    uav_state = ret.value();
+  } else {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
+    return;
+  }
+
+  if (!Support::noNans(uav_state.pose.orientation)) {
+    RCLCPP_ERROR(node_->get_logger(), "NaN in uav state orientation");
+    return;
+  }
+
+  mrs_msgs::msg::Float64Stamped agl_height;
+
+  if (is_using_agl_estimator_) {
+    agl_height = est_alt_agl_->getUavAglHeight();
+    ph_altitude_agl_.publish(agl_height);
+  }
+
+  mrs_msgs::msg::Float64Stamped max_flight_z_msg;
+  max_flight_z_msg.header.stamp = clock_->now();
+  if (active_estimator_ && active_estimator_->isInitialized()) {
+    max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
+    max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
+  }
+  max_flight_z_ = max_flight_z_msg.value;
+  ph_max_flight_z_.publish(max_flight_z_msg);
+
+  // publish diagnostics
+  mrs_msgs::msg::EstimationDiagnostics diagnostics;
+
+  diagnostics.header.stamp   = uav_state.header.stamp;
+  diagnostics.child_frame_id = uav_state.child_frame_id;
+
+  diagnostics.pose         = uav_state.pose;
+  diagnostics.velocity     = uav_state.velocity;
+  diagnostics.acceleration = uav_state.acceleration;
+
+  diagnostics.sm_state                 = sm_->getCurrentStateString();
+  diagnostics.max_flight_z             = max_flight_z_msg.value;
+  diagnostics.estimator_iteration      = estimator_switch_count_;
+  diagnostics.estimation_rate          = ch_->desired_uav_state_rate;
+  diagnostics.running_state_estimators = estimator_names_;
+
+  {
+    std::scoped_lock lock(mutex_switchable_estimator_names_);
+    diagnostics.switchable_state_estimators = switchable_estimator_names_;
+  }
+
+  if (active_estimator_ && active_estimator_->isInitialized()) {
+    diagnostics.header.frame_id         = active_estimator_->getFrameId();
+    diagnostics.current_state_estimator = active_estimator_->getName();
+  } else {
+    diagnostics.header.frame_id         = "";
+    diagnostics.current_state_estimator = "";
+  }
+
+  diagnostics.estimator_horizontal = uav_state.estimator_horizontal;
+  diagnostics.estimator_vertical   = uav_state.estimator_vertical;
+  diagnostics.estimator_heading    = uav_state.estimator_heading;
+
+  if (is_using_agl_estimator_) {
+    diagnostics.estimator_agl_height = est_alt_agl_name_;
+    diagnostics.agl_height           = agl_height.value;
+  } else {
+    diagnostics.estimator_agl_height = "NOT_USED";
+    diagnostics.agl_height           = std::nanf("");
+  }
+
+  diagnostics.platform_config = _platform_config_;
+  diagnostics.custom_config   = _custom_config_;
+
+  ph_diagnostics_.publish(diagnostics);
+
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "%s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.",
+                       sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
+                       active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
+}
+
+//}
+
+/* timerCheckHealth() //{ */
+
+void EstimationManager::timerCheckHealth() {
+
+  if (!sm_->isInitialized()) {
+    return;
+  }
+
+  mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerCheckHealth", ch_->scope_timer.logger, ch_->scope_timer.enabled);
+
+  /*//{ start ready estimators, check switchable estimators */
+
+  std::vector<std::string> switchable_estimator_names;
+  for (auto estimator : estimator_list_) {
+
+    if (estimator->isReady()) {
+      try {
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "starting the estimator '%s'", estimator->getName().c_str());
+        estimator->start();
+      }
+      catch (std::runtime_error& ex) {
+        RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator starting: '%s'", ex.what());
+        rclcpp::shutdown();
+        exit(1);
+      }
+    }
+
+    if (estimator->isRunning() && estimator->getName() != "dummy" && estimator->getName() != "ground_truth") {
+      switchable_estimator_names.push_back(estimator->getName());
+    }
+  }
+
+  {
+    std::scoped_lock lock(mutex_switchable_estimator_names_);
+    switchable_estimator_names_ = switchable_estimator_names;
+  }
+
+  if (is_using_agl_estimator_ && est_alt_agl_->isReady()) {
+    est_alt_agl_->start();
+  }
+
+  /*//}*/
+
+  if (!callbacks_disabled_by_service_ &&
+      (sm_->isInState(StateMachine::FLYING_STATE) || sm_->isInState(StateMachine::HOVER_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE))) {
+    callbacks_enabled_ = true;
+  } else {
+    callbacks_enabled_ = false;
+  }
+
+  // TODO fuj if, zmenit na switch
+  // activate initial estimator
+  if (sm_->isInState(StateMachine::INITIALIZED_STATE) && initial_estimator_->isRunning()) {
+    std::scoped_lock lock(mutex_active_estimator_);
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "activating the initial estimator %s", initial_estimator_->getName().c_str());
+    active_estimator_ = initial_estimator_;
+    active_estimator_->setActive(true);
+    if (active_estimator_->getName() == "dummy") {
+      sm_->changeState(StateMachine::DUMMY_STATE);
+    } else {
+      if (!is_using_agl_estimator_ || est_alt_agl_->isRunning()) {
+        sm_->changeState(StateMachine::READY_FOR_FLIGHT_STATE);
+      } else {
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s agl estimator: %s to be running", Support::waiting_for_string.c_str(),
+                             est_alt_agl_->getName().c_str());
+      }
+    }
+  }
+
+  // active estimator is in faulty state, we need to switch to healthy estimator
+  if (sm_->isInSwitchableState() && active_estimator_->isError()) {
+    sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
+  }
+
+  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
+    if (switchToHealthyEstimator()) {
+      sm_->changeToPreSwitchState();
+    } else {  // cannot switch to healthy estimator - failsafe necessary
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
+      sm_->changeState(StateMachine::FAILSAFE_STATE);
+    }
+  }
+
+  if (sm_->isInState(StateMachine::FAILSAFE_STATE)) {
+    if (!failsafe_call_succeeded_ && callFailsafeService()) {
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "failsafe called successfully");
+      failsafe_call_succeeded_ = true;
+    }
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "we are in failsafe state");
+  }
+
+  // standard takeoff
+  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == takeoff_tracker_name_) {
+      sm_->changeState(StateMachine::TAKING_OFF_STATE);
+    }
+  }
+
+  // midair activation
+  if (sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker == after_midair_activation_tracker_name_) {
+      sm_->changeState(StateMachine::FLYING_STATE);
+    }
+  }
+
+  if (sm_->isInState(StateMachine::TAKING_OFF_STATE)) {
+    if (sh_control_manager_diag_.hasMsg() && sh_control_manager_diag_.getMsg()->active_tracker != takeoff_tracker_name_) {
+      sm_->changeState(StateMachine::FLYING_STATE);
+    }
+  }
+
+  if (sm_->isInState(StateMachine::FLYING_STATE)) {
+    if (!sh_control_input_.hasMsg()) {
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
+                           "not received control input since starting EstimationManager, estimation suboptimal, potentially unstable");
+    } else if ((clock_->now() - sh_control_input_.lastMsgTime()).seconds() > 0.1) {
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not received control input for %.4fs, estimation suboptimal, potentially unstable",
+                           (clock_->now() - sh_control_input_.lastMsgTime()).seconds());
+    }
+  }
+}
+
+//}
 
 /* shutdown() //{ */
 
@@ -1223,7 +1265,8 @@ void EstimationManager::shutdown() {
 
 // | -------------------- service callbacks ------------------- |
 
-/*//{ callbackChangeEstimator() */
+/* callbackChangeEstimator() //{ */
+
 bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
@@ -1235,7 +1278,7 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
   if (!callbacks_enabled_ && active_estimator_->getName() != "vins_kickoff") {
     response->success = false;
     response->message = ("Service callbacks are disabled");
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    RCLCPP_WARN(node_->get_logger(), "Ignoring service call. Callbacks are disabled.");
     return true;
   }
 
@@ -1245,7 +1288,7 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
     std::stringstream ss;
     ss << "Switching to " << request->value << " estimator is not allowed.";
     response->message = ss.str();
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Switching to %s estimator is not allowed.", getName().c_str(), request->value.c_str());
+    RCLCPP_WARN(node_->get_logger(), "Switching to %s estimator is not allowed.", request->value.c_str());
     return true;
   }
 
@@ -1269,14 +1312,14 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
       switchToEstimator(target_estimator);
       sm_->changeToPreSwitchState();
     } else {
-      RCLCPP_WARN(node_->get_logger(), "[%s]: Switch to not running estimator %s requested", getName().c_str(), request->value.c_str());
+      RCLCPP_WARN(node_->get_logger(), "Switch to not running estimator %s requested", request->value.c_str());
       response->success = false;
       response->message = ("Requested estimator is not running");
       return true;
     }
 
   } else {
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Switch to invalid estimator %s requested", getName().c_str(), request->value.c_str());
+    RCLCPP_WARN(node_->get_logger(), "Switch to invalid estimator %s requested", request->value.c_str());
     response->success = false;
     response->message = ("Not a valid estimator type");
     return true;
@@ -1290,9 +1333,11 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
 
   return true;
 }
-/*//}*/
 
-/*//{ callbackResetEstimator() */
+//}
+
+/* callbackResetEstimator() //{ */
+
 bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
                                                const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
@@ -1303,10 +1348,9 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
   if (!callbacks_enabled_) {
     response->success = false;
     response->message = ("Service callbacks are disabled");
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
+    RCLCPP_WARN(node_->get_logger(), "Ignoring service call. Callbacks are disabled.");
     return true;
   }
-
 
   bool                                              target_estimator_found = false;
   std::shared_ptr<mrs_uav_managers::StateEstimator> target_estimator;
@@ -1320,24 +1364,23 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 
   if (target_estimator_found) {
 
-
     if (target_estimator->getName() == active_estimator_->getName()) {
       response->success = false;
       response->message = ("Cannot reset active estimator");
-      RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Cannot reset active estimator.", getName().c_str());
+      RCLCPP_WARN(node_->get_logger(), "Ignoring service call. Cannot reset active estimator.");
       return true;
     }
 
     target_estimator->reset();
-    RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Estimator %s reset", target_estimator->getName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "Estimator %s reset", target_estimator->getName().c_str());
 
     double t_wait_left = 5;
     while (t_wait_left > 0) {
-      RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Attempting starting %s estimator", target_estimator->getName().c_str());
+      RCLCPP_INFO(node_->get_logger(), "Attempting starting %s estimator", target_estimator->getName().c_str());
       target_estimator->start();
 
       if (target_estimator->isRunning()) {
-        RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Reset of %s estimator successful", target_estimator->getName().c_str());
+        RCLCPP_INFO(node_->get_logger(), "Reset of %s estimator successful", target_estimator->getName().c_str());
         break;
       }
 
@@ -1347,7 +1390,7 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
     }
 
   } else {
-    RCLCPP_WARN(node_->get_logger(), "[%s]: Reset of invalid estimator %s requested", getName().c_str(), request->value.c_str());
+    RCLCPP_WARN(node_->get_logger(), "Reset of invalid estimator %s requested", request->value.c_str());
     response->success = false;
     response->message = ("Not a valid estimator type");
     return true;
@@ -1358,7 +1401,6 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 
   return true;
 }
-/*//}*/
 
 /*//{ callbackSetWorldOrigin() */
 bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
@@ -1462,7 +1504,7 @@ bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std
                                                        const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!sm_->isInitialized()) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: service for toggling callbacks is not available before initialization.", getName().c_str());
+    RCLCPP_ERROR(node_->get_logger(), "service for toggling callbacks is not available before initialization.");
     return false;
   }
 
@@ -1473,11 +1515,11 @@ bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std
 
   if (callbacks_disabled_by_service_) {
 
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Service callbacks disabled.", getName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "Service callbacks disabled.");
 
   } else {
 
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Service callbacks enabled", getName().c_str());
+    RCLCPP_INFO(node_->get_logger(), "Service callbacks enabled");
   }
 
   return true;
@@ -1485,12 +1527,12 @@ bool EstimationManager::callbackToggleServiceCallbacks(const std::shared_ptr<std
 
 //}
 
-
 // --------------------------------------------------------------
 // |                        other methods                       |
 // --------------------------------------------------------------
-//
-/*//{ switchToHealthyEstimator() */
+
+/* switchToHealthyEstimator() //{ */
+
 bool EstimationManager::switchToHealthyEstimator() {
 
   // available estimators should be specified in decreasing priority order in config file
@@ -1500,24 +1542,30 @@ bool EstimationManager::switchToHealthyEstimator() {
       return true;
     }
   }
+
   return false;  // no other estimator is running
 }
-/*//}*/
 
-/*//{ switchToEstimator() */
+//}
+
+/* switchToEstimator() //{ */
+
 void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator) {
 
   std::scoped_lock lock(mutex_active_estimator_);
-  RCLCPP_INFO(node_->get_logger(), "[%s]: switching estimator from %s to %s", getName().c_str(), active_estimator_->getName().c_str(),
-              target_estimator->getName().c_str());
+
+  RCLCPP_INFO(node_->get_logger(), "switching estimator from %s to %s", active_estimator_->getName().c_str(), target_estimator->getName().c_str());
+
   active_estimator_->setActive(false);
   active_estimator_ = target_estimator;
   active_estimator_->setActive(true);
   estimator_switch_count_++;
 }
-/*//}*/
 
-/*//{ callFailsafeService() */
+//}
+
+/* callFailsafeService() //{ */
+
 bool EstimationManager::callFailsafeService() {
 
   auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
@@ -1530,13 +1578,16 @@ bool EstimationManager::callFailsafeService() {
 
   return true;
 }
-/*//}*/
 
-/*//{ getName() */
+//}
+
+/* getName() //{ */
+
 std::string EstimationManager::getName() const {
   return nodelet_name_;
 }
-/*//}*/
+
+//}
 
 /* loadConfigFile() //{ */
 
@@ -1544,7 +1595,7 @@ bool EstimationManager::loadConfigFile(const std::string& file_path) {
 
   const std::string name_space = std::string(node_->get_namespace()) + "/";
 
-  RCLCPP_INFO(node_->get_logger(), "[%s]: loading '%s' under the namespace '%s'", getName().c_str(), file_path.c_str(), name_space.c_str());
+  RCLCPP_INFO(node_->get_logger(), "'%s' under the namespace '%s'", file_path.c_str(), name_space.c_str());
 
   // load the user-requested file
   {
@@ -1552,7 +1603,7 @@ bool EstimationManager::loadConfigFile(const std::string& file_path) {
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load '%s'", getName().c_str(), file_path.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load '%s'", file_path.c_str());
       return false;
     }
   }
@@ -1563,7 +1614,7 @@ bool EstimationManager::loadConfigFile(const std::string& file_path) {
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load the platform config file '%s'", getName().c_str(), _platform_config_.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load the platform config file '%s'", _platform_config_.c_str());
       return false;
     }
   }
@@ -1574,7 +1625,7 @@ bool EstimationManager::loadConfigFile(const std::string& file_path) {
     int         result  = std::system(command.c_str());
 
     if (result != 0) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load the custom config file '%s'", getName().c_str(), _custom_config_.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "failed to load the custom config file '%s'", _custom_config_.c_str());
       return false;
     }
   }

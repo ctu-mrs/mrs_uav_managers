@@ -9,12 +9,14 @@
 #include <mrs_msgs/msg/gain_manager_diagnostics.hpp>
 #include <mrs_msgs/srv/string.hpp>
 
+#include <mrs_lib/node.h>
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/scope_timer.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
+#include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
 
 #include <rcl_interfaces/srv/set_parameters.hpp>
@@ -58,7 +60,7 @@ typedef struct
 
 } Gains_t;
 
-class GainManager : public rclcpp::Node {
+class GainManager : public mrs_lib::Node {
 
 public:
   GainManager(rclcpp::NodeOptions options);
@@ -71,9 +73,6 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
-
-  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
-  void                         timerPreInitialization();
 
   void initialize();
 
@@ -103,7 +102,7 @@ private:
 
   bool setGains(std::string gains_name);
 
-  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr service_server_set_gains_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> ss_set_gains_;
 
   bool callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
@@ -142,30 +141,11 @@ private:
 
 //}
 
-/* GainManager::GainManager() //{ */
+/* GainManager() //{ */
 
-GainManager::GainManager(rclcpp::NodeOptions options) : Node("control_manager", options) {
+GainManager::GainManager(rclcpp::NodeOptions options) : mrs_lib::Node("control_manager", options) {
 
-  timer_preinitialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&GainManager::timerPreInitialization, this));
-}
-
-//}
-
-/* timerPreInitialization() //{ */
-
-void GainManager::timerPreInitialization() {
-
-  node_  = this->shared_from_this();
-  clock_ = node_->get_clock();
-
-  cbkgrp_subs_   = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_     = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-
-  initialize();
-
-  timer_preinitialization_->cancel();
+  this->initialize();
 }
 
 //}
@@ -174,11 +154,17 @@ void GainManager::timerPreInitialization() {
 
 void GainManager::initialize() {
 
-  RCLCPP_INFO(node_->get_logger(), "[GainManager]: initializing");
+  node_  = this_node_ptr();
+  clock_ = node_->get_clock();
+
+  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   // | ------------------------- params ------------------------- |
 
-  mrs_lib::ParamLoader param_loader(node_, "GainManager");
+  mrs_lib::ParamLoader param_loader(node_);
 
   std::string custom_config_path;
   std::string platform_config_path;
@@ -221,7 +207,7 @@ void GainManager::initialize() {
   // loading gain_names
   for (it = _gain_names_.begin(); it != _gain_names_.end(); ++it) {
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "[GainManager]: loading gains '" << *it << "'");
+    RCLCPP_INFO_STREAM(node_->get_logger(), "loading gains '" << *it << "'");
 
     Gains_t new_gains;
 
@@ -255,7 +241,7 @@ void GainManager::initialize() {
     std::vector<std::string>::iterator it2;
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _gain_names_)) {
-        RCLCPP_ERROR(node_->get_logger(), "[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
+        RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
         rclcpp::shutdown();
         exit(1);
       }
@@ -271,7 +257,7 @@ void GainManager::initialize() {
     param_loader.loadParam(yaml_prefix + "default_gains/" + *it, temp_str);
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
-      RCLCPP_ERROR(node_->get_logger(), "[GainManager]: the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
+      RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
       rclcpp::shutdown();
       exit(1);
     }
@@ -279,15 +265,16 @@ void GainManager::initialize() {
     _map_type_default_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
   }
 
-  RCLCPP_INFO(node_->get_logger(), "[GainManager]: done loading dynamical params");
+  RCLCPP_INFO(node_->get_logger(), "done loading dynamical params");
 
   current_gains_       = "";
   last_estimator_name_ = "";
 
   // | ------------------------ services ------------------------ |
 
-  service_server_set_gains_ = node_->create_service<mrs_msgs::srv::String>(
-      "~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_set_gains_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
+      node_, "~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
 
   sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out", cbkgrp_sc_);
 
@@ -336,16 +323,16 @@ void GainManager::initialize() {
   // | ----------------------- finish init ---------------------- |
 
   if (!param_loader.loadedSuccessfully()) {
-    RCLCPP_ERROR(node_->get_logger(), "[GainManager]: could not load all parameters!");
+    RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
     rclcpp::shutdown();
     exit(1);
   }
 
   is_initialized_ = true;
 
-  RCLCPP_INFO(node_->get_logger(), "[GainManager]: initialized");
+  RCLCPP_INFO(node_->get_logger(), "initialized");
 
-  RCLCPP_DEBUG(node_->get_logger(), "[GainManager]: debug output is enabled");
+  RCLCPP_DEBUG(node_->get_logger(), "debug output is enabled");
 }
 
 //}
@@ -362,7 +349,7 @@ bool GainManager::setGains(std::string gains_name) {
   it = _gains_.find(gains_name);
 
   if (it == _gains_.end()) {
-    RCLCPP_WARN(node_->get_logger(), "[GainManager]: can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
+    RCLCPP_WARN(node_->get_logger(), "can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
     return false;
   }
 
@@ -522,20 +509,20 @@ bool GainManager::setGains(std::string gains_name) {
     request->parameters.push_back(param);
   }
 
-  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: setting up gains for '%s'", gains_name.c_str());
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "setting up gains for '%s'", gains_name.c_str());
 
   auto response = sc_set_gains_.callSync(request);
 
   if (!response) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the service for setting gains has failed!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the service for setting gains has failed!");
     return false;
 
   } else {
 
     for (auto res : response.value()->results) {
       if (!res.successful) {
-        RCLCPP_ERROR(get_logger(), "could not set param: %s", res.reason.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "could not set param: %s", res.reason.c_str());
       }
     }
 
@@ -567,7 +554,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     ss << "missing estimation diagnostics";
 
-    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
     response->message = ss.str();
     response->success = false;
@@ -580,7 +567,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     ss << "the gains '" << request->value.c_str() << "' do not exist (in the GainManager's config)";
 
-    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
     response->message = ss.str();
     response->success = false;
@@ -591,7 +578,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     ss << "the gains '" << request->value.c_str() << "' are not allowed given the current state estimator";
 
-    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
     response->message = ss.str();
     response->success = false;
@@ -603,7 +590,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     ss << "the Se3Controller could not set the gains";
 
-    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
     response->message = ss.str();
     response->success = false;
@@ -613,7 +600,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     ss << "the gains '" << request->value.c_str() << "' are set";
 
-    RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: " << ss.str());
+    RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
     response->message = ss.str();
     response->success = true;
@@ -656,7 +643,7 @@ void GainManager::timerGainManagement() {
   // | --- automatically set _gains_ when currrent state estimator changes -- |
   if (estimation_diagnostics->current_state_estimator != last_estimator_name) {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "the state estimator has changed! %s -> %s", last_estimator_name_.c_str(),
                          estimation_diagnostics->current_state_estimator.c_str());
 
     std::map<std::string, std::string>::iterator it;
@@ -664,7 +651,7 @@ void GainManager::timerGainManagement() {
 
     if (it == _map_type_default_gains_.end()) {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the state estimator '%s' was not specified in the gain_manager's config!",
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the state estimator '%s' was not specified in the gain_manager's config!",
                            estimation_diagnostics->current_state_estimator.c_str());
 
     } else {
@@ -677,18 +664,18 @@ void GainManager::timerGainManagement() {
         // else, try to set the default gains
       } else {
 
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the current gains '%s' are not within the allowed gains for '%s'",
-                             current_gains.c_str(), estimation_diagnostics->current_state_estimator.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
+                             estimation_diagnostics->current_state_estimator.c_str());
 
         if (setGains(it->second)) {
 
           last_estimator_name = estimation_diagnostics->current_state_estimator;
 
-          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: gains set to default: '%s'", it->second.c_str());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "gains set to default: '%s'", it->second.c_str());
 
         } else {
 
-          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: could not set gains!");
+          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "could not set gains!");
         }
       }
     }
@@ -711,12 +698,12 @@ void GainManager::timerDiagnostics() {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "GainManager::timerDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[GainManager]: can not do gain management, missing estimator diagnostics!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do gain management, missing estimator diagnostics!");
     return;
   }
 
   if (!sh_control_manager_diag_.hasMsg()) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "[GainManager]: can not do gain management, missing control manager diagnostics!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do gain management, missing control manager diagnostics!");
     return;
   }
 
@@ -740,7 +727,7 @@ void GainManager::timerDiagnostics() {
     it = _map_type_allowed_gains_.find(estimation_diagnostics->current_state_estimator);
 
     if (it == _map_type_allowed_gains_.end()) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[GainManager]: the estimator name '%s' was not specified in the gain_manager's config!",
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the estimator name '%s' was not specified in the gain_manager's config!",
                            estimation_diagnostics->current_state_estimator.c_str());
     } else {
       diagnostics.available = it->second;
@@ -753,7 +740,7 @@ void GainManager::timerDiagnostics() {
     it = _gains_.find(current_gains);
 
     if (it == _gains_.end()) {
-      RCLCPP_ERROR(node_->get_logger(), "[GainManager]: current gains '%s' not found in the gain list!", current_gains.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "current gains '%s' not found in the gain list!", current_gains.c_str());
       return;
     }
 
