@@ -1,7 +1,8 @@
-/* //{ includes */
+/* includes //{ */
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <mrs_lib/node.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/publisher_handler.h>
@@ -33,7 +34,7 @@
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
-/*//}*/
+//}
 
 /* using //{ */
 
@@ -48,14 +49,13 @@ namespace transform_manager
 {
 
 /*//{ class TransformManager */
-class TransformManager : public rclcpp::Node {
+class TransformManager : public mrs_lib::Node {
 
   using Support = estimation_manager::Support;
 
 public:
   TransformManager(rclcpp::NodeOptions options);
 
-  void onInit();
   bool is_initialized_ = false;
 
   std::string getName() const;
@@ -68,8 +68,7 @@ private:
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
 
-  rclcpp::TimerBase::SharedPtr timer_initialization_;
-  void                         timerInitialization();
+  void initialize();
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -154,25 +153,26 @@ private:
 };
 /*//}*/
 
-/*//{ TransformManager() */
-TransformManager::TransformManager(rclcpp::NodeOptions options) : Node("estimation_manager", options) {
+/* TransformManager() //{ */
 
-  RCLCPP_INFO(get_logger(), "[%s]: initializing", getName().c_str());
+TransformManager::TransformManager(rclcpp::NodeOptions options) : mrs_lib::Node("estimation_manager", options) {
+
+  this->initialize();
+}
+
+//}
+
+/* initialize() //{ */
+
+void TransformManager::initialize() {
+
+  node_  = this_node_ptr();
+  clock_ = node_->get_clock();
 
   ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
 
   ch_->nodelet_name = nodelet_name_;
   ch_->package_name = package_name_;
-
-  timer_initialization_ = create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&TransformManager::timerInitialization, this));
-}
-/*//}*/
-
-/*//{ timerInitialization() */
-void TransformManager::timerInitialization() {
-
-  node_  = this->shared_from_this();
-  clock_ = node_->get_clock();
 
   cbkgrp_subs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -184,7 +184,7 @@ void TransformManager::timerInitialization() {
   ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
   ch_->transformer->retryLookupNewest(true);
 
-  mrs_lib::ParamLoader param_loader(node_, getPrintName());
+  mrs_lib::ParamLoader param_loader(node_);
 
   param_loader.loadParam("custom_config", _custom_config_);
   param_loader.loadParam("platform_config", _platform_config_);
@@ -478,12 +478,11 @@ void TransformManager::timerInitialization() {
 
   is_initialized_ = true;
   RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
-
-  timer_initialization_->cancel();
 }
-/*//}*/
 
-/*//{ callbackUavState() */
+//}
+
+/* callbackUavState() //{ */
 
 void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg) {
 
@@ -647,9 +646,10 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
 
   last_frame_id_ = msg->header.frame_id;
 }
-/*//}*/
 
-/*//{ callbackHeightAgl() */
+//}
+
+/* callbackHeightAgl() //{ */
 
 void TransformManager::callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::ConstSharedPtr msg) {
 
@@ -686,9 +686,10 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::Co
   RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
 }
-/*//}*/
 
-/*//{ callbackAmslAltitude() */
+//}
+
+/* callbackAltitudeAmsl() //{ */
 
 void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::msg::HwApiAltitude::ConstSharedPtr msg) {
 
@@ -698,9 +699,10 @@ void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::msg
 
   // Currently not used. Not clear what this message from hw_api should be for. Transform manager publishes the AMSL altitude from RTK or GNSS messages.
 }
-/*//}*/
 
-/*//{ publishAmslTf() */
+//}
+
+/* publishAmslTf() //{ */
 
 void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time& stamp) {
 
@@ -736,9 +738,11 @@ void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time& 
   RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
 }
-/*//}*/
 
-/*//{ callbackHwApiOrientation() */
+//}
+
+/* callbackHwApiOrientation() //{ */
+
 void TransformManager::callbackHwApiOrientation(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
@@ -751,9 +755,11 @@ void TransformManager::callbackHwApiOrientation(const geometry_msgs::msg::Quater
     publishFcuUntiltedTf(msg);
   }
 }
-/*//}*/
 
-/*//{ callbackGnss() */
+//}
+
+/* callbackGnss() //{ */
+
 void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
@@ -798,9 +804,11 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
 
   got_utm_offset_ = true;
 }
-/*//}*/
 
-/*//{ callbackRtkGps() */
+//}
+
+/* callbackRtkGps() //{ */
+
 void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
@@ -866,9 +874,11 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
 
   got_utm_offset_ = true;
 }
-/*//}*/
 
-/*//{ publishFcuUntiltedTf() */
+//}
+
+/* publishFcuUntiltedTf() //{ */
+
 void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg) {
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "TransformManager::publishFcuUntilted", ch_->scope_timer.logger, ch_->scope_timer.enabled);
@@ -909,9 +919,11 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::Quaternion
   }
   scope_timer.checkpoint("tf pub");
 }
-/*//}*/
 
-/* publishLocalTf() //{*/
+//}
+
+/* publishLocalTf() //{ */
+
 void TransformManager::publishLocalTf() {
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
@@ -942,9 +954,11 @@ void TransformManager::publishLocalTf() {
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
   is_local_static_tf_published_ = true;
 }
-/*//}*/
 
-/*//{ transformRtkToFcu() */
+//}
+
+/* transformRtkToFcu() //{ */
+
 std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::msg::PoseStamped& pose_in) const {
 
   geometry_msgs::msg::PoseStamped pose_tmp = pose_in;
@@ -986,19 +1000,24 @@ std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(cons
 
   return fcu_in_utm;
 }
-/*//}*/
 
-/*//{ getName() */
+//}
+
+/* getName() //{ */
+
 std::string TransformManager::getName() const {
   return name_;
 }
-/*//}*/
 
-/*//{ getPrintName() */
+//}
+
+/* getPrintName() //{ */
+
 std::string TransformManager::getPrintName() const {
   return nodelet_name_;
 }
-/*//}*/
+
+//}
 
 }  // namespace transform_manager
 
