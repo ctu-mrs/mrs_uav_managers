@@ -396,7 +396,7 @@ private:
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> srvs_reset_estimator_;
   bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
-  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr srvs_set_world_origin_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
   bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, 
       const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
@@ -411,14 +411,7 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvch_failsafe_;
   bool                                                  failsafe_call_succeeded_ = false;
 
-
   mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv> srvch_set_world_origin_;
-
-  // TODO service clients
-  /* mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvc_hover_; */
-  /* mrs_lib::ServiceClientHandler<mrs_msgs::msg::ReferenceStampedSrv> srvc_reference_; */
-  /* mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvc_ehover_; */
-  /* mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> srvc_enable_callbacks_; */
 
   // | ------------- dynamic loading of estimators ------------- |
 
@@ -875,12 +868,12 @@ void EstimationManager::initialize() {
       node_, "~/reset_estimator_in", std::bind(&EstimationManager::callbackResetEstimator, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  srvs_set_world_origin_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
-      "~/set_world_origin_in", std::bind(&EstimationManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
+  srvs_set_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
+      node_, "~/set_world_origin_in", std::bind(&EstimationManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  srvs_toggle_callbacks_ = node_->create_service<std_srvs::srv::SetBool>(
-      "~/toggle_service_callbacks_in", std::bind(&EstimationManager::callbackToggleServiceCallbacks, this, std::placeholders::_1, std::placeholders::_2),
+  srvs_toggle_callbacks_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
+      node_, "~/toggle_service_callbacks_in", std::bind(&EstimationManager::callbackToggleServiceCallbacks, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   /*//}*/
@@ -1426,18 +1419,18 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
       const double lon = request->reference.position.y;
       mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
 
-      RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Setting world origin to lat: %.6f lon: %.6f by service callback",
+      RCLCPP_INFO(node_->get_logger(), "Setting world origin to lat: %.6f lon: %.6f by service callback",
           request->reference.position.x, request->reference.position.y);
 
     } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
       world_origin_x = request->reference.position.x;
       world_origin_y = request->reference.position.y;
 
-      RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Setting world origin to x: %.2f y: %.2f UTM by service callback",
+      RCLCPP_INFO(node_->get_logger(),"Setting world origin to x: %.2f y: %.2f UTM by service callback",
           request->reference.position.x, request->reference.position.y);
 
     } else {
-      RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+      RCLCPP_INFO(node_->get_logger(),"Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
                 request->header.frame_id.c_str());
       response->success = false;
       response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
@@ -1450,15 +1443,15 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
     for (auto estimator : estimator_list_) {
 
       estimator->reset();
-      RCLCPP_INFO(node_->get_logger(), "[EstimationManager]: Estimator %s reset", estimator->getName().c_str());
+      RCLCPP_INFO(node_->get_logger(), "Estimator %s reset", estimator->getName().c_str());
 
       double t_wait_left = 5;
       while (t_wait_left > 0) {
-        RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Attempting starting %s estimator", estimator->getName().c_str());
+        RCLCPP_INFO(node_->get_logger(),"Attempting starting %s estimator", estimator->getName().c_str());
         estimator->start();
 
         if (estimator->isRunning()) {
-          RCLCPP_INFO(node_->get_logger(),"[EstimationManager]: Reset of %s estimator successful", estimator->getName().c_str());
+          RCLCPP_INFO(node_->get_logger(),"Reset of %s estimator successful", estimator->getName().c_str());
           break;
         }
 
@@ -1471,14 +1464,14 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
   auto res = srvch_set_world_origin_.callSync(request);
 
   if (!res.has_value() || !res.value()->success) {
-    RCLCPP_WARN(node_->get_logger(),"[EstimationManager]: Could not call TransformManager set_world_origin service.");
+    RCLCPP_WARN(node_->get_logger(),"Could not call TransformManager set_world_origin service.");
     response->success = false;
     response->message = "Could not call TransformManager set_world_origin service.";
     return true;
   }
 
   if (!res.value()->success) {
-    RCLCPP_WARN(node_->get_logger(), "[EstimationManager]: TransformManager could not set world origin.");
+    RCLCPP_WARN(node_->get_logger(), "TransformManager could not set world origin.");
     response->success = false;
     response->message = "TransformManager could not set world origin.";
     return true;

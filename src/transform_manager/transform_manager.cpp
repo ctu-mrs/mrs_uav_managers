@@ -6,6 +6,7 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/transform_broadcaster.h>
@@ -104,7 +105,7 @@ private:
   std::string               world_origin_units_;
   geometry_msgs::msg::Point world_origin_;
 
-  rclcpp::Service<mrs_msgs::srv::ReferenceStampedSrv>::SharedPtr srvs_set_world_origin_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
   bool               callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request, 
       const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
@@ -460,8 +461,8 @@ void TransformManager::initialize() {
   /*//}*/
 
 /*//{ initialize service servers*/
-  srvs_set_world_origin_ = node_->create_service<mrs_msgs::srv::ReferenceStampedSrv>(
-      "~/set_world_origin_in", std::bind(&TransformManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
+  srvs_set_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
+      node_, "~/set_world_origin_in", std::bind(&TransformManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 /*//}*/
 
@@ -906,13 +907,13 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
     const double lat = request->reference.position.x;
     const double lon = request->reference.position.y;
     mrs_lib::UTM(lat, lon, &world_origin.x, &world_origin.y);
-    RCLCPP_INFO(node_->get_logger(),"[TransformManager]: Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
+    RCLCPP_INFO(node_->get_logger(),"Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
   } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
     world_origin.x = request->reference.position.x;
     world_origin.y = request->reference.position.y;
-    RCLCPP_INFO(node_->get_logger(),"[TransformManager]: Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
+    RCLCPP_INFO(node_->get_logger(),"Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
   } else {
-    RCLCPP_WARN(node_->get_logger(),"[TransformManager]: Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+    RCLCPP_WARN(node_->get_logger(),"Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
               request->header.frame_id.c_str());
     response->success = false;
     response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
