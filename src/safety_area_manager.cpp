@@ -154,6 +154,7 @@ private:
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_max_z_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_min_z_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetBoolSrv> ss_is_safety_zone_enabled_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_update_world_origin_;
 
   // | ----------------------- subscribers ----------------------- |
 
@@ -204,6 +205,9 @@ private:
                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response);
   bool callbackIsSafetyZoneEnabled([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Request> request,
                                    std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Response> response);
+  bool callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+
 
   // | ----------------------- routines ----------------------- |
 
@@ -409,11 +413,18 @@ void SafetyAreaManager::initialize() {
       },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
+  ss_update_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
+      node_, "~/update_world_origin_in",
+      [this](std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+        callbackUpdateWorldOrigin(request, response);
+      },
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+
   // | ------------------------- timers ------------------------- |
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
-  timer_opts_start.node      = node_;
-  timer_opts_start.autostart = true;
+  timer_opts_start.node           = node_;
+  timer_opts_start.autostart      = true;
   timer_opts_start.callback_group = cbkgrp_timers_;
 
   {
@@ -971,7 +982,40 @@ bool SafetyAreaManager::callbackIsSafetyZoneEnabled([[maybe_unused]] const std::
 }
 
 //}
+//
+bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+                                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
+  if (!is_initialized_) {
+    response->success = false;
+    response->message = "Could not set world origin";
+    return true;
+  }
+
+  if (request->header.frame_id.find("latlon_origin") != std::string::npos) {
+    const double lat = request->reference.position.x;
+    const double lon = request->reference.position.y;
+    RCLCPP_INFO(node_->get_logger(), "Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
+  } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
+    RCLCPP_INFO(node_->get_logger(), "Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
+  } else {
+    RCLCPP_WARN(node_->get_logger(), "Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+                request->header.frame_id.c_str());
+    response->success = false;
+    response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
+    return true;
+  }
+
+  safety_zone_handler_.parameters.world_origin.x = request->reference.position.x;
+  safety_zone_handler_.parameters.world_origin.y = request->reference.position.y;
+  safety_zone_handler_.parameters.world_origin.units =
+      (request->header.frame_id.find("latlon_origin") != std::string::npos) ? "LATLON" : "UTM";
+
+  response->success = true;
+  response->message = "World origin set successfully";
+
+  return true;
+}
 // --------------------------------------------------------------
 // |                          routines                          |
 // --------------------------------------------------------------
@@ -983,8 +1027,6 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
     return false;
   }
 
-  // Reload parameters for every call, it can be called multiple times if using
-  // the Rviz plugin and loading different world configurations
   std::string world_origin_units;
   double origin_x;
   double origin_y;

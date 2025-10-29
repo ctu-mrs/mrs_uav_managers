@@ -206,6 +206,7 @@ def generate_launch_description():
             # services out
             ("~/failsafe_out", "control_manager/failsafe"),
             ("~/set_world_origin_out", "transform_manager/set_world_origin"),
+            ("~/update_world_origin_out", "safety_area_manager/update_world_origin"),
         ],
     )
 
