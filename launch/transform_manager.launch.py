@@ -186,6 +186,8 @@ def generate_launch_description():
             # publishers
             ("~/profiler", "profiler"),
             ("~/map_delay_out", "~/map_delay"),
+            # services in
+            ("~/set_world_origin_in", "~/set_world_origin"),
         ],
     )
 
