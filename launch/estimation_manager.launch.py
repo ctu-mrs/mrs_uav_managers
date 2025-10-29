@@ -200,10 +200,12 @@ def generate_launch_description():
             ("~/height_agl_out", "~/height_agl"),
             # services in
             ("~/change_estimator_in", "~/change_estimator"),
+            ("~/set_world_origin_in", "~/set_world_origin"),
             ("~/reset_estimator_in", "~/reset_estimator"),
             ("~/toggle_service_callbacks_in", "~/toggle_service_callbacks"),
             # services out
             ("~/failsafe_out", "control_manager/failsafe"),
+            ("~/set_world_origin_out", "transform_manager/set_world_origin"),
         ],
     )
 
