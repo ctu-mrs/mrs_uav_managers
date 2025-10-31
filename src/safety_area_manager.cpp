@@ -221,8 +221,8 @@ private:
                                                          const std::string &horizontal_frame, const std::string &vertical_frame);
   std::unique_ptr<mrs_lib::safety_zone::Prism> makePrism(const std::vector<mrs_msgs::msg::Point2D> &points, const double max_z, const double min_z,
                                                          const std::string &horizontal_frame, const std::string &vertical_frame);
-  std::vector<mrs_lib::safety_zone::Point2d> transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points, const std::string &from_frame,
-                                                             const std::string &to_frame);
+  std::tuple<std::vector<mrs_lib::safety_zone::Point2d>, bool> transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
+                                                                               const std::string &from_frame, const std::string &to_frame);
 
   double transformZ(const std::string &current_frame, const std::string &target_frame, const double z);
   bool initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
@@ -501,11 +501,15 @@ void SafetyAreaManager::timerStatus() {
     // Rebuild safety area according to new world origin, keeping the global coordinates of the previous world origin (if it was set given to the previous world
     // origin)
     std::scoped_lock lock(mutex_safety_area_);
-    auto current_border            = safety_zone_handler_.safety_zone->getBorder();
-    auto global_border             = safety_zone_handler_.global_safety_zone->getBorder();
-    const auto global_points       = global_border.getPoints();
-    auto transformed_border_points = transformPoints(global_points, global_border.getHorizontalFrame(), current_border.getHorizontalFrame());
+    auto current_border                       = safety_zone_handler_.safety_zone->getBorder();
+    auto global_border                        = safety_zone_handler_.global_safety_zone->getBorder();
+    const auto global_points                  = global_border.getPoints();
+    auto [transformed_border_points, success] = transformPoints(global_points, global_border.getHorizontalFrame(), current_border.getHorizontalFrame());
 
+    if (!success) {
+      RCLCPP_ERROR(node_->get_logger(), "Failed to re-initialize safety area after world origin change - could not transform border points.");
+      return;
+    }
     auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(transformed_border_points, global_border.getMaxZ(), global_border.getMinZ(),
                                                                           current_border.getHorizontalFrame(), current_border.getVerticalFrame());
     // Recompute Obstacles
@@ -513,8 +517,13 @@ void SafetyAreaManager::timerStatus() {
     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> new_obstacle_prisms;
     for (const auto &[key, global_obstacle_ptr] : global_obstacles_ptrs) {
       const auto &global_obstacle_points = global_obstacle_ptr->getPoints();
-      auto transformed_obstacle_points =
+      auto [transformed_obstacle_points, success] =
           transformPoints(global_obstacle_points, global_obstacle_ptr->getHorizontalFrame(), current_border.getHorizontalFrame());
+
+      if (!success) {
+        RCLCPP_ERROR(node_->get_logger(), "Failed to re-initialize safety area after world origin change - could not transform obstacle points.");
+        return;
+      }
 
       new_obstacle_prisms.push_back(std::make_unique<mrs_lib::safety_zone::Prism>(transformed_obstacle_points, global_obstacle_ptr->getMaxZ(),
                                                                                   global_obstacle_ptr->getMinZ(), current_border.getHorizontalFrame(),
@@ -665,8 +674,17 @@ bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv:
     return true;
   }
 
-  int id = safety_zone_handler_.safety_zone->addObstacle(
-      makePrism(request->prism.points, request->prism.max_z, request->prism.min_z, request->prism.horizontal_frame, request->prism.vertical_frame));
+  auto prism_ptr = makePrism(request->prism.points, request->prism.max_z, request->prism.min_z, request->prism.horizontal_frame,
+                             request->prism.vertical_frame); 
+
+  if (!prism_ptr) {
+    RCLCPP_WARN(node_->get_logger(), "Could not create prism from the provided message");
+    response->message = "Could not create prism from the provided message";
+    response->success = false;
+    return true;
+  }
+
+  int id = safety_zone_handler_.safety_zone->addObstacle(std::move(prism_ptr));
 
   safety_zone_handler_.visualization_components.static_edges.push_back(
       std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, request->prism.horizontal_frame, node_, 2));
@@ -1127,6 +1145,11 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   auto border = makePrism(border_points, max_z, min_z, horizontal_frame, vertical_frame);
 
+  if (!border) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to create border prism!");
+    return false;
+  }
+
   // Making obstacle prisms
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacles;
 
@@ -1169,11 +1192,11 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
       // Make obstacle prism
       auto prism = makePrism(obstacle, max_z, min_z, horizontal_frame, vertical_frame);
 
-      if (prism) {
-        obstacles.push_back(std::move(prism));
-      } else {
-        RCLCPP_WARN(node_->get_logger(), "Failed to create obstacle prism!");
+      if (!prism) {
+        RCLCPP_WARN(node_->get_logger(), "Failed to create obstacle prism %d!", i);
+        return false;
       }
+      obstacles.push_back(std::move(prism));
     }
   }
 
@@ -1228,6 +1251,11 @@ bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::msg::Prism &prism_
   // Make border prism
   auto border = makePrism(prism_msg.points, prism_msg.max_z, prism_msg.min_z, prism_msg.horizontal_frame, prism_msg.vertical_frame);
 
+  if (!border) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to create border prism!");
+    return false;
+  }
+
   auto new_safety_zone = keep_obstacles ? createSafetyZone(std::move(border), copyExistingObstacles()) : createSafetyZone(std::move(border), {});
 
   RCLCPP_INFO(node_->get_logger(), "New safety zone created");
@@ -1280,7 +1308,13 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
   const double border_max_z                 = safety_border.getMaxZ();
   const double border_min_z                 = safety_border.getMinZ();
 
-  auto transformed_border_points = transformPoints(points, border_horizontal_frame, "latlon_origin");
+  // auto transformed_border_points = transformPoints(points, border_horizontal_frame, "latlon_origin");
+  auto [transformed_border_points, success] = transformPoints(points, border_horizontal_frame, "latlon_origin");
+
+  if (!success) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to transform safety border points to latlon_origin frame.");
+    return std::nullopt;
+  }
 
   // Log the border points in latlon
   RCLCPP_INFO(node_->get_logger(), "Safety area border points in latlon_origin frame:");
@@ -1304,7 +1338,12 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
       tmp_obstacle.max_z            = obstacle_ptr->getMaxZ();
       tmp_obstacle.min_z            = obstacle_ptr->getMinZ();
 
-      auto transformed_obstacle_points = transformPoints(obstacle_points, tmp_obstacle.horizontal_frame, "latlon_origin");
+      auto [transformed_obstacle_points, success] = transformPoints(obstacle_points, tmp_obstacle.horizontal_frame, "latlon_origin");
+
+      if (!success) {
+        RCLCPP_WARN(node_->get_logger(), "Failed to transform obstacle points to latlon_origin frame.");
+        return std::nullopt;
+      }
 
       RCLCPP_INFO(node_->get_logger(), "Saved obstacle in latlon_origin frame:");
       for (const auto &point : transformed_obstacle_points) {
@@ -1365,7 +1404,13 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
     points.emplace_back(mrs_lib::safety_zone::Point2d{matrix(i, 0), matrix(i, 1)});
   }
 
-  auto transformed_points  = transformPoints(points, horizontal_frame, "world_origin");
+  auto [transformed_points, success] = transformPoints(points, horizontal_frame, "world_origin");
+
+  if (!success) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to transform prism points to world_origin frame.");
+    return nullptr;
+  }
+
   double transformed_max_z = transformZ(vertical_frame, "world_origin", max_z);
   double transformed_min_z = transformZ(vertical_frame, "world_origin", min_z);
 
@@ -1391,7 +1436,11 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
     tmp_points.emplace_back(mrs_lib::safety_zone::Point2d{point.x, point.y});
   }
 
-  auto transformed_points  = transformPoints(tmp_points, horizontal_frame, "world_origin");
+  auto [transformed_points, success] = transformPoints(tmp_points, horizontal_frame, "world_origin");
+  if (!success) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to transform prism points to world_origin frame.");
+    return nullptr;
+  }
   double transformed_max_z = transformZ(vertical_frame, "world_origin", max_z);
   double transformed_min_z = transformZ(vertical_frame, "world_origin", min_z);
   return std::make_unique<mrs_lib::safety_zone::Prism>(transformed_points, transformed_max_z, transformed_min_z, "world_origin", "world_origin");
@@ -1401,10 +1450,11 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
 
 /* transformPoints() //{ */
 
-std::vector<mrs_lib::safety_zone::Point2d> SafetyAreaManager::transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
-                                                                              const std::string &from_frame, const std::string &to_frame) {
+std::tuple<std::vector<mrs_lib::safety_zone::Point2d>, bool> SafetyAreaManager::transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
+                                                                                                const std::string &from_frame, const std::string &to_frame) {
 
   std::vector<mrs_lib::safety_zone::Point2d> transformed_points;
+  transformed_points.reserve(points.size());
   mrs_msgs::msg::ReferenceStamped reference_tmp;
 
   for (const auto &point : points) {
@@ -1417,10 +1467,13 @@ std::vector<mrs_lib::safety_zone::Point2d> SafetyAreaManager::transformPoints(co
     if (auto transformed_reference = transformer_->transformSingle(reference_tmp, to_frame)) {
       reference_tmp = transformed_reference.value();
       transformed_points.emplace_back(mrs_lib::safety_zone::Point2d{reference_tmp.reference.position.x, reference_tmp.reference.position.y});
+    } else {
+      RCLCPP_WARN(node_->get_logger(), "Could not transform point from %s to %s.", from_frame.c_str(), to_frame.c_str());
+      return std::make_tuple(std::vector<mrs_lib::safety_zone::Point2d>{}, false);
     }
   }
 
-  return transformed_points;
+  return std::make_tuple(transformed_points, true);
 }
 
 //}
