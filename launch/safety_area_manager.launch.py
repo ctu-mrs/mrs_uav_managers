@@ -252,6 +252,7 @@ def generate_launch_description():
             ("~/get_min_z_in", "~/get_min_z"),
             ("~/is_safety_zone_enabled", "~/is_safety_zone_enabled"),
             ("~/update_world_origin_in", "~/update_world_origin"),
+            ("~/set_world_origin_out", "estimation_manager/set_world_origin"),
 
 
         ],
