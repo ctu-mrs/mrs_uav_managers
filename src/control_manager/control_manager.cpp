@@ -6097,7 +6097,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
           if (processed_trajectory.points.at(i).position.z < min_z) {
 
             processed_trajectory.points.at(i).position.z = min_z;
-            RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the trajectory violates the maximum Z!");
+            RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the trajectory violates the minimum Z!");
             trajectory_modified = true;
           }
 

@@ -678,7 +678,7 @@ bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv:
       std::make_unique<mrs_lib::StaticEdgesVisualization>(safety_zone_handler_.safety_zone.get(), id, _uav_name_, request->prism.horizontal_frame, node_, 2));
 
   RCLCPP_INFO(node_->get_logger(), "Obstacle loaded successfully");
-  response->message = "Succesfully added the obstacle";
+  response->message = "Successfully added the obstacle";
   response->success = true;
   return true;
 }
@@ -766,7 +766,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
   }
 
   RCLCPP_INFO(node_->get_logger(), "New safety border, with %lu vertices.", request->prism.points.size());
-  response->message = "Succesfully loaded safety border msg.";
+  response->message = "Successfully loaded safety border msg.";
   response->success = true;
   return true;
 }
