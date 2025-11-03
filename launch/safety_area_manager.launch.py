@@ -244,7 +244,7 @@ def generate_launch_description():
             ("~/point_in_safety_area_2d_in", "~/point_in_safety_area_2d"),
             ("~/path_in_safety_area_3d_in", "~/path_in_safety_area_3d"),
             ("~/path_in_safety_area_2d_in", "~/path_in_safety_area_2d"),
-            ("~/set_use_safety_area_in", "~/set_use_safety_area"),
+            ("~/toggle_safety_area_in", "~/toggle_safety_area"),
             ("~/set_safety_border_in", "~/set_safety_border"),
             ("~/add_obstacle_in", "~/add_obstacle"),
             ("~/set_obstacle_in", "~/set_obstacle"),

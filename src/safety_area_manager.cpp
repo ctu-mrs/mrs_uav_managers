@@ -37,7 +37,7 @@
 #include <mrs_msgs/msg/safety_area_manager_diagnostics.hpp>
 #include <mrs_msgs/srv/get_bool_srv.hpp>
 #include <mrs_msgs/srv/get_reference_stamped_srv.hpp>
-#include <mrs_msgs/srv/prism_srv.hpp>
+#include <mrs_msgs/srv/set_obstacle_srv.hpp>
 #include <mrs_msgs/srv/set_safety_border_srv.hpp>
 #include <mrs_msgs/srv/validate_path_to_point_srv.hpp>
 
@@ -141,7 +141,7 @@ private:
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetSafetyBorderSrv> ss_set_safety_border_;
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> ss_toggle_safety_area_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_add_obstacle_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::PrismSrv> ss_set_obstacle_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetObstacleSrv> ss_set_obstacle_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_max_z_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_min_z_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetBoolSrv> ss_is_safety_zone_enabled_;
@@ -192,7 +192,7 @@ private:
                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
                            const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::PrismSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::PrismSrv::Response> response);
+  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response);
   bool callbackGetMaxZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response);
   bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
@@ -371,7 +371,7 @@ void SafetyAreaManager::initialize() {
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   ss_toggle_safety_area_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
-      node_, "~/set_use_safety_area_in",
+      node_, "~/toggle_safety_area_in",
       [this](std::shared_ptr<std_srvs::srv::SetBool::Request> request, std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
         callbackToggleSafetyArea(request, response);
       },
@@ -384,9 +384,9 @@ void SafetyAreaManager::initialize() {
       },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  ss_set_obstacle_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::PrismSrv>(
+  ss_set_obstacle_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetObstacleSrv>(
       node_, "~/set_obstacle_in",
-      [this](std::shared_ptr<mrs_msgs::srv::PrismSrv::Request> request, std::shared_ptr<mrs_msgs::srv::PrismSrv::Response> response) {
+      [this](std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request, std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response) {
         callbackSetObstacle(request, response);
       },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -642,8 +642,8 @@ bool SafetyAreaManager::callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv:
 
 /* callbackSetObstacle() //{ */
 
-bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::PrismSrv::Request> request,
-                                            const std::shared_ptr<mrs_msgs::srv::PrismSrv::Response> response) {
+bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request,
+                                            const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
