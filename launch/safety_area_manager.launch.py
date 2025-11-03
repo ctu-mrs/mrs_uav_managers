@@ -253,6 +253,9 @@ def generate_launch_description():
             ("~/is_safety_zone_enabled_in", "~/is_safety_zone_enabled"),
             ("~/update_world_origin_in", "~/update_world_origin"),
             ("~/set_world_origin_out", "estimation_manager/set_world_origin"),
+            # markers
+            ("~/static_markers_out", "~/static_markers"),
+            ("~/static_markers_coordinates_out", "~/static_markers_coordinates"),
 
 
         ],
