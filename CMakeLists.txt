@@ -170,13 +170,13 @@ add_library(MrsUavManagers_SafetyAreaManager SHARED
   src/safety_area_manager.cpp
   )
 
-  ament_target_dependencies(MrsUavManagers_SafetyAreaManager
+ament_target_dependencies(MrsUavManagers_SafetyAreaManager
   ${DEPENDENCIES}
   )
 
-  rclcpp_components_register_nodes(MrsUavManagers_SafetyAreaManager PLUGIN "mrs_uav_managers::safety_area_manager::SafetyAreaManager" EXECUTABLE MrsUavManagers_SafetyAreaManager)
+rclcpp_components_register_nodes(MrsUavManagers_SafetyAreaManager PLUGIN "mrs_uav_managers::safety_area_manager::SafetyAreaManager" EXECUTABLE MrsUavManagers_SafetyAreaManager)
 
-  target_compile_definitions(MrsUavManagers_SafetyAreaManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_SafetyAreaManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 # Null Tracker
 

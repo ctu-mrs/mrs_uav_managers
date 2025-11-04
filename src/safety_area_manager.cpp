@@ -45,6 +45,16 @@
 
 //}
 
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
+//}
+
 namespace mrs_uav_managers
 {
 
@@ -66,9 +76,6 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
-
-  rclcpp::TimerBase::SharedPtr timer_preinitialization_;
-  void timerPreInitialization();
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
   std::atomic<bool> is_initialized_       = false;
@@ -192,7 +199,8 @@ private:
                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
                            const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response);
+  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request,
+                           const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response);
   bool callbackGetMaxZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response);
   bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
@@ -206,7 +214,7 @@ private:
   // | ----------------------- routines ----------------------- |
 
   // Safety area building
-  std::unique_ptr<mrs_lib::safety_zone::Prism> makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z,
+  std::unique_ptr<mrs_lib::safety_zone::Prism> makePrism(const Eigen::MatrixXd &matrix, const double max_z, const double min_z,
                                                          const std::string &horizontal_frame, const std::string &vertical_frame);
   std::unique_ptr<mrs_lib::safety_zone::Prism> makePrism(const std::vector<mrs_msgs::msg::Point2D> &points, const double max_z, const double min_z,
                                                          const std::string &horizontal_frame, const std::string &vertical_frame);
@@ -449,16 +457,14 @@ void SafetyAreaManager::initialize() {
 
 void SafetyAreaManager::timerPrerequisites() {
   mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerPrerequisites");
-  // mrs_lib::ScopeTimer timer         =
-  // mrs_lib::ScopeTimer(node_,"SafetyAreaManager::timerPrerequisites",
-  // scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_hw_api_capabilities = sh_hw_api_capabilities_.hasMsg();
   bool got_estimation_diag     = sh_estimation_diag_.hasMsg();
   bool got_gnss                = sh_gnss_.hasMsg();
 
   if (!got_hw_api_capabilities || !got_estimation_diag || !got_gnss) {
-    RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s EstimationManager=%s, GNSS=%s", got_hw_api_capabilities ? " true " : " FALSE ",
+    RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s EstimationManager=%s, GNSS=%s", got_hw_api_capabilities ? " TRUE " : " FALSE ",
                 got_estimation_diag ? "true" : "FALSE", got_gnss ? "true" : "FALSE");
     return;
   }
@@ -859,16 +865,13 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
 
   std::scoped_lock lock(mutex_safety_area_);
 
-  geometry_msgs::msg::PointStamped start = request->start;
-  geometry_msgs::msg::PointStamped end   = request->end;
-
   // transform points
   geometry_msgs::msg::PointStamped start_transformed, end_transformed;
 
   std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
 
   {
-    auto resp = transformer_->transformSingle(start, border_horizontal_frame);
+    auto resp = transformer_->transformSingle(request->start, border_horizontal_frame);
 
     if (!resp) {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1.0, "Could not transform the point to the safety area horizontal frame");
@@ -881,7 +884,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
   }
 
   {
-    auto resp = transformer_->transformSingle(end, border_horizontal_frame);
+    auto resp = transformer_->transformSingle(request->end, border_horizontal_frame);
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -926,16 +929,13 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
 
   std::scoped_lock lock(mutex_safety_area_);
 
-  geometry_msgs::msg::PointStamped start = request->start;
-  geometry_msgs::msg::PointStamped end   = request->end;
-
   // transform points
   geometry_msgs::msg::PointStamped start_transformed, end_transformed;
 
   std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
 
   {
-    auto resp = transformer_->transformSingle(start, border_horizontal_frame);
+    auto resp = transformer_->transformSingle(request->start, border_horizontal_frame);
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -948,7 +948,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
   }
 
   {
-    auto resp = transformer_->transformSingle(end, border_horizontal_frame);
+    auto resp = transformer_->transformSingle(request->end, border_horizontal_frame);
 
     if (!resp) {
       RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1388,7 +1388,7 @@ std::tuple<bool, std::string> SafetyAreaManager::validateMsg(const mrs_msgs::msg
 
 /* makePrism(matrix) //{ */
 
-std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd matrix, const double max_z, const double min_z,
+std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const Eigen::MatrixXd &matrix, const double max_z, const double min_z,
                                                                           const std::string &horizontal_frame, const std::string &vertical_frame) {
 
   if (matrix.rows() < 3) {
