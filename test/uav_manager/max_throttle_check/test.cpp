@@ -100,7 +100,7 @@ bool Tester::test(void) {
 bool Tester::setMass(const double mass) {
 
   std::shared_ptr<mrs_msgs::srv::Float64Srv::Request> request = std::make_shared<mrs_msgs::srv::Float64Srv::Request>();
-  request->value = mass;
+  request->value                                              = mass;
 
   auto response = sch_set_mass_.callSync(request);
 
@@ -112,7 +112,7 @@ bool Tester::setMass(const double mass) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

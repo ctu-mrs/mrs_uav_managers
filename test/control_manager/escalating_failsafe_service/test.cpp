@@ -21,7 +21,7 @@ std::optional<std::tuple<bool, std::string>> Tester::escalatingFailsafe() {
   return {{success, message}};
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

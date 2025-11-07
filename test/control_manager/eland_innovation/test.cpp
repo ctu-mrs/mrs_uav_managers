@@ -14,7 +14,8 @@ class Tester : public mrs_uav_testing::TestGeneric {
 public:
   Tester() : mrs_uav_testing::TestGeneric() {
 
-    sh_hw_api_odom_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
+    sh_hw_api_odom_ =
+        mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
 
     ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "/" + _uav_name_ + "/hw_api/odometry");
   }
@@ -104,7 +105,7 @@ bool Tester::test(void) {
   return false;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

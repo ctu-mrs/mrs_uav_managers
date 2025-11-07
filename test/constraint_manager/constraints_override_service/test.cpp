@@ -81,7 +81,8 @@ bool Tester::test(void) {
   const double vertical_desc_acceleration = uh->getCurrentConstraints()->vertical_descending_acceleration;
   ;
 
-  if (std::abs(horizontal_acceleration - desired_horizontal_acc) > 0.1 || std::abs(vertical_asc_acceleration - desired_vertical_acc) > 0.1 || std::abs(vertical_desc_acceleration - desired_vertical_acc) > 0.1) {
+  if (std::abs(horizontal_acceleration - desired_horizontal_acc) > 0.1 || std::abs(vertical_asc_acceleration - desired_vertical_acc) > 0.1 ||
+      std::abs(vertical_desc_acceleration - desired_vertical_acc) > 0.1) {
     RCLCPP_ERROR(node_->get_logger(), "constraints do not match");
     return false;
   }
@@ -94,7 +95,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

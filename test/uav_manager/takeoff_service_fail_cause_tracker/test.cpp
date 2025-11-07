@@ -10,10 +10,10 @@ using namespace std::chrono_literals;
 class Tester : public FailedTakeoffTest {
 
 public:
-  Tester() : FailedTakeoffTest(){};
+  Tester() : FailedTakeoffTest() {};
 };
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

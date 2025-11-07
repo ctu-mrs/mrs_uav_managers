@@ -150,7 +150,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char* state_names[2] = {"IDLING", "LANDING"};
+const char *state_names[2] = {"IDLING", "LANDING"};
 
 // state machine
 typedef enum
@@ -256,18 +256,18 @@ private:
 
   // | --------------- dynamic loading of trackers -------------- |
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Tracker>> tracker_loader_;  // pluginlib loader of dynamically loaded trackers
-  std::vector<std::string>                                           _tracker_names_;  // list of tracker names
-  std::map<std::string, TrackerParams>                               trackers_;        // map between tracker names and tracker param
-  std::vector<std::shared_ptr<mrs_uav_managers::Tracker>>            tracker_list_;    // list of trackers, routines are callable from this
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Tracker>> tracker_loader_; // pluginlib loader of dynamically loaded trackers
+  std::vector<std::string>                                           _tracker_names_; // list of tracker names
+  std::map<std::string, TrackerParams>                               trackers_;       // map between tracker names and tracker param
+  std::vector<std::shared_ptr<mrs_uav_managers::Tracker>>            tracker_list_;   // list of trackers, routines are callable from this
   std::mutex                                                         mutex_tracker_list_;
 
   // | ------------- dynamic loading of controllers ------------- |
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Controller>> controller_loader_;  // pluginlib loader of dynamically loaded controllers
-  std::vector<std::string>                                              _controller_names_;  // list of controller names
-  std::map<std::string, ControllerParams>                               controllers_;        // map between controller names and controller params
-  std::vector<std::shared_ptr<mrs_uav_managers::Controller>>            controller_list_;    // list of controllers, routines are callable from this
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Controller>> controller_loader_; // pluginlib loader of dynamically loaded controllers
+  std::vector<std::string>                                              _controller_names_; // list of controller names
+  std::map<std::string, ControllerParams>                               controllers_;       // map between controller names and controller params
+  std::vector<std::shared_ptr<mrs_uav_managers::Controller>>            controller_list_;   // list of controllers, routines are callable from this
   std::mutex                                                            mutex_controller_list_;
 
   // | ------------------------- HW API ------------------------- |
@@ -291,8 +291,8 @@ private:
 
   // | ------------ tracker and controller switching ------------ |
 
-  std::tuple<bool, std::string> switchController(const std::string& controller_name);
-  std::tuple<bool, std::string> switchTracker(const std::string& tracker_name);
+  std::tuple<bool, std::string> switchController(const std::string &controller_name);
+  std::tuple<bool, std::string> switchTracker(const std::string &tracker_name);
 
   // the time of last switching of a tracker or a controller
   rclcpp::Time controller_tracker_switch_time_;
@@ -313,13 +313,13 @@ private:
   int _state_input_;
 
   // names of important trackers
-  std::string _null_tracker_name_;     // null tracker is active when UAV is not in the air
-  std::string _ehover_tracker_name_;   // ehover tracker is used for emergency hovering
-  std::string _landoff_tracker_name_;  // landoff is used for landing and takeoff
+  std::string _null_tracker_name_;    // null tracker is active when UAV is not in the air
+  std::string _ehover_tracker_name_;  // ehover tracker is used for emergency hovering
+  std::string _landoff_tracker_name_; // landoff is used for landing and takeoff
 
   // names of important controllers
-  std::string _failsafe_controller_name_;  // controller used for feed-forward failsafe
-  std::string _eland_controller_name_;     // controller used for emergancy landing
+  std::string _failsafe_controller_name_; // controller used for feed-forward failsafe
+  std::string _eland_controller_name_;    // controller used for emergancy landing
 
   // joystick control
   bool        _joystick_enabled_ = false;
@@ -355,7 +355,7 @@ private:
   mrs_msgs::msg::UavState uav_state_;
   mrs_msgs::msg::UavState previous_uav_state_;
   bool                    got_uav_state_               = false;
-  double                  _uav_state_max_missing_time_ = 0;  // how long should we tolerate missing state estimate?
+  double                  _uav_state_max_missing_time_ = 0; // how long should we tolerate missing state estimate?
   double                  uav_roll_                    = 0;
   double                  uav_pitch_                   = 0;
   double                  uav_yaw_                     = 0;
@@ -403,7 +403,7 @@ private:
 
   // | -------------- enabling the output publisher ------------- |
 
-  void              toggleOutput(const bool& input);
+  void              toggleOutput(const bool &input);
   std::atomic<bool> output_enabled_ = false;
 
   // | ----------------------- publishers ----------------------- |
@@ -513,7 +513,7 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus> sh_hw_api_status_;
 
   std::atomic<bool> offboard_mode_          = false;
-  std::atomic<bool> offboard_mode_was_true_ = false;  // if it was ever true
+  std::atomic<bool> offboard_mode_was_true_ = false; // if it was ever true
   std::atomic<bool> armed_                  = false;
 
   // | -------------------- throttle and mass ------------------- |
@@ -535,15 +535,15 @@ private:
 
   // elanding when tilt error is too large
   bool   _tilt_limit_eland_enabled_;
-  double _tilt_limit_eland_ = 0;  // [rad]
+  double _tilt_limit_eland_ = 0; // [rad]
 
   // disarming when tilt error is too large
   bool   _tilt_limit_disarm_enabled_;
-  double _tilt_limit_disarm_ = 0;  // [rad]
+  double _tilt_limit_disarm_ = 0; // [rad]
 
   // elanding when yaw error is too large
   bool   _yaw_error_eland_enabled_;
-  double _yaw_error_eland_ = 0;  // [rad]
+  double _yaw_error_eland_ = 0; // [rad]
 
   // keeping track of control errors
   std::optional<double> tilt_error_ = 0;
@@ -555,10 +555,10 @@ private:
 
   // control error for triggering failsafe, eland, etc.
   // this filled with the current controllers failsafe threshold
-  double _failsafe_threshold_                = 0;  // control error for triggering failsafe
-  double _eland_threshold_                   = 0;  // control error for triggering eland
+  double _failsafe_threshold_                = 0; // control error for triggering failsafe
+  double _eland_threshold_                   = 0; // control error for triggering eland
   bool   _odometry_innovation_check_enabled_ = false;
-  double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
+  double _odometry_innovation_threshold_     = 0; // innovation size for triggering eland
 
   std::atomic<bool> callbacks_enabled_ = true;
 
@@ -585,12 +585,12 @@ private:
 
   // safety area routines
   // those are passed to trackers using the common_handlers object
-  bool   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& point);
-  bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& point);
-  bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& from, const mrs_msgs::msg::ReferenceStamped& to);
-  bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& from, const mrs_msgs::msg::ReferenceStamped& to);
-  double getMinZ(const std::string& frame_id);
-  double getMaxZ(const std::string& frame_id);
+  bool   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  double getMinZ(const std::string &frame_id);
+  double getMaxZ(const std::string &frame_id);
 
   // | ------------------------ callbacks ----------------------- |
 
@@ -602,7 +602,7 @@ private:
   void callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg);
 
   // topic timeouts
-  void timeoutUavState(const double& missing_for);
+  void timeoutUavState(const double &missing_for);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
@@ -682,13 +682,13 @@ private:
   // constraints management
   bool              got_constraints_ = false;
   std::mutex        mutex_constraints_;
-  void              setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
-  void              setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
-  void              setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
+  void              setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints);
+  void              setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints);
+  void              setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints);
   std::atomic<bool> constraints_being_enforced_ = false;
 
-  std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> enforceControllersConstraints(
-      const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints);
+  std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request>
+  enforceControllersConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints);
 
   mrs_msgs::srv::DynamicsConstraintsSrv::Request current_constraints_;
   mrs_msgs::srv::DynamicsConstraintsSrv::Request sanitized_constraints_;
@@ -755,7 +755,7 @@ private:
   double _bumper_horizontal_overshoot_ = 0;
   double _bumper_vertical_overshoot_   = 0;
 
-  int  bumperGetSectorId(const double& x, const double& y, const double& z);
+  int  bumperGetSectorId(const double &x, const double &y, const double &z);
   void bumperPushFromObstacle(void);
 
   // | --------------- safety checks and failsafes -------------- |
@@ -873,17 +873,17 @@ private:
   void updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
-  void updateControllers(const mrs_msgs::msg::UavState& uav_state);
+  void updateControllers(const mrs_msgs::msg::UavState &uav_state);
 
   // sets the reference to the active tracker
   std::tuple<bool, std::string> setReference(const mrs_msgs::msg::ReferenceStamped reference_in);
 
   // sets the velocity reference to the active tracker
-  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped& reference_in);
+  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in);
 
   // sets the reference trajectory to the active tracker
-  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> setTrajectoryReference(
-      const mrs_msgs::msg::TrajectoryReference trajectory_in);
+  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>
+  setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in);
 
   // publishes
   void publish(void);
@@ -891,14 +891,14 @@ private:
   double getMass(void);
 
   // publishes rviz-visualizable control reference
-  void publishControlReferenceOdom(const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command, const Controller::ControlOutput& control_output);
+  void publishControlReferenceOdom(const std::optional<mrs_msgs::msg::TrackerCommand> &tracker_command, const Controller::ControlOutput &control_output);
 
   void initializeControlOutput(void);
 
   // tell the mrs_odometry to disable its callbacks
   void odometryCallbacksSrv(const bool input);
 
-  mrs_msgs::msg::ReferenceStamped velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped& vel_reference);
+  mrs_msgs::msg::ReferenceStamped velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped &vel_reference);
 
   void                          setCallbacks(bool in);
   bool                          isOffboard(void);
@@ -1052,7 +1052,7 @@ void ControlManager::initialize(void) {
       safety_zone_ = std::make_unique<mrs_lib::safety_zone::SafetyZone>(border_points);
     }
 
-    catch (mrs_lib::safety_zone::BorderError& e) {
+    catch (mrs_lib::safety_zone::BorderError &e) {
       RCLCPP_ERROR(node_->get_logger(), "SafetyArea: wrong configruation for the safety zone border polygon");
       rclcpp::shutdown();
       exit(1);
@@ -1338,13 +1338,13 @@ void ControlManager::initialize(void) {
       RCLCPP_INFO(node_->get_logger(), "loading the tracker '%s'", new_tracker.address.c_str());
       tracker_list_.push_back(tracker_loader_->createSharedInstance(new_tracker.address.c_str()));
     }
-    catch (pluginlib::CreateClassException& ex1) {
+    catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the tracker '%s'", new_tracker.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
       exit(1);
     }
-    catch (pluginlib::PluginlibException& ex) {
+    catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the tracker '%s'", new_tracker.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
@@ -1380,7 +1380,7 @@ void ControlManager::initialize(void) {
       RCLCPP_INFO(node_->get_logger(), "initializing the tracker '%s'", it->second.address.c_str());
       success = tracker_list_.at(i)->initialize(subnode, common_handlers_, private_handlers);
     }
-    catch (std::runtime_error& ex) {
+    catch (std::runtime_error &ex) {
       RCLCPP_ERROR(node_->get_logger(), "exception caught during tracker initialization: '%s'", ex.what());
     }
 
@@ -1640,13 +1640,13 @@ void ControlManager::initialize(void) {
       RCLCPP_INFO(node_->get_logger(), "loading the controller '%s'", new_controller.address.c_str());
       controller_list_.push_back(controller_loader_->createSharedInstance(new_controller.address.c_str()));
     }
-    catch (pluginlib::CreateClassException& ex1) {
+    catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the controller '%s'", new_controller.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
       exit(1);
     }
-    catch (pluginlib::PluginlibException& ex) {
+    catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the controller '%s'", new_controller.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
@@ -1682,7 +1682,7 @@ void ControlManager::initialize(void) {
       RCLCPP_INFO(node_->get_logger(), "initializing the controller '%s'", it->second.address.c_str());
       success = controller_list_.at(i)->initialize(subnode, common_handlers_, private_handlers);
     }
-    catch (std::runtime_error& ex) {
+    catch (std::runtime_error &ex) {
       RCLCPP_ERROR(node_->get_logger(), "exception caught during controller initialization: '%s'", ex.what());
     }
 
@@ -1802,7 +1802,7 @@ void ControlManager::initialize(void) {
   ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "~/diagnostics_out");
   ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "~/offboard_on_out");
   ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/tilt_error_out");
-  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "~/mass_nominal_out");  // TODO latch
+  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "~/mass_nominal_out"); // TODO latch
   ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
 
   {
@@ -2930,7 +2930,7 @@ void ControlManager::timerSafety() {
       try {
         heading = mrs_lib::getHeading(innovation.value());
       }
-      catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+      catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
         RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
       }
 
@@ -3142,7 +3142,7 @@ void ControlManager::timerSafety() {
 
     toggleOutput(false);
   }
-}  // namespace control_manager
+} // namespace control_manager
 
 //}
 
@@ -3678,7 +3678,7 @@ void ControlManager::asyncControl(void) {
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
   auto current_constraints = mrs_lib::get_mutexed(mutex_constraints_, current_constraints_);
 
-  if (!failsafe_triggered_) {  // when failsafe is triggered, updateControllers() and publish() is called in timerFailsafe()
+  if (!failsafe_triggered_) { // when failsafe is triggered, updateControllers() and publish() is called in timerFailsafe()
 
     // run the safety timer
     // in the case of large control errors, the safety mechanisms will be triggered before the controllers and trackers are updated...
@@ -4416,7 +4416,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
 /* timeoutUavState() //{ */
 
-void ControlManager::timeoutUavState(const double& missing_for) {
+void ControlManager::timeoutUavState(const double &missing_for) {
 
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
@@ -5301,7 +5301,7 @@ bool ControlManager::callbackTransformReferenceArray(const std::shared_ptr<mrs_m
   response->array.header.frame_id = request->to_frame_id;
   response->array.array.reserve(request->array.array.size());
 
-  for (const auto& ref : request->array.array) {
+  for (const auto &ref : request->array.array) {
 
     mrs_msgs::msg::ReferenceStamped ref_stamped;
     ref_stamped.header    = request->array.header;
@@ -6126,7 +6126,7 @@ std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::msg::
 
 /* setVelocityReference() //{ */
 
-std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped& reference_in) {
+std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in) {
 
   std::stringstream ss;
 
@@ -6277,8 +6277,8 @@ std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msg
 
 /* setTrajectoryReference() //{ */
 
-std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>> ControlManager::setTrajectoryReference(
-    const mrs_msgs::msg::TrajectoryReference trajectory_in) {
+std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>
+ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in) {
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
@@ -6771,7 +6771,7 @@ void ControlManager::publishDiagnostics(void) {
 
 /* setConstraintsToTrackers() //{ */
 
-void ControlManager::setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints) {
+void ControlManager::setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraintsToTrackers", scope_timer_logger_, scope_timer_enabled_);
@@ -6794,7 +6794,7 @@ void ControlManager::setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConst
 
 /* setConstraintsToControllers() //{ */
 
-void ControlManager::setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints) {
+void ControlManager::setConstraintsToControllers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraintsToControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraintsToControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -6817,7 +6817,7 @@ void ControlManager::setConstraintsToControllers(const mrs_msgs::srv::DynamicsCo
 
 /* setConstraints() //{ */
 
-void ControlManager::setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints) {
+void ControlManager::setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("setConstraints");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::setConstraints", scope_timer_logger_, scope_timer_enabled_);
@@ -6831,8 +6831,8 @@ void ControlManager::setConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv:
 
 /* enforceControllerConstraints() //{ */
 
-std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request> ControlManager::enforceControllersConstraints(
-    const mrs_msgs::srv::DynamicsConstraintsSrv::Request& constraints) {
+std::optional<mrs_msgs::srv::DynamicsConstraintsSrv::Request>
+ControlManager::enforceControllersConstraints(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints) {
 
   // copy member variables
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -6937,7 +6937,7 @@ double ControlManager::getMass(void) {
 
 /* //{ isPointInSafetyArea3d() */
 
-bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& point) {
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   if (!use_safety_area_) {
     return true;
@@ -6965,7 +6965,7 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped
 
 /* //{ isPointInSafetyArea2d() */
 
-bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& point) {
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   if (!use_safety_area_) {
     return true;
@@ -6989,7 +6989,7 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped
 
 /* //{ isPathToPointInSafetyArea3d() */
 
-bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
 
   if (!use_safety_area_) {
     return true;
@@ -7035,7 +7035,7 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceS
 
 /* //{ isPathToPointInSafetyArea2d() */
 
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
 
   if (!use_safety_area_) {
     return true;
@@ -7081,7 +7081,7 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceS
 
 /* //{ getMaxZ() */
 
-double ControlManager::getMaxZ(const std::string& frame_id) {
+double ControlManager::getMaxZ(const std::string &frame_id) {
 
   // | ------- first, calculate max_z from the safety area ------ |
 
@@ -7143,7 +7143,7 @@ double ControlManager::getMaxZ(const std::string& frame_id) {
 
 /* //{ getMinZ() */
 
-double ControlManager::getMinZ(const std::string& frame_id) {
+double ControlManager::getMinZ(const std::string &frame_id) {
 
   if (!use_safety_area_) {
     return std::numeric_limits<double>::lowest();
@@ -7426,7 +7426,7 @@ void ControlManager::bumperPushFromObstacle(void) {
 
 /* bumperGetSectorId() //{ */
 
-int ControlManager::bumperGetSectorId(const double& x, const double& y, [[maybe_unused]] const double& z) {
+int ControlManager::bumperGetSectorId(const double &x, const double &y, [[maybe_unused]] const double &z) {
 
   // copy member variables
   auto bumper_data = sh_bumper_.getMsg();
@@ -7474,20 +7474,20 @@ void ControlManager::changeLandingState(LandingStates_t new_state) {
 
   switch (current_state_landing_) {
 
-    case IDLE_STATE:
-      break;
-    case LANDING_STATE: {
-
-      RCLCPP_DEBUG(node_->get_logger(), "starting eland timer");
-      timer_eland_->start();
-      RCLCPP_DEBUG(node_->get_logger(), "eland timer started");
-      eland_triggered_ = true;
-      bumper_enabled_  = false;
-
-      landing_uav_mass_ = getMass();
-    }
-
+  case IDLE_STATE:
     break;
+  case LANDING_STATE: {
+
+    RCLCPP_DEBUG(node_->get_logger(), "starting eland timer");
+    timer_eland_->start();
+    RCLCPP_DEBUG(node_->get_logger(), "eland timer started");
+    eland_triggered_ = true;
+    bumper_enabled_  = false;
+
+    landing_uav_mass_ = getMass();
+  }
+
+  break;
   }
 
   RCLCPP_INFO(node_->get_logger(), "switching emergency landing state %s -> %s", state_names[previous_state_landing_], state_names[current_state_landing_]);
@@ -7797,12 +7797,12 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
         controller_list_.at(active_controller_idx_)->deactivate();
         active_controller_idx_ = _failsafe_controller_idx_;
       }
-      catch (std::runtime_error& exrun) {
+      catch (std::runtime_error &exrun) {
         RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "could not deactivate the controller '%s'",
                               _controller_names_.at(active_controller_idx_).c_str());
       }
     }
-    catch (std::runtime_error& exrun) {
+    catch (std::runtime_error &exrun) {
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "error during activation of the controller '%s'", _failsafe_controller_name_.c_str());
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception: '%s'", exrun.what());
     }
@@ -7851,82 +7851,82 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   switch (next_state) {
 
-    case ESC_NONE_STATE: {
+  case ESC_NONE_STATE: {
 
-      ss << "escalating failsafe has run to impossible situation";
-      RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+    ss << "escalating failsafe has run to impossible situation";
+    RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-      return std::tuple(false, "escalating failsafe has run to impossible situation");
+    return std::tuple(false, "escalating failsafe has run to impossible situation");
 
-      break;
+    break;
+  }
+
+  case ESC_EHOVER_STATE: {
+
+    ss << "escalating failsafe escalates to ehover";
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+
+    auto [success, message] = ehover();
+
+    if (success) {
+      state_escalating_failsafe_ = ESC_EHOVER_STATE;
     }
 
-    case ESC_EHOVER_STATE: {
+    return {success, message};
 
-      ss << "escalating failsafe escalates to ehover";
-      RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+    break;
+  }
 
-      auto [success, message] = ehover();
+  case ESC_ELAND_STATE: {
 
-      if (success) {
-        state_escalating_failsafe_ = ESC_EHOVER_STATE;
-      }
+    ss << "escalating failsafe escalates to eland";
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-      return {success, message};
+    auto [success, message] = eland();
 
-      break;
+    if (success) {
+      state_escalating_failsafe_ = ESC_ELAND_STATE;
     }
 
-    case ESC_ELAND_STATE: {
+    return {success, message};
 
-      ss << "escalating failsafe escalates to eland";
-      RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+    break;
+  }
 
-      auto [success, message] = eland();
+  case ESC_FAILSAFE_STATE: {
 
-      if (success) {
-        state_escalating_failsafe_ = ESC_ELAND_STATE;
-      }
+    escalating_failsafe_time_ = clock_->now();
 
-      return {success, message};
+    ss << "escalating failsafe escalates to failsafe";
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-      break;
+    auto [success, message] = failsafe();
+
+    if (success) {
+      state_escalating_failsafe_ = ESC_FINISHED_STATE;
     }
 
-    case ESC_FAILSAFE_STATE: {
+    return {success, message};
 
-      escalating_failsafe_time_ = clock_->now();
+    break;
+  }
 
-      ss << "escalating failsafe escalates to failsafe";
-      RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+  case ESC_FINISHED_STATE: {
 
-      auto [success, message] = failsafe();
+    escalating_failsafe_time_ = clock_->now();
 
-      if (success) {
-        state_escalating_failsafe_ = ESC_FINISHED_STATE;
-      }
+    ss << "escalating failsafe has nothing more to do";
+    RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-      return {success, message};
+    return std::tuple(false, "escalating failsafe has nothing more to do");
 
-      break;
-    }
+    break;
+  }
 
-    case ESC_FINISHED_STATE: {
+  default: {
 
-      escalating_failsafe_time_ = clock_->now();
-
-      ss << "escalating failsafe has nothing more to do";
-      RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
-
-      return std::tuple(false, "escalating failsafe has nothing more to do");
-
-      break;
-    }
-
-    default: {
-
-      break;
-    }
+    break;
+  }
   }
 
   RCLCPP_ERROR(node_->get_logger(), "escalatingFailsafe() reached the final return, this should not happen!");
@@ -7944,58 +7944,58 @@ EscalatingFailsafeStates_t ControlManager::getNextEscFailsafeState(void) {
 
   switch (current_state) {
 
-    case ESC_FINISHED_STATE: {
+  case ESC_FINISHED_STATE: {
 
+    return ESC_FINISHED_STATE;
+
+    break;
+  }
+
+  case ESC_NONE_STATE: {
+
+    if (_escalating_failsafe_ehover_) {
+      return ESC_EHOVER_STATE;
+    } else if (_escalating_failsafe_eland_) {
+      return ESC_ELAND_STATE;
+    } else if (_escalating_failsafe_failsafe_) {
+      return ESC_FAILSAFE_STATE;
+    } else {
       return ESC_FINISHED_STATE;
-
-      break;
     }
 
-    case ESC_NONE_STATE: {
+    break;
+  }
 
-      if (_escalating_failsafe_ehover_) {
-        return ESC_EHOVER_STATE;
-      } else if (_escalating_failsafe_eland_) {
-        return ESC_ELAND_STATE;
-      } else if (_escalating_failsafe_failsafe_) {
-        return ESC_FAILSAFE_STATE;
-      } else {
-        return ESC_FINISHED_STATE;
-      }
+  case ESC_EHOVER_STATE: {
 
-      break;
-    }
-
-    case ESC_EHOVER_STATE: {
-
-      if (_escalating_failsafe_eland_) {
-        return ESC_ELAND_STATE;
-      } else if (_escalating_failsafe_failsafe_) {
-        return ESC_FAILSAFE_STATE;
-      } else {
-        return ESC_FINISHED_STATE;
-      }
-
-      break;
-    }
-
-    case ESC_ELAND_STATE: {
-
-      if (_escalating_failsafe_failsafe_) {
-        return ESC_FAILSAFE_STATE;
-      } else {
-        return ESC_FINISHED_STATE;
-      }
-
-      break;
-    }
-
-    case ESC_FAILSAFE_STATE: {
-
+    if (_escalating_failsafe_eland_) {
+      return ESC_ELAND_STATE;
+    } else if (_escalating_failsafe_failsafe_) {
+      return ESC_FAILSAFE_STATE;
+    } else {
       return ESC_FINISHED_STATE;
-
-      break;
     }
+
+    break;
+  }
+
+  case ESC_ELAND_STATE: {
+
+    if (_escalating_failsafe_failsafe_) {
+      return ESC_FAILSAFE_STATE;
+    } else {
+      return ESC_FINISHED_STATE;
+    }
+
+    break;
+  }
+
+  case ESC_FAILSAFE_STATE: {
+
+    return ESC_FINISHED_STATE;
+
+    break;
+  }
   }
 
   RCLCPP_ERROR(node_->get_logger(), "getNextEscFailsafeState() reached the final return, this should not happen!");
@@ -8162,7 +8162,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
 
-  request->data = input ? 1 : 0;  // arm or disarm?
+  request->data = input ? 1 : 0; // arm or disarm?
 
   RCLCPP_INFO(node_->get_logger(), "calling for %s", input ? "arming" : "disarming");
 
@@ -8309,7 +8309,7 @@ void ControlManager::ungripSrv(void) {
 
 /* toggleOutput() //{ */
 
-void ControlManager::toggleOutput(const bool& input) {
+void ControlManager::toggleOutput(const bool &input) {
 
   if (input == output_enabled_) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 100, "output is already %s", input ? "ON" : "OFF");
@@ -8342,7 +8342,7 @@ void ControlManager::toggleOutput(const bool& input) {
         RCLCPP_INFO(node_->get_logger(), "deactivating the tracker '%s'", it->second.address.c_str());
         tracker_list_.at(i)->deactivate();
       }
-      catch (std::runtime_error& ex) {
+      catch (std::runtime_error &ex) {
         RCLCPP_ERROR(node_->get_logger(), "exception caught during tracker deactivation: '%s'", ex.what());
       }
     }
@@ -8356,7 +8356,7 @@ void ControlManager::toggleOutput(const bool& input) {
         RCLCPP_INFO(node_->get_logger(), "deactivating the controller '%s'", it->second.address.c_str());
         controller_list_.at(i)->deactivate();
       }
-      catch (std::runtime_error& ex) {
+      catch (std::runtime_error &ex) {
         RCLCPP_ERROR(node_->get_logger(), "exception caught during controller deactivation: '%s'", ex.what());
       }
     }
@@ -8373,7 +8373,7 @@ void ControlManager::toggleOutput(const bool& input) {
 
 /* switchTracker() //{ */
 
-std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& tracker_name) {
+std::tuple<bool, std::string> ControlManager::switchTracker(const std::string &tracker_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchTracker");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::switchTracker", scope_timer_logger_, scope_timer_enabled_);
@@ -8489,12 +8489,12 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 
           active_tracker_idx_ = new_tracker_idx.value();
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
           RCLCPP_ERROR(node_->get_logger(), "could not deactivate the tracker '%s'", _tracker_names_.at(active_tracker_idx_).c_str());
         }
       }
     }
-    catch (std::runtime_error& exrun) {
+    catch (std::runtime_error &exrun) {
       RCLCPP_ERROR(node_->get_logger(), "error during activation of the tracker '%s'", tracker_name.c_str());
       RCLCPP_ERROR(node_->get_logger(), "exception: '%s'", exrun.what());
     }
@@ -8509,7 +8509,7 @@ std::tuple<bool, std::string> ControlManager::switchTracker(const std::string& t
 
 /* switchController() //{ */
 
-std::tuple<bool, std::string> ControlManager::switchController(const std::string& controller_name) {
+std::tuple<bool, std::string> ControlManager::switchController(const std::string &controller_name) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("switchController");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::switchController", scope_timer_logger_, scope_timer_enabled_);
@@ -8594,12 +8594,12 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
           controller_list_.at(active_controller_idx_)->deactivate();
           active_controller_idx_ = new_controller_idx.value();
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
           RCLCPP_ERROR(node_->get_logger(), "could not deactivate controller '%s'", _controller_names_.at(active_controller_idx_).c_str());
         }
       }
     }
-    catch (std::runtime_error& exrun) {
+    catch (std::runtime_error &exrun) {
       RCLCPP_ERROR(node_->get_logger(), "error during activation of controller '%s'", controller_name.c_str());
       RCLCPP_ERROR(node_->get_logger(), "exception: '%s'", exrun.what());
     }
@@ -8656,7 +8656,7 @@ void ControlManager::updateTrackers(void) {
           // active tracker => update and retrieve the command
           tracker_command = tracker_list_.at(i)->update(uav_state, last_control_output);
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "caught an exception while updating the active tracker (%s)",
                                 _tracker_names_.at(active_tracker_idx).c_str());
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "the exception: '%s'", exrun.what());
@@ -8669,7 +8669,7 @@ void ControlManager::updateTrackers(void) {
           // nonactive tracker => just update without retrieving the command
           tracker_list_.at(i)->update(uav_state, last_control_output);
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "caught an exception while updating the tracker '%s'", _tracker_names_.at(i).c_str());
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "the exception: '%s'", exrun.what());
         }
@@ -8725,7 +8725,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state) {
+void ControlManager::updateControllers(const mrs_msgs::msg::UavState &uav_state) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -8768,7 +8768,7 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state)
           // active controller => update and retrieve the command
           control_output = controller_list_.at(active_controller_idx)->updateActive(uav_state, last_tracker_cmd.value());
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
 
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "an exception while updating the active controller (%s)",
                                 _controller_names_.at(active_controller_idx).c_str());
@@ -8781,7 +8781,7 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState& uav_state)
           // nonactive controller => just update without retrieving the command
           controller_list_.at(i)->updateInactive(uav_state, last_tracker_cmd);
         }
-        catch (std::runtime_error& exrun) {
+        catch (std::runtime_error &exrun) {
 
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception while updating the controller '%s'", _controller_names_.at(i).c_str());
           RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception: '%s'", exrun.what());
@@ -9007,7 +9007,7 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
 /* velocityReferenceToReference() //{ */
 
-mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped& vel_reference) {
+mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped &vel_reference) {
 
   auto last_tracker_cmd    = mrs_lib::get_mutexed(mutex_last_tracker_cmd_, last_tracker_cmd_);
   auto uav_state           = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -9055,8 +9055,8 @@ mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(con
 
 /* publishControlReferenceOdom() //{ */
 
-void ControlManager::publishControlReferenceOdom(const std::optional<mrs_msgs::msg::TrackerCommand>& tracker_command,
-                                                 const Controller::ControlOutput&                    control_output) {
+void ControlManager::publishControlReferenceOdom(const std::optional<mrs_msgs::msg::TrackerCommand> &tracker_command,
+                                                 const Controller::ControlOutput                    &control_output) {
 
   if (!tracker_command || !control_output.control_output) {
     return;
@@ -9162,9 +9162,9 @@ void ControlManager::initializeControlOutput(void) {
 
 //}
 
-}  // namespace control_manager
+} // namespace control_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::control_manager::ControlManager)

@@ -8,7 +8,7 @@ namespace control_manager
 
 /* idxInVector() //{ */
 
-std::optional<unsigned int> idxInVector(const std::string& str, const std::vector<std::string>& vec) {
+std::optional<unsigned int> idxInVector(const std::string &str, const std::vector<std::string> &vec) {
 
   for (unsigned int i = 0; i < vec.size(); i++) {
     if (str == vec[i]) {
@@ -23,7 +23,7 @@ std::optional<unsigned int> idxInVector(const std::string& str, const std::vecto
 
 /* validateTrackerCommand() //{ */
 
-bool validateTrackerCommand(const rclcpp::Node::SharedPtr& node, const std::optional<mrs_msgs::msg::TrackerCommand>& msg, const std::string& var_name) {
+bool validateTrackerCommand(const rclcpp::Node::SharedPtr &node, const std::optional<mrs_msgs::msg::TrackerCommand> &msg, const std::string &var_name) {
 
   if (!msg) {
     RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "the optional variable '%s' is not set!!!", var_name.c_str());
@@ -168,7 +168,7 @@ bool validateTrackerCommand(const rclcpp::Node::SharedPtr& node, const std::opti
 
 /* validateOdometry() //{ */
 
-bool validateOdometry(const rclcpp::Node::SharedPtr& node, const nav_msgs::msg::Odometry& msg, const std::string& var_name) {
+bool validateOdometry(const rclcpp::Node::SharedPtr &node, const nav_msgs::msg::Odometry &msg, const std::string &var_name) {
 
   // check position
 
@@ -233,7 +233,7 @@ bool validateOdometry(const rclcpp::Node::SharedPtr& node, const nav_msgs::msg::
 
 /* validateVelocityReference() //{ */
 
-bool validateVelocityReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::VelocityReference& msg, const std::string& var_name) {
+bool validateVelocityReference(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::VelocityReference &msg, const std::string &var_name) {
 
   // check velocity
 
@@ -274,7 +274,7 @@ bool validateVelocityReference(const rclcpp::Node::SharedPtr& node, const mrs_ms
 
 /* validateReference() //{ */
 
-bool validateReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::Reference& msg, const std::string& var_name) {
+bool validateReference(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::Reference &msg, const std::string &var_name) {
 
   // check position
 
@@ -307,7 +307,7 @@ bool validateReference(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg:
 
 /* validateUavState() //{ */
 
-bool validateUavState(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::UavState& msg, const std::string& var_name) {
+bool validateUavState(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::UavState &msg, const std::string &var_name) {
 
   // check position
 
@@ -495,8 +495,8 @@ double RCChannelToRange(double rc_value, double range, double deadband) {
 
 /* loadDetailedUavModelParams() //{ */
 
-std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr& node, const std::string& platform_config,
-                                                                const std::string& custom_config) {
+std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::Node::SharedPtr &node, const std::string &platform_config,
+                                                                const std::string &custom_config) {
 
   mrs_lib::ParamLoader param_loader(node);
 
@@ -643,7 +643,7 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
 
 /* getLowestOutput() //{ */
 
-CONTROL_OUTPUT getLowestOuput(const ControlOutputModalities_t& outputs) {
+CONTROL_OUTPUT getLowestOuput(const ControlOutputModalities_t &outputs) {
 
   if (outputs.actuators) {
     return ACTUATORS_CMD;
@@ -684,7 +684,7 @@ CONTROL_OUTPUT getLowestOuput(const ControlOutputModalities_t& outputs) {
 
 /* getHighestOutput() //{ */
 
-CONTROL_OUTPUT getHighestOuput(const ControlOutputModalities_t& outputs) {
+CONTROL_OUTPUT getHighestOuput(const ControlOutputModalities_t &outputs) {
 
   if (outputs.position) {
     return POSITION;
@@ -727,7 +727,7 @@ CONTROL_OUTPUT getHighestOuput(const ControlOutputModalities_t& outputs) {
 
 /* extractThrottle() //{ */
 
-std::optional<double> extractThrottle(const Controller::ControlOutput& control_output) {
+std::optional<double> extractThrottle(const Controller::ControlOutput &control_output) {
 
   if (!control_output.control_output) {
     return {};
@@ -742,8 +742,8 @@ std::optional<double> extractThrottle(const Controller::ControlOutput& control_o
 
 /* validateControlOutput() //{ */
 
-bool validateControlOutput(const rclcpp::Node::SharedPtr& node, const Controller::ControlOutput& control_output,
-                           const ControlOutputModalities_t& output_modalities, const std::string& var_name) {
+bool validateControlOutput(const rclcpp::Node::SharedPtr &node, const Controller::ControlOutput &control_output,
+                           const ControlOutputModalities_t &output_modalities, const std::string &var_name) {
 
   if (!control_output.control_output) {
     RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "the optional variable '%s' is not set!!!", var_name.c_str());
@@ -761,7 +761,7 @@ bool validateControlOutput(const rclcpp::Node::SharedPtr& node, const Controller
 
 /* validateHwApiActuatorCmd() //{ */
 
-bool validateHwApiActuatorCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiActuatorCmd& msg, const std::string& var_name) {
+bool validateHwApiActuatorCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiActuatorCmd &msg, const std::string &var_name) {
 
   for (size_t i = 0; i < msg.motors.size(); i++) {
     if (!std::isfinite(msg.motors[i])) {
@@ -777,7 +777,7 @@ bool validateHwApiActuatorCmd(const rclcpp::Node::SharedPtr& node, const mrs_msg
 
 /* validateHwApiControlGroupCmd() //{ */
 
-bool validateHwApiControlGroupCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiControlGroupCmd& msg, const std::string& var_name) {
+bool validateHwApiControlGroupCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiControlGroupCmd &msg, const std::string &var_name) {
 
   if (!std::isfinite(msg.roll)) {
     RCLCPP_ERROR_THROTTLE(node->get_logger(), *node->get_clock(), 1000, "NaN detected in variable '%s.roll'!!!", var_name.c_str());
@@ -806,7 +806,7 @@ bool validateHwApiControlGroupCmd(const rclcpp::Node::SharedPtr& node, const mrs
 
 /* validateHwApiAttitudeCmd() //{ */
 
-bool validateHwApiAttitudeCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAttitudeCmd& msg, const std::string& var_name) {
+bool validateHwApiAttitudeCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiAttitudeCmd &msg, const std::string &var_name) {
 
   // check the orientation
 
@@ -844,7 +844,7 @@ bool validateHwApiAttitudeCmd(const rclcpp::Node::SharedPtr& node, const mrs_msg
 
 /* validateHwApiAttitudeRateCmd() //{ */
 
-bool validateHwApiAttitudeRateCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAttitudeRateCmd& msg, const std::string& var_name) {
+bool validateHwApiAttitudeRateCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiAttitudeRateCmd &msg, const std::string &var_name) {
 
   // check the body rate
 
@@ -877,8 +877,8 @@ bool validateHwApiAttitudeRateCmd(const rclcpp::Node::SharedPtr& node, const mrs
 
 /* validateHwApiAccelerationHdgRateCmd() //{ */
 
-bool validateHwApiAccelerationHdgRateCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg,
-                                         const std::string& var_name) {
+bool validateHwApiAccelerationHdgRateCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiAccelerationHdgRateCmd &msg,
+                                         const std::string &var_name) {
 
   // | ----------------- check the acceleration ----------------- |
 
@@ -911,7 +911,7 @@ bool validateHwApiAccelerationHdgRateCmd(const rclcpp::Node::SharedPtr& node, co
 
 /* validateHwApiAccelerationHdgCmd() //{ */
 
-bool validateHwApiAccelerationHdgCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiAccelerationHdgCmd& msg, const std::string& var_name) {
+bool validateHwApiAccelerationHdgCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiAccelerationHdgCmd &msg, const std::string &var_name) {
 
   // | ----------------- check the acceleration ----------------- |
 
@@ -944,7 +944,7 @@ bool validateHwApiAccelerationHdgCmd(const rclcpp::Node::SharedPtr& node, const 
 
 /* validateHwApiVelocityHdgRateCmd() //{ */
 
-bool validateHwApiVelocityHdgRateCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiVelocityHdgRateCmd& msg, const std::string& var_name) {
+bool validateHwApiVelocityHdgRateCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiVelocityHdgRateCmd &msg, const std::string &var_name) {
 
   // | ----------------- check the velocity ----------------- |
 
@@ -977,7 +977,7 @@ bool validateHwApiVelocityHdgRateCmd(const rclcpp::Node::SharedPtr& node, const 
 
 /* validateHwApiVelocityHdgCmd() //{ */
 
-bool validateHwApiVelocityHdgCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiVelocityHdgCmd& msg, const std::string& var_name) {
+bool validateHwApiVelocityHdgCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiVelocityHdgCmd &msg, const std::string &var_name) {
 
   // | ----------------- check the velocity ----------------- |
 
@@ -1010,7 +1010,7 @@ bool validateHwApiVelocityHdgCmd(const rclcpp::Node::SharedPtr& node, const mrs_
 
 /* validateHwApiPositionHdgCmd() //{ */
 
-bool validateHwApiPositionCmd(const rclcpp::Node::SharedPtr& node, const mrs_msgs::msg::HwApiPositionCmd& msg, const std::string& var_name) {
+bool validateHwApiPositionCmd(const rclcpp::Node::SharedPtr &node, const mrs_msgs::msg::HwApiPositionCmd &msg, const std::string &var_name) {
 
   // | ----------------- check the position ----------------- |
 
@@ -1045,50 +1045,50 @@ bool validateHwApiPositionCmd(const rclcpp::Node::SharedPtr& node, const mrs_msg
 
 /* initializeDefaultOutput() //{ */
 
-Controller::HwApiOutputVariant initializeDefaultOutput(const rclcpp::Node::SharedPtr& node, const ControlOutputModalities_t& possible_outputs,
-                                                       const mrs_msgs::msg::UavState& uav_state, const double& min_throttle, const double& n_motors) {
+Controller::HwApiOutputVariant initializeDefaultOutput(const rclcpp::Node::SharedPtr &node, const ControlOutputModalities_t &possible_outputs,
+                                                       const mrs_msgs::msg::UavState &uav_state, const double &min_throttle, const double &n_motors) {
 
   CONTROL_OUTPUT lowest_output = getLowestOuput(possible_outputs);
 
   Controller::HwApiOutputVariant output;
 
   switch (lowest_output) {
-    case ACTUATORS_CMD: {
-      output = mrs_msgs::msg::HwApiActuatorCmd();
-      break;
-    }
-    case CONTROL_GROUP: {
-      output = mrs_msgs::msg::HwApiControlGroupCmd();
-      break;
-    }
-    case ATTITUDE_RATE: {
-      output = mrs_msgs::msg::HwApiAttitudeRateCmd();
-      break;
-    }
-    case ATTITUDE: {
-      output = mrs_msgs::msg::HwApiAttitudeCmd();
-      break;
-    }
-    case ACCELERATION_HDG_RATE: {
-      output = mrs_msgs::msg::HwApiAccelerationHdgRateCmd();
-      break;
-    }
-    case ACCELERATION_HDG: {
-      output = mrs_msgs::msg::HwApiAccelerationHdgCmd();
-      break;
-    }
-    case VELOCITY_HDG_RATE: {
-      output = mrs_msgs::msg::HwApiVelocityHdgRateCmd();
-      break;
-    }
-    case VELOCITY_HDG: {
-      output = mrs_msgs::msg::HwApiVelocityHdgCmd();
-      break;
-    }
-    case POSITION: {
-      output = mrs_msgs::msg::HwApiPositionCmd();
-      break;
-    }
+  case ACTUATORS_CMD: {
+    output = mrs_msgs::msg::HwApiActuatorCmd();
+    break;
+  }
+  case CONTROL_GROUP: {
+    output = mrs_msgs::msg::HwApiControlGroupCmd();
+    break;
+  }
+  case ATTITUDE_RATE: {
+    output = mrs_msgs::msg::HwApiAttitudeRateCmd();
+    break;
+  }
+  case ATTITUDE: {
+    output = mrs_msgs::msg::HwApiAttitudeCmd();
+    break;
+  }
+  case ACCELERATION_HDG_RATE: {
+    output = mrs_msgs::msg::HwApiAccelerationHdgRateCmd();
+    break;
+  }
+  case ACCELERATION_HDG: {
+    output = mrs_msgs::msg::HwApiAccelerationHdgCmd();
+    break;
+  }
+  case VELOCITY_HDG_RATE: {
+    output = mrs_msgs::msg::HwApiVelocityHdgRateCmd();
+    break;
+  }
+  case VELOCITY_HDG: {
+    output = mrs_msgs::msg::HwApiVelocityHdgCmd();
+    break;
+  }
+  case POSITION: {
+    output = mrs_msgs::msg::HwApiPositionCmd();
+    break;
+  }
   }
 
   std::variant<rclcpp::Node::SharedPtr> node_var{node};
@@ -1105,7 +1105,7 @@ Controller::HwApiOutputVariant initializeDefaultOutput(const rclcpp::Node::Share
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiActuatorCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiActuatorCmd& msg, const double& min_throttle, const double& n_motors) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiActuatorCmd &msg, const double &min_throttle, const double &n_motors) {
 
   msg.stamp = node->get_clock()->now();
 
@@ -1118,7 +1118,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiControlGroupCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiControlGroupCmd& msg, const double& min_throttle) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiControlGroupCmd &msg, const double &min_throttle) {
 
   msg.stamp = node->get_clock()->now();
 
@@ -1132,7 +1132,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiAttitudeRateCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAttitudeRateCmd& msg, const double& min_throttle) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiAttitudeRateCmd &msg, const double &min_throttle) {
 
   msg.stamp = node->get_clock()->now();
 
@@ -1146,8 +1146,8 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiAttitudeCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAttitudeCmd& msg, const mrs_msgs::msg::UavState& uav_state,
-                        const double& min_throttle) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiAttitudeCmd &msg, const mrs_msgs::msg::UavState &uav_state,
+                        const double &min_throttle) {
 
   msg.stamp = node->get_clock()->now();
 
@@ -1159,7 +1159,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAccelerationHdgRateCmd& msg, const mrs_msgs::msg::UavState& uav_state) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiAccelerationHdgRateCmd &msg, const mrs_msgs::msg::UavState &uav_state) {
 
   msg.header.frame_id = uav_state.header.frame_id;
   msg.header.stamp    = node->get_clock()->now();
@@ -1174,7 +1174,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiAccelerationHdgCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiAccelerationHdgCmd& msg, const mrs_msgs::msg::UavState& uav_state) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiAccelerationHdgCmd &msg, const mrs_msgs::msg::UavState &uav_state) {
 
   msg.header.frame_id = uav_state.header.frame_id;
   msg.header.stamp    = node->get_clock()->now();
@@ -1186,7 +1186,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
   try {
     msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
   }
-  catch (std::runtime_error& exrun) {
+  catch (std::runtime_error &exrun) {
     msg.heading = 0;
   }
 }
@@ -1195,7 +1195,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiVelocityHdgRateCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiVelocityHdgRateCmd& msg, const mrs_msgs::msg::UavState& uav_state) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiVelocityHdgRateCmd &msg, const mrs_msgs::msg::UavState &uav_state) {
 
   msg.header.frame_id = uav_state.header.frame_id;
   msg.header.stamp    = node->get_clock()->now();
@@ -1210,7 +1210,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiVelocityHdgCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiVelocityHdgCmd& msg, const mrs_msgs::msg::UavState& uav_state) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiVelocityHdgCmd &msg, const mrs_msgs::msg::UavState &uav_state) {
 
   msg.header.frame_id = uav_state.header.frame_id;
   msg.header.stamp    = node->get_clock()->now();
@@ -1222,7 +1222,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
   try {
     msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
   }
-  catch (std::runtime_error& exrun) {
+  catch (std::runtime_error &exrun) {
     msg.heading = 0;
   }
 }
@@ -1231,7 +1231,7 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
 
 /* initializeHwApiCmd(mrs_msgs::msg::HwApiPositionCmd& msg) //{ */
 
-void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwApiPositionCmd& msg, const mrs_msgs::msg::UavState& uav_state) {
+void initializeHwApiCmd(const rclcpp::Node::SharedPtr &node, mrs_msgs::msg::HwApiPositionCmd &msg, const mrs_msgs::msg::UavState &uav_state) {
 
   msg.header.frame_id = uav_state.header.frame_id;
   msg.header.stamp    = node->get_clock()->now();
@@ -1243,13 +1243,13 @@ void initializeHwApiCmd(const rclcpp::Node::SharedPtr& node, mrs_msgs::msg::HwAp
   try {
     msg.heading = mrs_lib::AttitudeConverter(uav_state.pose.orientation).getHeading();
   }
-  catch (std::runtime_error& exrun) {
+  catch (std::runtime_error &exrun) {
     msg.heading = 0;
   }
 }
 
 //}
 
-}  // namespace control_manager
+} // namespace control_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers

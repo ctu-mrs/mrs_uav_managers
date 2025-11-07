@@ -218,7 +218,7 @@ bool Tester::toggleMinHeightCheck(const bool in) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

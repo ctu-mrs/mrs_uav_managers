@@ -66,7 +66,8 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (std::abs(gt_tfed_vector->vector.x - vec_tfed->vector.x) > 0.1 || std::abs(gt_tfed_vector->vector.y - vec_tfed->vector.y) > 0.1 || std::abs(gt_tfed_vector->vector.z - vec_tfed->vector.z) > 0.1) {
+    if (std::abs(gt_tfed_vector->vector.x - vec_tfed->vector.x) > 0.1 || std::abs(gt_tfed_vector->vector.y - vec_tfed->vector.y) > 0.1 ||
+        std::abs(gt_tfed_vector->vector.z - vec_tfed->vector.z) > 0.1) {
 
       RCLCPP_ERROR(node_->get_logger(), "vector #1 transformation failed, the vectors don't match");
       return false;
@@ -81,7 +82,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

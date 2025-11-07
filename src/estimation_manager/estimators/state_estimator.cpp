@@ -88,7 +88,7 @@ void StateEstimator::publishInnovation() const {
 /*//}*/
 
 /*//{ rotateQuaternionByHeading() */
-std::optional<geometry_msgs::msg::Quaternion> StateEstimator::rotateQuaternionByHeading(const geometry_msgs::msg::Quaternion& q, const double hdg) const {
+std::optional<geometry_msgs::msg::Quaternion> StateEstimator::rotateQuaternionByHeading(const geometry_msgs::msg::Quaternion &q, const double hdg) const {
 
   try {
     tf2::Quaternion tf2_q = mrs_lib::AttitudeConverter(q);
@@ -112,7 +112,7 @@ std::optional<geometry_msgs::msg::Quaternion> StateEstimator::rotateQuaternionBy
 /*//}*/
 
 /*//{ isCompatibleWithHwApi() */
-bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr& hw_api_capabilities) const {
+bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr &hw_api_capabilities) const {
 
   bool requires_gnss, requires_imu, requires_distance_sensor, requires_altitude, requires_magnetometer_heading, requires_position, requires_orientation,
       requires_velocity, requires_angular_velocity;
@@ -181,4 +181,4 @@ bool StateEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilitie
 }
 /*//}*/
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers

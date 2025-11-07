@@ -21,7 +21,7 @@ bool Tester::test(void) {
   return true;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

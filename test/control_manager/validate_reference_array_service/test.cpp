@@ -139,7 +139,6 @@ bool Tester::test(void) {
 
       RCLCPP_ERROR(node_->get_logger(), "reference array validation service call failed");
       return false;
-
     }
   }
 
@@ -151,7 +150,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

@@ -87,7 +87,7 @@ typedef enum
 
 } LandingStates_t;
 
-const char* state_names[3] = {
+const char *state_names[3] = {
 
     "IDLING", "GOTO", "LANDING"};
 
@@ -184,17 +184,17 @@ public:
 
   // service client wrappers
   bool takeoffSrv(void);
-  bool switchTrackerSrv(const std::string& tracker);
-  bool switchControllerSrv(const std::string& controller);
+  bool switchTrackerSrv(const std::string &tracker);
+  bool switchControllerSrv(const std::string &controller);
   bool landSrv(void);
   bool elandSrv(void);
   bool ehoverSrv(void);
   void disarmSrv(void);
-  bool emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped& goal);
-  void setOdometryCallbacksSrv(const bool& input);
-  void setControlCallbacksSrv(const bool& input);
+  bool emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal);
+  void setOdometryCallbacksSrv(const bool &input);
+  void setControlCallbacksSrv(const bool &input);
   void ungripSrv(void);
-  bool toggleControlOutput(const bool& input);
+  bool toggleControlOutput(const bool &input);
   bool offboardSrv(const bool in);
 
   std::shared_ptr<TimerType> timer_takeoff_;
@@ -668,29 +668,29 @@ void UavManager::changeLandingState(LandingStates_t new_state) {
 
   switch (current_state_landing_) {
 
-    case LANDING_STATE: {
+  case LANDING_STATE: {
 
-      // we used to have a check here for freshness of the data.. this was removed,
-      // since even old data on the mass estimate might be better than the nominal mass
-      // from the parameter
-      if (sh_mass_estimate_.hasMsg()) {
+    // we used to have a check here for freshness of the data.. this was removed,
+    // since even old data on the mass estimate might be better than the nominal mass
+    // from the parameter
+    if (sh_mass_estimate_.hasMsg()) {
 
-        // copy member variables
-        auto mass_esimtate = sh_mass_estimate_.getMsg();
+      // copy member variables
+      auto mass_esimtate = sh_mass_estimate_.getMsg();
 
-        landing_uav_mass_ = mass_esimtate->data;
+      landing_uav_mass_ = mass_esimtate->data;
 
-      } else {
+    } else {
 
-        landing_uav_mass_ = _uav_mass_;
-      }
-
-      break;
-    };
-
-    default: {
-      break;
+      landing_uav_mass_ = _uav_mass_;
     }
+
+    break;
+  };
+
+  default: {
+    break;
+  }
   }
 
   // just for ROS_INFO
@@ -777,7 +777,7 @@ void UavManager::timerLanding() {
     try {
       ref_heading = mrs_lib::getHeading(land_there_current_frame);
     }
-    catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+    catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
       return;
     }
@@ -971,7 +971,7 @@ void UavManager::timerTakeoff() {
       try {
         odom_heading = mrs_lib::getHeading(sh_odometry_.getMsg());
       }
-      catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+      catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
         RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
         return;
       }
@@ -1048,7 +1048,7 @@ void UavManager::timerMaxHeight() {
   try {
     odometry_heading = mrs_lib::getHeading(odometry);
   }
-  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+  catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
     return;
   }
@@ -1131,7 +1131,7 @@ void UavManager::timerMinHeight() {
   try {
     odometry_heading = mrs_lib::getHeading(odometry);
   }
-  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+  catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
     return;
   }
@@ -1290,7 +1290,7 @@ void UavManager::timerDiagnostics() {
   bool got_gps_est = false;
   bool got_rtk_est = false;
 
-  if (sh_estimation_diagnostics_.hasMsg()) {  // get current position in lat-lon
+  if (sh_estimation_diagnostics_.hasMsg()) { // get current position in lat-lon
 
     auto                     estimation_diag  = sh_estimation_diagnostics_.getMsg();
     std::vector<std::string> state_estimators = estimation_diag.get()->switchable_state_estimators;
@@ -1310,7 +1310,7 @@ void UavManager::timerDiagnostics() {
   // fill in the acumulated flight time
   diag.flight_time = flighttime;
 
-  if (sh_odometry_.hasMsg()) {  // get current position in lat-lon
+  if (sh_odometry_.hasMsg()) { // get current position in lat-lon
 
     if (got_gps_est || got_rtk_est) {
 
@@ -1575,7 +1575,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs
   try {
     odom_heading = mrs_lib::getHeading(sh_odometry_.getMsg());
   }
-  catch (mrs_lib::AttitudeConverter::GetHeadingException& e) {
+  catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
 
     std::stringstream ss;
@@ -2471,7 +2471,7 @@ std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
 
 /* setOdometryCallbacksSrv() //{ */
 
-void UavManager::setOdometryCallbacksSrv(const bool& input) {
+void UavManager::setOdometryCallbacksSrv(const bool &input) {
 
   RCLCPP_INFO(node_->get_logger(), "switching odometry callbacks to %s", input ? "ON" : "OFF");
 
@@ -2496,7 +2496,7 @@ void UavManager::setOdometryCallbacksSrv(const bool& input) {
 
 /* setControlCallbacksSrv() //{ */
 
-void UavManager::setControlCallbacksSrv(const bool& input) {
+void UavManager::setControlCallbacksSrv(const bool &input) {
 
   RCLCPP_INFO(node_->get_logger(), "switching control callbacks to %s", input ? "ON" : "OFF");
 
@@ -2544,7 +2544,7 @@ void UavManager::ungripSrv(void) {
 
 /* toggleControlOutput() //{ */
 
-bool UavManager::toggleControlOutput(const bool& input) {
+bool UavManager::toggleControlOutput(const bool &input) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "toggling control output %s", input ? "ON" : "OFF");
 
@@ -2623,7 +2623,7 @@ void UavManager::disarmSrv(void) {
 
 /* switchControllerSrv() //{ */
 
-bool UavManager::switchControllerSrv(const std::string& controller) {
+bool UavManager::switchControllerSrv(const std::string &controller) {
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "activating controller '" << controller << "'");
 
@@ -2653,7 +2653,7 @@ bool UavManager::switchControllerSrv(const std::string& controller) {
 
 /* switchTrackerSrv() //{ */
 
-bool UavManager::switchTrackerSrv(const std::string& tracker) {
+bool UavManager::switchTrackerSrv(const std::string &tracker) {
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "activating tracker '" << tracker << "'");
 
@@ -2797,7 +2797,7 @@ bool UavManager::takeoffSrv(void) {
 
 /* emergencyReferenceSrv() //{ */
 
-bool UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped& goal) {
+bool UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "calling for emergency reference");
 
@@ -2826,9 +2826,9 @@ bool UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped& go
 
 //}
 
-}  // namespace uav_manager
+} // namespace uav_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::uav_manager::UavManager)
