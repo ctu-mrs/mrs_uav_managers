@@ -163,6 +163,21 @@ rclcpp_components_register_nodes(MrsUavManagers_GainManager PLUGIN "mrs_uav_mana
 
 target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
+
+# Diagnostics Manager
+
+add_library(MrsUavManagers_DiagnosticsManager SHARED
+  src/diagnostics_manager/diagnostics_manager.cpp
+  )
+
+ament_target_dependencies(MrsUavManagers_DiagnosticsManager
+  ${DEPENDENCIES}
+  )
+
+rclcpp_components_register_nodes(MrsUavManagers_DiagnosticsManager PLUGIN "mrs_uav_managers::diagnostics_manager::DiagnosticsManager" EXECUTABLE MrsUavManagers_DiagnosticsManager)
+
+target_compile_definitions(MrsUavManagers_DiagnosticsManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
 # Null Tracker
 
 add_library(MrsUavManagers_NullTracker SHARED
