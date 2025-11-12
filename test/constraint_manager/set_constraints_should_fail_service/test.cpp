@@ -48,7 +48,7 @@ bool Tester::test(void) {
 
   // | ------------------------ set gains ----------------------- |
 
-    const std::string constraints = "do_not_exists";
+  const std::string constraints = "do_not_exists";
 
   {
     auto [success, message] = uh->setConstraints(constraints);
@@ -76,7 +76,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

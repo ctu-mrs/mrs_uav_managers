@@ -154,7 +154,8 @@ bool Tester::test(void) {
     auto body_vel = getBodyVelocity();
 
     if (!(body_vel[0] < -2.0 && abs(body_vel[1]) < 0.5 && abs(body_vel[2]) < 0.5)) {
-      RCLCPP_ERROR(node_->get_logger(), "body velocity is not suggesting that we are moving backwards (%.2f, %.2f, %.2f)", body_vel[0], body_vel[1], body_vel[2]);
+      RCLCPP_ERROR(node_->get_logger(), "body velocity is not suggesting that we are moving backwards (%.2f, %.2f, %.2f)", body_vel[0], body_vel[1],
+                   body_vel[2]);
       return false;
     }
   }
@@ -194,7 +195,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

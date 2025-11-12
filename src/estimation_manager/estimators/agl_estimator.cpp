@@ -23,7 +23,7 @@ void AglEstimator::publishCovariance() const {
 /*//}*/
 
 /*//{ isCompatibleWithHwApi() */
-bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr& hw_api_capabilities) const {
+bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr &hw_api_capabilities) const {
 
   ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/private/" + getName() + "/" + getName() + ".yaml");
   ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/public/" + getName() + "/" + getName() + ".yaml");
@@ -95,4 +95,4 @@ bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities:
 }
 /*//}*/
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers

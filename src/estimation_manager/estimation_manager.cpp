@@ -94,12 +94,12 @@ public:
   /*//}*/
 
 public:
-  StateMachine(const rclcpp::Node::SharedPtr& node, const std::string& nodelet_name) : nodelet_name_(nodelet_name) {
+  StateMachine(const rclcpp::Node::SharedPtr &node, const std::string &nodelet_name) : nodelet_name_(nodelet_name) {
     node_  = node;
     clock_ = node_->get_clock();
   }
 
-  bool isInState(const SMState_t& state) const {
+  bool isInState(const SMState_t &state) const {
     return mrs_lib::get_mutexed(mtx_state_, current_state_) == state;
   }
 
@@ -132,12 +132,12 @@ public:
     return mrs_lib::get_mutexed(mtx_state_, sm_state_names_[current_state_]);
   }
 
-  std::string getStateAsString(const SMState_t& state) const {
+  std::string getStateAsString(const SMState_t &state) const {
     return sm_state_names_[state];
   }
 
   /*//{ changeState() */
-  bool changeState(const SMState_t& target_state) {
+  bool changeState(const SMState_t &target_state) {
 
     if (target_state == current_state_) {
 
@@ -148,123 +148,123 @@ public:
 
     switch (target_state) {
 
-      case UNINITIALIZED_STATE: {
-        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is not possible from any state", getPrintName().c_str(),
-                              getStateAsString(UNINITIALIZED_STATE).c_str());
+    case UNINITIALIZED_STATE: {
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is not possible from any state", getPrintName().c_str(),
+                            getStateAsString(UNINITIALIZED_STATE).c_str());
+      return false;
+      break;
+    }
+
+    case INITIALIZED_STATE: {
+      if (current_state_ != UNINITIALIZED_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                              getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
         return false;
-        break;
       }
+      break;
+    }
 
-      case INITIALIZED_STATE: {
-        if (current_state_ != UNINITIALIZED_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
-                                getStateAsString(INITIALIZED_STATE).c_str(), getStateAsString(UNINITIALIZED_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case READY_FOR_FLIGHT_STATE: {
-        if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
-                                getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
-                                getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case TAKING_OFF_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
-                                getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
-                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case FLYING_STATE: {
-        if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE &&
-            current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(),
-                                getStateAsString(FLYING_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
-                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case HOVER_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
-                                getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
-                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case ESTIMATOR_SWITCHING_STATE: {
-        if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE &&
-            current_state_ != LANDING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
-                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
-                                getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
-                                getStateAsString(FLYING_STATE).c_str());
-          return false;
-        }
-        pre_switch_state_ = current_state_;
-        break;
-      }
-
-      case LANDING_STATE: {
-        if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
-                                getStateAsString(LANDING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
-                                getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case LANDED_STATE: {
-        if (current_state_ != LANDING_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
-                                getStateAsString(LANDED_STATE).c_str(), getStateAsString(LANDING_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-
-      case DUMMY_STATE: {
-        if (current_state_ != INITIALIZED_STATE) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
-                                getStateAsString(DUMMY_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str());
-          return false;
-        }
-        break;
-      }
-      case EMERGENCY_STATE: {
-        RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(EMERGENCY_STATE).c_str());
-        break;
-      }
-
-      case ERROR_STATE: {
-        RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(ERROR_STATE).c_str());
-        break;
-      }
-
-      case FAILSAFE_STATE: {
-        RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(FAILSAFE_STATE).c_str());
-        break;
-      }
-
-      default: {
-        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: rejected transition to unknown state id %d", getPrintName().c_str(), target_state);
+    case READY_FOR_FLIGHT_STATE: {
+      if (current_state_ != INITIALIZED_STATE && current_state_ != LANDED_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
+                              getStateAsString(READY_FOR_FLIGHT_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str(),
+                              getStateAsString(LANDED_STATE).c_str(), getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
         return false;
-        break;
       }
+      break;
+    }
+
+    case TAKING_OFF_STATE: {
+      if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                              getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
+                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+
+    case FLYING_STATE: {
+      if (current_state_ != TAKING_OFF_STATE && current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != HOVER_STATE &&
+          current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s or %s", getPrintName().c_str(),
+                              getStateAsString(FLYING_STATE).c_str(), getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+
+    case HOVER_STATE: {
+      if (current_state_ != FLYING_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s or %s", getPrintName().c_str(),
+                              getStateAsString(HOVER_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(),
+                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+
+    case ESTIMATOR_SWITCHING_STATE: {
+      if (current_state_ != READY_FOR_FLIGHT_STATE && current_state_ != TAKING_OFF_STATE && current_state_ != HOVER_STATE && current_state_ != FLYING_STATE &&
+          current_state_ != LANDING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s, %s, %s or %s", getPrintName().c_str(),
+                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str(), getStateAsString(READY_FOR_FLIGHT_STATE).c_str(),
+                              getStateAsString(TAKING_OFF_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                              getStateAsString(FLYING_STATE).c_str());
+        return false;
+      }
+      pre_switch_state_ = current_state_;
+      break;
+    }
+
+    case LANDING_STATE: {
+      if (current_state_ != FLYING_STATE && current_state_ != HOVER_STATE && current_state_ != ESTIMATOR_SWITCHING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s, %s or %s", getPrintName().c_str(),
+                              getStateAsString(LANDING_STATE).c_str(), getStateAsString(FLYING_STATE).c_str(), getStateAsString(HOVER_STATE).c_str(),
+                              getStateAsString(ESTIMATOR_SWITCHING_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+
+    case LANDED_STATE: {
+      if (current_state_ != LANDING_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                              getStateAsString(LANDED_STATE).c_str(), getStateAsString(LANDING_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+
+    case DUMMY_STATE: {
+      if (current_state_ != INITIALIZED_STATE) {
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transition to %s is possible only from %s", getPrintName().c_str(),
+                              getStateAsString(DUMMY_STATE).c_str(), getStateAsString(INITIALIZED_STATE).c_str());
+        return false;
+      }
+      break;
+    }
+    case EMERGENCY_STATE: {
+      RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(EMERGENCY_STATE).c_str());
+      break;
+    }
+
+    case ERROR_STATE: {
+      RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(ERROR_STATE).c_str());
+      break;
+    }
+
+    case FAILSAFE_STATE: {
+      RCLCPP_WARN(node_->get_logger(), "[%s]: transition to %s", getPrintName().c_str(), getStateAsString(FAILSAFE_STATE).c_str());
+      break;
+    }
+
+    default: {
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: rejected transition to unknown state id %d", getPrintName().c_str(), target_state);
+      return false;
+      break;
+    }
     }
 
     std::scoped_lock lock(mtx_state_);
@@ -362,7 +362,7 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>        ph_max_flight_z_;
   mrs_lib::PublisherHandler<mrs_msgs::msg::UavState>              ph_uav_state_;
   mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>              ph_odom_main_;
-  mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>              ph_odom_slow_;  // use topic throttler instead?
+  mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>              ph_odom_slow_; // use topic throttler instead?
   mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>              ph_innovation_;
 
   mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped> ph_altitude_amsl_;
@@ -397,8 +397,8 @@ private:
   bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
-  bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, 
-      const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> srvs_toggle_callbacks_;
 
@@ -416,9 +416,9 @@ private:
 
   // | ------------- dynamic loading of estimators ------------- |
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
-  std::vector<std::string>                                                  estimator_names_;         // list of estimator names
-  std::vector<std::shared_ptr<mrs_uav_managers::StateEstimator>>            estimator_list_;          // list of estimators
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::StateEstimator>> state_estimator_loader_; // pluginlib loader of dynamically loaded estimators
+  std::vector<std::string>                                                  estimator_names_;        // list of estimator names
+  std::vector<std::shared_ptr<mrs_uav_managers::StateEstimator>>            estimator_list_;         // list of estimators
   std::mutex                                                                mutex_estimator_list_;
   std::vector<std::string>                                                  switchable_estimator_names_;
   std::mutex                                                                mutex_switchable_estimator_names_;
@@ -427,7 +427,7 @@ private:
   std::shared_ptr<mrs_uav_managers::StateEstimator>                         active_estimator_;
   std::mutex                                                                mutex_active_estimator_;
 
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_;  // pluginlib loader of dynamically loaded estimators
+  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_; // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
   std::shared_ptr<mrs_uav_managers::AglEstimator>                         est_alt_agl_;
   bool                                                                    is_using_agl_estimator_;
@@ -435,9 +435,9 @@ private:
   double max_flight_z_;
 
   bool switchToHealthyEstimator();
-  void switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator);
+  void switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator> &target_estimator);
 
-  bool loadConfigFile(const std::string& file_path);
+  bool loadConfigFile(const std::string &file_path);
 
 public:
   EstimationManager(rclcpp::NodeOptions options);
@@ -683,13 +683,13 @@ void EstimationManager::initialize() {
       RCLCPP_INFO(node_->get_logger(), "loading the estimator '%s'", address.c_str());
       estimator_list_.push_back(state_estimator_loader_->createSharedInstance(address.c_str()));
     }
-    catch (pluginlib::CreateClassException& ex1) {
+    catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the estimator '%s'", address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
       exit(1);
     }
-    catch (pluginlib::PluginlibException& ex) {
+    catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the estimator '%s'", address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
@@ -717,13 +717,13 @@ void EstimationManager::initialize() {
       RCLCPP_INFO(node_->get_logger(), "loading the estimator '%s'", address.c_str());
       est_alt_agl_ = agl_estimator_loader_->createSharedInstance(address.c_str());
     }
-    catch (pluginlib::CreateClassException& ex1) {
+    catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the estimator '%s'", address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
       rclcpp::shutdown();
       exit(1);
     }
-    catch (pluginlib::PluginlibException& ex) {
+    catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the estimator '%s'", address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
       rclcpp::shutdown();
@@ -769,7 +769,7 @@ void EstimationManager::initialize() {
       RCLCPP_INFO(node_->get_logger(), "initializing the estimator '%s'", estimator->getName().c_str());
       estimator->initialize(subnode, ch_, ph);
     }
-    catch (std::runtime_error& ex) {
+    catch (std::runtime_error &ex) {
       RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator initialization: '%s'", ex.what());
       rclcpp::shutdown();
       exit(1);
@@ -797,7 +797,7 @@ void EstimationManager::initialize() {
       RCLCPP_INFO(node_->get_logger(), "initializing the estimator '%s'", est_alt_agl_->getName().c_str());
       est_alt_agl_->initialize(subnode, ch_, ph);
     }
-    catch (std::runtime_error& ex) {
+    catch (std::runtime_error &ex) {
       RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator initialization: '%s'", ex.what());
       rclcpp::shutdown();
       exit(1);
@@ -854,7 +854,7 @@ void EstimationManager::initialize() {
 
   /*//{ initialize service clients */
 
-  srvch_failsafe_ = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
+  srvch_failsafe_         = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
   srvch_set_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out", cbkgrp_sc_);
   srvch_update_sa_mgr_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/update_world_origin_out", cbkgrp_sc_);
 
@@ -1106,7 +1106,7 @@ void EstimationManager::timerCheckHealth() {
         RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "starting the estimator '%s'", estimator->getName().c_str());
         estimator->start();
       }
-      catch (std::runtime_error& ex) {
+      catch (std::runtime_error &ex) {
         RCLCPP_ERROR(node_->get_logger(), "exception caught during estimator starting: '%s'", ex.what());
         rclcpp::shutdown();
         exit(1);
@@ -1163,7 +1163,7 @@ void EstimationManager::timerCheckHealth() {
   if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
     if (switchToHealthyEstimator()) {
       sm_->changeToPreSwitchState();
-    } else {  // cannot switch to healthy estimator - failsafe necessary
+    } else { // cannot switch to healthy estimator - failsafe necessary
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
       sm_->changeState(StateMachine::FAILSAFE_STATE);
     }
@@ -1398,8 +1398,8 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 }
 
 /*//{ callbackSetWorldOrigin() */
-bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
-    const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!sm_->isInitialized()) {
     return false;
@@ -1421,19 +1421,19 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
       const double lon = request->reference.position.y;
       mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
 
-      RCLCPP_INFO(node_->get_logger(), "Setting world origin to lat: %.6f lon: %.6f by service callback",
-          request->reference.position.x, request->reference.position.y);
+      RCLCPP_INFO(node_->get_logger(), "Setting world origin to lat: %.6f lon: %.6f by service callback", request->reference.position.x,
+                  request->reference.position.y);
 
     } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
       world_origin_x = request->reference.position.x;
       world_origin_y = request->reference.position.y;
 
-      RCLCPP_INFO(node_->get_logger(),"Setting world origin to x: %.2f y: %.2f UTM by service callback",
-          request->reference.position.x, request->reference.position.y);
+      RCLCPP_INFO(node_->get_logger(), "Setting world origin to x: %.2f y: %.2f UTM by service callback", request->reference.position.x,
+                  request->reference.position.y);
 
     } else {
-      RCLCPP_INFO(node_->get_logger(),"Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
-                request->header.frame_id.c_str());
+      RCLCPP_INFO(node_->get_logger(), "Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+                  request->header.frame_id.c_str());
       response->success = false;
       response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
       return true;
@@ -1449,11 +1449,11 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
 
       double t_wait_left = 5;
       while (t_wait_left > 0) {
-        RCLCPP_INFO(node_->get_logger(),"Attempting starting %s estimator", estimator->getName().c_str());
+        RCLCPP_INFO(node_->get_logger(), "Attempting starting %s estimator", estimator->getName().c_str());
         estimator->start();
 
         if (estimator->isRunning()) {
-          RCLCPP_INFO(node_->get_logger(),"Reset of %s estimator successful", estimator->getName().c_str());
+          RCLCPP_INFO(node_->get_logger(), "Reset of %s estimator successful", estimator->getName().c_str());
           break;
         }
 
@@ -1463,21 +1463,21 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
       }
     }
 
-  auto res = srvch_set_world_origin_.callSync(request);
+    auto res = srvch_set_world_origin_.callSync(request);
 
-  if (!res.has_value() || !res.value()->success) {
-    RCLCPP_WARN(node_->get_logger(),"Could not call TransformManager set_world_origin service.");
-    response->success = false;
-    response->message = "Could not call TransformManager set_world_origin service.";
-    return true;
-  }
+    if (!res.has_value() || !res.value()->success) {
+      RCLCPP_WARN(node_->get_logger(), "Could not call TransformManager set_world_origin service.");
+      response->success = false;
+      response->message = "Could not call TransformManager set_world_origin service.";
+      return true;
+    }
 
-  if (!res.value()->success) {
-    RCLCPP_WARN(node_->get_logger(), "TransformManager could not set world origin.");
-    response->success = false;
-    response->message = "TransformManager could not set world origin.";
-    return true;
-  }
+    if (!res.value()->success) {
+      RCLCPP_WARN(node_->get_logger(), "TransformManager could not set world origin.");
+      response->success = false;
+      response->message = "TransformManager could not set world origin.";
+      return true;
+    }
 
   // update Safety Area manager world origin
   auto res_update = srvch_update_sa_mgr_world_origin_.callSync(request);
@@ -1500,9 +1500,8 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
 
   } else {
 
-  response->success = false;
-  response->message = "Cannot set world origin while flying";
-
+    response->success = false;
+    response->message = "Cannot set world origin while flying";
   }
 
 
@@ -1554,14 +1553,14 @@ bool EstimationManager::switchToHealthyEstimator() {
     }
   }
 
-  return false;  // no other estimator is running
+  return false; // no other estimator is running
 }
 
 //}
 
 /* switchToEstimator() //{ */
 
-void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator>& target_estimator) {
+void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator> &target_estimator) {
 
   std::scoped_lock lock(mutex_active_estimator_);
 
@@ -1602,7 +1601,7 @@ std::string EstimationManager::getName() const {
 
 /* loadConfigFile() //{ */
 
-bool EstimationManager::loadConfigFile(const std::string& file_path) {
+bool EstimationManager::loadConfigFile(const std::string &file_path) {
 
   const std::string name_space = std::string(node_->get_namespace()) + "/";
 
@@ -1646,9 +1645,9 @@ bool EstimationManager::loadConfigFile(const std::string& file_path) {
 
 //}
 
-}  // namespace estimation_manager
+} // namespace estimation_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::estimation_manager::EstimationManager)

@@ -132,7 +132,7 @@ private:
 
   // | ------------------------- helpers ------------------------ |
 
-  bool stringInVector(const std::string& value, const std::vector<std::string>& vector);
+  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 };
 
 //}
@@ -619,7 +619,7 @@ void ConstraintManager::timerDiagnostics() {
 
   auto current_constraints = mrs_lib::get_mutexed(mutex_current_constraints_, current_constraints_);
 
-  if (current_constraints == "") {  // this could happend just before timerConstraintManagement() finishes
+  if (current_constraints == "") { // this could happend just before timerConstraintManagement() finishes
     return;
   }
 
@@ -666,7 +666,7 @@ void ConstraintManager::timerDiagnostics() {
 
 /* stringInVector() //{ */
 
-bool ConstraintManager::stringInVector(const std::string& value, const std::vector<std::string>& vector) {
+bool ConstraintManager::stringInVector(const std::string &value, const std::vector<std::string> &vector) {
 
   if (std::find(vector.begin(), vector.end(), value) == vector.end()) {
     return false;
@@ -677,9 +677,9 @@ bool ConstraintManager::stringInVector(const std::string& value, const std::vect
 
 //}
 
-}  // namespace constraint_manager
+} // namespace constraint_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::constraint_manager::ConstraintManager)

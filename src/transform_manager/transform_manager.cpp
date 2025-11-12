@@ -106,8 +106,8 @@ private:
   geometry_msgs::msg::Point world_origin_;
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
-  bool               callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request, 
-      const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
@@ -125,7 +125,7 @@ private:
 
   std::unique_ptr<TfMappingOrigin> tf_mapping_origin_;
 
-  void timeoutCallback(const std::string& topic, const rclcpp::Time& last_msg);
+  void timeoutCallback(const std::string &topic, const rclcpp::Time &last_msg);
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState> sh_uav_state_;
   void                                                callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
@@ -150,13 +150,13 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps> sh_rtk_gps_;
   void                                              callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPtr msg);
 
-  std::optional<geometry_msgs::msg::Pose> transformRtkToFcu(const geometry_msgs::msg::PoseStamped& pose_in) const;
+  std::optional<geometry_msgs::msg::Pose> transformRtkToFcu(const geometry_msgs::msg::PoseStamped &pose_in) const;
 
   void publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
   void publishLocalTf();
 
-  void publishAmslTf(const double altitude, const rclcpp::Time& stamp);
+  void publishAmslTf(const double altitude, const rclcpp::Time &stamp);
 };
 /*//}*/
 
@@ -182,7 +182,7 @@ void TransformManager::initialize() {
   ch_->package_name = package_name_;
 
   cbkgrp_subs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
@@ -460,11 +460,11 @@ void TransformManager::initialize() {
   }
   /*//}*/
 
-/*//{ initialize service servers*/
+  /*//{ initialize service servers*/
   srvs_set_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
       node_, "~/set_world_origin_in", std::bind(&TransformManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-/*//}*/
+  /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
@@ -718,7 +718,7 @@ void TransformManager::callbackAltitudeAmsl([[maybe_unused]] const mrs_msgs::msg
 
 /* publishAmslTf() //{ */
 
-void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time& stamp) {
+void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time &stamp) {
 
   if (!is_initialized_) {
     return;
@@ -890,7 +890,8 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
 }
 
 /*//{ callbackSetWorldOrigin() */
-bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request, const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     response->success = false;
@@ -907,14 +908,14 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
     const double lat = request->reference.position.x;
     const double lon = request->reference.position.y;
     mrs_lib::UTM(lat, lon, &world_origin.x, &world_origin.y);
-    RCLCPP_INFO(node_->get_logger(),"Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
+    RCLCPP_INFO(node_->get_logger(), "Setting world origin to lat: %.6f lon: %.6f", request->reference.position.x, request->reference.position.y);
   } else if (request->header.frame_id.find("utm_origin") != std::string::npos) {
     world_origin.x = request->reference.position.x;
     world_origin.y = request->reference.position.y;
-    RCLCPP_INFO(node_->get_logger(),"Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
+    RCLCPP_INFO(node_->get_logger(), "Setting world origin to x: %.2f y: %.2f UTM", request->reference.position.x, request->reference.position.y);
   } else {
-    RCLCPP_WARN(node_->get_logger(),"Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
-              request->header.frame_id.c_str());
+    RCLCPP_WARN(node_->get_logger(), "Requested unsupported frame_id: \"%s\" in set_world_origin service. Supported are: latlon_origin, utm_origin",
+                request->header.frame_id.c_str());
     response->success = false;
     response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
     return true;
@@ -956,7 +957,7 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::Quaternion
   scope_timer.checkpoint("q inverse");
 
   geometry_msgs::msg::TransformStamped tf;
-  tf.header.stamp            = msg->header.stamp;  // TODO(petrlmat) rclcpp::Time::now()?
+  tf.header.stamp            = msg->header.stamp; // TODO(petrlmat) rclcpp::Time::now()?
   tf.header.frame_id         = ch_->frames.ns_fcu;
   tf.child_frame_id          = ch_->frames.ns_fcu_untilted;
   tf.transform.translation.x = 0.0;
@@ -1012,7 +1013,7 @@ void TransformManager::publishLocalTf() {
 
 /* transformRtkToFcu() //{ */
 
-std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::msg::PoseStamped& pose_in) const {
+std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(const geometry_msgs::msg::PoseStamped &pose_in) const {
 
   geometry_msgs::msg::PoseStamped pose_tmp = pose_in;
 
@@ -1072,9 +1073,9 @@ std::string TransformManager::getPrintName() const {
 
 //}
 
-}  // namespace transform_manager
+} // namespace transform_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::transform_manager::TransformManager)

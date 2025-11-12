@@ -23,7 +23,7 @@ bool Estimator::changeState(SMStates_t new_state) {
 
 /* isInState() //{ */
 
-bool Estimator::isInState(const SMStates_t& state_in) const {
+bool Estimator::isInState(const SMStates_t &state_in) const {
   return state_in == getCurrentSmState();
 }
 
@@ -87,7 +87,7 @@ SMStates_t Estimator::getCurrentSmState() const {
 
 /* setCurrentSmState() //{ */
 
-void Estimator::setCurrentSmState(const SMStates_t& new_state) {
+void Estimator::setCurrentSmState(const SMStates_t &new_state) {
   std::scoped_lock lock(mutex_current_state_);
   current_sm_state_ = new_state;
 }
@@ -96,7 +96,7 @@ void Estimator::setCurrentSmState(const SMStates_t& new_state) {
 
 /* getSmStateString() //{ */
 
-std::string Estimator::getSmStateString(const SMStates_t& state) const {
+std::string Estimator::getSmStateString(const SMStates_t &state) const {
   return sm::state_names[state];
 }
 
@@ -186,7 +186,7 @@ void Estimator::publishDiagnostics() const {
 
 /* getAccGlobal() //{ */
 
-tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr& input_msg, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr &input_msg, const double hdg) {
 
   geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->linear_acceleration;
@@ -195,7 +195,7 @@ tf2::Vector3 Estimator::getAccGlobal(const sensor_msgs::msg::Imu::ConstSharedPtr
   return getAccGlobal(acc_stamped, hdg);
 }
 
-tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstSharedPtr& input_msg, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstSharedPtr &input_msg, const double hdg) {
 
   geometry_msgs::msg::Vector3Stamped acc_stamped;
   acc_stamped.vector = input_msg->control_acceleration;
@@ -204,7 +204,7 @@ tf2::Vector3 Estimator::getAccGlobal(const mrs_msgs::msg::EstimatorInput::ConstS
   return getAccGlobal(acc_stamped, hdg);
 }
 
-tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped& acc_stamped, const double hdg) {
+tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped &acc_stamped, const double hdg) {
 
   // untilt the desired acceleration vector
   geometry_msgs::msg::Vector3Stamped des_acc;
@@ -236,7 +236,7 @@ tf2::Vector3 Estimator::getAccGlobal(const geometry_msgs::msg::Vector3Stamped& a
 
 /* getHeadingRate() //{ */
 
-std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr& odom_msg) {
+std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg) {
 
   double hdg_rate;
 
@@ -253,4 +253,4 @@ std::optional<double> Estimator::getHeadingRate(const nav_msgs::msg::Odometry::C
 
 //}
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers

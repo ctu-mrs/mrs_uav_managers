@@ -136,7 +136,7 @@ private:
 
   // | ------------------------- helpers ------------------------ |
 
-  bool stringInVector(const std::string& value, const std::vector<std::string>& vector);
+  bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
 };
 
 //}
@@ -709,7 +709,7 @@ void GainManager::timerDiagnostics() {
 
   auto current_gains = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
 
-  if (current_gains == "") {  // this could happend just before timerGainManagement() finishes
+  if (current_gains == "") { // this could happend just before timerGainManagement() finishes
     return;
   }
 
@@ -777,7 +777,7 @@ void GainManager::timerDiagnostics() {
 
 /* stringInVector() //{ */
 
-bool GainManager::stringInVector(const std::string& value, const std::vector<std::string>& vector) {
+bool GainManager::stringInVector(const std::string &value, const std::vector<std::string> &vector) {
 
   if (std::find(vector.begin(), vector.end(), value) == vector.end()) {
     return false;
@@ -788,9 +788,9 @@ bool GainManager::stringInVector(const std::string& value, const std::vector<std
 
 //}
 
-}  // namespace gain_manager
+} // namespace gain_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::gain_manager::GainManager)

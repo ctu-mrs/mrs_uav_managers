@@ -67,7 +67,10 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (std::abs(gt_tfed_reference->reference.position.x - ref_tfed->reference.position.x) > 0.1 || std::abs(gt_tfed_reference->reference.position.y - ref_tfed->reference.position.y) > 0.1 || std::abs(gt_tfed_reference->reference.position.z - ref_tfed->reference.position.z) > 0.1 || std::abs(mrs_lib::geometry::sradians::diff(gt_tfed_reference->reference.heading, ref_tfed->reference.heading)) > 0.1) {
+    if (std::abs(gt_tfed_reference->reference.position.x - ref_tfed->reference.position.x) > 0.1 ||
+        std::abs(gt_tfed_reference->reference.position.y - ref_tfed->reference.position.y) > 0.1 ||
+        std::abs(gt_tfed_reference->reference.position.z - ref_tfed->reference.position.z) > 0.1 ||
+        std::abs(mrs_lib::geometry::sradians::diff(gt_tfed_reference->reference.heading, ref_tfed->reference.heading)) > 0.1) {
 
       RCLCPP_ERROR(node_->get_logger(), "reference #1 transformation failed, the references don't match");
       return false;
@@ -82,7 +85,7 @@ bool Tester::test(void) {
   }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

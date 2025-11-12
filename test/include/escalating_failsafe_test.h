@@ -5,7 +5,7 @@ class EscalatingFailsafeTest : public mrs_uav_testing::TestGeneric {
 public:
   bool test();
 
-  EscalatingFailsafeTest() : mrs_uav_testing::TestGeneric(){};
+  EscalatingFailsafeTest() : mrs_uav_testing::TestGeneric() {};
 
   virtual std::optional<std::tuple<bool, std::string>> escalatingFailsafe() = 0;
 
@@ -147,7 +147,8 @@ bool EscalatingFailsafeTest::test() {
 
   auto uav_state = uh_->sh_uav_state_.getMsg();
 
-  if (!(!uh_->isFlyingNormally() && uh_->getActiveController() == "EmergencyController" && uh_->getActiveTracker() == "LandoffTracker" && uav_state->velocity.linear.z < -0.3)) {
+  if (!(!uh_->isFlyingNormally() && uh_->getActiveController() == "EmergencyController" && uh_->getActiveTracker() == "LandoffTracker" &&
+        uav_state->velocity.linear.z < -0.3)) {
     RCLCPP_ERROR(node_->get_logger(), "we are not elanding");
     return false;
   }
