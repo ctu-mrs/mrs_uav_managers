@@ -854,8 +854,8 @@ void EstimationManager::initialize() {
 
   /*//{ initialize service clients */
 
-  srvch_failsafe_         = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
-  srvch_set_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out", cbkgrp_sc_);
+  srvch_failsafe_                   = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_out", cbkgrp_sc_);
+  srvch_set_world_origin_           = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out", cbkgrp_sc_);
   srvch_update_sa_mgr_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/update_world_origin_out", cbkgrp_sc_);
 
   /*//}*/
@@ -1479,24 +1479,24 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
       return true;
     }
 
-  // update Safety Area manager world origin
-  auto res_update = srvch_update_sa_mgr_world_origin_.callSync(request);
-  if (!res_update.has_value() || !res_update.value()->success) {
-    RCLCPP_WARN(node_->get_logger(),"Could not call Safety Area Manager update_world_origin service.");
-    response->success = false;
-    response->message = "Could not call Safety Area Manager update_world_origin service.";
-    return true;
-  }
+    // update Safety Area manager world origin
+    auto res_update = srvch_update_sa_mgr_world_origin_.callSync(request);
+    if (!res_update.has_value() || !res_update.value()->success) {
+      RCLCPP_WARN(node_->get_logger(), "Could not call Safety Area Manager update_world_origin service.");
+      response->success = false;
+      response->message = "Could not call Safety Area Manager update_world_origin service.";
+      return true;
+    }
 
-  if (!res_update.value()->success) {
-    RCLCPP_WARN(node_->get_logger(), "Safety Area Manager could not update world origin.");
-    response->success = false;
-    response->message = "SA Manager could not update world origin.";
-    return true;
-  }
+    if (!res_update.value()->success) {
+      RCLCPP_WARN(node_->get_logger(), "Safety Area Manager could not update world origin.");
+      response->success = false;
+      response->message = "SA Manager could not update world origin.";
+      return true;
+    }
 
-  response->success = true;
-  response->message = "World origin set successfully";
+    response->success = true;
+    response->message = "World origin set successfully";
 
   } else {
 

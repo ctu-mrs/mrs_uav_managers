@@ -1835,12 +1835,12 @@ void ControlManager::initialize(void) {
     sh_odometry_innovation_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_innovation_in");
   }
 
-  sh_bumper_    = mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors>(shopts, "~/bumper_sectors_in");
-  sh_max_z_     = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/max_z_in");
-  sh_safety_area_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(shopts, "~/safety_area_diag_in"); 
-  sh_joystick_  = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts, "~/joystick_in", &ControlManager::callbackJoystick, this);
-  sh_gnss_      = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_bumper_           = mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors>(shopts, "~/bumper_sectors_in");
+  sh_max_z_            = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/max_z_in");
+  sh_safety_area_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(shopts, "~/safety_area_diag_in");
+  sh_joystick_         = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts, "~/joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_             = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &ControlManager::callbackGNSS, this);
+  sh_hw_api_rc_        = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
 
   sh_hw_api_status_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus>(shopts, "~/hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
@@ -1936,11 +1936,13 @@ void ControlManager::initialize(void) {
   sch_parachute_               = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/parachute_out", cbkgrp_sc_);
   sch_point_in_safety_area_2d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/point_in_safety_area_2d_out", cbkgrp_sc_);
   sch_point_in_safety_area_3d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/point_in_safety_area_3d_out", cbkgrp_sc_);
-  sch_path_to_point_in_safety_area_2d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_2d_out", cbkgrp_sc_);
-  sch_path_to_point_in_safety_area_3d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_3d_out", cbkgrp_sc_);
-  sch_get_min_z_                       = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_min_z_out", cbkgrp_sc_);
-  sch_get_max_z_                       = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_max_z_out", cbkgrp_sc_);
-  sch_is_safety_area_enabled_          = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetBoolSrv>(node_, "~/is_safety_area_enabled_out", cbkgrp_sc_);
+  sch_path_to_point_in_safety_area_2d_ =
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_2d_out", cbkgrp_sc_);
+  sch_path_to_point_in_safety_area_3d_ =
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_3d_out", cbkgrp_sc_);
+  sch_get_min_z_              = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_min_z_out", cbkgrp_sc_);
+  sch_get_max_z_              = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_max_z_out", cbkgrp_sc_);
+  sch_is_safety_area_enabled_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetBoolSrv>(node_, "~/is_safety_area_enabled_out", cbkgrp_sc_);
 
   // | ---------------- setpoint command services --------------- |
 
@@ -6149,39 +6151,39 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
               bool interpolation_success = true;
 
-                // iterpolate between the last valid point and this new valid
-                // point
-                double angle = atan2((processed_trajectory.points.at(i).position.y - processed_trajectory.points.at(last_valid_idx).position.y),
-                                     (processed_trajectory.points.at(i).position.x - processed_trajectory.points.at(last_valid_idx).position.x));
+              // iterpolate between the last valid point and this new valid
+              // point
+              double angle = atan2((processed_trajectory.points.at(i).position.y - processed_trajectory.points.at(last_valid_idx).position.y),
+                                   (processed_trajectory.points.at(i).position.x - processed_trajectory.points.at(last_valid_idx).position.x));
 
-                double dist_two_points = mrs_lib::geometry::dist(
-                    vec2_t(processed_trajectory.points.at(i).position.x, processed_trajectory.points.at(i).position.y),
-                    vec2_t(processed_trajectory.points.at(last_valid_idx).position.x, processed_trajectory.points.at(last_valid_idx).position.y));
-                double step = dist_two_points / (i - last_valid_idx);
+              double dist_two_points = mrs_lib::geometry::dist(
+                  vec2_t(processed_trajectory.points.at(i).position.x, processed_trajectory.points.at(i).position.y),
+                  vec2_t(processed_trajectory.points.at(last_valid_idx).position.x, processed_trajectory.points.at(last_valid_idx).position.y));
+              double step = dist_two_points / (i - last_valid_idx);
 
-                for (int j = last_valid_idx; j < i; j++) {
-                  mrs_msgs::msg::ReferenceStamped temp_point;
-                  temp_point.header.frame_id      = processed_trajectory.header.frame_id;
-                  temp_point.reference.position.x = processed_trajectory.points.at(last_valid_idx).position.x + (j - last_valid_idx) * cos(angle) * step;
-                  temp_point.reference.position.y = processed_trajectory.points.at(last_valid_idx).position.y + (j - last_valid_idx) * sin(angle) * step;
+              for (int j = last_valid_idx; j < i; j++) {
+                mrs_msgs::msg::ReferenceStamped temp_point;
+                temp_point.header.frame_id      = processed_trajectory.header.frame_id;
+                temp_point.reference.position.x = processed_trajectory.points.at(last_valid_idx).position.x + (j - last_valid_idx) * cos(angle) * step;
+                temp_point.reference.position.y = processed_trajectory.points.at(last_valid_idx).position.y + (j - last_valid_idx) * sin(angle) * step;
 
-                  if (!isPointInSafetyArea2d(temp_point)) {
-                    interpolation_success = false;
-                    break;
-                  } else {
-                    processed_trajectory.points.at(j).position.x = temp_point.reference.position.x;
-                    processed_trajectory.points.at(j).position.y = temp_point.reference.position.y;
-                  }
-                }
-
-                if (!interpolation_success) {
+                if (!isPointInSafetyArea2d(temp_point)) {
+                  interpolation_success = false;
                   break;
+                } else {
+                  processed_trajectory.points.at(j).position.x = temp_point.reference.position.x;
+                  processed_trajectory.points.at(j).position.y = temp_point.reference.position.y;
                 }
               }
 
-              first_invalid_idx = -1;
+              if (!interpolation_success) {
+                break;
+              }
             }
+
+            first_invalid_idx = -1;
           }
+        }
 
         // special case, the trajectory does not end with a valid point
         if (first_invalid_idx != -1) {
@@ -6266,11 +6268,11 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
     // prepare the message for current tracker
     request->trajectory = processed_trajectory;
 
-    bool success;
-    std::string message;
-    bool modified;
+    bool                     success;
+    std::string              message;
+    bool                     modified;
     std::vector<std::string> tracker_names;
-    std::vector<bool> tracker_successes;
+    std::vector<bool>        tracker_successes;
     std::vector<std::string> tracker_messages;
 
     {
@@ -6333,8 +6335,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
     }
 
     return std::tuple(success, message, modified, tracker_names, tracker_successes, tracker_messages);
-  }
-  else {
+  } else {
 
     ss << "safety area diagnostics message is not available, can not set trajectory";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
@@ -6620,7 +6621,7 @@ double ControlManager::getMass(void) {
 // | ----------------------- safety area ---------------------- |
 
 /* //{ isPointInSafetyArea3d() */
-bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& point) {
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
   std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
 
   request->header    = point.header;
@@ -6639,57 +6640,54 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped
   }
 
   return true;
- }
+}
 
 //}
 
 /* //{ isPointInSafetyArea2d() */
- bool ControlManager::isPointInSafetyArea2d(
-     const mrs_msgs::msg::ReferenceStamped &point) {
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
-   std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request =
-       std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
+  std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
 
-   request->header = point.header;
-   request->reference = point.reference;
+  request->header    = point.header;
+  request->reference = point.reference;
 
-   auto response = sch_point_in_safety_area_2d_.callSync(request);
+  auto response = sch_point_in_safety_area_2d_.callSync(request);
 
-   if (response) {
-     if (!response.value()->success) {
-       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                            "SafetyArea: The point is "
-                            "outside of the safety area");
-       return false;
-     }
-   } else {
-     RCLCPP_ERROR_THROTTLE(
-         node_->get_logger(), *clock_, 1000,
-         "SafetyArea: Could not call the service to check if "
-         "the point is in the safety area");
-     return false;
-   }
+  if (response) {
+    if (!response.value()->success) {
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
+                           "SafetyArea: The point is "
+                           "outside of the safety area");
+      return false;
+    }
+  } else {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "SafetyArea: Could not call the service to check if "
+                          "the point is in the safety area");
+    return false;
+  }
 
-   return true;
- }
+  return true;
+}
 
 //}
 
 /* //{ isPathToPointInSafetyArea3d() */
-bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
   std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request = std::make_shared<mrs_msgs::srv::ValidatePathToPointSrv::Request>();
 
-  request->start.header    = start.header;
-  request->start.point     = start.reference.position;
+  request->start.header = start.header;
+  request->start.point  = start.reference.position;
 
-  request->end.header      = end.header;
-  request->end.point       = end.reference.position;
+  request->end.header = end.header;
+  request->end.point  = end.reference.position;
 
   auto response = sch_path_to_point_in_safety_area_3d_.callSync(request);
 
   if (response) {
     if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area"); 
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area");
       return false;
     }
   } else {
@@ -6698,25 +6696,24 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceS
   }
 
   return true;
-
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea2d() */
-bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped& start, const mrs_msgs::msg::ReferenceStamped& end) {
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
   std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request = std::make_shared<mrs_msgs::srv::ValidatePathToPointSrv::Request>();
-  request->start.header    = start.header;
-  request->start.point     = start.reference.position;
+  request->start.header                                                   = start.header;
+  request->start.point                                                    = start.reference.position;
 
-  request->end.header      = end.header;
-  request->end.point       = end.reference.position;
+  request->end.header = end.header;
+  request->end.point  = end.reference.position;
 
   auto response = sch_path_to_point_in_safety_area_2d_.callSync(request);
 
   if (response) {
     if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area"); 
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area");
       return false;
     }
   } else {
@@ -6725,7 +6722,6 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceS
   }
 
   return true;
-
 }
 
 //}
@@ -6755,8 +6751,7 @@ double ControlManager::getMaxZ(const std::string &frame_id) {
         point.point.z = response.value()->reference.reference.position.z;
         auto ret      = transformer_->transformSingle(point, frame_id);
         if (!ret) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not transform safety area's max_z to '%s'",
-                                frame_id.c_str());
+          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
         }
         safety_area_max_z = ret->point.z;
       }
@@ -6811,16 +6806,16 @@ double ControlManager::getMinZ(const std::string &frame_id) {
     auto response = sch_get_min_z_.callSync(request);
 
     if (response) {
-      if (!response.value()->success) { 
+      if (!response.value()->success) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not get min_z from the safety area");
         return std::numeric_limits<double>::lowest();
       } else {
-        // transform it into the current control frame 
+        // transform it into the current control frame
         geometry_msgs::msg::PointStamped point;
-        point.header  = response.value()->reference.header; 
+        point.header  = response.value()->reference.header;
         point.point.x = 0;
         point.point.y = 0;
-        point.point.z = response.value()->reference.reference.position.z; 
+        point.point.z = response.value()->reference.reference.position.z;
 
         auto ret = transformer_->transformSingle(point, frame_id);
         if (!ret) {
@@ -6829,7 +6824,7 @@ double ControlManager::getMinZ(const std::string &frame_id) {
         }
         return ret->point.z;
       }
-    } else { 
+    } else {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to get min_z from the safety area");
       return std::numeric_limits<double>::lowest();
     }
