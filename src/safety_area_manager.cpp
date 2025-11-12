@@ -129,6 +129,7 @@ private:
   std::tuple<bool, bool> isPositionValid(mrs_msgs::msg::UavState);
 
   void initialize();
+  void shutdown();
 
   // | -------------- uav_state/odometry subscriber ------------- |
 
@@ -448,6 +449,16 @@ void SafetyAreaManager::initialize() {
 }
 
 //}
+
+/* shutdown() //{ */
+void SafetyAreaManager::shutdown() {
+
+  std::cout << "SafetyAreaManager: shutdown(): called" << std::endl;
+
+  timer_status_->stop();
+
+  std::cout << "SafetyAreaManager: finished shutdown()" << std::endl;
+}
 
 // --------------------------------------------------------------
 // |                          timers                            |
