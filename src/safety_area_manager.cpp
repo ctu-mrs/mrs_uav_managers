@@ -69,7 +69,7 @@ public:
   SafetyAreaManager(rclcpp::NodeOptions options);
 
 private:
-  rclcpp::Node::SharedPtr node_;
+  rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
@@ -78,15 +78,15 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
-  std::atomic<bool> is_initialized_       = false;
-  std::atomic<bool> world_origin_changed_ = false;
+  std::atomic<bool>                     is_initialized_       = false;
+  std::atomic<bool>                     world_origin_changed_ = false;
 
   // | ------------------- scope timer logger ------------------- |
 
-  bool scope_timer_enabled_ = false;
+  bool                                       scope_timer_enabled_ = false;
   std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
-  std::string _uav_name_;
-  std::string _world_config_;
+  std::string                                _uav_name_;
+  std::string                                _world_config_;
 
   struct VisualizationComponents
   {
@@ -99,7 +99,7 @@ private:
 
   struct SafetyZoneParams
   {
-    bool use_safety_area;
+    bool                       use_safety_area;
     mrs_msgs::msg::WorldOrigin world_origin;
   };
 
@@ -108,8 +108,8 @@ private:
     std::shared_ptr<mrs_lib::safety_zone::SafetyZone> safety_zone;
     // Safety zone with global coordinates, used for world origin updates
     std::shared_ptr<mrs_lib::safety_zone::SafetyZone> global_safety_zone;
-    VisualizationComponents visualization_components;
-    SafetyZoneParams parameters;
+    VisualizationComponents                           visualization_components;
+    SafetyZoneParams                                  parameters;
 
     SafetyZoneHandler()                                = default;
     SafetyZoneHandler(SafetyZoneHandler &&)            = default;
@@ -120,8 +120,8 @@ private:
 
   // profiling
   mrs_lib::Profiler profiler_;
-  bool profiler_enabled_ = false;
-  int status_timer_rate_ = 0;
+  bool              profiler_enabled_  = false;
+  int               status_timer_rate_ = 0;
 
   // diagnostics publishing
   void publishDiagnostics(void);
@@ -133,36 +133,36 @@ private:
 
   // | -------------- uav_state/odometry subscriber ------------- |
 
-  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_odometry_;
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>       sh_odometry_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_max_z_;
-  mrs_msgs::msg::UavState uav_state_;
-  std::mutex mutex_uav_state_;
+  mrs_msgs::msg::UavState                                   uav_state_;
+  std::mutex                                                mutex_uav_state_;
 
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_gnss_;
 
   // | --------------------- service servers -------------------- |
 
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_point_in_safety_area_3d_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_point_in_safety_area_2d_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>    ss_point_in_safety_area_3d_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>    ss_point_in_safety_area_2d_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidatePathToPointSrv> ss_path_in_safety_area_3d_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidatePathToPointSrv> ss_path_in_safety_area_2d_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetSafetyBorderSrv> ss_set_safety_border_;
-  mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> ss_toggle_safety_area_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_add_obstacle_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetObstacleSrv> ss_set_obstacle_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetSafetyBorderSrv>     ss_set_safety_border_;
+  mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>                ss_toggle_safety_area_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>    ss_add_obstacle_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::SetObstacleSrv>         ss_set_obstacle_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_max_z_;
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv> ss_get_min_z_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetBoolSrv> ss_is_safety_zone_enabled_;
-  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> ss_update_world_origin_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetBoolSrv>             ss_is_safety_zone_enabled_;
+  mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>    ss_update_world_origin_;
 
   // | --------------------- service clients --------------------- |
   mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv> sc_set_world_origin_;
 
   // | ----------------------- subscribers ----------------------- |
 
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>         sh_hw_api_capabilities_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics> sh_estimation_diag_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>     sh_estimation_diag_;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -173,11 +173,11 @@ private:
   // this timer will check till we already got the hardware api diagnostics
   // the initialization of the SafetyAreaManager
   rclcpp::TimerBase::SharedPtr timer_prerequisites_;
-  void timerPrerequisites();
+  void                         timerPrerequisites();
 
   // timer for regular status publishing
   std::shared_ptr<TimerType> timer_status_;
-  void timerStatus();
+  void                       timerStatus();
 
   // | ----------------------- callbacks ----------------------- |
   // topic callbacks
@@ -185,30 +185,30 @@ private:
   void callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
   // services
-  bool callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+  bool callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+  bool callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackValidatePathToPoint3d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+  bool callbackValidatePathToPoint3d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
                                      const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response);
-  bool callbackValidatePathToPoint2d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+  bool callbackValidatePathToPoint2d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
                                      const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response);
 
-  bool callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Request> request,
+  bool callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Request>  request,
                                const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Response> response);
-  bool callbackToggleSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  bool callbackToggleSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
-  bool callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+  bool callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                            const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request,
+  bool callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request>  request,
                            const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response);
-  bool callbackGetMaxZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
+  bool callbackGetMaxZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request>  request,
                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response);
-  bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
+  bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request>  request,
                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response);
   bool callbackIsSafetyZoneEnabled([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Request> request,
-                                   std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Response> response);
-  bool callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+                                   std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Response>                       response);
+  bool callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                  const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
 
@@ -222,20 +222,20 @@ private:
   std::tuple<bool, std::vector<mrs_lib::safety_zone::Point2d>> transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
                                                                                const std::string &from_frame, const std::string &to_frame);
 
-  std::tuple<bool, double> transformZ(const std::string &current_frame, const std::string &target_frame, const double z);
-  bool initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
+  std::tuple<bool, double>                                  transformZ(const std::string &current_frame, const std::string &target_frame, const double z);
+  bool                                                      initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> copyExistingObstacles();
-  bool initializationFromMsg(const mrs_msgs::msg::Prism &prism_msg, bool keep_obstacles);
-  std::optional<SafetyZoneHandler> createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border,
-                                                    std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacle_prisms);
+  bool                                                      initializationFromMsg(const mrs_msgs::msg::Prism &prism_msg, bool keep_obstacles);
+  std::optional<SafetyZoneHandler>                          createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>            &&border,
+                                                                             std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacle_prisms);
 
   std::tuple<bool, std::string> validateMsg(const mrs_msgs::msg::Prism &prism_msg);
 
   // Reference validation
-  bool isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point);
-  bool isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
-  bool isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
-  bool isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  bool   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
   double getMaxZ(const std::string &frame_id);
   double getMinZ(const std::string &frame_id);
 
@@ -362,13 +362,13 @@ void SafetyAreaManager::initialize() {
 
   ss_path_in_safety_area_3d_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidatePathToPointSrv>(
       node_, "~/path_in_safety_area_3d_in",
-      [this](std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+      [this](std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
              std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response) { callbackValidatePathToPoint3d(request, response); },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   ss_path_in_safety_area_2d_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidatePathToPointSrv>(
       node_, "~/path_in_safety_area_2d_in",
-      [this](std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+      [this](std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
              std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response) { callbackValidatePathToPoint2d(request, response); },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
@@ -402,13 +402,13 @@ void SafetyAreaManager::initialize() {
 
   ss_get_max_z_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv>(
       node_, "~/get_max_z_in",
-      [this](std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
+      [this](std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request>  request,
              std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response) { callbackGetMaxZ(request, response); },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   ss_get_min_z_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetReferenceStampedSrv>(
       node_, "~/get_min_z_in",
-      [this](std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
+      [this](std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request>  request,
              std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response) { callbackGetMinZ(request, response); },
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
@@ -467,8 +467,8 @@ void SafetyAreaManager::shutdown() {
 /* timerPrerequisites() //{ */
 
 void SafetyAreaManager::timerPrerequisites() {
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerPrerequisites");
-  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPrerequisites");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_hw_api_capabilities = sh_hw_api_capabilities_.hasMsg();
   bool got_estimation_diag     = sh_estimation_diag_.hasMsg();
@@ -493,8 +493,8 @@ void SafetyAreaManager::timerStatus() {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("timerStatus");
-  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerStatus");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_odom = sh_odometry_.hasMsg();
 
@@ -507,9 +507,9 @@ void SafetyAreaManager::timerStatus() {
     // Rebuild safety area according to new world origin, keeping the global coordinates of the previous world origin (if it was set given to the previous world
     // origin)
     std::scoped_lock lock(mutex_safety_area_);
-    auto current_border                       = safety_zone_handler_.safety_zone->getBorder();
-    auto global_border                        = safety_zone_handler_.global_safety_zone->getBorder();
-    const auto global_points                  = global_border.getPoints();
+    auto             current_border           = safety_zone_handler_.safety_zone->getBorder();
+    auto             global_border            = safety_zone_handler_.global_safety_zone->getBorder();
+    const auto       global_points            = global_border.getPoints();
     auto [success, transformed_border_points] = transformPoints(global_points, global_border.getHorizontalFrame(), current_border.getHorizontalFrame());
 
     if (!success) {
@@ -519,7 +519,7 @@ void SafetyAreaManager::timerStatus() {
     auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(transformed_border_points, global_border.getMaxZ(), global_border.getMinZ(),
                                                                           current_border.getHorizontalFrame(), current_border.getVerticalFrame());
     // Recompute Obstacles
-    const auto &global_obstacles_ptrs = safety_zone_handler_.global_safety_zone->getObstacles();
+    const auto                                               &global_obstacles_ptrs = safety_zone_handler_.global_safety_zone->getObstacles();
     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> new_obstacle_prisms;
     for (const auto &[key, global_obstacle_ptr] : global_obstacles_ptrs) {
       const auto &global_obstacle_points = global_obstacle_ptr->getPoints();
@@ -566,8 +566,8 @@ void SafetyAreaManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSha
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackOdometry");
-  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::callbackOdometry", scope_timer_logger_, scope_timer_enabled_);
 
   // | ------------------ check for time stamp ------------------ |
 
@@ -597,8 +597,8 @@ void SafetyAreaManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSha
 
 void SafetyAreaManager::callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) {
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("callbackGNSS");
-  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGNSS");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::callbackGNSS", scope_timer_logger_, scope_timer_enabled_);
 
   transformer_->setLatLon(msg->latitude, msg->longitude);
 }
@@ -609,7 +609,7 @@ void SafetyAreaManager::callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSha
 
 /* callbackAddObstacle() //{ */
 
-bool SafetyAreaManager::callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+bool SafetyAreaManager::callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                             const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -626,7 +626,7 @@ bool SafetyAreaManager::callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv:
   point.reference = request->reference;
   // Get the safety area horizontal frame
   std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto tfed_horizontal         = transformer_->transformSingle(point, horizontal_frame);
+  auto        tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -659,7 +659,7 @@ bool SafetyAreaManager::callbackAddObstacle(const std::shared_ptr<mrs_msgs::srv:
 
 /* callbackSetObstacle() //{ */
 
-bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request> request,
+bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Request>  request,
                                             const std::shared_ptr<mrs_msgs::srv::SetObstacleSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -704,7 +704,7 @@ bool SafetyAreaManager::callbackSetObstacle(const std::shared_ptr<mrs_msgs::srv:
 
 /* callbackToggleSafetyArea() //{ */
 
-bool SafetyAreaManager::callbackToggleSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+bool SafetyAreaManager::callbackToggleSafetyArea(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
                                                  const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
   if (!is_initialized_) {
     return false;
@@ -720,7 +720,7 @@ bool SafetyAreaManager::callbackToggleSafetyArea(const std::shared_ptr<std_srvs:
 
 // /* callbackSetSafetyBorder() //{ */
 
-bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Request> request,
+bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::SetSafetyBorderSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -791,7 +791,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 //}
 
 // /* callbackValidatePoint3d() //{ */
-bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -806,7 +806,7 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
 
   std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
   std::string border_vertical_frame   = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
-  auto tfed_horizontal                = transformer_->transformSingle(point, border_horizontal_frame);
+  auto        tfed_horizontal         = transformer_->transformSingle(point, border_horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -830,7 +830,7 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
 //}
 
 // /* callbackValidatePoint2d() //{ */
-bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
   if (!is_initialized_) {
     return false;
@@ -843,7 +843,7 @@ bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::
   point.header    = request->header;
 
   std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto tfed_horizontal                = transformer_->transformSingle(point, border_horizontal_frame);
+  auto        tfed_horizontal         = transformer_->transformSingle(point, border_horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -867,7 +867,7 @@ bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::
 
 // /* callbackValidatePathtoPoint3d() //{ */
 
-bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
                                                       const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -931,7 +931,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
 
 /* callbackValidatePathtoPoint2d() //{ */
 
-bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request,
+bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
                                                       const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -992,7 +992,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
 // /* callbackGetMaxZ() //{ */
 
 bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
-                                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response) {
+                                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response>                 response) {
 
   if (!is_initialized_) {
     return false;
@@ -1006,7 +1006,7 @@ bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] const std::shared_ptr<m
 
   auto border = safety_zone_handler_.safety_zone->getBorder();
 
-  double max_z               = border.getMaxZ();
+  double      max_z          = border.getMaxZ();
   std::string vertical_frame = border.getVerticalFrame();
 
   response->reference.header.frame_id      = vertical_frame;
@@ -1026,7 +1026,7 @@ bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] const std::shared_ptr<m
 /* callbackGetMinZ() //{ */
 
 bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request,
-                                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response> response) {
+                                        const std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Response>                 response) {
 
   if (!is_initialized_) {
     return false;
@@ -1041,7 +1041,7 @@ bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<m
 
   auto border = safety_zone_handler_.safety_zone->getBorder();
 
-  double min_z               = border.getMinZ();
+  double      min_z          = border.getMinZ();
   std::string vertical_frame = border.getVerticalFrame();
 
   response->reference.header.frame_id      = vertical_frame;
@@ -1061,7 +1061,7 @@ bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<m
 /* callbackIsSafetyZoneEnabled() //{ */
 
 bool SafetyAreaManager::callbackIsSafetyZoneEnabled([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Request> request,
-                                                    const std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Response> response) {
+                                                    const std::shared_ptr<mrs_msgs::srv::GetBoolSrv::Response>                 response) {
   if (!is_initialized_) {
     return false;
   }
@@ -1079,7 +1079,7 @@ bool SafetyAreaManager::callbackIsSafetyZoneEnabled([[maybe_unused]] const std::
 
 //}
 //
-bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request,
+bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                   const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
@@ -1123,11 +1123,11 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   }
 
   std::string world_origin_units;
-  double origin_x;
-  double origin_y;
+  double      origin_x;
+  double      origin_y;
   std::string horizontal_frame;
   std::string vertical_frame;
-  bool safety_area_enabled;
+  bool        safety_area_enabled;
   param_loader.loadParam("world_origin/units", world_origin_units);
   param_loader.loadParam("world_origin/origin_x", origin_x);
   param_loader.loadParam("world_origin/origin_y", origin_y);
@@ -1143,8 +1143,8 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   // Make border prism
   const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
-  const auto max_z                    = param_loader.loadParam2<double>("safety_area/border/max_z");
-  const auto min_z                    = param_loader.loadParam2<double>("safety_area/border/min_z");
+  const auto            max_z         = param_loader.loadParam2<double>("safety_area/border/max_z");
+  const auto            min_z         = param_loader.loadParam2<double>("safety_area/border/min_z");
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load safety area border parameters!");
@@ -1172,13 +1172,13 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
     // std::vector<Eigen::MatrixXd> obstacles;
     obstacles.reserve(obstacles_count);
     for (int i = 0; i < obstacles_count; i++) {
-      double max_z, min_z;
+      double      max_z, min_z;
       std::string horizontal_frame, vertical_frame;
 
       std::string obstacle_path = "safety_area/obstacles/obstacle_" + std::to_string(i);
 
-      std::string points_path  = obstacle_path + "/points";
-      Eigen::MatrixXd obstacle = param_loader.loadMatrixDynamic2(points_path, -1, 2);
+      std::string     points_path = obstacle_path + "/points";
+      Eigen::MatrixXd obstacle    = param_loader.loadMatrixDynamic2(points_path, -1, 2);
 
       std::string horizontal_frame_path = obstacle_path + "/horizontal_frame";
       param_loader.loadParam(horizontal_frame_path, horizontal_frame);
@@ -1236,7 +1236,7 @@ std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> SafetyAreaManager::cop
     return {};
   }
 
-  const auto &obstacles_map = safety_zone_handler_.safety_zone->getObstacles();
+  const auto                                               &obstacles_map = safety_zone_handler_.safety_zone->getObstacles();
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacles_copy;
   obstacles_copy.reserve(obstacles_map.size());
 
@@ -1285,7 +1285,7 @@ bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::msg::Prism &prism_
 /* createSafetyZone () //{ */
 
 std::optional<SafetyAreaManager::SafetyZoneHandler>
-SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism> &&border,
+SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>            &&border,
                                     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacle_prisms = {}) {
   SafetyZoneHandler safety_zone_handler;
   safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(std::move(border), std::move(obstacle_prisms));
@@ -1309,12 +1309,12 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
   }
 
   // Save current safety zone in a global reference frame
-  auto safety_border                        = safety_zone_handler.safety_zone->getBorder();
-  const auto points                         = safety_border.getPoints();
+  auto              safety_border           = safety_zone_handler.safety_zone->getBorder();
+  const auto        points                  = safety_border.getPoints();
   const std::string border_horizontal_frame = safety_border.getHorizontalFrame();
   const std::string border_vertical_frame   = safety_border.getVerticalFrame();
-  const double border_max_z                 = safety_border.getMaxZ();
-  const double border_min_z                 = safety_border.getMinZ();
+  const double      border_max_z            = safety_border.getMaxZ();
+  const double      border_min_z            = safety_border.getMinZ();
 
   auto [success, transformed_border_points] = transformPoints(points, border_horizontal_frame, "latlon_origin");
 
@@ -1339,11 +1339,11 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
 
     for (const auto &[key, obstacle_ptr] : obstacles_ptrs) {
       mrs_msgs::msg::Prism tmp_obstacle;
-      const auto &obstacle_points   = obstacle_ptr->getPoints();
-      tmp_obstacle.horizontal_frame = obstacle_ptr->getHorizontalFrame();
-      tmp_obstacle.vertical_frame   = obstacle_ptr->getVerticalFrame();
-      tmp_obstacle.max_z            = obstacle_ptr->getMaxZ();
-      tmp_obstacle.min_z            = obstacle_ptr->getMinZ();
+      const auto          &obstacle_points = obstacle_ptr->getPoints();
+      tmp_obstacle.horizontal_frame        = obstacle_ptr->getHorizontalFrame();
+      tmp_obstacle.vertical_frame          = obstacle_ptr->getVerticalFrame();
+      tmp_obstacle.max_z                   = obstacle_ptr->getMaxZ();
+      tmp_obstacle.min_z                   = obstacle_ptr->getMinZ();
 
       auto [success, transformed_obstacle_points] = transformPoints(obstacle_points, tmp_obstacle.horizontal_frame, "latlon_origin");
 
@@ -1522,8 +1522,8 @@ std::tuple<bool, double> SafetyAreaManager::transformZ(const std::string &curren
 bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::scoped_lock lock(mutex_safety_area_);
-  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto tfed_horizontal         = transformer_->transformSingle(point, horizontal_frame);
+  std::string      horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto             tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1544,8 +1544,8 @@ bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStam
 bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::scoped_lock lock(mutex_safety_area_);
-  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto tfed_horizontal         = transformer_->transformSingle(point, horizontal_frame);
+  std::string      horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto             tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1780,8 +1780,8 @@ void SafetyAreaManager::publishDiagnostics(void) {
     return;
   }
 
-  mrs_lib::Routine profiler_routine = profiler_.createRoutine("publishDiagnostics");
-  mrs_lib::ScopeTimer timer         = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
+  mrs_lib::Routine    profiler_routine = profiler_.createRoutine("publishDiagnostics");
+  mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::publishDiagnostics", scope_timer_logger_, scope_timer_enabled_);
 
   mrs_msgs::msg::SafetyAreaManagerDiagnostics diagnostics_msg;
 
@@ -1843,11 +1843,11 @@ void SafetyAreaManager::publishDiagnostics(void) {
     // Iterate over vector of ObstaclePtr
     for (const auto &[key, obstaclePtr] : obstacles_ptrs) {
       mrs_msgs::msg::Prism tmp_obstacle;
-      const auto &obstacle_points   = obstaclePtr->getPoints();
-      tmp_obstacle.horizontal_frame = obstaclePtr->getHorizontalFrame();
-      tmp_obstacle.vertical_frame   = obstaclePtr->getVerticalFrame();
-      tmp_obstacle.max_z            = obstaclePtr->getMaxZ();
-      tmp_obstacle.min_z            = obstaclePtr->getMinZ();
+      const auto          &obstacle_points = obstaclePtr->getPoints();
+      tmp_obstacle.horizontal_frame        = obstaclePtr->getHorizontalFrame();
+      tmp_obstacle.vertical_frame          = obstaclePtr->getVerticalFrame();
+      tmp_obstacle.max_z                   = obstaclePtr->getMaxZ();
+      tmp_obstacle.min_z                   = obstaclePtr->getMinZ();
 
       // Extract the points of the obstacle
       for (const auto &point : obstacle_points) {
