@@ -1,1 +1,1 @@
-add_subdirectory(./switch_estimator_service)
+add_subdirectory(switch_estimator_service)
