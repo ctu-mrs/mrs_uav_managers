@@ -2,6 +2,9 @@
 #ifndef ESTIMATION_MANAGER_TYPES_H
 #define ESTIMATION_MANAGER_TYPES_H
 
+#include <vector>
+#include <string>
+
 namespace mrs_uav_managers
 {
 
@@ -67,10 +70,10 @@ namespace sm
   };
 // clang-format on
 
-}  // namespace sm
+} // namespace sm
 
-}  // namespace estimation_manager
+} // namespace estimation_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // ESTIMATION_MANAGER_TYPES_H
+#endif // ESTIMATION_MANAGER_TYPES_H
