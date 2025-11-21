@@ -1132,8 +1132,8 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   param_loader.loadParam("world_origin/origin_x", origin_x);
   param_loader.loadParam("world_origin/origin_y", origin_y);
   param_loader.loadParam("safety_area/enabled", safety_area_enabled);
-  param_loader.loadParam("safety_area/border/horizontal_frame", horizontal_frame);
-  param_loader.loadParam("safety_area/border/vertical_frame", vertical_frame);
+  param_loader.loadParam("safety_area/horizontal/frame_name", horizontal_frame);
+  param_loader.loadParam("safety_area/vertical/frame_name", vertical_frame);
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load world config parameters!");
@@ -1142,9 +1142,9 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   }
 
   // Make border prism
-  const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/border/points", -1, 2);
-  const auto            max_z         = param_loader.loadParam2<double>("safety_area/border/max_z");
-  const auto            min_z         = param_loader.loadParam2<double>("safety_area/border/min_z");
+  const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
+  const auto            max_z         = param_loader.loadParam2<double>("safety_area/vertical/max_z");
+  const auto            min_z         = param_loader.loadParam2<double>("safety_area/vertical/min_z");
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load safety area border parameters!");
@@ -1162,34 +1162,34 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacles;
 
   bool obstacles_present = false;
-  param_loader.loadParam("safety_area/obstacles/present", obstacles_present);
+  param_loader.loadParam("obstacles/present", obstacles_present);
 
   // If any is present, fill obstacles
   if (obstacles_present) {
     // Read parameters for obstacles
     int obstacles_count = 0;
-    param_loader.loadParam("safety_area/obstacles/count", obstacles_count);
+    param_loader.loadParam("obstacles/count", obstacles_count);
     // std::vector<Eigen::MatrixXd> obstacles;
     obstacles.reserve(obstacles_count);
     for (int i = 0; i < obstacles_count; i++) {
       double      max_z, min_z;
       std::string horizontal_frame, vertical_frame;
 
-      std::string obstacle_path = "safety_area/obstacles/obstacle_" + std::to_string(i);
+      std::string obstacle_path = "obstacles/obstacle_" + std::to_string(i);
 
-      std::string     points_path = obstacle_path + "/points";
+      std::string     points_path = obstacle_path + "/horizontal/points";
       Eigen::MatrixXd obstacle    = param_loader.loadMatrixDynamic2(points_path, -1, 2);
 
-      std::string horizontal_frame_path = obstacle_path + "/horizontal_frame";
+      std::string horizontal_frame_path = obstacle_path + "/horizontal/frame_name";
       param_loader.loadParam(horizontal_frame_path, horizontal_frame);
 
-      std::string vertical_frame_path = obstacle_path + "/vertical_frame";
+      std::string vertical_frame_path = obstacle_path + "/vertical/frame_name";
       param_loader.loadParam(vertical_frame_path, vertical_frame);
 
-      std::string max_z_path = obstacle_path + "/max_z";
+      std::string max_z_path = obstacle_path + "/vertical/max_z";
       param_loader.loadParam(max_z_path, max_z);
 
-      std::string min_z_path = obstacle_path + "/min_z";
+      std::string min_z_path = obstacle_path + "/vertical/min_z";
       param_loader.loadParam(min_z_path, min_z);
 
       if (!param_loader.loadedSuccessfully()) {
