@@ -242,6 +242,7 @@ private:
 }; // class SafetyAreaManager
 
 //}
+
 /* SafetyAreaManager::SafetyAreaManager() //{ */
 
 SafetyAreaManager::SafetyAreaManager(rclcpp::NodeOptions options) : mrs_lib::Node("safety_area_manager", options) {
@@ -451,6 +452,7 @@ void SafetyAreaManager::initialize() {
 //}
 
 /* shutdown() //{ */
+
 void SafetyAreaManager::shutdown() {
 
   std::cout << "SafetyAreaManager: shutdown(): called" << std::endl;
@@ -459,6 +461,8 @@ void SafetyAreaManager::shutdown() {
 
   std::cout << "SafetyAreaManager: finished shutdown()" << std::endl;
 }
+
+//}
 
 // --------------------------------------------------------------
 // |                          timers                            |
@@ -485,7 +489,7 @@ void SafetyAreaManager::timerPrerequisites() {
 }
 //}
 
-/* timerStatus //{ */
+/* timerStatus() //{ */
 
 void SafetyAreaManager::timerStatus() {
 
@@ -504,12 +508,14 @@ void SafetyAreaManager::timerStatus() {
   }
 
   if (world_origin_changed_) {
+
     // Rebuild safety area according to new world origin, keeping the global coordinates of the previous world origin (if it was set given to the previous world
     // origin)
     std::scoped_lock lock(mutex_safety_area_);
-    auto             current_border           = safety_zone_handler_.safety_zone->getBorder();
-    auto             global_border            = safety_zone_handler_.global_safety_zone->getBorder();
-    const auto       global_points            = global_border.getPoints();
+
+    auto       current_border                 = safety_zone_handler_.safety_zone->getBorder();
+    auto       global_border                  = safety_zone_handler_.global_safety_zone->getBorder();
+    const auto global_points                  = global_border.getPoints();
     auto [success, transformed_border_points] = transformPoints(global_points, global_border.getHorizontalFrame(), current_border.getHorizontalFrame());
 
     if (!success) {
@@ -521,7 +527,9 @@ void SafetyAreaManager::timerStatus() {
     // Recompute Obstacles
     const auto                                               &global_obstacles_ptrs = safety_zone_handler_.global_safety_zone->getObstacles();
     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> new_obstacle_prisms;
+
     for (const auto &[key, global_obstacle_ptr] : global_obstacles_ptrs) {
+
       const auto &global_obstacle_points = global_obstacle_ptr->getPoints();
       auto [success, transformed_obstacle_points] =
           transformPoints(global_obstacle_points, global_obstacle_ptr->getHorizontalFrame(), current_border.getHorizontalFrame());
@@ -547,6 +555,7 @@ void SafetyAreaManager::timerStatus() {
     safety_zone_handler_  = std::move(*new_safety_zone);
     world_origin_changed_ = false;
   }
+
   // Publishing
   publishDiagnostics();
 }
@@ -556,6 +565,7 @@ void SafetyAreaManager::timerStatus() {
 // --------------------------------------------------------------
 // |                          callbacks                          |
 // --------------------------------------------------------------
+
 // | --------------------- topic callbacks -------------------- |
 
 /* //{ callbackOdometry() */
@@ -791,6 +801,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 //}
 
 // /* callbackValidatePoint3d() //{ */
+
 bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
@@ -830,6 +841,7 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
 //}
 
 // /* callbackValidatePoint2d() //{ */
+
 bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                 const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
   if (!is_initialized_) {
@@ -1118,6 +1130,7 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
 /* initializationFromFile() //{ */
 
 bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename) {
+
   if (!param_loader.addYamlFile(filename)) {
     return false;
   }
@@ -1128,6 +1141,7 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   std::string horizontal_frame;
   std::string vertical_frame;
   bool        safety_area_enabled;
+
   param_loader.loadParam("world_origin/units", world_origin_units);
   param_loader.loadParam("world_origin/origin_x", origin_x);
   param_loader.loadParam("world_origin/origin_y", origin_y);
@@ -1162,15 +1176,20 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacles;
 
   bool obstacles_present = false;
+
   param_loader.loadParam("obstacles/present", obstacles_present);
 
   // If any is present, fill obstacles
   if (obstacles_present) {
+
     // Read parameters for obstacles
     int obstacles_count = 0;
+
     param_loader.loadParam("obstacles/count", obstacles_count);
+
     // std::vector<Eigen::MatrixXd> obstacles;
     obstacles.reserve(obstacles_count);
+
     for (int i = 0; i < obstacles_count; i++) {
       double      max_z, min_z;
       std::string horizontal_frame, vertical_frame;
@@ -1744,6 +1763,7 @@ double SafetyAreaManager::getMinZ(const std::string &frame_id) {
 
   // | ---------- first, get min_z from the safety area --------- |
   std::scoped_lock lock(mutex_safety_area_);
+
   if (!safety_zone_handler_.safety_zone) {
     RCLCPP_WARN(node_->get_logger(), "No safety border defined.");
     return std::numeric_limits<float>::lowest();
@@ -1842,7 +1862,9 @@ void SafetyAreaManager::publishDiagnostics(void) {
 
     // Iterate over vector of ObstaclePtr
     for (const auto &[key, obstaclePtr] : obstacles_ptrs) {
+
       mrs_msgs::msg::Prism tmp_obstacle;
+
       const auto          &obstacle_points = obstaclePtr->getPoints();
       tmp_obstacle.horizontal_frame        = obstaclePtr->getHorizontalFrame();
       tmp_obstacle.vertical_frame          = obstaclePtr->getVerticalFrame();
@@ -1855,6 +1877,7 @@ void SafetyAreaManager::publishDiagnostics(void) {
         tmp_point.y = boost::geometry::get<1>(point);
         tmp_obstacle.points.push_back(tmp_point);
       }
+
       diagnostics_msg.obstacles.push_back(tmp_obstacle);
     }
   }

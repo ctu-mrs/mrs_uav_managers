@@ -291,7 +291,7 @@ rclcpp_components_register_nodes(MrsUavManagers_GainManager "mrs_uav_managers::g
 
 target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
-# # Safety Area Manager
+# Safety Area Manager
 
 add_library(MrsUavManagers_SafetyAreaManager SHARED
   src/safety_area_manager.cpp
