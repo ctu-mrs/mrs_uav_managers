@@ -66,6 +66,233 @@ set(LIBRARIES
 ## |                           Compile                          |
 ## --------------------------------------------------------------
 
+# Estimation Manager
+
+add_library(MrsUavManagers_EstimationManager SHARED
+  src/estimation_manager/estimation_manager.cpp
+  src/estimation_manager/estimator.cpp
+  src/estimation_manager/estimators/state_estimator.cpp
+  src/estimation_manager/estimators/agl_estimator.cpp
+)
+
+target_include_directories(MrsUavManagers_EstimationManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_EstimationManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_EstimationManager "mrs_uav_managers::estimation_manager::EstimationManager")
+
+target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Transform Manager
+
+add_library(MrsUavManagers_TransformManager SHARED
+  src/transform_manager/transform_manager.cpp
+)
+
+target_include_directories(MrsUavManagers_TransformManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_TransformManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_TransformManager "mrs_uav_managers::transform_manager::TransformManager")
+
+target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Control Manager
+
+add_library(MrsUavManagers_ControlManager SHARED
+  src/control_manager/control_manager.cpp
+  src/control_manager/output_publisher.cpp
+  src/control_manager/common/common.cpp
+)
+
+target_include_directories(MrsUavManagers_ControlManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_ControlManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_ControlManager "mrs_uav_managers::control_manager::ControlManager")
+
+target_compile_definitions(MrsUavManagers_ControlManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
+
+# UAV Manager
+
+add_library(MrsUavManagers_UavManager SHARED
+  src/uav_manager.cpp
+)
+
+target_include_directories(MrsUavManagers_UavManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_UavManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_UavManager "mrs_uav_managers::uav_manager::UavManager")
+
+target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Constraint Manager
+
+add_library(MrsUavManagers_ConstraintManager SHARED
+  src/constraint_manager.cpp
+)
+
+target_include_directories(MrsUavManagers_ConstraintManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_ConstraintManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_ConstraintManager "mrs_uav_managers::constraint_manager::ConstraintManager")
+
+target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Gain Manager
+
+add_library(MrsUavManagers_GainManager SHARED
+  src/gain_manager.cpp
+)
+
+target_include_directories(MrsUavManagers_GainManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_GainManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_GainManager "mrs_uav_managers::gain_manager::GainManager")
+
+target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
+# Null Tracker
+
+add_library(MrsUavManagers_NullTracker SHARED
+  src/null_tracker.cpp
+)
+
+target_include_directories(MrsUavManagers_NullTracker
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_NullTracker
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${visualization_msgs_TARGETS}
+    ${tf2_geometry_msgs_TARGETS}
+)
+
+target_compile_definitions(MrsUavManagers_NullTracker PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+
 # Public interface of this library
 
 add_library(MrsUavManagers_MrsUavManagers INTERFACE)
@@ -103,6 +330,7 @@ target_sources(MrsUavManagers_MrsUavManagers
 
 target_link_libraries(MrsUavManagers_MrsUavManagers
   INTERFACE
+    ${LIBRARIES}
     rclcpp::rclcpp
     mrs_lib::mrs_lib
     pluginlib::pluginlib
@@ -116,205 +344,6 @@ target_link_libraries(MrsUavManagers_MrsUavManagers
     ${visualization_msgs}
     ${tf2_geometry_msgs_TARGETS}
 )
-
-# Estimation Manager
-
-add_library(MrsUavManagers_EstimationManager SHARED
-  src/estimation_manager/estimation_manager.cpp
-  src/estimation_manager/estimator.cpp
-  src/estimation_manager/estimators/state_estimator.cpp
-  src/estimation_manager/estimators/agl_estimator.cpp
-)
-
-target_link_libraries(MrsUavManagers_EstimationManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_EstimationManager "mrs_uav_managers::estimation_manager::EstimationManager")
-
-target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
-
-# Transform Manager
-
-add_library(MrsUavManagers_TransformManager SHARED
-  src/transform_manager/transform_manager.cpp
-)
-
-target_link_libraries(MrsUavManagers_TransformManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_TransformManager "mrs_uav_managers::transform_manager::TransformManager")
-
-target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
-
-# Control Manager
-
-add_library(MrsUavManagers_ControlManager SHARED
-  src/control_manager/control_manager.cpp
-  src/control_manager/output_publisher.cpp
-  src/control_manager/common/common.cpp
-)
-
-target_link_libraries(MrsUavManagers_ControlManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_ControlManager "mrs_uav_managers::control_manager::ControlManager")
-
-target_compile_definitions(MrsUavManagers_ControlManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
-
-# UAV Manager
-
-add_library(MrsUavManagers_UavManager SHARED
-  src/uav_manager.cpp
-)
-
-target_link_libraries(MrsUavManagers_UavManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_UavManager "mrs_uav_managers::uav_manager::UavManager")
-
-target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
-
-# Constraint Manager
-
-add_library(MrsUavManagers_ConstraintManager SHARED
-  src/constraint_manager.cpp
-)
-
-target_link_libraries(MrsUavManagers_ConstraintManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_ConstraintManager "mrs_uav_managers::constraint_manager::ConstraintManager")
-
-target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
-
-# Gain Manager
-
-add_library(MrsUavManagers_GainManager SHARED
-  src/gain_manager.cpp
-)
-
-target_link_libraries(MrsUavManagers_GainManager
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-rclcpp_components_register_nodes(MrsUavManagers_GainManager "mrs_uav_managers::gain_manager::GainManager")
-
-target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
-
-# Null Tracker
-
-add_library(MrsUavManagers_NullTracker SHARED
-  src/null_tracker.cpp
-)
-
-target_link_libraries(MrsUavManagers_NullTracker
-  PRIVATE
-    mrs_uav_managers::mrs_uav_managers
-    rclcpp::rclcpp
-    rclcpp_components::component
-    mrs_lib::mrs_lib
-    pluginlib::pluginlib
-    mrs_uav_hw_api::mrs_uav_hw_api
-    Eigen3::Eigen
-    ${mrs_msgs_TARGETS}
-    ${geometry_msgs_TARGETS}
-    ${nav_msgs_TARGETS}
-    ${std_msgs_TARGETS}
-    ${sensor_msgs_TARGETS}
-    ${visualization_msgs_TARGETS}
-    ${tf2_geometry_msgs_TARGETS}
-)
-
-target_compile_definitions(MrsUavManagers_NullTracker PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                       export plugins                       |
