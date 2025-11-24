@@ -1937,9 +1937,9 @@ void ControlManager::initialize(void) {
   sch_point_in_safety_area_2d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/point_in_safety_area_2d_out", cbkgrp_sc_);
   sch_point_in_safety_area_3d_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/point_in_safety_area_3d_out", cbkgrp_sc_);
   sch_path_to_point_in_safety_area_2d_ =
-      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_2d_out", cbkgrp_sc_);
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_in_safety_area_2d_out", cbkgrp_sc_);
   sch_path_to_point_in_safety_area_3d_ =
-      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_to_point_in_safety_area_3d_out", cbkgrp_sc_);
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ValidatePathToPointSrv>(node_, "~/path_in_safety_area_3d_out", cbkgrp_sc_);
   sch_get_min_z_              = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_min_z_out", cbkgrp_sc_);
   sch_get_max_z_              = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetReferenceStampedSrv>(node_, "~/get_max_z_out", cbkgrp_sc_);
   sch_is_safety_area_enabled_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetBoolSrv>(node_, "~/is_safety_area_enabled_out", cbkgrp_sc_);
@@ -6628,18 +6628,11 @@ bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped
   request->reference = point.reference;
 
   auto response = sch_point_in_safety_area_3d_.callSync(request);
-
-  if (response) {
-    if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The point is outside of the safety area");
-      return false;
-    }
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to check if the point is in the safety area");
+  if (!response) {
+    RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
     return false;
   }
-
-  return true;
+  return response.value()->success;
 }
 
 //}
@@ -6653,22 +6646,12 @@ bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped
   request->reference = point.reference;
 
   auto response = sch_point_in_safety_area_2d_.callSync(request);
-
-  if (response) {
-    if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000,
-                           "SafetyArea: The point is "
-                           "outside of the safety area");
-      return false;
-    }
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000,
-                          "SafetyArea: Could not call the service to check if "
-                          "the point is in the safety area");
+  if (!response) {
+    RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
     return false;
   }
 
-  return true;
+  return response.value()->success;
 }
 
 //}
@@ -6684,19 +6667,13 @@ bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceS
   request->end.point  = end.reference.position;
 
   auto response = sch_path_to_point_in_safety_area_3d_.callSync(request);
-
-  if (response) {
-    if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area");
-      return false;
-    }
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to check if the point is in the safety area");
+  if (!response) {
+    RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
     return false;
   }
-
-  return true;
+  return response.value()->success;
 }
+
 
 //}
 
@@ -6710,18 +6687,11 @@ bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceS
   request->end.point  = end.reference.position;
 
   auto response = sch_path_to_point_in_safety_area_2d_.callSync(request);
-
-  if (response) {
-    if (!response.value()->success) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: The path is outside of the safety area");
-      return false;
-    }
-  } else {
-    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to check if the point is in the safety area");
+  if (!response) {
+    RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
     return false;
   }
-
-  return true;
+  return response.value()->success;
 }
 
 //}
@@ -6739,24 +6709,21 @@ double ControlManager::getMaxZ(const std::string &frame_id) {
 
     auto response = sch_get_max_z_.callSync(request);
 
-    if (response) {
-      if (!response.value()->success) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not get max_z from the safety area");
-      } else {
-        // transform it into the current control frame
-        geometry_msgs::msg::PointStamped point;
-        point.header  = response.value()->reference.header;
-        point.point.x = 0;
-        point.point.y = 0;
-        point.point.z = response.value()->reference.reference.position.z;
-        auto ret      = transformer_->transformSingle(point, frame_id);
-        if (!ret) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
-        }
-        safety_area_max_z = ret->point.z;
+    if (!response) {
+      RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to get max_z from the safety area timed out");
+    } else {
+      geometry_msgs::msg::PointStamped point;
+      point.header  = response.value()->reference.header;
+      point.point.x = 0;
+      point.point.y = 0;
+      point.point.z = response.value()->reference.reference.position.z;
+      auto ret      = transformer_->transformSingle(point, frame_id);
+
+      if (!ret) {
+        RCLCPP_WARN(node_->get_logger(), "SafetyArea: Could not transform safety area's max_z to '%s'", frame_id.c_str());
       }
-    } else
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to get max_z from the safety area");
+      safety_area_max_z = ret->point.z;
+    }
   }
 
   // | ------------ overwrite from estimation manager ----------- |
@@ -6802,32 +6769,26 @@ double ControlManager::getMinZ(const std::string &frame_id) {
   {
     std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::GetReferenceStampedSrv::Request>();
 
-
     auto response = sch_get_min_z_.callSync(request);
 
-    if (response) {
-      if (!response.value()->success) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not get min_z from the safety area");
-        return std::numeric_limits<double>::lowest();
-      } else {
-        // transform it into the current control frame
-        geometry_msgs::msg::PointStamped point;
-        point.header  = response.value()->reference.header;
-        point.point.x = 0;
-        point.point.y = 0;
-        point.point.z = response.value()->reference.reference.position.z;
-
-        auto ret = transformer_->transformSingle(point, frame_id);
-        if (!ret) {
-          RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not transform safety area's min_z to '%s'", frame_id.c_str());
-          return std::numeric_limits<double>::lowest();
-        }
-        return ret->point.z;
-      }
-    } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "SafetyArea: Could not call the service to get min_z from the safety area");
+    if (!response) {
+      RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to get min_z from the safety area timed out");
       return std::numeric_limits<double>::lowest();
     }
+
+    geometry_msgs::msg::PointStamped point;
+    point.header  = response.value()->reference.header;
+    point.point.x = 0;
+    point.point.y = 0;
+    point.point.z = response.value()->reference.reference.position.z;
+    auto ret      = transformer_->transformSingle(point, frame_id);
+
+    if (!ret) {
+      RCLCPP_WARN(node_->get_logger(), "SafetyArea: Could not transform safety area's min_z to '%s'", frame_id.c_str());
+      return std::numeric_limits<double>::lowest();
+    }
+
+    return ret->point.z;
   }
 }
 

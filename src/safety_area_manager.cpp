@@ -831,10 +831,12 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
 
   if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, transformed_z)) {
     response->message = "The point is not in the safety area";
+    response->success = false;
     return true;
   }
 
   response->message = "The point is in the safety area";
+  response->success = true;
   return true;
 }
 
