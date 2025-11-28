@@ -17,6 +17,7 @@
 
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/mutex.h>
 
@@ -39,6 +40,7 @@ class Estimator {
 
 protected:
   mutable mrs_lib::PublisherHandler<mrs_msgs::msg::EstimatorDiagnostics> ph_diagnostics_;
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher>                   error_publisher_;
 
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;

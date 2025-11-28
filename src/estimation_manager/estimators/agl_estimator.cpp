@@ -43,51 +43,61 @@ bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities:
 
   if (!ph_->param_loader->loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-    rclcpp::shutdown();
+    error_publisher_->addOneshotError("Could not load all non-optional parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (requires_gnss && !hw_api_capabilities->produces_gnss) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires gnss but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_imu && !hw_api_capabilities->produces_imu) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires imu but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_distance_sensor && !hw_api_capabilities->produces_distance_sensor) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires distance_sensor but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_altitude && !hw_api_capabilities->produces_altitude) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires altitude but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_magnetometer_heading && !hw_api_capabilities->produces_magnetometer_heading) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires magnetometer_heading but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_position && !hw_api_capabilities->produces_position) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires position but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_orientation && !hw_api_capabilities->produces_orientation) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires orientation but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_velocity && !hw_api_capabilities->produces_velocity) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires velocity but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
   if (requires_angular_velocity && !hw_api_capabilities->produces_angular_velocity) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: requires angular_velocity but hw api does not provide it.", getPrintName().c_str());
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return false;
   }
 
