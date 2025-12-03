@@ -40,6 +40,7 @@ mrs_uav_managers:
     FailsafeController:
       address: "mrs_uav_controllers::failsafe_controller::FailsafeController"
       namespace: "failsafe_controller"
+      human_switchable: false
 
       # which outputs the controller can provide
       outputs:
@@ -56,6 +57,7 @@ mrs_uav_managers:
     EmergencyController:
       address: "mrs_uav_controllers::mpc_controller::MpcController"
       namespace: "emergency_controller"
+      human_switchable: false
 
       # which outputs the controller can provide
       outputs:
@@ -73,6 +75,7 @@ mrs_uav_managers:
     MidairActivationController:
       address: "mrs_uav_controllers::midair_activation_controller::MidairActivationController"
       namespace: "midair_activation_controller"
+      human_switchable: false
 
       # which outputs the controller can provide
       outputs:

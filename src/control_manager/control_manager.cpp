@@ -1277,7 +1277,7 @@ void ControlManager::initialize(void) {
 
     param_loader_->loadParam(tracker_name + "/address", address);
     param_loader_->loadParam(tracker_name + "/namespace", name_space);
-    param_loader_->loadParam(tracker_name + "/human_switchable", human_switchable, false);
+    param_loader_->loadParam(tracker_name + "/human_switchable", human_switchable);
 
     TrackerParams new_tracker(address, name_space, human_switchable);
     trackers_.insert(std::pair<std::string, TrackerParams>(tracker_name, new_tracker));
@@ -1459,7 +1459,7 @@ void ControlManager::initialize(void) {
     param_loader_->loadParam(controller_name + "/eland_threshold", eland_threshold);
     param_loader_->loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
     param_loader_->loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
-    param_loader_->loadParam(controller_name + "/human_switchable", human_switchable, false);
+    param_loader_->loadParam(controller_name + "/human_switchable", human_switchable);
 
     // check if the controller can output some of the required outputs
     {
