@@ -1144,12 +1144,12 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   std::string vertical_frame;
   bool        safety_area_enabled;
 
-  param_loader.loadParam("world_origin/units", world_origin_units);
-  param_loader.loadParam("world_origin/origin_x", origin_x);
-  param_loader.loadParam("world_origin/origin_y", origin_y);
-  param_loader.loadParam("safety_area/enabled", safety_area_enabled);
-  param_loader.loadParam("safety_area/horizontal/frame_name", horizontal_frame);
-  param_loader.loadParam("safety_area/vertical/frame_name", vertical_frame);
+  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
+  param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", origin_x);
+  param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", origin_y);
+  param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/enabled", safety_area_enabled);
+  param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/horizontal/frame_name", horizontal_frame);
+  param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/vertical/frame_name", vertical_frame);
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load world config parameters!");
@@ -1158,9 +1158,9 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   }
 
   // Make border prism
-  const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("safety_area/horizontal/points", -1, 2);
-  const auto            max_z         = param_loader.loadParam2<double>("safety_area/vertical/max_z");
-  const auto            min_z         = param_loader.loadParam2<double>("safety_area/vertical/min_z");
+  const Eigen::MatrixXd border_points = param_loader.loadMatrixDynamic2("mrs_uav_managers/safety_area_manager/safety_area/horizontal/points", -1, 2);
+  const auto            max_z         = param_loader.loadParam2<double>("mrs_uav_managers/safety_area_manager/safety_area/vertical/max_z");
+  const auto            min_z         = param_loader.loadParam2<double>("mrs_uav_managers/safety_area_manager/safety_area/vertical/min_z");
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load safety area border parameters!");
@@ -1179,7 +1179,7 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   bool obstacles_present = false;
 
-  param_loader.loadParam("obstacles/present", obstacles_present);
+  param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/obstacles/present", obstacles_present);
 
   // If any is present, fill obstacles
   if (obstacles_present) {
@@ -1187,7 +1187,7 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
     // Read parameters for obstacles
     int obstacles_count = 0;
 
-    param_loader.loadParam("obstacles/count", obstacles_count);
+    param_loader.loadParam("mrs_uav_managers/safety_area_manager/obstacles/count", obstacles_count);
 
     // std::vector<Eigen::MatrixXd> obstacles;
     obstacles.reserve(obstacles_count);
@@ -1196,7 +1196,7 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
       double      max_z, min_z;
       std::string horizontal_frame, vertical_frame;
 
-      std::string obstacle_path = "obstacles/obstacle_" + std::to_string(i);
+      std::string obstacle_path = "mrs_uav_managers/safety_area_manager/obstacles/obstacle_" + std::to_string(i);
 
       std::string     points_path = obstacle_path + "/horizontal/points";
       Eigen::MatrixXd obstacle    = param_loader.loadMatrixDynamic2(points_path, -1, 2);
@@ -1354,6 +1354,7 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
       std::make_unique<mrs_lib::safety_zone::Prism>(transformed_border_points, border_max_z, border_min_z, "latlon_origin", border_vertical_frame);
 
   std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> global_obstacle_prisms;
+
   if (!obstacle_prisms.empty()) {
     // getObstacles return a vector with the obstacle ptr's
     const auto &obstacles_ptrs = safety_zone_handler.safety_zone->getObstacles();
@@ -1523,12 +1524,14 @@ std::tuple<bool, std::vector<mrs_lib::safety_zone::Point2d>> SafetyAreaManager::
 /* transformZ() //{ */
 
 std::tuple<bool, double> SafetyAreaManager::transformZ(const std::string &current_frame, const std::string &target_frame, const double z) {
+
   geometry_msgs::msg::Point point;
   point.x = 0;
   point.y = 0;
   point.z = z;
 
   const auto res = transformer_->transformSingle(current_frame, point, target_frame);
+
   if (!res) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform point from %s to %s.", current_frame.c_str(), target_frame.c_str());
     return std::make_tuple(false, 0);

@@ -231,29 +231,29 @@ void TransformManager::initialize() {
   double world_origin_x     = 0;
   double world_origin_y     = 0;
 
-  param_loader.loadParam("world_origin/units", world_origin_units_);
+  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units_);
 
   if (Support::toLowercase(world_origin_units_) == "utm") {
 
     RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in UTM units.", getPrintName().c_str());
 
-    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", world_origin_y);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
 
   } else if (Support::toLowercase(world_origin_units_) == "latlon") {
 
     RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
 
     double lat, lon;
-    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("world_origin/origin_y", lon);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
 
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
 
     RCLCPP_INFO(node_->get_logger(), "[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
     rclcpp::shutdown();
   }
 
