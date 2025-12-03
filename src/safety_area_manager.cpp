@@ -599,6 +599,8 @@ void SafetyAreaManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSha
     uav_state_.pose             = msg->pose.pose;
     uav_state_.velocity.angular = msg->twist.twist.angular;
   }
+
+  transformer_->setDefaultFrame(msg->header.frame_id);
 }
 
 //}
