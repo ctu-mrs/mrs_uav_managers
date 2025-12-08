@@ -32,6 +32,7 @@
 #include <boost/geometry.hpp>
 #include <limits>
 #include <memory>
+#include <cmath>
 
 #include <mrs_msgs/msg/point2_d.hpp>
 #include <mrs_msgs/msg/safety_area_manager_diagnostics.hpp>
@@ -78,8 +79,10 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
-  std::atomic<bool>                     is_initialized_       = false;
-  std::atomic<bool>                     world_origin_changed_ = false;
+  std::atomic<bool>                     is_initialized_        = false;
+  std::atomic<bool>                     world_origin_changed_  = false;
+  double                                world_origin_offset_x_ = 0.0;
+  double                                world_origin_offset_y_ = 0.0;
 
   // | ------------------- scope timer logger ------------------- |
 
@@ -507,6 +510,57 @@ void SafetyAreaManager::timerStatus() {
     return;
   }
 
+  auto current_border = safety_zone_handler_.safety_zone->getBorder();
+
+  if (world_origin_changed_ && current_border.getHorizontalFrame() == "world_origin") {
+    RCLCPP_INFO(node_->get_logger(), "World origin has changed, updating the safety area accordingly.");
+
+    std::scoped_lock lock(mutex_safety_area_);
+
+    auto current_frame  = current_border.getHorizontalFrame();
+    auto current_points = current_border.getPoints();
+    auto current_min_z  = current_border.getMinZ();
+    auto current_max_z  = current_border.getMaxZ();
+
+    std::vector<mrs_lib::safety_zone::Point2d> new_points;
+
+    // Add offset to border points
+    for (auto &point : current_points) {
+      new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() + world_origin_offset_x_, point.get<1>() + world_origin_offset_y_});
+    }
+
+    auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", "world_origin");
+
+    // Add existing obstacles with updated positions
+    auto existing_obstacles = copyExistingObstacles();
+
+    // Check if obstacles defined in world_origin frame 
+    for (auto &obstacle : existing_obstacles) {
+      if (obstacle->getHorizontalFrame() == "world_origin") {
+        auto obstacle_points = obstacle->getPoints();
+        std::vector<mrs_lib::safety_zone::Point2d> updated_points;
+
+        for (auto &point : obstacle_points) {
+          updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() + world_origin_offset_x_, point.get<1>() + world_origin_offset_y_});
+        }
+
+        *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", "world_origin");
+      }
+    }
+
+    auto new_safety_zone    = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
+
+    // Update the new safety zone and visualization components
+    if (new_safety_zone) {
+      safety_zone_handler_.visualization_components.safeCleanup();
+      safety_zone_handler_ = std::move(*new_safety_zone);
+    } else {
+      RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
+    }
+
+    world_origin_changed_ = false;
+  }
+
   // Publishing
   publishDiagnostics();
 }
@@ -751,8 +805,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 
       ref_request->reference.position.x = tfed_point->point.x;
       ref_request->reference.position.y = tfed_point->point.y;
-    }
-    else {
+    } else {
       ref_request->reference.position.x = center.get<0>();
       ref_request->reference.position.y = center.get<1>();
     }
@@ -1092,6 +1145,35 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
     return true;
   }
 
+  // Get the difference between the new and old world origin
+  const double R = 6371000.0; // Earth radius in meters
+  const double p = M_PI / 180.0;
+
+  double lat1_rad = safety_zone_handler_.parameters.world_origin.x * p;
+  double lat2_rad = request->reference.position.x * p;
+
+  double dLat = (request->reference.position.x - safety_zone_handler_.parameters.world_origin.x) * p;
+  double dLon = (request->reference.position.y - safety_zone_handler_.parameters.world_origin.y) * p;
+
+  // Haversine distance
+  double a        = std::sin(dLat / 2) * std::sin(dLat / 2) + std::cos(lat1_rad) * std::cos(lat2_rad) * std::sin(dLon / 2) * std::sin(dLon / 2);
+  double c        = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
+  double distance = R * c;
+
+  // Calculate bearing (forward azimuth)
+  double y       = std::sin(dLon) * std::cos(lat2_rad);
+  double x       = std::cos(lat1_rad) * std::sin(lat2_rad) - std::sin(lat1_rad) * std::cos(lat2_rad) * std::cos(dLon);
+  double bearing = std::atan2(y, x);
+
+  // Convert distance and bearing to Cartesian offsets
+  double delta_x = distance * std::sin(bearing);
+  double delta_y = distance * std::cos(bearing);
+
+  world_origin_offset_x_ = delta_x;
+  world_origin_offset_y_ = delta_y;
+
+  RCLCPP_INFO(node_->get_logger(), "World origin shifted by dx: %.2f dy: %.2f meters", delta_x, delta_y);
+
   safety_zone_handler_.parameters.world_origin.x     = request->reference.position.x;
   safety_zone_handler_.parameters.world_origin.y     = request->reference.position.y;
   safety_zone_handler_.parameters.world_origin.units = (request->header.frame_id.find("latlon_origin") != std::string::npos) ? "LATLON" : "UTM";
@@ -1356,23 +1438,6 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
   auto prism = std::make_unique<mrs_lib::safety_zone::Prism>(points, max_z, min_z, horizontal_frame, vertical_frame);
 
   return prism;
-
-  // auto [success, transformed_points] = transformPoints(points, horizontal_frame, "local_origin");
-  //
-  // if (!success) {
-  //   RCLCPP_WARN(node_->get_logger(), "Failed to transform prism points to local_origin frame.");
-  //   return nullptr;
-  // }
-  //
-  // auto [z_success_max, transformed_max_z] = transformZ(vertical_frame, "local_origin", max_z);
-  // auto [z_success_min, transformed_min_z] = transformZ(vertical_frame, "local_origin", min_z);
-  //
-  // if (!z_success_max || !z_success_min) {
-  //   RCLCPP_WARN(node_->get_logger(), "Failed to transform prism Z coordinates to local_origin frame.");
-  //   return nullptr;
-  // }
-  //
-  // return std::make_unique<mrs_lib::safety_zone::Prism>(transformed_points, transformed_max_z, transformed_min_z, "local_origin", "local_origin");
 }
 
 //}
@@ -1397,22 +1462,6 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
   auto prism = std::make_unique<mrs_lib::safety_zone::Prism>(tmp_points, max_z, min_z, horizontal_frame, vertical_frame);
 
   return prism;
-
-  // auto [success, transformed_points] = transformPoints(tmp_points, horizontal_frame, "local_origin");
-  // if (!success) {
-  //   RCLCPP_WARN(node_->get_logger(), "Failed to transform prism points to local_origin frame.");
-  //   return nullptr;
-  // }
-  //
-  // auto [z_success_max, transformed_max_z] = transformZ(vertical_frame, "local_origin", max_z);
-  // auto [z_success_min, transformed_min_z] = transformZ(vertical_frame, "local_origin", min_z);
-  //
-  // if (!z_success_max || !z_success_min) {
-  //   RCLCPP_WARN(node_->get_logger(), "Failed to transform prism Z coordinates to local_origin frame.");
-  //   return nullptr;
-  // }
-  //
-  // return std::make_unique<mrs_lib::safety_zone::Prism>(transformed_points, transformed_max_z, transformed_min_z, "local_origin", "local_origin");
 }
 
 //}
