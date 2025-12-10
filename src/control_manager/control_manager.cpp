@@ -8654,7 +8654,7 @@ mrs_msgs::msg::ReferenceStamped ControlManager::velocityReferenceToReference(con
 
     double stopping_time_z = 0;
 
-    if (vel_reference.reference.velocity.x >= 0) {
+    if (vel_reference.reference.velocity.z >= 0) {
       stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_ascending_acceleration) + 1.0;
     } else {
       stopping_time_z = 1.5 * (fabs(vel_reference.reference.velocity.z) / current_constraints.constraints.vertical_descending_acceleration) + 1.0;
