@@ -239,8 +239,8 @@ private:
   bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
   bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
   bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
-  double getMaxZ(const std::string &frame_id);
-  double getMinZ(const std::string &frame_id);
+  double getMaxZ();
+  double getMinZ();
 
 }; // class SafetyAreaManager
 
@@ -835,27 +835,13 @@ bool SafetyAreaManager::callbackValidatePoint3d(const std::shared_ptr<mrs_msgs::
     return false;
   }
 
-  std::scoped_lock lock(mutex_safety_area_);
-
   mrs_msgs::msg::ReferenceStamped point;
   point.header    = request->header;
   point.reference = request->reference;
 
-  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  std::string border_vertical_frame   = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
-  auto        tfed_horizontal         = transformer_->transformSingle(point, border_horizontal_frame);
+  auto result = isPointInSafetyArea3d(point);
 
-  if (!tfed_horizontal) {
-    RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
-    response->message = "Could not transform the point to the safety area horizontal frame";
-    response->success = false;
-    return true;
-  }
-
-  // As the vertical frame can be different from horizontal frame
-  auto [success, transformed_z] = transformZ(point.header.frame_id, border_vertical_frame, tfed_horizontal->reference.position.z);
-
-  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, transformed_z)) {
+  if (!result) {
     response->message = "The point is not in the safety area";
     response->success = false;
     return true;
@@ -876,23 +862,13 @@ bool SafetyAreaManager::callbackValidatePoint2d(const std::shared_ptr<mrs_msgs::
     return false;
   }
 
-  std::scoped_lock lock(mutex_safety_area_);
-
   mrs_msgs::msg::ReferenceStamped point;
   point.reference = request->reference;
   point.header    = request->header;
 
-  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto        tfed_horizontal         = transformer_->transformSingle(point, border_horizontal_frame);
+  auto result = isPointInSafetyArea2d(point);
 
-  if (!tfed_horizontal) {
-    RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
-    response->message = "Could not transform the point to the safety area horizontal frame";
-    response->success = false;
-    return true;
-  }
-
-  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y)) {
+  if (!result) {
     response->message = "The point is not in the safety area";
     response->success = false;
     return true;
@@ -914,51 +890,18 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
     return false;
   }
 
-  std::scoped_lock lock(mutex_safety_area_);
+  // prepare start and end references
+  mrs_msgs::msg::ReferenceStamped start, end;
+  start.header             = request->start.header;
+  start.reference.position = request->start.point;
+  end.header               = request->end.header;
+  end.reference.position   = request->end.point;
 
-  // transform points
-  geometry_msgs::msg::PointStamped start_transformed, end_transformed;
+  auto result = isPathToPointInSafetyArea3d(start, end);
 
-  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-
-  {
-    auto resp = transformer_->transformSingle(request->start, border_horizontal_frame);
-
-    if (!resp) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1.0, "Could not transform the point to the safety area horizontal frame");
-      response->message = "Could not transform the first point in the path";
-      response->success = false;
-      return true;
-    }
-
-    start_transformed = resp.value();
-  }
-
-  {
-    auto resp = transformer_->transformSingle(request->end, border_horizontal_frame);
-
-    if (!resp) {
-      RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
-      response->success = false;
-      response->message = "Could not transform the point in the path";
-      return true;
-    }
-
-    end_transformed = resp.value();
-  }
-
-  // verify the whole path
-  mrs_lib::safety_zone::Point3d start_point, end_point;
-  start_point.set<0>(start_transformed.point.x);
-  start_point.set<1>(start_transformed.point.y);
-  start_point.set<2>(start_transformed.point.z);
-  end_point.set<0>(end_transformed.point.x);
-  end_point.set<1>(end_transformed.point.y);
-  end_point.set<2>(end_transformed.point.z);
-
-  if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point)) {
+  if (!result) {
+    response->message = "The path is not in the safety area";
     response->success = false;
-    response->message = "The path is not valid";
     return true;
   }
 
@@ -978,49 +921,18 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
     return false;
   }
 
-  std::scoped_lock lock(mutex_safety_area_);
+  // prepare start and end references
+  mrs_msgs::msg::ReferenceStamped start, end;
+  start.header             = request->start.header;
+  start.reference.position = request->start.point;
+  end.header               = request->end.header;
+  end.reference.position   = request->end.point;
 
-  // transform points
-  geometry_msgs::msg::PointStamped start_transformed, end_transformed;
+  auto result = isPathToPointInSafetyArea2d(start, end);
 
-  std::string border_horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-
-  {
-    auto resp = transformer_->transformSingle(request->start, border_horizontal_frame);
-
-    if (!resp) {
-      RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
-      response->message = "Could not transform the first point in the path";
-      response->success = false;
-      return true;
-    }
-
-    start_transformed = resp.value();
-  }
-
-  {
-    auto resp = transformer_->transformSingle(request->end, border_horizontal_frame);
-
-    if (!resp) {
-      RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
-      response->message = "Could not transform the point in the path";
-      response->success = false;
-      return true;
-    }
-
-    end_transformed = resp.value();
-  }
-
-  // verify the whole path
-  mrs_lib::safety_zone::Point2d start_point, end_point;
-  start_point.set<0>(start_transformed.point.x);
-  start_point.set<1>(start_transformed.point.y);
-  end_point.set<0>(end_transformed.point.x);
-  end_point.set<1>(end_transformed.point.y);
-
-  if (!safety_zone_handler_.safety_zone->isPathValid(start_point, end_point)) {
+  if (!result) {
+    response->message = "The path is not in the safety area";
     response->success = false;
-    response->message = "The path is not valid";
     return true;
   }
 
@@ -1037,27 +949,12 @@ bool SafetyAreaManager::callbackGetMaxZ([[maybe_unused]] const std::shared_ptr<m
   if (!is_initialized_) {
     return false;
   }
-  std::scoped_lock lock(mutex_safety_area_);
 
-  if (!safety_zone_handler_.safety_zone) {
-    RCLCPP_WARN(node_->get_logger(), "No safety border defined.");
-    return false;
-  }
-
-  auto border = safety_zone_handler_.safety_zone->getBorder();
-
-  double      max_z          = border.getMaxZ();
-  std::string vertical_frame = border.getVerticalFrame();
-
-  response->reference.header.frame_id      = vertical_frame;
+  auto max_z                               = getMaxZ();
+  response->reference.header.frame_id      = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
   response->reference.reference.position.x = 0;
-  if (safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
-    response->reference.reference.position.z = max_z;
-  } else {
-    response->reference.reference.position.z = std::numeric_limits<double>::max();
-  }
-
-  response->success = true;
+  response->reference.reference.position.z = max_z;
+  response->success                        = true;
   return true;
 }
 
@@ -1072,27 +969,11 @@ bool SafetyAreaManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<m
     return false;
   }
 
-  std::scoped_lock lock(mutex_safety_area_);
-
-  if (!safety_zone_handler_.safety_zone) {
-    RCLCPP_WARN(node_->get_logger(), "No safety border defined.");
-    return false;
-  }
-
-  auto border = safety_zone_handler_.safety_zone->getBorder();
-
-  double      min_z          = border.getMinZ();
-  std::string vertical_frame = border.getVerticalFrame();
-
-  response->reference.header.frame_id      = vertical_frame;
+  auto min_z                               = getMinZ();
+  response->reference.header.frame_id      = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
   response->reference.reference.position.x = 0;
-  if (safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
-    response->reference.reference.position.z = min_z;
-  } else {
-    response->reference.reference.position.z = std::numeric_limits<double>::lowest();
-  }
-
-  response->success = true;
+  response->reference.reference.position.z = min_z;
+  response->success                        = true;
   return true;
 }
 
@@ -1537,8 +1418,13 @@ std::tuple<bool, double> SafetyAreaManager::transformZ(const std::string &curren
 bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::scoped_lock lock(mutex_safety_area_);
-  std::string      horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto             tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
+
+  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
+    return true;
+  }
+
+  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto        tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1559,8 +1445,13 @@ bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStam
 bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::scoped_lock lock(mutex_safety_area_);
-  std::string      horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-  auto             tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
+
+  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
+    return true;
+  }
+
+  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
+  auto        tfed_horizontal  = transformer_->transformSingle(point, horizontal_frame);
 
   if (!tfed_horizontal) {
     RCLCPP_WARN(node_->get_logger(), "Could not transform the point to the safety area horizontal frame");
@@ -1580,6 +1471,10 @@ bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStam
 /* //{ isPathToPointInSafetyArea2d() */
 
 bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
+
+  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
+    return true;
+  }
 
   mrs_msgs::msg::ReferenceStamped start_transformed, end_transformed;
 
@@ -1635,6 +1530,10 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::Referen
 
 bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
 
+  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
+    return true;
+  }
+
   if (!isPointInSafetyArea3d(start) || !isPointInSafetyArea3d(end)) {
     return false;
   }
@@ -1689,34 +1588,21 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::Referen
 
 /* //{ getMaxZ() */
 
-double SafetyAreaManager::getMaxZ(const std::string &frame_id) {
+double SafetyAreaManager::getMaxZ() {
 
   // | ---------- first, get max_z from the safety area --------- |
 
   std::scoped_lock lock(mutex_safety_area_);
-  if (!safety_zone_handler_.safety_zone) {
-    RCLCPP_WARN(node_->get_logger(), "No safety border defined.");
+
+  if (!safety_zone_handler_.safety_zone || !safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
     return std::numeric_limits<float>::max();
   }
 
-  auto border = safety_zone_handler_.safety_zone->getBorder();
+  auto        border                = safety_zone_handler_.safety_zone->getBorder();
+  double      safety_area_max_z     = border.getMaxZ();
+  std::string border_vertical_frame = border.getVerticalFrame();
 
-  double safety_area_max_z = std::numeric_limits<float>::max();
-
-  std::string horizontal_frame = border.getHorizontalFrame();
-
-  geometry_msgs::msg::PointStamped point;
-  point.header.frame_id = horizontal_frame;
-  point.point.x         = 0;
-  point.point.y         = 0;
-  point.point.z         = safety_zone_handler_.safety_zone->getBorder().getMaxZ();
-
-  auto ret = transformer_->transformSingle(point, frame_id);
-
-  if (!ret) {
-    RCLCPP_WARN(node_->get_logger(), "Could not transform safety area's max_z to '%s'", frame_id.c_str());
-  }
-  // | ------------ overwrite from estimation manager ----------- |
+  // | ------------ possible overwrite with max_z from estimation manager ----------- |
 
   double estimation_manager_max_z = std::numeric_limits<float>::max();
 
@@ -1733,58 +1619,38 @@ double SafetyAreaManager::getMaxZ(const std::string &frame_id) {
       point.point.y = 0;
       point.point.z = msg->value;
 
-      auto ret = transformer_->transformSingle(point, frame_id);
+      auto ret = transformer_->transformSingle(point, border_vertical_frame);
 
       if (!ret) {
         RCLCPP_WARN(node_->get_logger(), "Could not transform estimation manager's max_z to the "
-                                         "current control frame");
+                                         "current safety area frame");
       }
 
       estimation_manager_max_z = ret->point.z;
     }
   }
 
-  if (estimation_manager_max_z < safety_area_max_z) {
-    return estimation_manager_max_z;
-  } else {
-    return safety_area_max_z;
-  }
+  return std::min(estimation_manager_max_z, safety_area_max_z);
 }
 
 //}
 
 /* //{ getMinZ() */
 
-double SafetyAreaManager::getMinZ(const std::string &frame_id) {
+double SafetyAreaManager::getMinZ() {
 
   // | ---------- first, get min_z from the safety area --------- |
   std::scoped_lock lock(mutex_safety_area_);
 
-  if (!safety_zone_handler_.safety_zone) {
-    RCLCPP_WARN(node_->get_logger(), "No safety border defined.");
+  if (!safety_zone_handler_.safety_zone || !safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
     return std::numeric_limits<float>::lowest();
   }
 
-  if (!safety_zone_handler_.safety_zone->safetyZoneEnabled()) {
-    return std::numeric_limits<float>::lowest();
-  }
+  auto border                  = safety_zone_handler_.safety_zone->getBorder();
+  double safety_area_min_z     = border.getMinZ();
+  std::string border_vertical_frame = border.getVerticalFrame(); 
 
-  std::string horizontal_frame = safety_zone_handler_.safety_zone->getBorder().getHorizontalFrame();
-
-  geometry_msgs::msg::PointStamped point;
-  point.header.frame_id = horizontal_frame;
-  point.point.x         = 0;
-  point.point.y         = 0;
-  point.point.z         = safety_zone_handler_.safety_zone->getBorder().getMinZ();
-
-  auto ret = transformer_->transformSingle(point, frame_id);
-
-  if (!ret) {
-    RCLCPP_WARN(node_->get_logger(), "Could not transform safety area's min_z to '%s'", frame_id.c_str());
-    return std::numeric_limits<float>::lowest();
-  }
-
-  return ret->point.z;
+  return safety_area_min_z; 
 }
 
 //}
