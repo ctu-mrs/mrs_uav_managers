@@ -102,7 +102,6 @@ private:
 
   struct SafetyZoneParams
   {
-    bool                       use_safety_area;
     mrs_msgs::msg::WorldOrigin world_origin;
   };
 
@@ -1173,7 +1172,10 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   RCLCPP_INFO(node_->get_logger(), "New safety zone created");
 
-  // Update values of new safety zone
+  // Enable/disable safety zone based on parameter
+  new_safety_zone->safety_zone->enableSafetyZone(safety_area_enabled);
+
+  // Save values of new safety zone
   safety_zone_handler_.visualization_components.safeCleanup();
   safety_zone_handler_                               = std::move(*new_safety_zone);
   safety_zone_handler_.parameters.world_origin.units = world_origin_units;
@@ -1249,8 +1251,6 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
   if (!safety_zone_handler.safety_zone) {
     return std::nullopt;
   }
-
-  safety_zone_handler.safety_zone->enableSafetyZone(true);
 
   // Transform prism to local_origin frame for visualization
   auto border_prism      = safety_zone_handler.safety_zone->getBorder();
