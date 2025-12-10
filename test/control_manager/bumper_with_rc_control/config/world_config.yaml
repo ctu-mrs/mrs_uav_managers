@@ -35,7 +35,7 @@ mrs_uav_managers:
         frame_name: "world_origin"
 
         max_z: 15.0
-        min_z: 0.5
+        min_z: -2.0 # activating in-the-air (2.0 m agl) with gps_baro
 
       obstacles:
 
