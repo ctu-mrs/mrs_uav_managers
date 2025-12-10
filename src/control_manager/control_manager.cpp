@@ -4490,14 +4490,11 @@ bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::S
   bool prereq_check = true;
 
   {
-    mrs_msgs::msg::ReferenceStamped current_coord;
-    current_coord.header.frame_id      = uav_state.header.frame_id;
-    current_coord.reference.position.x = uav_state.pose.position.x;
-    current_coord.reference.position.y = uav_state.pose.position.y;
-
-    if (!isPointInSafetyArea2d(current_coord)) {
-      ss << "cannot toggle output, the UAV is outside of the safety area!";
-      prereq_check = false;
+    if (sh_safety_area_diag_.hasMsg()) {
+      if (!sh_safety_area_diag_.getMsg()->position_valid_2d) {
+        ss << "cannot toggle output, the UAV is outside of the safety area!";
+        prereq_check = false;
+      }
     }
   }
 

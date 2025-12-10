@@ -163,7 +163,6 @@ private:
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>         sh_hw_api_capabilities_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>     sh_estimation_diag_;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -278,7 +277,6 @@ SafetyAreaManager::SafetyAreaManager(rclcpp::NodeOptions options) : mrs_lib::Nod
   sh_hw_api_capabilities_  = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
   sh_gnss_                 = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &SafetyAreaManager::callbackGNSS, this);
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
-  sh_estimation_diag_      = mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>(shopts, "~/estimation_diagnostics_in");
 
   timer_prerequisites_ = node_->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&SafetyAreaManager::timerPrerequisites, this));
 }
@@ -479,11 +477,9 @@ void SafetyAreaManager::timerPrerequisites() {
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
 
   bool got_hw_api_capabilities = sh_hw_api_capabilities_.hasMsg();
-  bool got_estimation_diag     = sh_estimation_diag_.hasMsg();
 
-  if (!got_hw_api_capabilities || !got_estimation_diag) {
-    RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s EstimationManager=%s", got_hw_api_capabilities ? " TRUE " : " FALSE ",
-                got_estimation_diag ? "true" : "FALSE");
+  if (!got_hw_api_capabilities) {
+    RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s", got_hw_api_capabilities ? " TRUE " : " FALSE ");
     return;
   }
 
@@ -534,10 +530,10 @@ void SafetyAreaManager::timerStatus() {
     // Add existing obstacles with updated positions
     auto existing_obstacles = copyExistingObstacles();
 
-    // Check if obstacles defined in world_origin frame 
+    // Check if obstacles defined in world_origin frame
     for (auto &obstacle : existing_obstacles) {
       if (obstacle->getHorizontalFrame() == "world_origin") {
-        auto obstacle_points = obstacle->getPoints();
+        auto                                       obstacle_points = obstacle->getPoints();
         std::vector<mrs_lib::safety_zone::Point2d> updated_points;
 
         for (auto &point : obstacle_points) {
@@ -548,7 +544,7 @@ void SafetyAreaManager::timerStatus() {
       }
     }
 
-    auto new_safety_zone    = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
+    auto new_safety_zone = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
 
     // Update the new safety zone and visualization components
     if (new_safety_zone) {
