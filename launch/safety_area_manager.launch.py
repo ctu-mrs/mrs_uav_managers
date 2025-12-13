@@ -18,7 +18,6 @@ from launch.substitutions import (
 
 from ament_index_python.packages import get_package_share_directory
 
-
 def generate_launch_description():
 
     ld = launch.LaunchDescription()
@@ -213,20 +212,12 @@ def generate_launch_description():
 
         parameters=[
             {"uav_name": uav_name},
-            {"uav_mass": uav_mass},
-            {"topic_prefix": ["/", uav_name]},
             {"use_sim_time": use_sim_time},
             {"enable_profiler": False},
-            {"g": 9.81},
-            {"body_frame": "fcu"},
-            {"run_type": "simulation"},
-            {"body_disturbance_x": 0.0},
-            {"body_disturbance_y": 0.0},
             {'private_config': this_pkg_path + '/config/private/safety_area_manager.yaml'},
             {'platform_config': platform_config},
             {'custom_config': custom_config},
             {'world_config': world_config},
-            {'network_config': network_config},
         ],
 
         remappings=[
@@ -256,9 +247,8 @@ def generate_launch_description():
             # markers
             ("~/static_markers_out", "~/static_markers"),
             ("~/static_markers_coordinates_out", "~/static_markers_coordinates"),
-
-
         ],
+
     )
 
     load_into_existing = LoadComposableNodes(

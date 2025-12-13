@@ -120,8 +120,8 @@ private:
 
   // profiling
   mrs_lib::Profiler profiler_;
-  bool              profiler_enabled_  = false;
-  int               status_timer_rate_ = 0;
+  bool              profiler_enabled_;
+  double            status_timer_rate_;
 
   // diagnostics publishing
   void publishDiagnostics(void);
@@ -156,6 +156,7 @@ private:
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>    ss_update_world_origin_;
 
   // | --------------------- service clients --------------------- |
+
   mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv> sc_set_world_origin_;
 
   // | ----------------------- subscribers ----------------------- |
@@ -256,6 +257,7 @@ SafetyAreaManager::SafetyAreaManager(rclcpp::NodeOptions options) : mrs_lib::Nod
   param_loader.loadParam("uav_name", _uav_name_);
 
   // | ---------------------- tf-transformer ----------------------- |
+
   transformer_ = std::make_shared<mrs_lib::Transformer>(node_);
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->retryLookupNewest(true);
@@ -289,12 +291,27 @@ void SafetyAreaManager::initialize() {
   RCLCPP_INFO(node_->get_logger(), "initializing");
 
   // | --------------------- parameters ---------------------- |
+
   mrs_lib::ParamLoader param_loader(node_, "SafetyAreaManager");
+
+  std::string custom_config_path;
+  std::string platform_config_path;
+
+  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("platform_config", platform_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
+  }
+
   param_loader.loadParam("world_config", _world_config_);
   param_loader.addYamlFile(_world_config_);
 
   param_loader.addYamlFileFromParam("private_config");
-  // param_loader.addYamlFileFromParam("public_config");
 
   param_loader.loadParam("uav_name", _uav_name_);
   param_loader.loadParam("enable_profiler", profiler_enabled_);
@@ -303,8 +320,8 @@ void SafetyAreaManager::initialize() {
   param_loader.loadParam("status_timer_rate", status_timer_rate_);
 
   // | ------------------------ profiler ------------------------ |
-  profiler_ = mrs_lib::Profiler(node_, "SafetyAreaManager", profiler_enabled_);
 
+  profiler_ = mrs_lib::Profiler(node_, "SafetyAreaManager", profiler_enabled_);
 
   // | ------------------- scope timer logger ------------------- |
 
@@ -321,15 +338,17 @@ void SafetyAreaManager::initialize() {
   param_loader.setPrefix("");
 
   // | ---------------------- safety zone ----------------------- |
+
   bool success = initializationFromFile(param_loader, _world_config_);
 
   if (!success) {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to initialize safety area from file.");
+    RCLCPP_ERROR(node_->get_logger(), "Failed to initialize safety area from file");
     rclcpp::shutdown();
     exit(1);
   }
 
   // | ----------------------- publishers ----------------------- |
+
   ph_diagnostics_ = mrs_lib::PublisherHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(node_, "~/diagnostics_out");
 
   // | ----------------------- subscribers ---------------------- |
@@ -429,9 +448,11 @@ void SafetyAreaManager::initialize() {
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   // | ----------------------- service clients ---------------------- |
+
   sc_set_world_origin_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out", cbkgrp_sc_);
 
   // | ------------------------- timers ------------------------- |
+
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
   timer_opts_start.node           = node_;
@@ -445,6 +466,7 @@ void SafetyAreaManager::initialize() {
   }
 
   // | ----------------------- finish init ---------------------- |
+
   is_initialized_ = true;
 
   RCLCPP_INFO(node_->get_logger(), "Safety area initialized");
@@ -472,6 +494,7 @@ void SafetyAreaManager::shutdown() {
 /* timerPrerequisites() //{ */
 
 void SafetyAreaManager::timerPrerequisites() {
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPrerequisites");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerPrerequisites", scope_timer_logger_, scope_timer_enabled_);
 
@@ -483,8 +506,10 @@ void SafetyAreaManager::timerPrerequisites() {
   }
 
   initialize();
+
   timer_prerequisites_->cancel();
 }
+
 //}
 
 /* timerStatus() //{ */
@@ -911,7 +936,7 @@ bool SafetyAreaManager::callbackValidatePathToPoint3d(const std::shared_ptr<mrs_
 
 //}
 
-/* callbackValidatePathtoPoint2d() //{ */
+/* callbackValidatePathToPoint2d() //{ */
 
 bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request>  request,
                                                       const std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Response> response) {
@@ -939,6 +964,8 @@ bool SafetyAreaManager::callbackValidatePathToPoint2d(const std::shared_ptr<mrs_
   response->success = true;
   return true;
 }
+
+//}
 
 // /* callbackGetMaxZ() //{ */
 
@@ -998,7 +1025,9 @@ bool SafetyAreaManager::callbackIsSafetyZoneEnabled([[maybe_unused]] const std::
 }
 
 //}
-//
+
+/* callbackUpdateWorldOrigin() //{ */
+
 bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                                                   const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
@@ -1060,6 +1089,9 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
 
   return true;
 }
+
+//}
+
 // --------------------------------------------------------------
 // |                          routines                          |
 // --------------------------------------------------------------
@@ -1245,6 +1277,7 @@ bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::msg::Prism &prism_
 std::optional<SafetyAreaManager::SafetyZoneHandler>
 SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>            &&border,
                                     std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacle_prisms = {}) {
+
   SafetyZoneHandler safety_zone_handler;
   safety_zone_handler.safety_zone = std::make_shared<mrs_lib::safety_zone::SafetyZone>(std::move(border), std::move(obstacle_prisms));
 
@@ -1320,6 +1353,7 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
 //}
 
 /* makePrism(points) //{ */
+
 std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const std::vector<mrs_msgs::msg::Point2D> &points, const double max_z,
                                                                           const double min_z, const std::string &horizontal_frame,
                                                                           const std::string &vertical_frame) {
@@ -1415,6 +1449,7 @@ std::tuple<bool, double> SafetyAreaManager::transformZ(const std::string &curren
 //}
 
 /* //{ isPointInSafetyArea2d() */
+
 bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::scoped_lock lock(mutex_safety_area_);
@@ -1440,7 +1475,7 @@ bool SafetyAreaManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStam
 
 //}
 
-/* //{ isPointInSafetyArea3d() */
+/* isPointInSafetyArea3d() //{ */
 
 bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
 
@@ -1468,7 +1503,7 @@ bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStam
 
 //}
 
-/* //{ isPathToPointInSafetyArea2d() */
+/* isPathToPointInSafetyArea2d() //{ */
 
 bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
 
@@ -1526,7 +1561,7 @@ bool SafetyAreaManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::Referen
 
 //}
 
-/* //{ isPathToPointInSafetyArea3d() */
+/* isPathToPointInSafetyArea3d() //{ */
 
 bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
 
@@ -1586,7 +1621,7 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::Referen
 
 //}
 
-/* //{ getMaxZ() */
+/* getMaxZ() //{ */
 
 double SafetyAreaManager::getMaxZ() {
 
@@ -1635,7 +1670,7 @@ double SafetyAreaManager::getMaxZ() {
 
 //}
 
-/* //{ getMinZ() */
+/* getMinZ() //{ */
 
 double SafetyAreaManager::getMinZ() {
 
@@ -1646,16 +1681,17 @@ double SafetyAreaManager::getMinZ() {
     return std::numeric_limits<float>::lowest();
   }
 
-  auto border                  = safety_zone_handler_.safety_zone->getBorder();
-  double safety_area_min_z     = border.getMinZ();
-  std::string border_vertical_frame = border.getVerticalFrame(); 
+  auto        border                = safety_zone_handler_.safety_zone->getBorder();
+  double      safety_area_min_z     = border.getMinZ();
+  std::string border_vertical_frame = border.getVerticalFrame();
 
-  return safety_area_min_z; 
+  return safety_area_min_z;
 }
 
 //}
 
 /* publishDiagnostics() //{ */
+
 void SafetyAreaManager::publishDiagnostics(void) {
 
   if (!is_initialized_) {
@@ -1684,8 +1720,7 @@ void SafetyAreaManager::publishDiagnostics(void) {
   diagnostics_msg.world_origin.x     = origin_x;
   diagnostics_msg.world_origin.y     = origin_y;
 
-  // | ------------------------- Fill in the safety zone data
-  // ------------------------ |
+  // | -------------- fill in the safety zone data -------------- |
   {
     std::scoped_lock lock(mutex_safety_area_);
 

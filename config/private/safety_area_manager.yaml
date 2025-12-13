@@ -2,7 +2,7 @@ mrs_uav_managers:
 
   safety_area_manager:
   
-    status_timer_rate: 10
+    status_timer_rate: 10.0 # [Hz]
 
     scope_timer:
 
