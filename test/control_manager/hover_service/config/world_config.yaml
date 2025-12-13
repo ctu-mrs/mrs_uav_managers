@@ -16,7 +16,6 @@ mrs_uav_managers:
       horizontal:
 
         # the frame of reference in which the points are expressed
-        # frame_name: "local_origin"
         frame_name: "world_origin"
 
         # polygon
@@ -24,10 +23,10 @@ mrs_uav_managers:
         # x, y [m] for any frame_name except latlon_origin
         # x = latitude, y = longitude [deg]  for frame_name=="latlon_origin"
         points: [
-          -50, -50,
-          50,  -50,
-          50,  50,
-          -50, 50,
+          -400, -400,
+          400,  -400,
+          400,  400,
+          -400, 400,
         ]
       vertical:
 

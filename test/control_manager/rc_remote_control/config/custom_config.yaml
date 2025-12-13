@@ -3,10 +3,12 @@ mrs_uav_managers:
   estimation_manager:
 
     state_estimators: [
-    "gps_baro",
+      "gps_baro",
     ]
 
     initial_state_estimator: "gps_baro"
+
+    agl_estimator: ""
 
   constraint_manager:
 

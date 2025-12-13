@@ -311,7 +311,7 @@ bool Tester::test(void) {
 
   deactivate();
 
-  sleep(2.0);
+  sleep(5.0);
 
   if (uh_->isFlyingNormally()) {
     return true;

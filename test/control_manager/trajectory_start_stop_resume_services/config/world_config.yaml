@@ -24,10 +24,10 @@ mrs_uav_managers:
         # x, y [m] for any frame_name except latlon_origin
         # x = latitude, y = longitude [deg]  for frame_name=="latlon_origin"
         points: [
-          -50, -50,
-          50,  -50,
-          50,  50,
-          -50, 50,
+          -500, -500,
+          500,  -500,
+          500,  500,
+          -500, 500,
         ]
       vertical:
 
@@ -35,7 +35,7 @@ mrs_uav_managers:
         frame_name: "world_origin"
 
         max_z: 15.0
-        min_z: 0.5
+        min_z: -2.0
 
       obstacles:
 

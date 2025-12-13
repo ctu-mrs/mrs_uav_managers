@@ -3304,9 +3304,12 @@ void ControlManager::timerBumper() {
     return;
   }
 
+  // bumper should be only active when flying normally
   if (!isFlyingNormally()) {
+
+    // however, the exceptins are when the "not flying normally" is caused by the bumper itself or the RC mode
     if (!(bumper_repulsing_ || rc_goto_active_)) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "bumpper can not function, not flying 'normally'");
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "bumper can not function, not flying 'normally'");
       return;
     }
   }
@@ -6886,18 +6889,20 @@ void ControlManager::bumperPushFromObstacle(void) {
   // check for vertical collision down
   if (bumper_data->sectors.at(bumper_data->n_horizontal_sectors) > 0 && bumper_data->sectors.at(bumper_data->n_horizontal_sectors) <= min_distance_vertical) {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Bumper: potential collision below");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Bumper: potential collision below, obstacle distance: %.2f, limit: %.2f",
+                         bumper_data->sectors.at(bumper_data->n_horizontal_sectors), min_distance_vertical);
     vertical_collision_detected = true;
-    vertical_repulsion_distance = min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors);
+    vertical_repulsion_distance = min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors) + _bumper_vertical_overshoot_;
   }
 
   // check for vertical collision up
   if (bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) > 0 &&
       bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) <= min_distance_vertical) {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Bumper: potential collision above");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Bumper: potential collision above, obstacle distance: %.2f, limit: %.2f",
+                         bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1), min_distance_vertical);
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1));
+    vertical_repulsion_distance = -(min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1) + _bumper_vertical_overshoot_);
   }
 
   // if potential collision was detected and we should start the repulsing_
