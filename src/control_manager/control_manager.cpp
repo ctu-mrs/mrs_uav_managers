@@ -3307,8 +3307,7 @@ void ControlManager::timerBumper() {
   // bumper should be only active when flying normally
   if (!isFlyingNormally()) {
 
-    // however, the exceptins are when the "not flying normally" is caused by the bumper itself or the RC mode
-    if (!(bumper_repulsing_ || rc_goto_active_)) {
+    if (!bumper_repulsing_) {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "bumper can not function, not flying 'normally'");
       return;
     }
