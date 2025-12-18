@@ -63,8 +63,8 @@ struct CommonHandlers_t
   DebugTopics_t                         debug_topics;
 };
 
-}  // namespace estimation_manager
+} // namespace estimation_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // COMMON_HANDLERS_H
+#endif // COMMON_HANDLERS_H

@@ -47,7 +47,7 @@ protected:
   const std::string name_;
   const std::string package_name_;
 
-  std::string frame_id_;  // cannot be constant - must remain overridable by loaded parameter
+  std::string frame_id_; // cannot be constant - must remain overridable by loaded parameter
   std::string ns_frame_id_;
 
   std::shared_ptr<CommonHandlers_t>  ch_;
@@ -108,6 +108,6 @@ public:
   std::optional<double> getHeadingRate(const nav_msgs::msg::Odometry::ConstSharedPtr &odom_msg);
 };
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // MRS_UAV_MANAGERS_ESTIMATION_MANAGER_ESTIMATOR_H
+#endif // MRS_UAV_MANAGERS_ESTIMATION_MANAGER_ESTIMATOR_H

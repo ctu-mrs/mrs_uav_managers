@@ -40,7 +40,6 @@ bool Tester::test(void) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation succeeded, this should not happen: '%s'", message.c_str());
       return false;
     }
-
   }
 
   return true;

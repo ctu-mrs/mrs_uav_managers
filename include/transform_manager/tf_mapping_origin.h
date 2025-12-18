@@ -28,8 +28,8 @@ class TfMappingOrigin {
 
 public:
   /*//{ constructor */
-  TfMappingOrigin(const rclcpp::Node::SharedPtr& node, std::shared_ptr<mrs_lib::ParamLoader> param_loader,
-                  const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch)
+  TfMappingOrigin(const rclcpp::Node::SharedPtr &node, std::shared_ptr<mrs_lib::ParamLoader> param_loader,
+                  const std::shared_ptr<mrs_lib::TransformBroadcaster> &broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch)
       : broadcaster_(broadcaster), ch_(ch) {
 
     node_  = node;
@@ -164,7 +164,7 @@ private:
       mapping_odom = *msg;
 
       // Find corresponding orientation
-      geometry_msgs::msg::QuaternionStamped rot_tmp           = *sh_mapping_odom_rot_.getMsg();  // start with newest msg
+      geometry_msgs::msg::QuaternionStamped rot_tmp           = *sh_mapping_odom_rot_.getMsg(); // start with newest msg
       rclcpp::Time                          dbg_timestamp_rot = rot_tmp.header.stamp;
       tf2::Quaternion                       tf2_rot;
 
@@ -214,7 +214,7 @@ private:
 
 
       // Find corresponding local odom
-      double       odom_alt          = msg->pose.pose.position.z;  // start with newest msg
+      double       odom_alt          = msg->pose.pose.position.z; // start with newest msg
       rclcpp::Time dbg_timestamp_alt = msg->header.stamp;
       for (size_t i = 0; i < vec_mapping_odom_alt_.size(); i++) {
         if (rclcpp::Time(mapping_odom.header.stamp) < rclcpp::Time(vec_mapping_odom_alt_.at(i).header.stamp)) {
@@ -392,6 +392,6 @@ private:
 };
 /*//}*/
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #endif

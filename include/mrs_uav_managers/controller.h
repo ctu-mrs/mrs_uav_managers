@@ -138,12 +138,12 @@ public:
    *
    * @return a service response
    */
-  virtual const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response> setConstraints(
-      const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request> &constraints) = 0;
+  virtual const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Response>
+  setConstraints(const std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request> &constraints) = 0;
 
   virtual ~Controller() = default;
 };
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #endif

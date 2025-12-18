@@ -18,8 +18,8 @@ struct PrivateHandlers_t
   std::string                           runtime_name;
 };
 
-}  // namespace control_manager
+} // namespace control_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // CONTROL_MANAGER_PRIVATE_HANDLERS_H
+#endif // CONTROL_MANAGER_PRIVATE_HANDLERS_H

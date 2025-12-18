@@ -253,7 +253,8 @@ void TransformManager::initialize() {
     RCLCPP_INFO(node_->get_logger(), "[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
 
   } else {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(), world_origin_units_.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(),
+                 world_origin_units_.c_str());
     rclcpp::shutdown();
   }
 

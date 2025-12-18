@@ -20,7 +20,7 @@ public:
   std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
-TrajectoryTrackingTest::TrajectoryTrackingTest() : mrs_uav_testing::TestGeneric() {};
+TrajectoryTrackingTest::TrajectoryTrackingTest() : mrs_uav_testing::TestGeneric(){};
 
 /* checkTrajectoryFlythrough() //{ */
 

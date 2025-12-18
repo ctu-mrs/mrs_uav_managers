@@ -35,7 +35,7 @@ public:
 
   /*//{ toSnakeCase() */
 
-  static std::string toSnakeCase(const std::string& str_in) {
+  static std::string toSnakeCase(const std::string &str_in) {
 
     std::string str(1, tolower(str_in[0]));
 
@@ -80,7 +80,7 @@ public:
   /*//{ stateCovToString() */
 
   template <typename StateCov>
-  static std::string stateCovToString(const StateCov& sc) {
+  static std::string stateCovToString(const StateCov &sc) {
 
     std::stringstream ss;
     ss << "State:\n";
@@ -108,7 +108,7 @@ public:
 
   /* //{ rotateVecByHdg() */
 
-  static tf2::Vector3 rotateVecByHdg(const geometry_msgs::msg::Vector3& vec_in, const double hdg_in) {
+  static tf2::Vector3 rotateVecByHdg(const geometry_msgs::msg::Vector3 &vec_in, const double hdg_in) {
 
     const tf2::Quaternion q_hdg = mrs_lib::AttitudeConverter(0, 0, 0).setHeading(hdg_in);
 
@@ -122,7 +122,7 @@ public:
   //}
 
   /* noNans() //{ */
-  static bool noNans(const geometry_msgs::msg::TransformStamped& tf) {
+  static bool noNans(const geometry_msgs::msg::TransformStamped &tf) {
 
     return (std::isfinite(tf.transform.rotation.x) && std::isfinite(tf.transform.rotation.y) && std::isfinite(tf.transform.rotation.z) &&
             std::isfinite(tf.transform.rotation.w) && std::isfinite(tf.transform.translation.x) && std::isfinite(tf.transform.translation.y) &&
@@ -132,7 +132,7 @@ public:
 
   /* noNans() //{ */
 
-  static bool noNans(const geometry_msgs::msg::Quaternion& q) {
+  static bool noNans(const geometry_msgs::msg::Quaternion &q) {
 
     return (std::isfinite(q.x) && std::isfinite(q.y) && std::isfinite(q.z) && std::isfinite(q.w));
   }
@@ -141,7 +141,7 @@ public:
 
   /* isZeroQuaternion() //{ */
 
-  static bool isZeroQuaternion(const geometry_msgs::msg::Quaternion& q) {
+  static bool isZeroQuaternion(const geometry_msgs::msg::Quaternion &q) {
 
     return (q.x == 0 && q.y == 0 && q.z == 0 && q.w == 0);
   }
@@ -150,7 +150,7 @@ public:
 
   /* tf2FromPose() //{ */
 
-  static tf2::Transform tf2FromPose(const geometry_msgs::msg::Pose& pose_in) {
+  static tf2::Transform tf2FromPose(const geometry_msgs::msg::Pose &pose_in) {
 
     tf2::Vector3 position(pose_in.position.x, pose_in.position.y, pose_in.position.z);
 
@@ -166,7 +166,7 @@ public:
 
   /* poseFromTf2() //{ */
 
-  static geometry_msgs::msg::Pose poseFromTf2(const tf2::Transform& tf_in) {
+  static geometry_msgs::msg::Pose poseFromTf2(const tf2::Transform &tf_in) {
 
     geometry_msgs::msg::Pose pose_out;
     pose_out.position.x = tf_in.getOrigin().getX();
@@ -182,7 +182,7 @@ public:
 
   /* msgFromTf2() //{ */
 
-  static geometry_msgs::msg::Transform msgFromTf2(const tf2::Transform& tf_in) {
+  static geometry_msgs::msg::Transform msgFromTf2(const tf2::Transform &tf_in) {
 
     geometry_msgs::msg::Transform tf_out;
     tf_out.translation.x = tf_in.getOrigin().getX();
@@ -197,7 +197,7 @@ public:
 
   /* tf2FromMsg() //{ */
 
-  static tf2::Transform tf2FromMsg(const geometry_msgs::msg::Transform& tf_in) {
+  static tf2::Transform tf2FromMsg(const geometry_msgs::msg::Transform &tf_in) {
 
     tf2::Transform tf_out;
     tf_out.setOrigin(tf2::Vector3(tf_in.translation.x, tf_in.translation.y, tf_in.translation.z));
@@ -210,7 +210,7 @@ public:
 
   /* pointToVector3() //{ */
 
-  static geometry_msgs::msg::Vector3 pointToVector3(const geometry_msgs::msg::Point& point_in) {
+  static geometry_msgs::msg::Vector3 pointToVector3(const geometry_msgs::msg::Point &point_in) {
 
     geometry_msgs::msg::Vector3 vec_out;
 
@@ -225,7 +225,7 @@ public:
 
   /*//{ rotateVector() */
 
-  static geometry_msgs::msg::Vector3 rotateVector(const geometry_msgs::msg::Vector3& vec_in, const geometry_msgs::msg::Quaternion& q_in) {
+  static geometry_msgs::msg::Vector3 rotateVector(const geometry_msgs::msg::Vector3 &vec_in, const geometry_msgs::msg::Quaternion &q_in) {
 
     try {
       Eigen::Matrix3d R = mrs_lib::AttitudeConverter(q_in);
@@ -250,7 +250,7 @@ public:
 
   /*//{ uavStateToOdom() */
 
-  static nav_msgs::msg::Odometry uavStateToOdom(const mrs_msgs::msg::UavState& uav_state) {
+  static nav_msgs::msg::Odometry uavStateToOdom(const mrs_msgs::msg::UavState &uav_state) {
 
     nav_msgs::msg::Odometry odom;
 
@@ -270,7 +270,7 @@ public:
 
   /*//{ getPoseDiff() */
 
-  static geometry_msgs::msg::Pose getPoseDiff(const geometry_msgs::msg::Pose& p1, const geometry_msgs::msg::Pose& p2) {
+  static geometry_msgs::msg::Pose getPoseDiff(const geometry_msgs::msg::Pose &p1, const geometry_msgs::msg::Pose &p2) {
 
     tf2::Vector3 v1, v2;
     tf2::fromMsg(p1.position, v1);
@@ -294,7 +294,7 @@ public:
 
   /*//{ applyPoseDiff() */
 
-  static geometry_msgs::msg::Pose applyPoseDiff(const geometry_msgs::msg::Pose& pose_in, const geometry_msgs::msg::Pose& pose_diff) {
+  static geometry_msgs::msg::Pose applyPoseDiff(const geometry_msgs::msg::Pose &pose_in, const geometry_msgs::msg::Pose &pose_diff) {
 
     tf2::Vector3    pos_in;
     tf2::Quaternion q_in;
@@ -320,7 +320,7 @@ public:
 
   /*//{ loadParamFile() */
 
-  static void loadParamFile(const rclcpp::Node::SharedPtr& node, const std::string& file_path, const std::string& ns = "") {
+  static void loadParamFile(const rclcpp::Node::SharedPtr &node, const std::string &file_path, const std::string &ns = "") {
 
     std::string command = "rosparam load " + file_path + " " + ns;
     int         result  = std::system(command.c_str());
@@ -334,7 +334,7 @@ public:
 
   /*//{ isStringInVector() */
 
-  static bool isStringInVector(const std::string& value, const std::vector<std::string>& str_vec) {
+  static bool isStringInVector(const std::string &value, const std::vector<std::string> &str_vec) {
     return std::find(str_vec.begin(), str_vec.end(), value) != str_vec.end();
   }
 
@@ -342,7 +342,7 @@ public:
 
   /*//{ frameIdToEstimatorName() */
 
-  static std::string frameIdToEstimatorName(const std::string& str_in) {
+  static std::string frameIdToEstimatorName(const std::string &str_in) {
     const std::string str_tmp = str_in.substr(str_in.find("/") + 1, str_in.size());
     return str_tmp.substr(0, str_tmp.find("_origin"));
   }
@@ -356,8 +356,8 @@ private:
 
 /*//}*/
 
-}  // namespace estimation_manager
+} // namespace estimation_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // ESTIMATION_MANAGER_SUPPORT_H
+#endif // ESTIMATION_MANAGER_SUPPORT_H
