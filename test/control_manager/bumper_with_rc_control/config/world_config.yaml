@@ -24,10 +24,10 @@ mrs_uav_managers:
         # x, y [m] for any frame_name except latlon_origin
         # x = latitude, y = longitude [deg]  for frame_name=="latlon_origin"
         points: [
-          -50, -50,
-          50,  -50,
-          50,  50,
-          -50, 50,
+          -100, -100,
+          100,  -100,
+          100,  100,
+          -100, 100,
         ]
       vertical:
 

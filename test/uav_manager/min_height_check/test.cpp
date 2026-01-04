@@ -81,11 +81,9 @@ bool Tester::test(void) {
   // | --------------- goto to violate min height --------------- |
 
   {
-    RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0.5, 0]");
+    RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0.25, 0]");
 
-    auto [success, message] = uh->gotoAbs(0, 0, 0.5, 0);
-
-    RCLCPP_INFO(node_->get_logger(), "goto suceeded");
+    auto [success, message] = uh->gotoAbs(0, 0, 0.25, 0);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to descend");
