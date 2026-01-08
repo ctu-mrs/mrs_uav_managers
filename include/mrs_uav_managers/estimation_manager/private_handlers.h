@@ -17,8 +17,8 @@ struct PrivateHandlers_t
   loadConfigFile_t                      loadConfigFile;
 };
 
-}  // namespace estimation_manager
+} // namespace estimation_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // ESTIMATION_MANAGER_PRIVATE_HANDLERS_H
+#endif // ESTIMATION_MANAGER_PRIVATE_HANDLERS_H

@@ -73,7 +73,7 @@ public:
   nav_msgs::msg::Odometry                       getInnovation() const;
   std::vector<double>                           getPoseCovariance() const;
   std::vector<double>                           getTwistCovariance() const;
-  void setActive(const bool active);
+  void                                          setActive(const bool active);
   void                                          publishUavState() const;
   void                                          publishOdom() const;
   void                                          publishCovariance() const;
@@ -82,6 +82,6 @@ public:
   bool                                          isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr &hw_api_capabilities) const;
 };
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // MRS_UAV_MANAGERS_STATE_ESTIMATOR_H
+#endif // MRS_UAV_MANAGERS_STATE_ESTIMATOR_H

@@ -65,6 +65,6 @@ public:
   bool isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr &hw_api_capabilities) const;
 };
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // MRS_UAV_MANAGERS_AGL_ESTIMATOR_H
+#endif // MRS_UAV_MANAGERS_AGL_ESTIMATOR_H

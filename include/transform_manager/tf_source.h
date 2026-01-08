@@ -35,7 +35,10 @@ class TfSource {
 
 public:
   /*//{ constructor */
-  TfSource(const std::string& name, const rclcpp::Node::SharedPtr& node, std::shared_ptr<mrs_lib::ParamLoader> param_loader, const std::shared_ptr<mrs_lib::TransformBroadcaster>& broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch, const bool is_utm_source) : name_(name), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
+  TfSource(const std::string &name, const rclcpp::Node::SharedPtr &node, std::shared_ptr<mrs_lib::ParamLoader> param_loader,
+           const std::shared_ptr<mrs_lib::TransformBroadcaster> &broadcaster, const std::shared_ptr<estimation_manager::CommonHandlers_t> ch,
+           const bool is_utm_source)
+      : name_(name), broadcaster_(broadcaster), ch_(ch), is_utm_source_(is_utm_source) {
 
     node_  = node;
     clock_ = node->get_clock();
@@ -126,7 +129,8 @@ public:
     /* } */
 
     for (auto frame_id : republish_in_frames_) {
-      republishers_.push_back(std::make_pair(frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, full_topic_odom_ + "/" + frame_id.substr(0, frame_id.find("_origin")))));
+      republishers_.push_back(std::make_pair(
+          frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, full_topic_odom_ + "/" + frame_id.substr(0, frame_id.find("_origin")))));
     }
     is_initialized_ = true;
     RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
@@ -178,7 +182,7 @@ public:
   /*//}*/
 
   /*//{ setUtmOrigin() */
-  void setUtmOrigin(const geometry_msgs::msg::Point& pt) {
+  void setUtmOrigin(const geometry_msgs::msg::Point &pt) {
 
     if (is_utm_based_ && !is_utm_origin_set_) {
       utm_origin_        = pt;
@@ -188,7 +192,7 @@ public:
   /*//}*/
 
   /*//{ setWorldOrigin() */
-  void setWorldOrigin(const geometry_msgs::msg::Point& pt) {
+  void setWorldOrigin(const geometry_msgs::msg::Point &pt) {
 
     if (is_utm_based_) {
       world_origin_        = pt;
@@ -306,7 +310,7 @@ private:
   /*//}*/
 
   /* publishTfFromOdom() //{*/
-  void publishTfFromOdom(const nav_msgs::msg::Odometry::ConstSharedPtr& odom) {
+  void publishTfFromOdom(const nav_msgs::msg::Odometry::ConstSharedPtr &odom) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishTfFromOdom", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -362,7 +366,8 @@ private:
       if (is_utm_source_) {
 
         if (!is_utm_origin_set_) {
-          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s utm_origin initialization", getPrintName().c_str(), Support::waiting_for_string.c_str());
+          RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s utm_origin initialization", getPrintName().c_str(),
+                               Support::waiting_for_string.c_str());
           return;
         }
 
@@ -430,14 +435,16 @@ private:
       /*//}*/
 
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(),
+                     tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
   }
   /*//}*/
 
   /* publishTfFromAtt() //{*/
-  void publishTfFromAtt(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr& msg) {
+  void publishTfFromAtt(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr &msg) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishTfFromAtt", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -477,14 +484,16 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_attitude_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(),
+                     tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_attitude_.c_str());
   }
   /*//}*/
 
   /* publishLocalTf() //{*/
-  void publishLocalTf(const std::string& frame_id) {
+  void publishLocalTf(const std::string &frame_id) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishLocalTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -504,15 +513,17 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
+                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_local_static_tf_published_ = true;
   }
   /*//}*/
 
   /* publishUtmTf() //{*/
-  void publishUtmTf(const std::string& frame_id) {
+  void publishUtmTf(const std::string &frame_id) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishUtmTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -521,9 +532,9 @@ private:
 
     tf_msg.header.frame_id         = frame_id;
     tf_msg.child_frame_id          = frame_id.substr(0, frame_id.find("_origin")) + "_utm_origin";
-    tf_msg.transform.translation.x = -utm_origin_.x;  // minus because inverse tf tree
-    tf_msg.transform.translation.y = -utm_origin_.y;  // minus because inverse tf tree
-    tf_msg.transform.translation.z = -utm_origin_.z;  // minus because inverse tf tree
+    tf_msg.transform.translation.x = -utm_origin_.x; // minus because inverse tf tree
+    tf_msg.transform.translation.y = -utm_origin_.y; // minus because inverse tf tree
+    tf_msg.transform.translation.z = -utm_origin_.z; // minus because inverse tf tree
     tf_msg.transform.rotation.x    = 0;
     tf_msg.transform.rotation.y    = 0;
     tf_msg.transform.rotation.z    = 0;
@@ -537,15 +548,17 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
+                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_utm_static_tf_published_ = true;
   }
   /*//}*/
 
   /* publishWorldTf() //{*/
-  void publishWorldTf(const std::string& frame_id) {
+  void publishWorldTf(const std::string &frame_id) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::publishWorldTf", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -554,8 +567,8 @@ private:
 
     tf_msg.header.frame_id         = frame_id;
     tf_msg.child_frame_id          = frame_id.substr(0, frame_id.find("_origin")) + "_world_origin";
-    tf_msg.transform.translation.x = -(utm_origin_.x - world_origin_.x);  // minus because inverse tf tree
-    tf_msg.transform.translation.y = -(utm_origin_.y - world_origin_.y);  // minus because inverse tf tree
+    tf_msg.transform.translation.x = -(utm_origin_.x - world_origin_.x); // minus because inverse tf tree
+    tf_msg.transform.translation.y = -(utm_origin_.y - world_origin_.y); // minus because inverse tf tree
     /* tf_msg.transform.translation.z = -(utm_origin_.z);                    // minus because inverse tf tree */
     tf_msg.transform.translation.z = 0;
     tf_msg.transform.rotation.x    = 0;
@@ -571,15 +584,18 @@ private:
         RCLCPP_ERROR(node_->get_logger(), "exception caught ");
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
+                           tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     }
-    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s", getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+    RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on first message of: %s",
+                     getPrintName().c_str(), tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
     is_world_static_tf_published_ = true;
   }
   /*//}*/
 
   /* republishInFrame() //{*/
-  void republishInFrame(const nav_msgs::msg::Odometry::ConstSharedPtr& msg, const std::string& frame_id, mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>& ph) {
+  void republishInFrame(const nav_msgs::msg::Odometry::ConstSharedPtr &msg, const std::string &frame_id,
+                        mrs_lib::PublisherHandler<nav_msgs::msg::Odometry> &ph) {
 
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::republishInFrame", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
@@ -595,7 +611,8 @@ private:
       msg_out.pose.pose = res->pose;
       ph.publish(msg_out);
     } else {
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform pose to %s. Not republishing odom in this frame.", getPrintName().c_str(), frame_id.c_str());
+      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform pose to %s. Not republishing odom in this frame.",
+                            getPrintName().c_str(), frame_id.c_str());
       return;
     }
   }
@@ -605,6 +622,6 @@ private:
 
 /*//}*/
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
 #endif

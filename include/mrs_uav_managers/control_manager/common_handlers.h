@@ -78,8 +78,8 @@ struct CommonHandlers_t
   rclcpp::Node::SharedPtr                          parent_node;
 };
 
-}  // namespace control_manager
+} // namespace control_manager
 
-}  // namespace mrs_uav_managers
+} // namespace mrs_uav_managers
 
-#endif  // CONTROL_MANAGER_COMMON_HANDLERS_H
+#endif // CONTROL_MANAGER_COMMON_HANDLERS_H

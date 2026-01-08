@@ -52,7 +52,7 @@ public:
 
 /* constructor //{ */
 
-RemoteControlTest::RemoteControlTest() : mrs_uav_testing::TestGeneric() {};
+RemoteControlTest::RemoteControlTest() : mrs_uav_testing::TestGeneric(){};
 
 //}
 

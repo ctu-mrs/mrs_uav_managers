@@ -7,10 +7,11 @@
   <version>2.0.0</version>
   <description>MRS UAV Managers</description>
 
-  <author email="tomas.baca@fel.cvut.cz">klaxalk</author>
   <maintainer email="tomas.baca@fel.cvut.cz">klaxalk</maintainer>
 
   <license>BSD 3-Clause</license>
+
+  <author email="tomas.baca@fel.cvut.cz">klaxalk</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
@@ -45,6 +46,10 @@
   <test_depend>launch_testing</test_depend>
   <test_depend>launch_testing_ament_cmake</test_depend>
   <test_depend>rclpy</test_depend>
+
+  <!-- Linters -->
+  <test_depend>ament_cmake_clang_format</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
