@@ -820,7 +820,8 @@ private:
 
   std::shared_ptr<TimerType> timer_joystick_;
   void                       timerJoystick();
-  double                     _joystick_timer_rate_ = 0;
+  double                     _joystick_timer_rate_   = 0;
+  std::atomic<bool>          running_timer_joystick_ = false;
 
   double _joystick_carrot_distance_ = 0;
 
@@ -3861,6 +3862,8 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
     return;
   }
 
+  mrs_lib::AtomicScopeFlag unset_running(running_timer_joystick_);
+
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackJoystick");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
 
@@ -4099,6 +4102,14 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
       // rc control deactivation
       if (rc_goto_active_ && channel_low) {
+
+        for (int i = 0; i < 10; i++) {
+          if (!running_timer_joystick_) {
+            break;
+          } else {
+            clock_->sleep_for(0.01s);
+          }
+        }
 
         RCLCPP_INFO(node_->get_logger(), "deactivating RC joystick");
 

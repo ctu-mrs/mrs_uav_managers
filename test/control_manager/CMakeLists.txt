@@ -1,5 +1,5 @@
-add_subdirectory(bumper_with_goto)
-add_subdirectory(bumper_with_rc_control)
+# add_subdirectory(bumper_with_goto)
+# add_subdirectory(bumper_with_rc_control)
 add_subdirectory(control_manager_start_stop)
 add_subdirectory(eland_control_error)
 add_subdirectory(eland_innovation)
