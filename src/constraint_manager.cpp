@@ -169,16 +169,38 @@ void ConstraintManager::initialize() {
   param_loader.loadParam("platform_config", platform_config_path);
 
   if (custom_config_path != "") {
-    param_loader.addYamlFile(custom_config_path);
+    if (!param_loader.addYamlFile(custom_config_path)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   if (platform_config_path != "") {
-    param_loader.addYamlFile(platform_config_path);
+    if (!param_loader.addYamlFile(platform_config_path)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
-  param_loader.addYamlFileFromParam("private_config");
-  param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("public_constraints");
+  if (!param_loader.addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader.addYamlFileFromParam("public_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader.addYamlFileFromParam("public_constraints")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_constraints");
+    rclcpp::shutdown();
+    exit(1);
+  }
 
   const std::string yaml_prefix = "mrs_uav_managers/constraint_manager/";
 
