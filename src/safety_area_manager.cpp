@@ -1425,8 +1425,9 @@ SafetyAreaManager::transformPoints(const std::vector<mrs_lib::safety_zone::Point
   mrs_msgs::msg::ReferenceStamped reference_tmp;
 
   for (const auto &point : points) {
+
     reference_tmp.header.frame_id      = from_frame;
-    reference_tmp.header.stamp         = rclcpp::Time(0);
+    reference_tmp.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
     reference_tmp.reference.position.x = boost::geometry::get<0>(point);
     reference_tmp.reference.position.y = boost::geometry::get<1>(point);
     reference_tmp.reference.position.z = 0;
