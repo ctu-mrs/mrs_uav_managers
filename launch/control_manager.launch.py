@@ -356,7 +356,7 @@ def generate_launch_description():
         executable='component_container_mt',
         output="screen",
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
-        # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
+        # prefix=["valgrind --gen-suppressions=all --suppressions=/home/klaxalk/ws_bug/valgrind.supp --leak-check=full --track-origins=yes --verbose --log-file=/tmp/valgrind.txt"],
         composable_node_descriptions=[control_manager_node],
         parameters=[
             {'use_intra_process_comms': True},
