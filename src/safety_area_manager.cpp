@@ -299,19 +299,37 @@ void SafetyAreaManager::initialize() {
 
   param_loader.loadParam("custom_config", custom_config_path);
   param_loader.loadParam("platform_config", platform_config_path);
+  param_loader.loadParam("world_config", _world_config_);
 
   if (custom_config_path != "") {
-    param_loader.addYamlFile(custom_config_path);
+    if (!param_loader.addYamlFile(custom_config_path)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   if (platform_config_path != "") {
-    param_loader.addYamlFile(platform_config_path);
+    if (!param_loader.addYamlFile(platform_config_path)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
-  param_loader.loadParam("world_config", _world_config_);
-  param_loader.addYamlFile(_world_config_);
+  if (_world_config_ != "") {
+    if (!param_loader.addYamlFile(_world_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
+  }
 
-  param_loader.addYamlFileFromParam("private_config");
+  if (!param_loader.addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
+    rclcpp::shutdown();
+    exit(1);
+  }
 
   param_loader.loadParam("uav_name", _uav_name_);
   param_loader.loadParam("enable_profiler", profiler_enabled_);
@@ -1407,8 +1425,9 @@ SafetyAreaManager::transformPoints(const std::vector<mrs_lib::safety_zone::Point
   mrs_msgs::msg::ReferenceStamped reference_tmp;
 
   for (const auto &point : points) {
+
     reference_tmp.header.frame_id      = from_frame;
-    reference_tmp.header.stamp         = rclcpp::Time(0);
+    reference_tmp.header.stamp         = rclcpp::Time(0, 0, clock_->get_clock_type());
     reference_tmp.reference.position.x = boost::geometry::get<0>(point);
     reference_tmp.reference.position.y = boost::geometry::get<1>(point);
     reference_tmp.reference.position.z = 0;

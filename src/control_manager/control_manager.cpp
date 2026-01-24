@@ -974,26 +974,66 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("network_config", _network_config_);
 
   if (_custom_config_ != "") {
-    param_loader_->addYamlFile(_custom_config_);
+    if (!param_loader_->addYamlFile(_custom_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   if (_platform_config_ != "") {
-    param_loader_->addYamlFile(_platform_config_);
+    if (!param_loader_->addYamlFile(_platform_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   if (_world_config_ != "") {
-    param_loader_->addYamlFile(_world_config_);
+    if (!param_loader_->addYamlFile(_world_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   if (_network_config_ != "") {
-    param_loader_->addYamlFile(_network_config_);
+    if (!param_loader_->addYamlFile(_network_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load network_config");
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
-  param_loader_->addYamlFileFromParam("private_config");
-  param_loader_->addYamlFileFromParam("public_config");
-  param_loader_->addYamlFileFromParam("private_trackers");
-  param_loader_->addYamlFileFromParam("private_controllers");
-  param_loader_->addYamlFileFromParam("public_controllers");
+  if (!param_loader_->addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader_->addYamlFileFromParam("public_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader_->addYamlFileFromParam("private_trackers")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_trackers");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader_->addYamlFileFromParam("private_controllers")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_controllers");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
+  if (!param_loader_->addYamlFileFromParam("public_controllers")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_controllers");
+    rclcpp::shutdown();
+    exit(1);
+  }
 
   // params passed from the launch file are not prefixed
   param_loader_->loadParam("uav_name", _uav_name_);
