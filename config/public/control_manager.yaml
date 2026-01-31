@@ -17,6 +17,8 @@ mrs_uav_managers:
 
     safety:
 
+      # safety measures that trigger when the absolute tilt is larger than certain threshold
+      # -> will be overriden by rc_emergency_handoff=true
       tilt_limit:
 
         eland:
@@ -25,13 +27,20 @@ mrs_uav_managers:
 
         disarm:
           enabled: true
-          limit: 75.0 # [deg]
+          limit: 90.0 # [deg]
 
+      # disarming safety measure which triggers with large tilt (orientation) error that is sustained over the set timeout threshold
+      # -> 20 degress tilt error is unusual during normal flight and almost exclusively happen with ESC / motor / propeller failure.
+      #    With such failures, it is often safer to disarm the UAV at that moment than having it fight the error without all its actuators.
+      # -> will be overriden by rc_emergency_handoff=true
       tilt_error_disarm:
         enabled: true
         timeout: 0.5 # [s] # for how long the error has to be present to disarm
         error_threshold: 20.0 # [deg]
 
+      # safety measures that trigger when yaw control error grows over pre-set threshold
+      # -> our SO(3) geometric tracking control might not converge with yaw error over 90 degrees
+      # -> will be overriden by rc_emergency_handoff=true
       yaw_error_eland:
         enabled: true
         limit: 90.0 # [deg]
@@ -79,8 +88,11 @@ mrs_uav_managers:
         # how often does it allow to escalate
         timeout: 2.0 # [s]
 
+        # 1st press: the emergency hover is triggered (the user's input into the system is ignored, EmergencyController is activated)
         ehover: true
+        # 2nd press: the emergency landing is triggered
         eland: true
+        # 3rd press: the feedforward failsafe landing is triggered (semi-controlled fall)
         failsafe: false
 
       parachute:
@@ -90,9 +102,13 @@ mrs_uav_managers:
       # when the active tracker returns empty command
       tracker_error_action: "eland" # {eland, ehover}
 
-      # handoff directly to RC control
-      # * overrides eland and failsafe landing
-      # * recommended when flying over water
+      # Disables safety measures that would "bring the UAV to the ground" (emergancy landing, failsafe landing, disarm)
+      # * true => any safety measure that would othewise lead to the ground will result in giving control back to the safety pilot's RC controller
+      #    > use above water or other surfaces when immediate landing is not the best choice
+      #    > use when the safety pilot is always ready to take over
+      # * false => the system will automatically eland, failsafe leanding or disarm to minimize damage during malfunction
+      #    > use in multi-robot experiments
+      #    > use when the pilot might not be able to safe the UAV
       rc_emergency_handoff:
         enabled: false
 
