@@ -1891,6 +1891,8 @@ void ControlManager::initialize(void) {
     if (hover_throttle < _hover_throttle_range_check_min_ || hover_throttle > _hover_throttle_range_check_max_) {
       RCLCPP_ERROR(node_->get_logger(), "hover_throttle (%.2f) is outside of the allowed range (%.2f < allowed < %.2f)!", hover_throttle,
                    _hover_throttle_range_check_min_, _hover_throttle_range_check_max_);
+      RCLCPP_ERROR(node_->get_logger(), "... this is possibly caused by wrong motor constants (wrong platform_config.yaml, wrong UAV_TYPE), or poorly set initial UAV_MASS.");
+      RCLCPP_ERROR(node_->get_logger(), "... shutting down the system to prevent a crash.");
       rclcpp::shutdown();
       exit(1);
     }
