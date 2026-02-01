@@ -568,6 +568,10 @@ private:
   bool   _odometry_innovation_check_enabled_ = false;
   double _odometry_innovation_threshold_     = 0; // innovation size for triggering eland
 
+  bool   _hover_throttle_range_check_enabled_ = false;
+  double _hover_throttle_range_check_min_;
+  double _hover_throttle_range_check_max_;
+
   std::atomic<bool> callbacks_enabled_ = true;
 
   // | ------------------------ parachute ----------------------- |
@@ -1070,6 +1074,10 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("safety/ehover_tracker", _ehover_tracker_name_);
   param_loader_->loadParam("safety/failsafe_controller", _failsafe_controller_name_);
 
+  param_loader_->loadParam("safety/hover_throttle_range_check/enabled", _hover_throttle_range_check_enabled_);
+  param_loader_->loadParam("safety/hover_throttle_range_check/min", _hover_throttle_range_check_min_);
+  param_loader_->loadParam("safety/hover_throttle_range_check/max", _hover_throttle_range_check_max_);
+
   param_loader_->loadParam("safety/eland/controller", _eland_controller_name_);
   param_loader_->loadParam("safety/eland/cutoff_mass_factor", _elanding_cutoff_mass_factor_);
   param_loader_->loadParam("safety/eland/cutoff_timeout", _elanding_cutoff_timeout_);
@@ -1479,6 +1487,12 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("mrs_controllers", _controller_names_);
   param_loader_->loadParam("controllers", custom_controllers);
 
+  if (!param_loader_->loadedSuccessfully()) {
+    RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
+    rclcpp::shutdown();
+    exit(1);
+  }
+
   if (!custom_controllers.empty()) {
     _controller_names_.insert(_controller_names_.end(), custom_controllers.begin(), custom_controllers.end());
   }
@@ -1501,6 +1515,12 @@ void ControlManager::initialize(void) {
     param_loader_->loadParam(controller_name + "/failsafe_threshold", failsafe_threshold);
     param_loader_->loadParam(controller_name + "/odometry_innovation_threshold", odometry_innovation_threshold);
     param_loader_->loadParam(controller_name + "/human_switchable", human_switchable);
+
+    if (!param_loader_->loadedSuccessfully()) {
+      RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
+      rclcpp::shutdown();
+      exit(1);
+    }
 
     // check if the controller can output some of the required outputs
     {
@@ -1854,6 +1874,26 @@ void ControlManager::initialize(void) {
     nominal_mass.data = _uav_mass_;
 
     ph_mass_nominal_.publish(nominal_mass);
+  }
+
+  // | ------- check the hover throttle agains the limits ------- |
+
+  if (_hover_throttle_range_check_enabled_) {
+
+    double hover_throttle = mrs_lib::quadratic_throttle_model::forceToThrottle(common_handlers_->throttle_model, _uav_mass_ * common_handlers_->g);
+
+    if (!std::isfinite(hover_throttle)) {
+      RCLCPP_ERROR(node_->get_logger(), "NaN detected in variable \"hover_throttle\"!!!");
+      rclcpp::shutdown();
+      exit(1);
+    }
+
+    if (hover_throttle < _hover_throttle_range_check_min_ || hover_throttle > _hover_throttle_range_check_max_) {
+      RCLCPP_ERROR(node_->get_logger(), "hover_throttle (%.2f) is outside of the allowed range (%.2f < allowed < %.2f)!", hover_throttle,
+                   _hover_throttle_range_check_min_, _hover_throttle_range_check_max_);
+      rclcpp::shutdown();
+      exit(1);
+    }
   }
 
   // | ----------------------- subscribers ---------------------- |

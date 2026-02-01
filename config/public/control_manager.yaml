@@ -45,12 +45,6 @@ mrs_uav_managers:
         enabled: true
         limit: 90.0 # [deg]
 
-      # tracker used for emergency hover routine
-      ehover_tracker: "LandoffTracker"
-
-      # controller used for safety landing (feed forward)
-      failsafe_controller: "FailsafeController"
-
       # after not receiving odometry for more than this, the failsafe landing will trigger
       # will be overriden for ACCELERATION+ output mode
       odometry_max_missing_time: 0.1 # [s]
@@ -60,6 +54,12 @@ mrs_uav_managers:
       # - the innovation limit is set per-controller in the controllers.yaml file
       odometry_innovation_eland:
         enabled: true
+
+      # won't start the system when the hover throttle (based on nominal mass and the motor params) is out of bounds
+      hover_throttle_range_check:
+        enabled: true
+        min: 0.2 # [%/100]
+        max: 0.7 # [%/100]
 
       # emergency landing (still feedback)
       eland:
@@ -96,7 +96,6 @@ mrs_uav_managers:
         failsafe: false
 
       parachute:
-
         enabled: false
 
       # when the active tracker returns empty command
@@ -112,7 +111,13 @@ mrs_uav_managers:
       rc_emergency_handoff:
         enabled: false
 
-      min_throttle_null_tracker: 0.10 # [] minimum throttle when not flying
+      min_throttle_null_tracker: 0.10 # [%/100] minimum throttle being output when not flying
+
+      # tracker used for emergency hover routine
+      ehover_tracker: "LandoffTracker"
+
+      # controller used for safety landing (feed forward)
+      failsafe_controller: "FailsafeController"
 
     trajectory_tracking:
 
