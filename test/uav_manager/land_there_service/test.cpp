@@ -12,11 +12,11 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler("uav1");
@@ -26,7 +26,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   // | ------------- wait for the system to be ready ------------ |
@@ -37,7 +37,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (uh->mrsSystemReady()) {
+    if (uh_->mrsSystemReady()) {
       break;
     }
   }
@@ -45,7 +45,7 @@ bool Tester::test(void) {
   // | ------------------------ take off ------------------------ |
 
   {
-    auto [success, message] = uh->takeoff();
+    auto [success, message] = uh_->takeoff();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "takeoff failed with message: '%s'", message.c_str());
@@ -58,7 +58,7 @@ bool Tester::test(void) {
   // | --------------------- goto somewhere --------------------- |
 
   {
-    auto [success, message] = uh->gotoAbs(10, 15, 5, 1.2);
+    auto [success, message] = uh_->gotoAbs(10, 15, 5, 1.2);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "goto failed with message: '%s'", message.c_str());
@@ -73,7 +73,7 @@ bool Tester::test(void) {
   double des_hdg = 3.14;
 
   {
-    auto [success, message] = uh->landThere(des_x, des_y, des_hdg);
+    auto [success, message] = uh_->landThere(des_x, des_y, des_hdg);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "land there failed with message: '%s'", message.c_str());
@@ -83,7 +83,7 @@ bool Tester::test(void) {
 
   // | ---------------- check the final position ---------------- |
 
-  if (uh->isAtPosition(des_x, des_y, 0, des_hdg, 0.5)) {
+  if (uh_->isAtPosition(des_x, des_y, 0, des_hdg, 0.5)) {
     return true;
   } else {
     RCLCPP_ERROR(node_->get_logger(), "land there did end in wrong place");

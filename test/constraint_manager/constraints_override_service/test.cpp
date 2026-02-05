@@ -12,13 +12,13 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
 
   const std::string uav_name = "uav1";
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler(uav_name);
@@ -28,11 +28,11 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
@@ -47,7 +47,7 @@ bool Tester::test(void) {
   {
     const std::string constraints = "medium";
 
-    auto [success, message] = uh->setConstraints(constraints);
+    auto [success, message] = uh_->setConstraints(constraints);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to switch to '%s'", constraints.c_str());
@@ -63,7 +63,7 @@ bool Tester::test(void) {
   const double desired_vertical_acc   = 0.3;
 
   {
-    auto [success, message] = uh->overrideConstraints(desired_horizontal_acc, desired_vertical_acc);
+    auto [success, message] = uh_->overrideConstraints(desired_horizontal_acc, desired_vertical_acc);
 
     if (!success) {
 
@@ -76,10 +76,9 @@ bool Tester::test(void) {
 
   // | ----------------------- check constraints ---------------------- |
 
-  const double horizontal_acceleration    = uh->getCurrentConstraints()->horizontal_acceleration;
-  const double vertical_asc_acceleration  = uh->getCurrentConstraints()->vertical_ascending_acceleration;
-  const double vertical_desc_acceleration = uh->getCurrentConstraints()->vertical_descending_acceleration;
-  ;
+  const double horizontal_acceleration    = uh_->getCurrentConstraints()->horizontal_acceleration;
+  const double vertical_asc_acceleration  = uh_->getCurrentConstraints()->vertical_ascending_acceleration;
+  const double vertical_desc_acceleration = uh_->getCurrentConstraints()->vertical_descending_acceleration;
 
   if (std::abs(horizontal_acceleration - desired_horizontal_acc) > 0.1 || std::abs(vertical_asc_acceleration - desired_vertical_acc) > 0.1 ||
       std::abs(vertical_desc_acceleration - desired_vertical_acc) > 0.1) {
@@ -87,7 +86,7 @@ bool Tester::test(void) {
     return false;
   }
 
-  if (uh->isFlyingNormally()) {
+  if (uh_->isFlyingNormally()) {
     return true;
   } else {
     RCLCPP_ERROR(node_->get_logger(), "not flying normally");

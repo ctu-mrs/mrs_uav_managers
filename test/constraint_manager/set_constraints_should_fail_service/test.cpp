@@ -12,13 +12,13 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
 
   const std::string uav_name = "uav1";
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler(uav_name);
@@ -28,11 +28,11 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
@@ -44,14 +44,14 @@ bool Tester::test(void) {
 
   // | --------------- remember the current constraints --------------- |
 
-  const std::string old_constraints = uh->sh_constraint_manager_diag_.getMsg()->current_name;
+  const std::string old_constraints = uh_->sh_constraint_manager_diag_.getMsg()->current_name;
 
   // | ------------------------ set gains ----------------------- |
 
   const std::string constraints = "do_not_exists";
 
   {
-    auto [success, message] = uh->setConstraints(constraints);
+    auto [success, message] = uh_->setConstraints(constraints);
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "switching to constraints '%s' secceeded, which should not happen", constraints.c_str());
@@ -63,12 +63,12 @@ bool Tester::test(void) {
 
   // | ----------------------- check constraints ---------------------- |
 
-  if (uh->sh_constraint_manager_diag_.getMsg()->current_name != old_constraints) {
+  if (uh_->sh_constraint_manager_diag_.getMsg()->current_name != old_constraints) {
     RCLCPP_ERROR(node_->get_logger(), "constraints changed even though they should not");
     return false;
   }
 
-  if (uh->isFlyingNormally()) {
+  if (uh_->isFlyingNormally()) {
     return true;
   } else {
     RCLCPP_ERROR(node_->get_logger(), "not flying normally");

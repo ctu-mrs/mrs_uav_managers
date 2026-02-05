@@ -12,11 +12,11 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   const std::string uav_name = "uav1";
 
@@ -28,13 +28,13 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   // | ---------- call midair activation in async task ---------- |
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation succeeded, this should not happen: '%s'", message.c_str());

@@ -10,11 +10,11 @@ public:
 
   FailedTakeoffTest() : mrs_uav_testing::TestGeneric() {
   }
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool FailedTakeoffTest::test() {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   const std::string uav_name = "uav1";
 
@@ -26,7 +26,7 @@ bool FailedTakeoffTest::test() {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   // | ---------------- wait for ready to takeoff --------------- |
@@ -39,12 +39,12 @@ bool FailedTakeoffTest::test() {
 
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for the MRS UAV System");
 
-    if (uh->mrsSystemReady()) {
+    if (uh_->mrsSystemReady()) {
       RCLCPP_INFO(node_->get_logger(), "MRS UAV System is ready");
       break;
     }
 
-    uh->sleep(0.01);
+    uh_->sleep(0.01);
   }
 
   // | ---------------------- arm the drone --------------------- |
@@ -56,7 +56,7 @@ bool FailedTakeoffTest::test() {
     request->data                                            = true;
 
     {
-      auto response = uh->sch_arming_.callSync(request);
+      auto response = uh_->sch_arming_.callSync(request);
 
       if (!response || !response.value()->success) {
         return false;
@@ -70,7 +70,7 @@ bool FailedTakeoffTest::test() {
 
   // | --------------------- check if armed --------------------- |
 
-  if (!uh->sh_hw_api_status_.getMsg()->armed) {
+  if (!uh_->sh_hw_api_status_.getMsg()->armed) {
     return false;
   }
 
@@ -80,7 +80,7 @@ bool FailedTakeoffTest::test() {
     std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
     {
-      auto response = uh->sch_offboard_.callSync(request);
+      auto response = uh_->sch_offboard_.callSync(request);
 
       if (!response || !response.value()->success) {
         return false;
@@ -94,7 +94,7 @@ bool FailedTakeoffTest::test() {
 
   // | ------------------ check if in offboard ------------------ |
 
-  if (!uh->sh_hw_api_status_.getMsg()->offboard) {
+  if (!uh_->sh_hw_api_status_.getMsg()->offboard) {
     return false;
   }
 
@@ -106,7 +106,7 @@ bool FailedTakeoffTest::test() {
     std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
     {
-      auto response = uh->sch_takeoff_.callSync(request);
+      auto response = uh_->sch_takeoff_.callSync(request);
 
       if (!response || response.value()->success) {
         RCLCPP_ERROR(node_->get_logger(), "takeoff call success, this should not happen");
@@ -119,7 +119,7 @@ bool FailedTakeoffTest::test() {
 
   sleep(2.0);
 
-  if (uh->sh_hw_api_status_.getMsg()->armed) {
+  if (uh_->sh_hw_api_status_.getMsg()->armed) {
     RCLCPP_ERROR(node_->get_logger(), "the uav is still armed");
     return false;
   }

@@ -25,11 +25,11 @@ public:
   mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool> sch_min_height_check_;
 
   bool toggleMinHeightCheck(const bool in);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler(_uav_name_);
@@ -39,7 +39,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   pl_->loadParam("mrs_uav_managers/uav_manager/min_height_checking/safety_height_offset", _min_height_offset_);
@@ -51,7 +51,7 @@ bool Tester::test(void) {
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
@@ -83,7 +83,7 @@ bool Tester::test(void) {
   {
     RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0.25, 0]");
 
-    auto [success, message] = uh->gotoAbs(0, 0, 0.25, 0);
+    auto [success, message] = uh_->gotoAbs(0, 0, 0.25, 0);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to descend");
@@ -110,7 +110,7 @@ bool Tester::test(void) {
 
   // | ------------- check if we are flying normally ------------ |
 
-  if (uh->isFlyingNormally()) {
+  if (uh_->isFlyingNormally()) {
     RCLCPP_ERROR(node_->get_logger(), "we are still flying normally");
     return false;
   }
@@ -125,7 +125,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (uh->isFlyingNormally()) {
+    if (uh_->isFlyingNormally()) {
       break;
     }
 
@@ -139,7 +139,7 @@ bool Tester::test(void) {
   {
     RCLCPP_INFO(node_->get_logger(), "going to [0, 0, 0, 0]");
 
-    auto [success, message] = uh->gotoAbs(0, 0, 0, 0);
+    auto [success, message] = uh_->gotoAbs(0, 0, 0, 0);
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "goto should fail");
@@ -159,7 +159,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (uh->isFlyingNormally()) {
+    if (uh_->isFlyingNormally()) {
       break;
     }
 
@@ -172,7 +172,7 @@ bool Tester::test(void) {
 
   RCLCPP_INFO(node_->get_logger(), "checking our AGL");
 
-  auto height = uh->getHeightAgl();
+  auto height = uh_->getHeightAgl();
 
   if (height) {
 

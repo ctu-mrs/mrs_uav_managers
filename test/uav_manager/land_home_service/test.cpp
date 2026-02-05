@@ -12,11 +12,11 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler("uav1");
@@ -26,7 +26,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   // | ------------- wait for the system to be ready ------------ |
@@ -37,20 +37,20 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (uh->mrsSystemReady()) {
+    if (uh_->mrsSystemReady()) {
       break;
     }
   }
 
   // | ---------------- save the current position --------------- |
 
-  auto takeoff_pos = uh->sh_uav_state_.getMsg()->pose.position;
-  auto takeoff_hdg = mrs_lib::AttitudeConverter(uh->sh_uav_state_.getMsg()->pose.orientation).getHeading();
+  auto takeoff_pos = uh_->sh_uav_state_.getMsg()->pose.position;
+  auto takeoff_hdg = mrs_lib::AttitudeConverter(uh_->sh_uav_state_.getMsg()->pose.orientation).getHeading();
 
   // | ------------------------ take off ------------------------ |
 
   {
-    auto [success, message] = uh->takeoff();
+    auto [success, message] = uh_->takeoff();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "takeoff failed with message: '%s'", message.c_str());
@@ -63,7 +63,7 @@ bool Tester::test(void) {
   // | --------------------- goto somewhere --------------------- |
 
   {
-    auto [success, message] = uh->gotoRel(8, 1, 2, 1.2);
+    auto [success, message] = uh_->gotoRel(8, 1, 2, 1.2);
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "goto failed with message: '%s'", message.c_str());
@@ -74,7 +74,7 @@ bool Tester::test(void) {
   // | ------------------------ land home ----------------------- |
 
   {
-    auto [success, message] = uh->landHome();
+    auto [success, message] = uh_->landHome();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "land home failed with message: '%s'", message.c_str());
@@ -84,7 +84,7 @@ bool Tester::test(void) {
 
   // | ---------------- check the final position ---------------- |
 
-  if (uh->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_pos.z, takeoff_hdg, 0.5)) {
+  if (uh_->isAtPosition(takeoff_pos.x, takeoff_pos.y, takeoff_pos.z, takeoff_hdg, 0.5)) {
     return true;
   } else {
     RCLCPP_ERROR(node_->get_logger(), "land home did end in wrong place");

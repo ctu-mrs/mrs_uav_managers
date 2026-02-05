@@ -12,11 +12,11 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   const std::string uav_name = "uav1";
 
@@ -28,10 +28,10 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
-  auto [success, message] = uh->takeoff();
+  auto [success, message] = uh_->takeoff();
 
   if (!success) {
     RCLCPP_ERROR(node_->get_logger(), "takeoff failed with message: '%s'", message.c_str());
@@ -40,7 +40,7 @@ bool Tester::test(void) {
 
   this->sleep(5.0);
 
-  if (uh->isFlyingNormally()) {
+  if (uh_->isFlyingNormally()) {
     return true;
   } else {
     RCLCPP_ERROR(node_->get_logger(), "not flying normally");

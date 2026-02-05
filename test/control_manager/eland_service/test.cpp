@@ -12,13 +12,13 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
 
   const std::string uav_name = "uav1";
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   {
     auto [uhopt, message] = getUAVHandler(uav_name);
@@ -28,11 +28,11 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "midair activation failed with message: '%s'", message.c_str());
@@ -43,7 +43,7 @@ bool Tester::test(void) {
   // | ---------------------- trigger eland --------------------- |
 
   {
-    auto [success, message] = uh->eland();
+    auto [success, message] = uh_->eland();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "eland call failed with message: '%s'", message.c_str());

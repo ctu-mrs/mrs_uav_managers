@@ -12,11 +12,11 @@ public:
   }
 
   bool test(void);
+
+  std::shared_ptr<mrs_uav_testing::UAVHandler> uh_;
 };
 
 bool Tester::test(void) {
-
-  std::shared_ptr<mrs_uav_testing::UAVHandler> uh;
 
   const std::string uav_name = "uav1";
 
@@ -28,11 +28,11 @@ bool Tester::test(void) {
       return false;
     }
 
-    uh = uhopt.value();
+    uh_ = uhopt.value();
   }
 
   {
-    auto [success, message] = uh->activateMidAir();
+    auto [success, message] = uh_->activateMidAir();
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "activation failed with message: '%s'", message.c_str());
@@ -43,7 +43,7 @@ bool Tester::test(void) {
   // | --------------- goto to violate min height --------------- |
 
   {
-    auto [success, message] = uh->gotoAbs(0, 0, 100, 0);
+    auto [success, message] = uh_->gotoAbs(0, 0, 100, 0);
 
     if (success) {
       RCLCPP_ERROR(node_->get_logger(), "goto should fail");
@@ -61,7 +61,7 @@ bool Tester::test(void) {
       return false;
     }
 
-    if (uh->isFlyingNormally()) {
+    if (uh_->isFlyingNormally()) {
       break;
     }
   }
@@ -70,14 +70,14 @@ bool Tester::test(void) {
 
   sleep(1.0);
 
-  if (!uh->sh_max_height_.hasMsg()) {
+  if (!uh_->sh_max_height_.hasMsg()) {
     RCLCPP_ERROR(node_->get_logger(), "missing max height msgs");
     return false;
   }
 
-  double max_height_agl = uh->sh_max_height_.getMsg()->value;
+  double max_height_agl = uh_->sh_max_height_.getMsg()->value;
 
-  auto height = uh->getHeightAgl();
+  auto height = uh_->getHeightAgl();
 
   if (height) {
     if (height.value() < max_height_agl) {
