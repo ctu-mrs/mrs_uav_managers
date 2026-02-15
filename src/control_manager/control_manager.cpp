@@ -3155,6 +3155,8 @@ void ControlManager::timerFailsafe() {
 
 void ControlManager::timerJoystick() {
 
+  mrs_lib::AtomicScopeFlag unset_running(running_timer_joystick_);
+
   if (!is_initialized_) {
     return;
   }
@@ -3944,8 +3946,6 @@ void ControlManager::callbackJoystick(const sensor_msgs::msg::Joy::ConstSharedPt
   if (!is_initialized_) {
     return;
   }
-
-  mrs_lib::AtomicScopeFlag unset_running(running_timer_joystick_);
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackJoystick");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackJoystick", scope_timer_logger_, scope_timer_enabled_);
