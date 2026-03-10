@@ -1512,8 +1512,16 @@ bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStam
     return false;
   }
 
-  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y,
-                                                      tfed_horizontal->reference.position.z)) {
+  // Transform Z coordinate to vertical frame since it may be different from horizontal frame
+  std::string vertical_frame                = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
+  auto [z_transform_success, z_transformed] = transformZ(point.header.frame_id, vertical_frame, point.reference.position.z);
+
+  if (!z_transform_success) {
+    RCLCPP_WARN(node_->get_logger(), "Could not transform the Z coordinate to the safety area vertical frame");
+    return false;
+  }
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, z_transformed)) {
     return false;
   }
 
