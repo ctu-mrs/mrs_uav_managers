@@ -1517,7 +1517,10 @@ bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStam
   auto [z_transform_success, z_transformed] = transformZ(point.header.frame_id, vertical_frame, point.reference.position.z);
 
   if (!z_transform_success) {
-    RCLCPP_WARN(node_->get_logger(), "Could not transform the Z coordinate to the safety area vertical frame");
+    RCLCPP_DEBUG(node_->get_logger(),
+                 "SafetyAreaManager: failed to transform Z from frame '%s' to safety area vertical frame '%s'; "
+                 "rejecting point as outside safety area.",
+                 point.header.frame_id.c_str(), vertical_frame.c_str());
     return false;
   }
 
