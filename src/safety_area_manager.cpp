@@ -551,40 +551,41 @@ void SafetyAreaManager::timerStatus() {
   }
 
   // RViz Visualizations, only once we have the safety zone defined and there is a transform available to the local_origin frame.
-  if (safety_zone_handler_.safety_zone && !safety_zone_handler_.visualization_components.initialized) {
+  {
     std::scoped_lock lock(mutex_safety_area_);
+    if (safety_zone_handler_.safety_zone && !safety_zone_handler_.visualization_components.initialized) {
+      bool all_transforms_done = true;
 
-    bool all_transforms_done = true;
+      // Transform prism to local_origin frame for visualization
+      auto border_prism      = safety_zone_handler_.safety_zone->getBorder();
+      auto transformed_prism = transformPrism(border_prism, "local_origin");
 
-    // Transform prism to local_origin frame for visualization
-    auto border_prism      = safety_zone_handler_.safety_zone->getBorder();
-    auto transformed_prism = transformPrism(border_prism, "local_origin");
-
-    if (!transformed_prism) {
-      all_transforms_done = false;
-    } else {
-      safety_zone_handler_.visualization_components.static_edges.push_back(
-          std::make_unique<mrs_lib::StaticEdgesVisualization>(transformed_prism.value(), _uav_name_, "local_origin", node_, 2));
-
-      // Obstacles if safety zone is already defined and transformed successfully
-      const auto &obstacles = safety_zone_handler_.safety_zone->getObstacles();
-      for (const auto &[id, obstacle_ptr] : obstacles) {
-        // Transform obstacle prism to local_origin frame
-        auto transformed_obstacle_prism = transformPrism(*obstacle_ptr, "local_origin");
-
-        if (!transformed_obstacle_prism) {
-          all_transforms_done = false;
-          break;
-        }
+      if (!transformed_prism) {
+        all_transforms_done = false;
+      } else {
         safety_zone_handler_.visualization_components.static_edges.push_back(
-            std::make_unique<mrs_lib::StaticEdgesVisualization>(transformed_obstacle_prism.value(), _uav_name_, "local_origin", node_, 2));
-      }
-    }
+            std::make_unique<mrs_lib::StaticEdgesVisualization>(transformed_prism.value(), _uav_name_, "local_origin", node_, 2));
 
-    if (all_transforms_done) {
-      safety_zone_handler_.visualization_components.initialized = true;
-    } else {
-      safety_zone_handler_.visualization_components.safeCleanup();
+        // Obstacles if safety zone is already defined and transformed successfully
+        const auto &obstacles = safety_zone_handler_.safety_zone->getObstacles();
+        for (const auto &[id, obstacle_ptr] : obstacles) {
+          // Transform obstacle prism to local_origin frame
+          auto transformed_obstacle_prism = transformPrism(*obstacle_ptr, "local_origin");
+
+          if (!transformed_obstacle_prism) {
+            all_transforms_done = false;
+            break;
+          }
+          safety_zone_handler_.visualization_components.static_edges.push_back(
+              std::make_unique<mrs_lib::StaticEdgesVisualization>(transformed_obstacle_prism.value(), _uav_name_, "local_origin", node_, 2));
+        }
+      }
+
+      if (all_transforms_done) {
+        safety_zone_handler_.visualization_components.initialized = true;
+      } else {
+        safety_zone_handler_.visualization_components.safeCleanup();
+      }
     }
   }
 
