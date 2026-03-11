@@ -222,7 +222,7 @@ private:
   std::unique_ptr<mrs_lib::safety_zone::Prism> makePrism(const std::vector<mrs_msgs::msg::Point2D> &points, const double max_z, const double min_z,
                                                          const std::string &horizontal_frame, const std::string &vertical_frame);
   // Transform prism
-  std::optional<mrs_lib::safety_zone::Prism> transformPrism(mrs_lib::safety_zone::Prism &prism, const std::string &target_frame);
+  std::optional<mrs_lib::safety_zone::Prism> transformPrism(const mrs_lib::safety_zone::Prism &prism, const std::string &target_frame);
 
   std::tuple<bool, std::vector<mrs_lib::safety_zone::Point2d>> transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
                                                                                const std::string &from_frame, const std::string &target_frame);
@@ -1420,7 +1420,7 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
 
 /* transformPrism() //{ */
 
-std::optional<mrs_lib::safety_zone::Prism> SafetyAreaManager::transformPrism(mrs_lib::safety_zone::Prism &prism, const std::string &target_frame) {
+std::optional<mrs_lib::safety_zone::Prism> SafetyAreaManager::transformPrism(const mrs_lib::safety_zone::Prism &prism, const std::string &target_frame) {
 
   auto border_points                        = prism.getPoints();
   auto [success, transformed_border_points] = transformPoints(border_points, prism.getHorizontalFrame(), target_frame);
