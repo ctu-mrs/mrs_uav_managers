@@ -1429,7 +1429,7 @@ std::optional<mrs_lib::safety_zone::Prism> SafetyAreaManager::transformPrism(mrs
   auto [z_success_min, transformed_min_z] = transformZ(prism.getVerticalFrame(), target_frame, prism.getMinZ());
 
   if (!success || !z_success_max || !z_success_min) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Failed to transform safety border points to %s frame. Will retry later.", target_frame.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Failed to transform safety zone points to %s frame. Will retry later.", target_frame.c_str());
     return std::nullopt;
   }
 
