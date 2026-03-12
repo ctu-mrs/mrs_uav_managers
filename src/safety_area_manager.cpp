@@ -1512,8 +1512,19 @@ bool SafetyAreaManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStam
     return false;
   }
 
-  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y,
-                                                      tfed_horizontal->reference.position.z)) {
+  // Transform Z coordinate to vertical frame since it may be different from horizontal frame
+  std::string vertical_frame                = safety_zone_handler_.safety_zone->getBorder().getVerticalFrame();
+  auto [z_transform_success, z_transformed] = transformZ(point.header.frame_id, vertical_frame, point.reference.position.z);
+
+  if (!z_transform_success) {
+    RCLCPP_DEBUG(node_->get_logger(),
+                 "SafetyAreaManager: failed to transform Z from frame '%s' to safety area vertical frame '%s'; "
+                 "rejecting point as outside safety area.",
+                 point.header.frame_id.c_str(), vertical_frame.c_str());
+    return false;
+  }
+
+  if (!safety_zone_handler_.safety_zone->isPointValid(tfed_horizontal->reference.position.x, tfed_horizontal->reference.position.y, z_transformed)) {
     return false;
   }
 
@@ -1602,7 +1613,8 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::Referen
 
   auto border = safety_zone_handler_.safety_zone->getBorder();
 
-  std::string border_frame = border.getHorizontalFrame();
+  std::string border_frame   = border.getHorizontalFrame();
+  std::string vertical_frame = border.getVerticalFrame();
 
   {
     auto ret = transformer_->transformSingle(start, border_frame);
@@ -1626,14 +1638,25 @@ bool SafetyAreaManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::Referen
     end_transformed = ret.value();
   }
 
+  // Transform Z coordinates to the border's vertical frame (may differ from horizontal frame)
+  auto [start_z_success, start_z] = transformZ(start.header.frame_id, vertical_frame, start.reference.position.z);
+  auto [end_z_success, end_z]     = transformZ(end.header.frame_id, vertical_frame, end.reference.position.z);
+  if (!start_z_success || !end_z_success) {
+    RCLCPP_DEBUG(node_->get_logger(),
+                 "SafetyAreaManager: failed to transform Z from frames '%s' or '%s' to safety area vertical frame '%s'; "
+                 "rejecting path as outside safety area.",
+                 start.header.frame_id.c_str(), end.header.frame_id.c_str(), vertical_frame.c_str());
+    return false;
+  }
+
   // verify the whole path
   mrs_lib::safety_zone::Point3d start_point, end_point;
   start_point.set<0>(start_transformed.reference.position.x);
   start_point.set<1>(start_transformed.reference.position.y);
-  start_point.set<2>(start_transformed.reference.position.z);
+  start_point.set<2>(start_z);
   end_point.set<0>(end_transformed.reference.position.x);
   end_point.set<1>(end_transformed.reference.position.y);
-  end_point.set<2>(end_transformed.reference.position.z);
+  end_point.set<2>(end_z);
 
   return safety_zone_handler_.safety_zone->isPathValid(start_point, end_point);
 }
