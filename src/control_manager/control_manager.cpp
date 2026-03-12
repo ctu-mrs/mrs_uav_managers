@@ -3288,7 +3288,7 @@ void ControlManager::timerBumper(const ros::TimerEvent& event) {
 
   if (!isFlyingNormally()) {
     if (!(bumper_repulsing_ || rc_goto_active_)) {
-      ROS_WARN_THROTTLE(1.0, "[ControlManager]: bumpper can not function, not flying 'normally'");
+      ROS_WARN_THROTTLE(1.0, "[ControlManager]: bumper can not function, not flying 'normally'");
       return;
     }
   }
@@ -7016,7 +7016,7 @@ void ControlManager::bumperPushFromObstacle(void) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision below");
     vertical_collision_detected = true;
-    vertical_repulsion_distance = min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors);
+    vertical_repulsion_distance = min_distance_vertical + _bumper_horizontal_overshoot_ - bumper_data->sectors.at(bumper_data->n_horizontal_sectors);
   }
 
   // check for vertical collision up
@@ -7025,7 +7025,7 @@ void ControlManager::bumperPushFromObstacle(void) {
 
     ROS_INFO_THROTTLE(1.0, "[ControlManager]: Bumper: potential collision above");
     vertical_collision_detected = true;
-    vertical_repulsion_distance = -(min_distance_vertical - bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1));
+    vertical_repulsion_distance = -(min_distance_vertical + _bumper_horizontal_overshoot_ - bumper_data->sectors.at(bumper_data->n_horizontal_sectors + 1));
   }
 
   // if potential collision was detected and we should start the repulsing_
