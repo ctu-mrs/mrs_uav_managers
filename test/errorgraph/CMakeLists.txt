@@ -1,0 +1,2 @@
+add_subdirectory(errorgraph_managers_report_waiting)
+add_subdirectory(errorgraph_managers_clear_after_startup)
