@@ -699,7 +699,7 @@ namespace mrs_uav_managers
 
       auto control_manager_diagnostics = sh_control_manager_diag_.getMsg();
 
-      if (control_manager_diagnostics->tracker_status.have_goal)
+      if (control_manager_diagnostics && control_manager_diagnostics->tracker_status.have_goal)
       {
 
         ROS_WARN("[SafetyAreaManager]: Can only modify safety area in IDLE state");
@@ -723,7 +723,6 @@ namespace mrs_uav_managers
       auto old_origin_y = origin_y_;
       auto old_origin_x = origin_x_;
       auto old_use_safety_area = use_safety_area_;
-      safety_zone_->enableSafetyZone(use_safety_area_);
 
       mrs_lib::ParamLoader param_loader(nh_, "SafetyAreaManager");
       bool success = initializationFromFile(param_loader, req.value);
@@ -731,8 +730,6 @@ namespace mrs_uav_managers
       if (!success)
       {
         ROS_WARN("[SafetyAreaManager]: Could not read the file. Probably data format is not correct.");
-        res.message = "Could not read the file. Probably data format is not correct.";
-        res.success = false;
         // Restore from backup, if successful no need to delete the backups as they will get destroyed automatically
         safety_zone_ = std::move(old_safety_zone);
         static_edges_ = std::move(old_static_edges);
@@ -746,8 +743,18 @@ namespace mrs_uav_managers
         origin_y_ = old_origin_y;
         origin_x_ = old_origin_x;
         use_safety_area_ = old_use_safety_area;
-        safety_zone_->enableSafetyZone(use_safety_area_);
+
+        if (safety_zone_)
+          safety_zone_->enableSafetyZone(use_safety_area_);
+
+        res.message = "Could not read the file. Probably data format is not correct.";
+        res.success = false;
+        return true;
       }
+
+      // Success case
+      if (safety_zone_)
+        safety_zone_->enableSafetyZone(use_safety_area_);
 
       res.message = "Successfully loaded world config.";
       res.success = true;
