@@ -996,9 +996,10 @@ void ControlManager::initialize(void) {
   param_loader.loadParam("g", common_handlers_->g);
 
   // motor params are also not prefixed, since they are common to more nodes
-  param_loader.loadParam("motor_params/a", common_handlers_->throttle_model.A);
-  param_loader.loadParam("motor_params/b", common_handlers_->throttle_model.B);
-  param_loader.loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
+  common_handlers_->throttle_model.initialize(param_loader);
+  /* param_loader.loadParam("motor_params/a", common_handlers_->throttle_model.A); */
+  /* param_loader.loadParam("motor_params/b", common_handlers_->throttle_model.B); */
+  /* param_loader.loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors); */
 
   // | ----------------------- safety area ---------------------- |
 
