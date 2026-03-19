@@ -66,16 +66,16 @@ struct ControlOutputModalities_t
 
 struct CommonHandlers_t
 {
-  SafetyArea_t                                     safety_area;
-  std::shared_ptr<mrs_lib::Transformer>            transformer;
-  ScopeTimer_t                                     scope_timer;
-  getMass_t                                        getMass;
-  double                                           g;
-  mrs_lib::quadratic_throttle_model::MotorParams_t throttle_model;
-  std::optional<DetailedModelParams_t>             detailed_model_params;
-  ControlOutputModalities_t                        control_output_modalities;
-  std::string                                      uav_name;
-  rclcpp::Node::SharedPtr                          parent_node;
+  SafetyArea_t                                      safety_area;
+  std::shared_ptr<mrs_lib::Transformer>             transformer;
+  ScopeTimer_t                                      scope_timer;
+  getMass_t                                         getMass;
+  double                                            g;
+  mrs_lib::quadratic_throttle_model::motor_params_t throttle_model;
+  std::optional<DetailedModelParams_t>              detailed_model_params;
+  ControlOutputModalities_t                         control_output_modalities;
+  std::string                                       uav_name;
+  rclcpp::Node::SharedPtr                           parent_node;
 };
 
 } // namespace control_manager

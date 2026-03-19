@@ -1056,9 +1056,10 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("g", common_handlers_->g);
 
   // motor params are also not prefixed, since they are common to more nodes
-  param_loader_->loadParam("motor_params/a", common_handlers_->throttle_model.A);
-  param_loader_->loadParam("motor_params/b", common_handlers_->throttle_model.B);
-  param_loader_->loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors);
+  common_handlers_->throttle_model.initialize(*param_loader_);
+  /* param_loader_->loadParam("motor_params/a", common_handlers_->throttle_model.A); */
+  /* param_loader_->loadParam("motor_params/b", common_handlers_->throttle_model.B); */
+  /* param_loader_->loadParam("motor_params/n_motors", common_handlers_->throttle_model.n_motors); */
 
   param_loader_->setPrefix("mrs_uav_managers/control_manager/");
 
@@ -2031,9 +2032,9 @@ void ControlManager::initialize(void) {
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  ss_goto_     = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
-                                                                    std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
-                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
+                                                                std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
+                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
       node_, "~/goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);

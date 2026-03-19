@@ -291,7 +291,7 @@ public:
   // diagnostics timer
   double _diagnostics_timer_rate_;
 
-  mrs_lib::quadratic_throttle_model::MotorParams_t _throttle_model_;
+  mrs_lib::quadratic_throttle_model::motor_params_t _throttle_model_;
 
   // landing state machine states
   LandingStates_t current_state_landing_  = IDLE_STATE;
@@ -433,9 +433,10 @@ void UavManager::initialize() {
   param_loader.loadParam("g", _g_);
 
   // motor params are also not prefixed, since they are common to more nodes
-  param_loader.loadParam("motor_params/n_motors", _throttle_model_.n_motors);
-  param_loader.loadParam("motor_params/a", _throttle_model_.A);
-  param_loader.loadParam("motor_params/b", _throttle_model_.B);
+  _throttle_model_.initialize(param_loader);
+  /* param_loader.loadParam("motor_params/n_motors", _throttle_model_.n_motors); */
+  /* param_loader.loadParam("motor_params/a", _throttle_model_.A); */
+  /* param_loader.loadParam("motor_params/b", _throttle_model_.B); */
 
   param_loader.loadParam(yaml_prefix + "null_tracker", _null_tracker_name_);
 
