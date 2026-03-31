@@ -20,13 +20,14 @@ public:
   bool test(void);
 
 private:
-  struct TopicState {
+  struct TopicState
+  {
     rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub;
-    std::optional<mrs_msgs::msg::ErrorgraphElement> last_msg;
-    int consecutive_clean = 0;
+    std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_msg;
+    int                                                               consecutive_clean = 0;
   };
 
-  std::mutex mtx_;
+  std::mutex              mtx_;
   std::vector<TopicState> topics_;
 
   const std::vector<std::string> topic_names_ = {
@@ -50,8 +51,7 @@ Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
   for (size_t i = 0; i < topic_names_.size(); i++) {
     topics_[i].sub = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(
-        topic_names_[i], 100,
-        [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
+        topic_names_[i], 100, [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
   }
 }
 
@@ -64,9 +64,9 @@ bool Tester::test(void) {
 
   RCLCPP_INFO(node_->get_logger(), "Waiting for all 3 managers' errorgraph errors to clear after startup...");
 
-  const double timeout_s = 90.0;
-  const double poll_rate_s = 0.2;
-  const int required_consecutive_clean = 3;
+  const double timeout_s                  = 90.0;
+  const double poll_rate_s                = 0.2;
+  const int    required_consecutive_clean = 3;
 
   double elapsed = 0.0;
 
@@ -82,7 +82,7 @@ bool Tester::test(void) {
     for (size_t i = 0; i < topics_.size(); i++) {
 
       if (topics_[i].consecutive_clean >= required_consecutive_clean) {
-        continue;  // already cleared
+        continue; // already cleared
       }
 
       if (!topics_[i].last_msg.has_value()) {
@@ -90,7 +90,7 @@ bool Tester::test(void) {
         continue;
       }
 
-      const auto& element = topics_[i].last_msg.value();
+      const auto &element = topics_[i].last_msg.value();
 
       if (element.source_node.node != expected_source_nodes_[i] || element.source_node.component != "main") {
         all_cleared = false;
@@ -98,7 +98,7 @@ bool Tester::test(void) {
       }
 
       bool has_waiting_for_node = false;
-      for (const auto& error : element.errors) {
+      for (const auto &error : element.errors) {
         if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE) {
           has_waiting_for_node = true;
           break;
@@ -107,8 +107,8 @@ bool Tester::test(void) {
 
       if (!has_waiting_for_node) {
         topics_[i].consecutive_clean++;
-        RCLCPP_INFO(node_->get_logger(), "%s: clean message %d/%d",
-                     expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean, required_consecutive_clean);
+        RCLCPP_INFO(node_->get_logger(), "%s: clean message %d/%d", expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean,
+                    required_consecutive_clean);
       } else {
         topics_[i].consecutive_clean = 0;
       }
@@ -127,15 +127,15 @@ bool Tester::test(void) {
   // Report which topics didn't clear
   for (size_t i = 0; i < topics_.size(); i++) {
     if (topics_[i].consecutive_clean < required_consecutive_clean) {
-      RCLCPP_ERROR(node_->get_logger(), "FAILED: %s did not clear (consecutive_clean=%d/%d)",
-                   expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean, required_consecutive_clean);
+      RCLCPP_ERROR(node_->get_logger(), "FAILED: %s did not clear (consecutive_clean=%d/%d)", expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean,
+                   required_consecutive_clean);
     }
   }
 
   return false;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 

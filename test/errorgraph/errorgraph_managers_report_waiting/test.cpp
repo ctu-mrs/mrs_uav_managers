@@ -21,13 +21,14 @@ public:
   bool test(void);
 
 private:
-  struct TopicState {
+  struct TopicState
+  {
     rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub;
-    std::optional<mrs_msgs::msg::ErrorgraphElement> last_msg;
-    bool saw_waiting_error = false;
+    std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_msg;
+    bool                                                              saw_waiting_error = false;
   };
 
-  std::mutex mtx_;
+  std::mutex              mtx_;
   std::vector<TopicState> topics_;
 
   // Expected source_node names and their known dependencies
@@ -58,8 +59,7 @@ Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
   for (size_t i = 0; i < topic_names_.size(); i++) {
     topics_[i].sub = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(
-        topic_names_[i], 100,
-        [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
+        topic_names_[i], 100, [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
   }
 }
 
@@ -72,7 +72,7 @@ bool Tester::test(void) {
 
   RCLCPP_INFO(node_->get_logger(), "Waiting for at least one manager to report waiting_for_node errors...");
 
-  const double timeout_s = 30.0;
+  const double timeout_s   = 30.0;
   const double poll_rate_s = 0.2;
 
   double elapsed = 0.0;
@@ -90,28 +90,27 @@ bool Tester::test(void) {
         continue;
       }
 
-      const auto& element = topics_[i].last_msg.value();
+      const auto &element = topics_[i].last_msg.value();
 
       // Verify the source_node matches what we expect
       if (element.source_node.node != expected_source_nodes_[i] || element.source_node.component != "main") {
         continue;
       }
 
-      for (const auto& error : element.errors) {
+      for (const auto &error : element.errors) {
         if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE) {
 
           // Verify waited_for_node is a known dependency
           if (known_dependencies_.count(error.waited_for_node.node) > 0) {
             topics_[i].saw_waiting_error = true;
-            RCLCPP_INFO(node_->get_logger(), "%s is waiting for node: %s",
-                         expected_source_nodes_[i].c_str(), error.waited_for_node.node.c_str());
+            RCLCPP_INFO(node_->get_logger(), "%s is waiting for node: %s", expected_source_nodes_[i].c_str(), error.waited_for_node.node.c_str());
           }
         }
       }
     }
 
     // Check if at least one manager reported waiting errors
-    for (const auto& t : topics_) {
+    for (const auto &t : topics_) {
       if (t.saw_waiting_error) {
         RCLCPP_INFO(node_->get_logger(), "SUCCESS: at least one manager reported waiting_for_node errors during startup.");
         return true;
@@ -119,12 +118,11 @@ bool Tester::test(void) {
     }
   }
 
-  RCLCPP_ERROR(node_->get_logger(),
-               "FAILED: no manager reported waiting_for_node errors within %.1f seconds.", timeout_s);
+  RCLCPP_ERROR(node_->get_logger(), "FAILED: no manager reported waiting_for_node errors within %.1f seconds.", timeout_s);
   return false;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
   rclcpp::init(argc, argv);
 
