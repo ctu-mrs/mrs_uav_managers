@@ -198,6 +198,7 @@ def generate_launch_description():
             ("~/diagnostics_out", "~/diagnostics"),
             ("~/max_flight_z_agl_out", "~/max_flight_z_agl"),
             ("~/height_agl_out", "~/height_agl"),
+            ("~/errors", "errors"),
             # services in
             ("~/change_estimator_in", "~/change_estimator"),
             ("~/set_world_origin_in", "~/set_world_origin"),

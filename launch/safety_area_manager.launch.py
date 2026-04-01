@@ -230,6 +230,7 @@ def generate_launch_description():
             ("~/max_z_in", "estimation_manager/max_flight_z_agl"),
             # publishers
             ("~/diagnostics_out", "~/diagnostics"),
+            ("~/errors", "errors"),
             # services
             ("~/point_in_safety_area_3d_in", "~/point_in_safety_area_3d"),
             ("~/point_in_safety_area_2d_in", "~/point_in_safety_area_2d"),

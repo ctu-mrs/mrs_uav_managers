@@ -110,11 +110,9 @@ private:
   rclcpp::TimerBase::SharedPtr timer_preinitialization_;
   void                         timerPreInitialization();
 
-  bool        is_initialized_ = false;
-  std::string _uav_name_;
-
+  bool                                                 is_initialized_ = false;
+  std::string                                          _uav_name_;
   std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
-
 
 public:
   std::shared_ptr<mrs_lib::Transformer> transformer_;
@@ -349,11 +347,10 @@ UavManager::UavManager(rclcpp::NodeOptions options) : mrs_lib::Node("uav_manager
   clock_ = node_->get_clock();
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "UavManager", "main");
-
-  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   mrs_lib::SubscriberHandlerOptions shopts;
 

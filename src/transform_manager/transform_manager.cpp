@@ -11,6 +11,7 @@
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/transform_broadcaster.h>
 #include <mrs_lib/gps_conversions.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 #include <mrs_msgs/msg/uav_state.hpp>
 #include <mrs_msgs/msg/float64_stamped.hpp>
@@ -157,6 +158,18 @@ private:
   void publishLocalTf();
 
   void publishAmslTf(const double altitude, const rclcpp::Time &stamp);
+
+  // | -------------------- error publisher --------------------- |
+
+  enum class error_type_t : uint16_t
+  {
+    nans_in_transform,
+    nans_in_utm,
+    nans_in_rtk,
+    transform_failure,
+  };
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
 };
 /*//}*/
 
@@ -175,6 +188,8 @@ void TransformManager::initialize() {
 
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
+
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "TransformManager", "main");
 
   ch_ = std::make_shared<estimation_manager::CommonHandlers_t>();
 
@@ -255,7 +270,8 @@ void TransformManager::initialize() {
   } else {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(),
                  world_origin_units_.c_str());
-    rclcpp::shutdown();
+    error_publisher_->addOneshotError("Invalid world_origin/units: must be 'UTM' or 'LATLON'.");
+    error_publisher_->flushAndShutdown();
   }
 
   world_origin_.x = world_origin_x;
@@ -264,7 +280,8 @@ void TransformManager::initialize() {
 
   if (!is_origin_param_ok) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
-    rclcpp::shutdown();
+    error_publisher_->addOneshotError("Could not load all mandatory parameters from world file.");
+    error_publisher_->flushAndShutdown();
   }
 
   /*//}*/
@@ -469,7 +486,8 @@ void TransformManager::initialize() {
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", getPrintName().c_str());
-    rclcpp::shutdown();
+    error_publisher_->addOneshotError("Could not load all non-optional parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   // Check if the RTK antenna static tf is defined
@@ -488,7 +506,8 @@ void TransformManager::initialize() {
   if (!got_rtk_antenna_tf) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
                  getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
-    rclcpp::shutdown();
+    error_publisher_->addOneshotError("RTK antenna TF not available.");
+    error_publisher_->flushAndShutdown();
   }
 
   is_initialized_ = true;
@@ -563,6 +582,7 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
       } else {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                              tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+        error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in stable_origin transform.");
       }
       RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                        tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -607,6 +627,7 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
     } else {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                            tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+      error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in fixed_origin transform.");
     }
     RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                      tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -697,6 +718,7 @@ void TransformManager::callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::Co
   } else {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                          tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in height_agl transform.");
   }
   RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -749,6 +771,7 @@ void TransformManager::publishAmslTf(const double altitude, const rclcpp::Time &
   } else {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                          tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in AMSL transform.");
   }
   RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -790,11 +813,13 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
 
   if (!std::isfinite(out_x)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in UTM variable \"out_x\"!!!", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_utm, "NaN in UTM out_x.");
     return;
   }
 
   if (!std::isfinite(out_y)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in UTM variable \"out_y\"!!!", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_utm, "NaN in UTM out_y.");
     return;
   }
 
@@ -836,16 +861,19 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
 
   if (!std::isfinite(msg->gps.latitude)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->latitude\"!!!", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_rtk, "NaN in RTK latitude.");
     return;
   }
 
   if (!std::isfinite(msg->gps.longitude)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->longitude\"!!!", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_rtk, "NaN in RTK longitude.");
     return;
   }
 
   if (!std::isfinite(msg->gps.altitude)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] NaN detected in RTK variable \"msg->altitude\"!!!", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_rtk, "NaN in RTK altitude.");
     return;
   }
 
@@ -865,6 +893,7 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
     rtk_pos.pose = res.value();
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: transform to fcu failed", getPrintName().c_str());
+    error_publisher_->addOneshotError("Transform RTK to FCU failed.");
     return;
   }
 
@@ -971,6 +1000,7 @@ void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::Quaternion
     broadcaster_->sendTransform(tf);
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN encountered in fcu_untilted tf", getPrintName().c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in FCU untilted TF.");
   }
   scope_timer.checkpoint("tf pub");
 }
@@ -1004,6 +1034,7 @@ void TransformManager::publishLocalTf() {
   } else {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                          tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
+    error_publisher_->addGeneralError(error_type_t::nans_in_transform, "NaN in local_origin transform.");
   }
   RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                    tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -1025,6 +1056,7 @@ std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(cons
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not obtain transform from %s to %s.", getPrintName().c_str(),
                           ch_->frames.ns_fcu_untilted.c_str(), ch_->frames.ns_fcu.c_str());
+    error_publisher_->addOneshotError("Could not obtain transform from fcu_untilted to fcu.");
     return {};
   }
 
@@ -1046,6 +1078,7 @@ std::optional<geometry_msgs::msg::Pose> TransformManager::transformRtkToFcu(cons
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: Could not transform RTK pose from %s to %s.", getPrintName().c_str(),
                           utm_in_antenna.header.frame_id.c_str(), ch_->frames.ns_fcu.c_str());
+    error_publisher_->addOneshotError("Could not transform RTK pose to FCU frame.");
     return {};
   }
 
