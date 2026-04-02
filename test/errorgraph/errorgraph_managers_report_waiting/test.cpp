@@ -5,6 +5,7 @@
 #include <mrs_msgs/msg/errorgraph_element.hpp>
 #include <mrs_msgs/msg/errorgraph_error.hpp>
 
+#include <map>
 #include <mutex>
 #include <vector>
 #include <string>
@@ -21,27 +22,21 @@ public:
   bool test(void);
 
 private:
-  struct TopicState
+  struct ManagerState
   {
-    rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub;
-    std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_msg;
-    bool                                                              saw_waiting_error = false;
+    std::optional<mrs_msgs::msg::ErrorgraphElement> last_msg;
+    bool                                            saw_waiting_error = false;
   };
 
-  std::mutex              mtx_;
-  std::vector<TopicState> topics_;
+  std::mutex                          mtx_;
+  std::map<std::string, ManagerState> manager_states_;
 
-  // Expected source_node names and their known dependencies
-  const std::vector<std::string> topic_names_ = {
-      "/uav1/estimation_manager/errors",
-      "/uav1/control_manager/errors",
-      "/uav1/uav_manager/errors",
-  };
+  rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub_;
+
+  const std::string topic_name_ = "/uav1/errors";
 
   const std::vector<std::string> expected_source_nodes_ = {
-      "EstimationManager",
-      "ControlManager",
-      "UavManager",
+      "EstimationManager", "SafetyAreaManager", "TransformManager", "ConstraintManager", "GainManager", "ControlManager", "UavManager",
   };
 
   const std::set<std::string> known_dependencies_ = {
@@ -50,22 +45,25 @@ private:
       "EstimationManager",
   };
 
-  void errorsCallback(size_t idx, const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
+  void errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
 };
 
 Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
-  topics_.resize(topic_names_.size());
-
-  for (size_t i = 0; i < topic_names_.size(); i++) {
-    topics_[i].sub = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(
-        topic_names_[i], 100, [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
+  for (const auto &name : expected_source_nodes_) {
+    manager_states_[name] = ManagerState{};
   }
+
+  sub_ = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(topic_name_, 100,
+                                                                      [this](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(msg); });
 }
 
-void Tester::errorsCallback(size_t idx, const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) {
+void Tester::errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) {
   std::scoped_lock lck(mtx_);
-  topics_[idx].last_msg = *msg;
+  auto             it = manager_states_.find(msg->source_node.node);
+  if (it != manager_states_.end()) {
+    it->second.last_msg = *msg;
+  }
 }
 
 bool Tester::test(void) {
@@ -84,16 +82,16 @@ bool Tester::test(void) {
 
     std::scoped_lock lck(mtx_);
 
-    for (size_t i = 0; i < topics_.size(); i++) {
+    for (auto &[name, state] : manager_states_) {
 
-      if (!topics_[i].last_msg.has_value()) {
+      if (!state.last_msg.has_value()) {
         continue;
       }
 
-      const auto &element = topics_[i].last_msg.value();
+      const auto &element = state.last_msg.value();
 
       // Verify the source_node matches what we expect
-      if (element.source_node.node != expected_source_nodes_[i] || element.source_node.component != "main") {
+      if (element.source_node.node != name || element.source_node.component != "main") {
         continue;
       }
 
@@ -102,16 +100,16 @@ bool Tester::test(void) {
 
           // Verify waited_for_node is a known dependency
           if (known_dependencies_.count(error.waited_for_node.node) > 0) {
-            topics_[i].saw_waiting_error = true;
-            RCLCPP_INFO(node_->get_logger(), "%s is waiting for node: %s", expected_source_nodes_[i].c_str(), error.waited_for_node.node.c_str());
+            state.saw_waiting_error = true;
+            RCLCPP_INFO(node_->get_logger(), "%s is waiting for node: %s", name.c_str(), error.waited_for_node.node.c_str());
           }
         }
       }
     }
 
     // Check if at least one manager reported waiting errors
-    for (const auto &t : topics_) {
-      if (t.saw_waiting_error) {
+    for (const auto &[name, state] : manager_states_) {
+      if (state.saw_waiting_error) {
         RCLCPP_INFO(node_->get_logger(), "SUCCESS: at least one manager reported waiting_for_node errors during startup.");
         return true;
       }

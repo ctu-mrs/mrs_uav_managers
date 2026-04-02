@@ -5,6 +5,7 @@
 #include <mrs_msgs/msg/errorgraph_element.hpp>
 #include <mrs_msgs/msg/errorgraph_error.hpp>
 
+#include <map>
 #include <mutex>
 #include <vector>
 #include <string>
@@ -20,44 +21,42 @@ public:
   bool test(void);
 
 private:
-  struct TopicState
+  struct ManagerState
   {
-    rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub;
-    std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_msg;
-    int                                                               consecutive_clean = 0;
+    std::optional<mrs_msgs::msg::ErrorgraphElement> last_msg;
+    int                                             consecutive_clean = 0;
   };
 
-  std::mutex              mtx_;
-  std::vector<TopicState> topics_;
+  std::mutex                          mtx_;
+  std::map<std::string, ManagerState> manager_states_;
 
-  const std::vector<std::string> topic_names_ = {
-      "/uav1/estimation_manager/errors",
-      "/uav1/control_manager/errors",
-      "/uav1/uav_manager/errors",
-  };
+  rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub_;
+
+  const std::string topic_name_ = "/uav1/errors";
 
   const std::vector<std::string> expected_source_nodes_ = {
-      "EstimationManager",
-      "ControlManager",
-      "UavManager",
+      "EstimationManager", "SafetyAreaManager", "TransformManager", "ConstraintManager", "GainManager", "ControlManager", "UavManager",
   };
 
-  void errorsCallback(size_t idx, const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
+  void errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
 };
 
 Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
-  topics_.resize(topic_names_.size());
-
-  for (size_t i = 0; i < topic_names_.size(); i++) {
-    topics_[i].sub = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(
-        topic_names_[i], 100, [this, i](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(i, msg); });
+  for (const auto &name : expected_source_nodes_) {
+    manager_states_[name] = ManagerState{};
   }
+
+  sub_ = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(topic_name_, 100,
+                                                                      [this](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(msg); });
 }
 
-void Tester::errorsCallback(size_t idx, const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) {
+void Tester::errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) {
   std::scoped_lock lck(mtx_);
-  topics_[idx].last_msg = *msg;
+  auto             it = manager_states_.find(msg->source_node.node);
+  if (it != manager_states_.end()) {
+    it->second.last_msg = *msg;
+  }
 }
 
 bool Tester::test(void) {
@@ -79,20 +78,20 @@ bool Tester::test(void) {
 
     bool all_cleared = true;
 
-    for (size_t i = 0; i < topics_.size(); i++) {
+    for (auto &[name, state] : manager_states_) {
 
-      if (topics_[i].consecutive_clean >= required_consecutive_clean) {
+      if (state.consecutive_clean >= required_consecutive_clean) {
         continue; // already cleared
       }
 
-      if (!topics_[i].last_msg.has_value()) {
+      if (!state.last_msg.has_value()) {
         all_cleared = false;
         continue;
       }
 
-      const auto &element = topics_[i].last_msg.value();
+      const auto &element = state.last_msg.value();
 
-      if (element.source_node.node != expected_source_nodes_[i] || element.source_node.component != "main") {
+      if (element.source_node.node != name || element.source_node.component != "main") {
         all_cleared = false;
         continue;
       }
@@ -106,14 +105,13 @@ bool Tester::test(void) {
       }
 
       if (!has_waiting_for_node) {
-        topics_[i].consecutive_clean++;
-        RCLCPP_INFO(node_->get_logger(), "%s: clean message %d/%d", expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean,
-                    required_consecutive_clean);
+        state.consecutive_clean++;
+        RCLCPP_INFO(node_->get_logger(), "%s: clean message %d/%d", name.c_str(), state.consecutive_clean, required_consecutive_clean);
       } else {
-        topics_[i].consecutive_clean = 0;
+        state.consecutive_clean = 0;
       }
 
-      if (topics_[i].consecutive_clean < required_consecutive_clean) {
+      if (state.consecutive_clean < required_consecutive_clean) {
         all_cleared = false;
       }
     }
@@ -124,10 +122,10 @@ bool Tester::test(void) {
     }
   }
 
-  // Report which topics didn't clear
-  for (size_t i = 0; i < topics_.size(); i++) {
-    if (topics_[i].consecutive_clean < required_consecutive_clean) {
-      RCLCPP_ERROR(node_->get_logger(), "FAILED: %s did not clear (consecutive_clean=%d/%d)", expected_source_nodes_[i].c_str(), topics_[i].consecutive_clean,
+  // Report which managers didn't clear
+  for (const auto &[name, state] : manager_states_) {
+    if (state.consecutive_clean < required_consecutive_clean) {
+      RCLCPP_ERROR(node_->get_logger(), "FAILED: %s did not clear (consecutive_clean=%d/%d)", name.c_str(), state.consecutive_clean,
                    required_consecutive_clean);
     }
   }
