@@ -43,6 +43,7 @@
 #include <mrs_msgs/srv/validate_path_to_point_srv.hpp>
 
 #include <mrs_lib/safety_zone/static_edges_visualization.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 //}
 
@@ -244,6 +245,10 @@ private:
   double getMaxZ();
   double getMinZ();
 
+  // | -------------------- error publisher --------------------- |
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
+
 }; // class SafetyAreaManager
 
 //}
@@ -254,6 +259,8 @@ SafetyAreaManager::SafetyAreaManager(rclcpp::NodeOptions options) : mrs_lib::Nod
 
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
+
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "SafetyAreaManager", "main");
 
   mrs_lib::ParamLoader param_loader(node_, "SafetyAreaManager");
   param_loader.loadParam("uav_name", _uav_name_);
@@ -306,31 +313,31 @@ void SafetyAreaManager::initialize() {
   if (custom_config_path != "") {
     if (!param_loader.addYamlFile(custom_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load custom_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (platform_config_path != "") {
     if (!param_loader.addYamlFile(platform_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load platform_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (_world_config_ != "") {
     if (!param_loader.addYamlFile(_world_config_)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load world_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (!param_loader.addYamlFileFromParam("private_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load private_config.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.loadParam("uav_name", _uav_name_);
@@ -351,8 +358,8 @@ void SafetyAreaManager::initialize() {
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader.setPrefix("");
@@ -363,8 +370,8 @@ void SafetyAreaManager::initialize() {
 
   if (!success) {
     RCLCPP_ERROR(node_->get_logger(), "Failed to initialize safety area from file");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to initialize safety area from file.");
+    error_publisher_->flushAndShutdown();
   }
 
   // | ----------------------- publishers ----------------------- |
@@ -522,6 +529,7 @@ void SafetyAreaManager::timerPrerequisites() {
 
   if (!got_hw_api_capabilities) {
     RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s", got_hw_api_capabilities ? " TRUE " : " FALSE ");
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return;
   }
 
@@ -547,6 +555,7 @@ void SafetyAreaManager::timerStatus() {
 
   if (!got_odom) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 5000, "waiting for data: Odometry=%s", got_odom ? "true" : "FALSE");
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
     return;
   }
 
@@ -635,6 +644,7 @@ void SafetyAreaManager::timerStatus() {
       safety_zone_handler_ = std::move(*new_safety_zone);
     } else {
       RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
+      error_publisher_->addOneshotError("Failed to update safety area after world origin change.");
     }
 
     world_origin_changed_ = false;
@@ -825,6 +835,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 
   if (!sh_control_manager_diag_.hasMsg()) {
     RCLCPP_WARN(node_->get_logger(), "No control manager diagnostics received yet.");
+    error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
     response->message = "No control manager diagnostics received yet.";
     response->success = false;
     return true;
@@ -845,6 +856,7 @@ bool SafetyAreaManager::callbackSetSafetyBorder(const std::shared_ptr<mrs_msgs::
 
   if (!success) {
     RCLCPP_WARN(node_->get_logger(), "Failed to set safety border.");
+    error_publisher_->addOneshotError("Failed to set safety border.");
     response->message = "Failed to set border";
     response->success = false;
     return true;
@@ -1179,8 +1191,8 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load world config parameters!");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Could not load world config parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   // Make border prism
@@ -1258,6 +1270,7 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
 
   if (!new_safety_zone) {
     RCLCPP_WARN(node_->get_logger(), "Failed to create new safety zone.");
+    error_publisher_->addOneshotError("Failed to create new safety zone from file.");
     return false;
   }
 
@@ -1319,6 +1332,7 @@ bool SafetyAreaManager::initializationFromMsg(const mrs_msgs::msg::Prism &prism_
 
   if (!new_safety_zone) {
     RCLCPP_WARN(node_->get_logger(), "Failed to create new safety zone.");
+    error_publisher_->addOneshotError("Failed to create new safety zone from message.");
     return false;
   }
 

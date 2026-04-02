@@ -161,6 +161,7 @@ def generate_launch_description():
             # publishers
             ("~/diagnostics_out", "~/diagnostics"),
             ("~/profiler", "profiler"),
+            ("~/errors", "errors"),
             # services in
             ("~/set_gains_in", "~/set_gains"),
             # services out

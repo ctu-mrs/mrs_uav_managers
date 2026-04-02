@@ -18,6 +18,7 @@
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 #include <rcl_interfaces/srv/set_parameters.hpp>
 
@@ -137,6 +138,10 @@ private:
   // | ------------------------- helpers ------------------------ |
 
   bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
+
+  // | -------------------- error publisher --------------------- |
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
 };
 
 //}
@@ -157,6 +162,8 @@ void GainManager::initialize() {
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "GainManager", "main");
+
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -175,35 +182,35 @@ void GainManager::initialize() {
   if (custom_config_path != "") {
     if (!param_loader.addYamlFile(custom_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load custom_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (platform_config_path != "") {
     if (!param_loader.addYamlFile(platform_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load platform_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (!param_loader.addYamlFileFromParam("private_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load private_config.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader.addYamlFileFromParam("public_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load public_config.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader.addYamlFileFromParam("public_gains")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_gains");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load public_gains.");
+    error_publisher_->flushAndShutdown();
   }
 
   const std::string yaml_prefix = "mrs_uav_managers/gain_manager/";
@@ -264,8 +271,8 @@ void GainManager::initialize() {
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _gain_names_)) {
         RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_gains is not a valid gain!", it2->c_str(), it->c_str());
-        rclcpp::shutdown();
-        exit(1);
+        error_publisher_->addOneshotError("Invalid gain '" + *it2 + "' in " + *it + "/allowed_gains.");
+        error_publisher_->flushAndShutdown();
       }
     }
 
@@ -280,8 +287,8 @@ void GainManager::initialize() {
 
     if (!stringInVector(temp_str, _map_type_allowed_gains_.at(*it))) {
       RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_gains is not a valid gain!", temp_str.c_str(), it->c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Invalid default gain '" + temp_str + "' for " + *it + ".");
+      error_publisher_->flushAndShutdown();
     }
 
     _map_type_default_gains_.insert(std::pair<std::string, std::string>(*it, temp_str));
@@ -346,8 +353,8 @@ void GainManager::initialize() {
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   is_initialized_ = true;
@@ -545,6 +552,7 @@ bool GainManager::setGains(std::string gains_name) {
     for (auto res : response.value()->results) {
       if (!res.successful) {
         RCLCPP_ERROR(node_->get_logger(), "could not set param: %s", res.reason.c_str());
+        error_publisher_->addOneshotError("Could not set param: " + res.reason);
       }
     }
 
@@ -577,6 +585,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
     ss << "missing estimation diagnostics";
 
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
 
     response->message = ss.str();
     response->success = false;
@@ -613,6 +622,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
     ss << "the Se3Controller could not set the gains";
 
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
+    error_publisher_->addOneshotError("The Se3Controller could not set the gains.");
 
     response->message = ss.str();
     response->success = false;
@@ -721,11 +731,13 @@ void GainManager::timerDiagnostics() {
 
   if (!sh_estimation_diag_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do gain management, missing estimator diagnostics!");
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
     return;
   }
 
   if (!sh_control_manager_diag_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do gain management, missing control manager diagnostics!");
+    error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
     return;
   }
 

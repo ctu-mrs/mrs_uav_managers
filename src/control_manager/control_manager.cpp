@@ -52,6 +52,7 @@
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/service_server_handler.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 #include <mrs_msgs/msg/hw_api_capabilities.hpp>
 #include <mrs_msgs/msg/hw_api_status.hpp>
@@ -249,6 +250,8 @@ private:
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
   std::string       _body_frame_;
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
 
   std::string _uav_dynamics_config_;
   std::string _custom_config_;
@@ -926,6 +929,8 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ControlManager", "main");
+
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -1047,8 +1052,8 @@ void ControlManager::initialize(void) {
 
   if (_uav_mass_ <= 0.0) {
     RCLCPP_ERROR(node_->get_logger(), "nominal uav mass should be > 0.0.");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Invalid uav mass, must be > 0.0");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("body_disturbance_x", _initial_body_disturbance_x_);
@@ -1067,8 +1072,8 @@ void ControlManager::initialize(void) {
 
   if (!(_state_input_ == INPUT_UAV_STATE || _state_input_ == INPUT_ODOMETRY)) {
     RCLCPP_ERROR(node_->get_logger(), "the state_input parameter has to be in {0, 1}");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Invalid state_input parameter, must be in {0,1}");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("safety/min_throttle_null_tracker", _min_throttle_null_tracker_);
@@ -1101,8 +1106,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_limit_eland_enabled_ && fabs(_tilt_limit_eland_) < 1e-3) {
     RCLCPP_ERROR(node_->get_logger(), "safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("safety/tilt_limit/eland/enabled = 'TRUE' but the limit is too low");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("safety/tilt_limit/disarm/enabled", _tilt_limit_disarm_enabled_);
@@ -1112,8 +1117,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_limit_disarm_enabled_ && fabs(_tilt_limit_disarm_) < 1e-3) {
     RCLCPP_ERROR(node_->get_logger(), "safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("safety/tilt_limit/disarm/enabled = 'TRUE' but the limit is too low");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("safety/yaw_error_eland/enabled", _yaw_error_eland_enabled_);
@@ -1123,8 +1128,8 @@ void ControlManager::initialize(void) {
 
   if (_yaw_error_eland_enabled_ && fabs(_yaw_error_eland_) < 1e-3) {
     RCLCPP_ERROR(node_->get_logger(), "safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("safety/yaw_error_eland/enabled = 'TRUE' but the limit is too low");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("status_timer_rate", _status_timer_rate_);
@@ -1143,8 +1148,8 @@ void ControlManager::initialize(void) {
 
   if (_tilt_error_disarm_enabled_ && fabs(_tilt_error_disarm_threshold_) < 1e-3) {
     RCLCPP_ERROR(node_->get_logger(), "safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("safety/tilt_error_disarm/enabled = 'TRUE' but the limit is too low");
+    error_publisher_->flushAndShutdown();
   }
 
   // default constraints
@@ -1238,8 +1243,8 @@ void ControlManager::initialize(void) {
   if (_tracker_error_action_ != ELAND_STR && _tracker_error_action_ != EHOVER_STR) {
     RCLCPP_ERROR(node_->get_logger(), "the tracker_error_action parameter (%s) is not correct, requires {%s, %s}", _tracker_error_action_.c_str(), ELAND_STR,
                  EHOVER_STR);
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Invalid tracker_error_action parameter, must be in {eland, ehover}");
+    error_publisher_->flushAndShutdown();
   }
 
   param_loader_->loadParam("rc_joystick/enabled", _rc_goto_enabled_);
@@ -1339,14 +1344,14 @@ void ControlManager::initialize(void) {
     catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the tracker '%s'", new_tracker.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("CreateClassException for the tracker " + new_tracker.address + ": " + std::string(ex1.what()));
+      error_publisher_->flushAndShutdown();
     }
     catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the tracker '%s'", new_tracker.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load the tracker " + new_tracker.address + ": " + std::string(ex.what()));
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1384,8 +1389,8 @@ void ControlManager::initialize(void) {
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to initialize the tracker '%s'", it->second.address.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to initialize the tracker " + it->second.address);
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1405,8 +1410,8 @@ void ControlManager::initialize(void) {
       _ehover_tracker_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the safety/hover_tracker (%s) is not within the loaded trackers", _ehover_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The safety/hover_tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1419,8 +1424,8 @@ void ControlManager::initialize(void) {
       _landoff_tracker_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the landoff tracker (%s) is not within the loaded trackers", _landoff_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The landoff tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1433,8 +1438,8 @@ void ControlManager::initialize(void) {
       _null_tracker_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the null tracker (%s) is not within the loaded trackers", _null_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The null tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1450,8 +1455,8 @@ void ControlManager::initialize(void) {
       _joystick_tracker_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the joystick tracker (%s) is not within the loaded trackers", _joystick_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The joystick tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1461,8 +1466,8 @@ void ControlManager::initialize(void) {
 
     if (!idx) {
       RCLCPP_ERROR(node_->get_logger(), "the bumper tracker (%s) is not within the loaded trackers", _bumper_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The bumper tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1473,8 +1478,8 @@ void ControlManager::initialize(void) {
       _joystick_fallback_tracker_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the joystick fallback tracker (%s) is not within the loaded trackers", _joystick_fallback_tracker_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The joystick fallback tracker is not within the loaded trackers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1591,15 +1596,16 @@ void ControlManager::initialize(void) {
           RCLCPP_ERROR(node_->get_logger(), "- position");
         }
 
-        rclcpp::shutdown();
-        exit(1);
+        error_publisher_->addOneshotError("The controller " + controller_name + " does not meet the control output requirements of the HW API");
+        error_publisher_->flushAndShutdown();
       }
 
       if ((_hw_api_inputs_.actuators || _hw_api_inputs_.control_group) && !common_handlers_->detailed_model_params) {
         RCLCPP_ERROR(node_->get_logger(),
                      "the HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
-        rclcpp::shutdown();
-        exit(1);
+        error_publisher_->addOneshotError(
+            "The HW API supports 'actuators' or 'control_group' input, but the 'detailed uav model params' were not loaded sucessfully");
+        error_publisher_->flushAndShutdown();
       }
     }
 
@@ -1653,14 +1659,14 @@ void ControlManager::initialize(void) {
     catch (pluginlib::CreateClassException &ex1) {
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for the controller '%s'", new_controller.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex1.what());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("CreateClassException for the controller " + new_controller.address + ": " + std::string(ex1.what()));
+      error_publisher_->flushAndShutdown();
     }
     catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for the controller '%s'", new_controller.address.c_str());
       RCLCPP_ERROR(node_->get_logger(), "Error: %s", ex.what());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load the controller " + new_controller.address + ": " + std::string(ex.what()));
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1698,8 +1704,8 @@ void ControlManager::initialize(void) {
 
     if (!success) {
       RCLCPP_ERROR(node_->get_logger(), "failed to initialize the controller '%s'", it->second.address.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to initialize the controller " + it->second.address);
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1712,8 +1718,8 @@ void ControlManager::initialize(void) {
       _failsafe_controller_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the failsafe controller (%s) is not within the loaded controllers", _failsafe_controller_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The failsafe controller is not within the loaded controllers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1724,8 +1730,8 @@ void ControlManager::initialize(void) {
       _eland_controller_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the eland controller (%s) is not within the loaded controllers", _eland_controller_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The eland controller is not within the loaded controllers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1736,8 +1742,8 @@ void ControlManager::initialize(void) {
       _joystick_controller_idx_ = idx.value();
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the joystick controller (%s) is not within the loaded controllers", _joystick_controller_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The joystick controller is not within the loaded controllers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1747,8 +1753,8 @@ void ControlManager::initialize(void) {
 
     if (!idx) {
       RCLCPP_ERROR(node_->get_logger(), "the bumper controller (%s) is not within the loaded controllers", _bumper_controller_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The bumper controller is not within the loaded controllers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -1760,8 +1766,8 @@ void ControlManager::initialize(void) {
     } else {
       RCLCPP_ERROR(node_->get_logger(), "the joystick fallback controller (%s) is not within the loaded controllers",
                    _joystick_fallback_controller_name_.c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("The joystick fallback controller is not within the loaded controllers");
+      error_publisher_->flushAndShutdown();
     }
   }
 
@@ -2135,8 +2141,8 @@ void ControlManager::initialize(void) {
 
   if (!param_loader_->loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "could not load all parameters!");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Could not load all parameters");
+    error_publisher_->flushAndShutdown();
   }
 
   is_initialized_ = true;
@@ -2204,6 +2210,7 @@ void ControlManager::timerHwApiCapabilities() {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for HW API capabilities");
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
     return;
   }
 
@@ -4402,6 +4409,7 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] const std::shar
     } else {
       message << "the tracker '" << tracker_name << "' reset failed!";
       RCLCPP_ERROR_STREAM(node_->get_logger(), "" << message.str());
+      error_publisher_->addOneshotError("Tracker reset failed");
     }
   }
 
@@ -4603,6 +4611,7 @@ bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::S
   if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).seconds() > 1.0) {
     ss << "cannot toggle output ON, missing HW API status!";
     prereq_check = false;
+    error_publisher_->addOneshotError("cannot toggle output ON, missing HW API status!");
   }
 
   if (!prereq_check) {
@@ -4653,6 +4662,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
     response->success = false;
 
     RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+    error_publisher_->addOneshotError("Cannot arm/disarm during failsafe or eland");
 
     return true;
   }
@@ -4662,6 +4672,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
     ss << "this service is not allowed to arm the UAV";
     response->success = false;
     RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+    error_publisher_->addOneshotError("Arming via service is disabled");
 
   } else {
 
@@ -4678,6 +4689,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
       ss << "could not disarm: " << message;
       response->success = false;
       RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+      error_publisher_->addOneshotError("Disarming failed: " + message);
     }
   }
 
@@ -8253,6 +8265,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
     ss << "can not switch controller, missing odometry innovation!";
     RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+    error_publisher_->addOneshotError("ControlManager: switchController: missing odometry innovation");
     return std::tuple(false, ss.str());
   }
 
@@ -8262,6 +8275,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
   if (!new_controller_idx) {
     ss << "the controller '" << controller_name << "' does not exist!";
     RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+    error_publisher_->addOneshotError("The controller '" + controller_name + "' does not exist");
     return std::tuple(false, ss.str());
   }
 
@@ -8283,6 +8297,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
         ss << "the controller '" << controller_name << "' was not activated";
         RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
+        error_publisher_->addOneshotError("The controller '" + controller_name + "' was not activated");
         return std::tuple(false, ss.str());
 
       } else {

@@ -160,6 +160,7 @@ def generate_launch_description():
             # publishers
             ("~/diagnostics_out", "~/diagnostics"),
             ("~/profiler", "profiler"),
+            ("~/errors", "errors"),
             # services in
             ("~/set_constraints_in", "~/set_constraints"),
             ("~/constraints_override_in", "~/constraints_override"),

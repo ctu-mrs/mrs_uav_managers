@@ -19,6 +19,7 @@
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 //}
 
@@ -133,6 +134,10 @@ private:
   // | ------------------------- helpers ------------------------ |
 
   bool stringInVector(const std::string &value, const std::vector<std::string> &vector);
+
+  // | -------------------- error publisher --------------------- |
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
 };
 
 //}
@@ -153,6 +158,8 @@ void ConstraintManager::initialize() {
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ConstraintManager", "main");
+
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -171,35 +178,35 @@ void ConstraintManager::initialize() {
   if (custom_config_path != "") {
     if (!param_loader.addYamlFile(custom_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load custom_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (platform_config_path != "") {
     if (!param_loader.addYamlFile(platform_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Failed to load platform_config.");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (!param_loader.addYamlFileFromParam("private_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load private_config.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader.addYamlFileFromParam("public_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load public_config.");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader.addYamlFileFromParam("public_constraints")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_constraints");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Failed to load public_constraints.");
+    error_publisher_->flushAndShutdown();
   }
 
   const std::string yaml_prefix = "mrs_uav_managers/constraint_manager/";
@@ -268,8 +275,8 @@ void ConstraintManager::initialize() {
     for (it2 = temp_vector.begin(); it2 != temp_vector.end(); ++it2) {
       if (!stringInVector(*it2, _constraint_names_)) {
         RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", it2->c_str(), it->c_str());
-        rclcpp::shutdown();
-        exit(1);
+        error_publisher_->addOneshotError("Invalid constraint '" + *it2 + "' in " + *it + "/allowed_constraints.");
+        error_publisher_->flushAndShutdown();
       }
     }
 
@@ -284,8 +291,8 @@ void ConstraintManager::initialize() {
 
     if (!stringInVector(temp_str, _map_type_allowed_constraints_.at(*it))) {
       RCLCPP_ERROR(node_->get_logger(), "the element '%s' of %s/allowed_constraints is not a valid constraint!", temp_str.c_str(), it->c_str());
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("Invalid default constraint '" + temp_str + "' for " + *it + ".");
+      error_publisher_->flushAndShutdown();
     }
 
     _map_type_default_constraints_.insert(std::pair<std::string, std::string>(*it, temp_str));
@@ -357,8 +364,8 @@ void ConstraintManager::initialize() {
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "Could not load all parameters!");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("Could not load all parameters.");
+    error_publisher_->flushAndShutdown();
   }
 
   is_initialized_ = true;
@@ -381,6 +388,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
   if (it == _constraints_.end()) {
     RCLCPP_ERROR(node_->get_logger(), "could not setConstraints(), the constraint name '%s' is not on the list", constraints_name.c_str());
+    error_publisher_->addOneshotError("Constraint name '" + constraints_name + "' is not on the list.");
     return false;
   }
 
@@ -452,6 +460,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
     ss << "missing odometry diagnostics";
 
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
 
     response->message = ss.str();
     response->success = false;
@@ -490,6 +499,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
     ss << "the ControlManager could not set the constraints";
 
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
+    error_publisher_->addOneshotError("The ControlManager could not set the constraints.");
 
     response->message = ss.str();
     response->success = false;
@@ -634,6 +644,7 @@ void ConstraintManager::timerDiagnostics() {
 
   if (!sh_estimation_diag_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do constraint management, missing estimation diagnostics!");
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
     return;
   }
 

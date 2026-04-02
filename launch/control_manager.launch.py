@@ -334,6 +334,7 @@ def generate_launch_description():
             ("~/get_min_z_out", "safety_area_manager/get_min_z"),
             ("~/get_max_z_out", "safety_area_manager/get_max_z"),
             ("~/is_safety_area_enabled_out", "safety_area_manager/is_safety_zone_enabled"),
+            ("~/errors", "errors"),
         ],
     )
 

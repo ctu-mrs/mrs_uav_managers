@@ -185,6 +185,7 @@ def generate_launch_description():
             ("~/altitude_amsl_in", "hw_api/altitude"),
             # publishers
             ("~/profiler", "profiler"),
+            ("~/errors", "errors"),
             ("~/map_delay_out", "~/map_delay"),
             # services in
             ("~/set_world_origin_in", "~/set_world_origin"),

@@ -213,6 +213,7 @@ def generate_launch_description():
             # publishers
             ("~/diagnostics_out", "~/diagnostics"),
             ("~/profiler", "profiler"),
+            ("~/errors", "errors"),
             # services in
             ("~/takeoff_in", "~/takeoff"),
             ("~/land_in", "~/land"),
