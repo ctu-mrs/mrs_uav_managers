@@ -1887,7 +1887,7 @@ void ControlManager::initialize(void) {
 
   if (_hover_throttle_range_check_enabled_) {
 
-    double hover_throttle = mrs_lib::quadratic_throttle_model::forceToThrottle(common_handlers_->throttle_model, _uav_mass_ * common_handlers_->g);
+    double hover_throttle = mrs_lib::quadratic_throttle_model::forceToThrottle(common_handlers_->throttle_model, _uav_mass_ * common_handlers_->g, *node_);
 
     if (!std::isfinite(hover_throttle)) {
       RCLCPP_ERROR(node_->get_logger(), "NaN detected in variable \"hover_throttle\"!!!");
@@ -2038,9 +2038,9 @@ void ControlManager::initialize(void) {
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  ss_goto_     = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
-                                                                    std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
-                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
+                                                                std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
+                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
       node_, "~/goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);
