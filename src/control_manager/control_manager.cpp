@@ -2038,9 +2038,9 @@ void ControlManager::initialize(void) {
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  ss_goto_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
-                                                                std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
-                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_     = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
+                                                                    std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
+                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
       node_, "~/goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);
