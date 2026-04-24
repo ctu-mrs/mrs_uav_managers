@@ -7,6 +7,8 @@ add_subdirectory(uav_manager)
 
 add_subdirectory(estimation_manager)
 
+add_subdirectory(transform_manager)
+
 add_subdirectory(gain_manager)
 
 add_subdirectory(constraint_manager)
