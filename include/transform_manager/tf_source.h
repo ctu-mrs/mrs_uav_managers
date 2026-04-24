@@ -355,7 +355,7 @@ private:
 
       /*//{ tf utm origin */
 
-      geometry_msgs::TransformStamped tf_utm_msg;
+      geometry_msgs::TransformStamped tf_world_utm_msg;
       if (is_utm_source_) {
         
         if (!is_utm_origin_set_) {
@@ -363,25 +363,24 @@ private:
           return;
         }
 
-        geometry_msgs::Pose pose_utm = odom->pose.pose;
-        pose_utm.position.x += utm_origin_.x - first_msg_->pose.pose.position.x;
-        pose_utm.position.y += utm_origin_.y - first_msg_->pose.pose.position.y;
-        pose_utm.position.z += utm_origin_.z - first_msg_->pose.pose.position.z;
+        tf2::Transform tf_world;
+        tf_world.setOrigin(tf2::Vector3(world_origin_.x, world_origin_.y, world_origin_.z));
+        tf_world.setRotation(tf2::Quaternion(0, 0, 0, 1));
 
-        tf_utm_msg.header.stamp    = odom->header.stamp;
-        tf_utm_msg.header.frame_id = ns_utm_origin_parent_frame_id_;
-        tf_utm_msg.child_frame_id  = ns_utm_origin_child_frame_id_;
+        tf_world_utm_msg.header.stamp    = odom->header.stamp;
+        tf_world_utm_msg.header.frame_id = ns_world_origin_child_frame_id_;
+        tf_world_utm_msg.child_frame_id  = ns_utm_origin_child_frame_id_;
 
         tf2::Transform tf_utm;
         if (is_inverted_) {
-          tf_utm = Support::tf2FromPose(pose_utm).inverse();
+          tf_utm = tf_world.inverse();
         } else {
-          tf_utm = Support::tf2FromPose(pose_utm);
+          tf_utm = tf_world;
         }
-        tf_utm_msg.transform = Support::msgFromTf2(tf_utm);
+        tf_world_utm_msg.transform = Support::msgFromTf2(tf_utm);
 
         try {
-          broadcaster_->sendTransform(tf_utm_msg);
+          static_broadcaster_->sendTransform(tf_world_utm_msg);
           ROS_INFO_ONCE("[%s]: publishing utm_origin tf", getPrintName().c_str());
         }
         catch (...) {
