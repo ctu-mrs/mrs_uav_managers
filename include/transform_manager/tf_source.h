@@ -380,7 +380,7 @@ private:
         tf_world_utm_msg.transform = Support::msgFromTf2(tf_utm);
 
         try {
-          static_broadcaster_->sendTransform(tf_world_utm_msg);
+          static_broadcaster_.sendTransform(tf_world_utm_msg);
           ROS_INFO_ONCE("[%s]: publishing utm_origin tf", getPrintName().c_str());
         }
         catch (...) {
