@@ -971,7 +971,7 @@ void EstimationManager::timerPublish() {
     uav_state = ret.value();
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
-    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getName()});
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getPrintName()});
     return;
   }
 
@@ -1048,7 +1048,7 @@ void EstimationManager::timerPublishDiagnostics() {
     uav_state = ret.value();
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
-    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getName()});
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getPrintName()});
     return;
   }
 
@@ -1192,7 +1192,7 @@ void EstimationManager::timerCheckHealth() {
       } else {
         RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s agl estimator: %s to be running", Support::waiting_for_string.c_str(),
                              est_alt_agl_->getName().c_str());
-        error_publisher_->addWaitingForNodeError({"EstimationManager", est_alt_agl_->getName()});
+        error_publisher_->addWaitingForNodeError({"EstimationManager", est_alt_agl_->getPrintName()});
       }
     }
   }
