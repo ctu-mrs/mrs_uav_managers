@@ -76,11 +76,11 @@ public:
   virtual bool start(void)                                                                                                                                = 0;
   virtual bool pause(void)                                                                                                                                = 0;
   virtual bool reset(void)                                                                                                                                = 0;
+  virtual std::string getPrintName(void) const;
 
   // implemented methods
   // access methods
   std::string getName(void) const;
-  std::string getPrintName(void) const;
   std::string getType(void) const;
   std::string getFrameId(void) const;
   double      getMaxFlightZ(void) const;
