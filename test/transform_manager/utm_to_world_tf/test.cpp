@@ -75,7 +75,7 @@ bool Tester::test() {
   const std::string world_frame_id = _uav_name_ + "/world_origin";
 
   const double tf_pos_eps = 0.01;
-  const double t_sleep = 0.001;
+  const double t_sleep = 0.01;
   const double t_stop = 30;
 
   while (true) {
@@ -104,9 +104,10 @@ bool Tester::test() {
     if (std::fabs(tf_opt1.value().transform.translation.x - tf_opt2.value().transform.translation.x) > tf_pos_eps ||
         std::fabs(tf_opt1.value().transform.translation.y - tf_opt2.value().transform.translation.y) > tf_pos_eps ||
         std::fabs(tf_opt1.value().transform.translation.z - tf_opt2.value().transform.translation.z) > tf_pos_eps) {
-      printUavState(uh);
+      ROS_ERROR("[%s]: the tf from utm_origin to world_origin is not constant.", ros::this_node::getName().c_str());
       printTf(tf_opt1.value());
       printTf(tf_opt2.value());
+      printUavState(uh);
       test_success = false;
     }
 
@@ -146,7 +147,7 @@ void Tester::printUavState(std::shared_ptr<mrs_uav_testing::UAVHandler> uh) {
     m.getRPY(roll, pitch, yaw);
 
     ROS_INFO("[%s]: got the uav_state", ros::this_node::getName().c_str());
-    std::cout << "xyz: " << uav_state->pose.position.x << " " << uav_state->pose.position.y << " " << uav_state->pose.position.z << "rpy: " << roll << " " << pitch << " " << yaw << std::endl;
+    std::cout << "xyz: " << uav_state->pose.position.x << " " << uav_state->pose.position.y << " " << uav_state->pose.position.z << " rpy: " << roll << " " << pitch << " " << yaw << std::endl;
     
 }
 
@@ -159,6 +160,7 @@ TEST(TESTSuite, test) {
   if (result) {
     GTEST_SUCCEED();
   } else {
+    ROS_ERROR("[%s]: The tf from utm_origin to world_origin was not constant during the test.", ros::this_node::getName().c_str());
     GTEST_FAIL();
   }
 }
