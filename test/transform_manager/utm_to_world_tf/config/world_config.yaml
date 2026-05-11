@@ -1,0 +1,48 @@
+world_origin:
+
+  units: "LATLON" # {"UTM, "LATLON"}
+
+  origin_x: 50.11197947897792
+  origin_y: 14.419033095399037
+
+sim_gnss: 
+
+  lat: 50.11197947897792
+  lon: 14.419033095399037
+  amsl: 420
+
+gnss:
+  utm_zone: "33U"
+  utm_x: 458460.72
+  utm_y: 5551242.81
+  amsl: 420.0
+
+safety_area:
+
+  enabled: false
+
+  horizontal:
+
+    # the frame of reference in which the points are expressed
+    frame_name: "latlon_origin"
+
+    # polygon
+    #
+    # x, y [m] for any frame_name except latlon_origin
+    # x = latitude, y = longitude [deg]  for frame_name=="latlon_origin"
+    points: [
+      50.111950, 14.417189,
+      50.111448, 14.417361,
+      50.111824, 14.419732,
+      50.112316, 14.419609
+    ]
+
+
+  vertical:
+
+    # the frame of reference in which the max&min z is expressed
+    frame_name: "world_origin"
+
+    max_z: 30.0
+    min_z: 1.9
+
