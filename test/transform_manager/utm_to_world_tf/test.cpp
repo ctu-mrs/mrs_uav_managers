@@ -100,7 +100,6 @@ bool Tester::test() {
 
     this->sleep(t_sleep);
     
-    const auto tf_opt1 = this->transformer_->getTransform(utm_frame_id, world_frame_id, t_now);
     const auto tf_opt2 = this->transformer_->getTransform(utm_frame_id, world_frame_id, ros::Time());
 
     if (std::fabs(tf_opt1.value().transform.translation.x - tf_opt2.value().transform.translation.x) > tf_pos_eps ||
