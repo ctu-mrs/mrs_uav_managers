@@ -237,6 +237,10 @@ def generate_launch_description():
             ("~/ungrip_out", "gripper/ungrip"),
             ("~/offboard_out", "hw_api/offboard"),
         ],
+
+        extra_arguments=[
+            {'use_intra_process_comms': True}
+        ],
     )
 
     load_into_existing = LoadComposableNodes(
@@ -261,7 +265,6 @@ def generate_launch_description():
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
         composable_node_descriptions=[uav_manager_node],
         parameters=[
-            {'use_intra_process_comms': True},
             {'thread_num': os.cpu_count()},
             {'use_sim_time': use_sim_time},
         ],

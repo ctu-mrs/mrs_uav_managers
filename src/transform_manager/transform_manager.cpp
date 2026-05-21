@@ -201,6 +201,9 @@ void TransformManager::initialize() {
 
   RCLCPP_INFO(node_->get_logger(), "[%s]: initializing", getPrintName().c_str());
 
+  auto use_intra = node_->get_node_options().use_intra_process_comms();
+  RCLCPP_INFO(node_->get_logger(), "Intra-process comms is: %s", use_intra ? "ON" : "OFF");
+
   broadcaster_        = std::make_shared<mrs_lib::TransformBroadcaster>(node_);
   static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(node_);
 

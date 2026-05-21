@@ -158,6 +158,11 @@ void ConstraintManager::initialize() {
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
+  RCLCPP_INFO(node_->get_logger(), "initializing");
+
+  auto use_intra = node_->get_node_options().use_intra_process_comms();
+  RCLCPP_INFO(node_->get_logger(), "Intra-process comms is: %s", use_intra ? "ON" : "OFF");
+
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ConstraintManager", "main");
 
   cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

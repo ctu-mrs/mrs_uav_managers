@@ -299,6 +299,9 @@ void SafetyAreaManager::initialize() {
 
   RCLCPP_INFO(node_->get_logger(), "initializing");
 
+  auto use_intra = node_->get_node_options().use_intra_process_comms();
+  RCLCPP_INFO(node_->get_logger(), "Intra-process comms is: %s", use_intra ? "ON" : "OFF");
+
   // | --------------------- parameters ---------------------- |
 
   mrs_lib::ParamLoader param_loader(node_, "SafetyAreaManager");

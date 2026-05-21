@@ -552,6 +552,11 @@ void EstimationManager::initialize() {
 
   rclcpp::on_shutdown([this]() { this->shutdown(); });
 
+  RCLCPP_INFO(node_->get_logger(), "initializing");
+
+  auto use_intra = node_->get_node_options().use_intra_process_comms();
+  RCLCPP_INFO(node_->get_logger(), "Intra-process comms is: %s", use_intra ? "ON" : "OFF");
+
   sm_ = std::make_shared<StateMachine>(node_, nodelet_name_);
 
   ch_ = std::make_shared<CommonHandlers_t>();

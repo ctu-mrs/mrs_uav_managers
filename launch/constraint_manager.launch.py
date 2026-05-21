@@ -167,6 +167,10 @@ def generate_launch_description():
             # services out
             ("~/set_constraints_out", "control_manager/set_constraints"),
         ],
+
+        extra_arguments=[
+            {'use_intra_process_comms': True}
+        ],
     )
 
     load_into_existing = LoadComposableNodes(
@@ -191,7 +195,6 @@ def generate_launch_description():
         composable_node_descriptions=[constraint_manager_node],
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
         parameters=[
-            {'use_intra_process_comms': True},
             {'thread_num': os.cpu_count()},
             {'use_sim_time': use_sim_time},
         ],

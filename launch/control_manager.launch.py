@@ -336,6 +336,10 @@ def generate_launch_description():
             ("~/is_safety_area_enabled_out", "safety_area_manager/is_safety_zone_enabled"),
             ("~/errors", "errors"),
         ],
+
+        extra_arguments=[
+            {'use_intra_process_comms': True}
+        ],
     )
 
     load_into_existing = LoadComposableNodes(
@@ -360,7 +364,6 @@ def generate_launch_description():
         # prefix=["valgrind --gen-suppressions=all --suppressions=/home/klaxalk/ws_bug/valgrind.supp --leak-check=full --track-origins=yes --verbose --log-file=/tmp/valgrind.txt"],
         composable_node_descriptions=[control_manager_node],
         parameters=[
-            {'use_intra_process_comms': True},
             {'thread_num': os.cpu_count()},
             {'use_sim_time': use_sim_time},
         ],

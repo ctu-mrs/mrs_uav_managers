@@ -250,6 +250,9 @@ def generate_launch_description():
             ("~/static_markers_coordinates_out", "~/static_markers_coordinates"),
         ],
 
+        extra_arguments=[
+            {'use_intra_process_comms': True}
+        ],
     )
 
     load_into_existing = LoadComposableNodes(
@@ -274,7 +277,6 @@ def generate_launch_description():
         # prefix=['debug_roslaunch ' + os.ttyname(sys.stdout.fileno())],
         composable_node_descriptions=[safety_area_manager_node],
         parameters=[
-            {'use_intra_process_comms': True},
             {'thread_num': os.cpu_count()},
             {'use_sim_time': use_sim_time},
         ],
