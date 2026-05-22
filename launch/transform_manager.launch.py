@@ -229,10 +229,19 @@ def generate_launch_description():
         # Nodes under test
         launch_ros.actions.Node(
             package='tf2_ros',
-            namespace='',
             executable='static_transform_publisher',
             name='fcu_to_rtk_antenna',
-            arguments=["0.0", "0.0", "0.20", "0", "0", "0", [uav_name, "/fcu"], [uav_name, "/rtk_antenna"]],
+            # arguments=["0.0", "0.0", "0.20", "0", "0", "0", [uav_name, "/fcu"], [uav_name, "/rtk_antenna"]],
+            arguments=[
+                '--x', '0.1',
+                '--y', '0.0',
+                '--z', '0.2',
+                '--roll', '0.0',
+                '--pitch', '0.0',
+                '--yaw', '0',
+                '--frame-id', [uav_name,"/fcu"],
+                '--child-frame-id', [uav_name,"/rtk_antenna"],
+            ],
         )
     )
 
