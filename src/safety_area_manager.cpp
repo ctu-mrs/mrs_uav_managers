@@ -33,6 +33,7 @@
 #include <limits>
 #include <memory>
 #include <cmath>
+#include <exception>
 
 #include <mrs_msgs/msg/point2_d.hpp>
 #include <mrs_msgs/msg/safety_area_manager_diagnostics.hpp>
