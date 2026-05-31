@@ -86,7 +86,6 @@ target_include_directories(MrsUavManagers_EstimationManager
 
 target_link_libraries(MrsUavManagers_EstimationManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -119,7 +118,6 @@ target_include_directories(MrsUavManagers_TransformManager
 
 target_link_libraries(MrsUavManagers_TransformManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -154,7 +152,6 @@ target_include_directories(MrsUavManagers_ControlManager
 
 target_link_libraries(MrsUavManagers_ControlManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -182,7 +179,6 @@ add_library(MrsUavManagers_SafetyAreaManager SHARED
 
 target_link_libraries(MrsUavManagers_SafetyAreaManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -215,7 +211,6 @@ target_include_directories(MrsUavManagers_UavManager
 
 target_link_libraries(MrsUavManagers_UavManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -248,7 +243,6 @@ target_include_directories(MrsUavManagers_ConstraintManager
 
 target_link_libraries(MrsUavManagers_ConstraintManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -281,7 +275,6 @@ target_include_directories(MrsUavManagers_GainManager
 
 target_link_libraries(MrsUavManagers_GainManager
   PRIVATE
-    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -368,6 +361,7 @@ target_sources(MrsUavManagers_MrsUavManagers
 
 target_link_libraries(MrsUavManagers_MrsUavManagers
   INTERFACE
+    ${LIBRARIES}
     rclcpp::rclcpp
     mrs_lib::mrs_lib
     pluginlib::pluginlib
