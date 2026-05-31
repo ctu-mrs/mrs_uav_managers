@@ -56,11 +56,14 @@ set(LIBRARIES
   MrsUavManagers_EstimationManager
   MrsUavManagers_TransformManager
   MrsUavManagers_ControlManager
-  MrsUavManagers_NullTracker
   MrsUavManagers_UavManager
   MrsUavManagers_ConstraintManager
   MrsUavManagers_GainManager
   MrsUavManagers_SafetyAreaManager
+)
+
+set(PLUGINS
+  MrsUavManagers_NullTracker
 )
 
 ## --------------------------------------------------------------
@@ -360,6 +363,7 @@ target_sources(MrsUavManagers_MrsUavManagers
 target_link_libraries(MrsUavManagers_MrsUavManagers
   INTERFACE
     ${LIBRARIES}
+
     rclcpp::rclcpp
     mrs_lib::mrs_lib
     pluginlib::pluginlib
@@ -367,10 +371,10 @@ target_link_libraries(MrsUavManagers_MrsUavManagers
     ${mrs_msgs_TARGETS}
     ${geometry_msgs_TARGETS}
     ${nav_msgs_TARGETS}
-    ${std_msgs}
-    ${sensor_msgs}
-    ${mrs_uav_hw_api}
-    ${visualization_msgs}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${mrs_uav_hw_api_TARGETS}
+    ${visualization_msgs_TARGETS}
     ${tf2_geometry_msgs_TARGETS}
 )
 
@@ -409,6 +413,14 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
   FILE_SET HEADERS DESTINATION "include/${PROJECT_NAME}"
+)
+
+install(
+  TARGETS
+    ${PLUGINS}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
 install(
