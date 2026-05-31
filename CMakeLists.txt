@@ -86,6 +86,7 @@ target_include_directories(MrsUavManagers_EstimationManager
 
 target_link_libraries(MrsUavManagers_EstimationManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -103,7 +104,7 @@ target_link_libraries(MrsUavManagers_EstimationManager
 
 rclcpp_components_register_nodes(MrsUavManagers_EstimationManager "mrs_uav_managers::estimation_manager::EstimationManager")
 
-target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Transform Manager
 
@@ -118,6 +119,7 @@ target_include_directories(MrsUavManagers_TransformManager
 
 target_link_libraries(MrsUavManagers_TransformManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -135,7 +137,7 @@ target_link_libraries(MrsUavManagers_TransformManager
 
 rclcpp_components_register_nodes(MrsUavManagers_TransformManager "mrs_uav_managers::transform_manager::TransformManager")
 
-target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_TransformManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Control Manager
 
@@ -152,6 +154,7 @@ target_include_directories(MrsUavManagers_ControlManager
 
 target_link_libraries(MrsUavManagers_ControlManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -197,7 +200,7 @@ target_link_libraries(MrsUavManagers_SafetyAreaManager
 
 rclcpp_components_register_nodes(MrsUavManagers_SafetyAreaManager "mrs_uav_managers::safety_area_manager::SafetyAreaManager")
 
-target_compile_definitions(MrsUavManagers_SafetyAreaManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_SafetyAreaManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # UAV Manager
 
@@ -212,6 +215,7 @@ target_include_directories(MrsUavManagers_UavManager
 
 target_link_libraries(MrsUavManagers_UavManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -229,7 +233,7 @@ target_link_libraries(MrsUavManagers_UavManager
 
 rclcpp_components_register_nodes(MrsUavManagers_UavManager "mrs_uav_managers::uav_manager::UavManager")
 
-target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_UavManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Constraint Manager
 
@@ -244,6 +248,7 @@ target_include_directories(MrsUavManagers_ConstraintManager
 
 target_link_libraries(MrsUavManagers_ConstraintManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -261,7 +266,7 @@ target_link_libraries(MrsUavManagers_ConstraintManager
 
 rclcpp_components_register_nodes(MrsUavManagers_ConstraintManager "mrs_uav_managers::constraint_manager::ConstraintManager")
 
-target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_ConstraintManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Gain Manager
 
@@ -276,6 +281,7 @@ target_include_directories(MrsUavManagers_GainManager
 
 target_link_libraries(MrsUavManagers_GainManager
   PRIVATE
+    mrs_uav_managers::mrs_uav_managers
     rclcpp::rclcpp
     rclcpp_components::component
     mrs_lib::mrs_lib
@@ -293,7 +299,7 @@ target_link_libraries(MrsUavManagers_GainManager
 
 rclcpp_components_register_nodes(MrsUavManagers_GainManager "mrs_uav_managers::gain_manager::GainManager")
 
-target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_GainManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Null Tracker
 
@@ -323,7 +329,7 @@ target_link_libraries(MrsUavManagers_NullTracker
     ${tf2_geometry_msgs_TARGETS}
 )
 
-target_compile_definitions(MrsUavManagers_NullTracker PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsUavManagers_NullTracker PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Public interface of this library
 
@@ -362,8 +368,6 @@ target_sources(MrsUavManagers_MrsUavManagers
 
 target_link_libraries(MrsUavManagers_MrsUavManagers
   INTERFACE
-    ${LIBRARIES}
-
     rclcpp::rclcpp
     mrs_lib::mrs_lib
     pluginlib::pluginlib
