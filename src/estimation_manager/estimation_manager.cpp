@@ -345,6 +345,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_co_timers_;
 
   std::string _custom_config_;
   std::string _platform_config_;
@@ -397,7 +398,7 @@ private:
   void                       timerPublishDiagnostics();
 
   std::shared_ptr<TimerType> timer_check_health_;
-  void                       timerCheckHealth();
+  mrs_lib::Task<>            timerCheckHealth();
 
   void initialize();
 
@@ -413,8 +414,8 @@ private:
   bool callbackResetEstimator(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
-  bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  mrs_lib::Task<bool> callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                             const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> srvs_toggle_callbacks_;
 
@@ -423,7 +424,7 @@ private:
   bool callbacks_enabled_             = false;
   bool callbacks_disabled_by_service_ = false;
 
-  bool                                                  callFailsafeService();
+  mrs_lib::Task<bool>                                   callFailsafeService();
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> srvch_failsafe_;
   bool                                                  failsafe_call_succeeded_ = false;
 
@@ -470,11 +471,12 @@ EstimationManager::EstimationManager(rclcpp::NodeOptions options) : mrs_lib::Nod
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
-  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "EstimationManager", "main");
-  cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  error_publisher_  = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "EstimationManager", "main");
+  cbkgrp_subs_      = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_        = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_timers_    = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_co_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
@@ -872,6 +874,12 @@ void EstimationManager::initialize() {
   opts.autostart      = true;
   opts.callback_group = cbkgrp_timers_;
 
+  mrs_lib::TimerHandlerOptions opts_co;
+
+  opts_co.node           = node_;
+  opts_co.autostart      = true;
+  opts_co.callback_group = cbkgrp_co_timers_;
+
   {
     std::function<void()> callback_fcn = std::bind(&EstimationManager::timerPublish, this);
 
@@ -884,11 +892,7 @@ void EstimationManager::initialize() {
     timer_publish_diagnostics_ = std::make_shared<TimerType>(opts, rclcpp::Rate(ch_->desired_diagnostics_rate, clock_), callback_fcn);
   }
 
-  {
-    std::function<void()> callback_fcn = std::bind(&EstimationManager::timerCheckHealth, this);
-
-    timer_check_health_ = std::make_shared<TimerType>(opts, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), callback_fcn);
-  }
+  timer_check_health_ = std::make_shared<TimerType>(opts_co, rclcpp::Rate(ch_->desired_uav_state_rate, clock_), &EstimationManager::timerCheckHealth, this);
 
   /*//}*/
 
@@ -911,8 +915,7 @@ void EstimationManager::initialize() {
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   srvs_set_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
-      node_, "~/set_world_origin_in", std::bind(&EstimationManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/set_world_origin_in", &EstimationManager::callbackSetWorldOrigin, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   srvs_toggle_callbacks_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/toggle_service_callbacks_in", std::bind(&EstimationManager::callbackToggleServiceCallbacks, this, std::placeholders::_1, std::placeholders::_2),
@@ -1134,10 +1137,10 @@ void EstimationManager::timerPublishDiagnostics() {
 
 /* timerCheckHealth() //{ */
 
-void EstimationManager::timerCheckHealth() {
+mrs_lib::Task<> EstimationManager::timerCheckHealth() {
 
   if (!sm_->isInitialized()) {
-    return;
+    co_return;
   }
 
   mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, "EstimationManager::timerCheckHealth", ch_->scope_timer.logger, ch_->scope_timer.enabled);
@@ -1218,9 +1221,12 @@ void EstimationManager::timerCheckHealth() {
   }
 
   if (sm_->isInState(StateMachine::FAILSAFE_STATE)) {
-    if (!failsafe_call_succeeded_ && callFailsafeService()) {
-      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "failsafe called successfully");
-      failsafe_call_succeeded_ = true;
+    if (!failsafe_call_succeeded_) {
+      auto res = co_await callFailsafeService();
+      if (res) {
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "failsafe called successfully");
+        failsafe_call_succeeded_ = true;
+      }
     }
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "we are in failsafe state");
     error_publisher_->addGeneralError(error_type_t::in_failsafe_state, "Estimation manager in failsafe state.");
@@ -1447,18 +1453,18 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 }
 
 /*//{ callbackSetWorldOrigin() */
-bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+mrs_lib::Task<bool> EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!sm_->isInitialized()) {
-    return false;
+    co_return false;
   }
 
   if (!callbacks_enabled_) {
     response->success = false;
     response->message = ("Service callbacks are disabled");
     RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
-    return true;
+    co_return true;
   }
 
   if (sm_->isInState(StateMachine::INITIALIZED_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
@@ -1485,7 +1491,7 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
                   request->header.frame_id.c_str());
       response->success = false;
       response->message = "Requested unsupported frame_id. Supported are: latlon_origin, utm_origin";
-      return true;
+      co_return true;
     }
 
     ch_->world_origin.x = world_origin_x;
@@ -1512,36 +1518,37 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
       }
     }
 
-    auto res = srvch_set_world_origin_.callSync(request);
+    auto res = co_await srvch_set_world_origin_.callAwaitable(request);
 
     if (!res.has_value() || !res.value()->success) {
       RCLCPP_WARN(node_->get_logger(), "Could not call TransformManager set_world_origin service.");
       response->success = false;
       response->message = "Could not call TransformManager set_world_origin service.";
-      return true;
+      co_return true;
     }
 
     if (!res.value()->success) {
       RCLCPP_WARN(node_->get_logger(), "TransformManager could not set world origin.");
       response->success = false;
       response->message = "TransformManager could not set world origin.";
-      return true;
+      co_return true;
     }
 
     // update Safety Area manager world origin
-    auto res_update = srvch_update_sa_mgr_world_origin_.callSync(request);
+    auto res_update = co_await srvch_update_sa_mgr_world_origin_.callAwaitable(request);
+
     if (!res_update.has_value() || !res_update.value()->success) {
       RCLCPP_WARN(node_->get_logger(), "Could not call Safety Area Manager update_world_origin service.");
       response->success = false;
       response->message = "Could not call Safety Area Manager update_world_origin service.";
-      return true;
+      co_return true;
     }
 
     if (!res_update.value()->success) {
       RCLCPP_WARN(node_->get_logger(), "Safety Area Manager could not update world origin.");
       response->success = false;
       response->message = "SA Manager could not update world origin.";
-      return true;
+      co_return true;
     }
 
     response->success = true;
@@ -1554,7 +1561,7 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
   }
 
 
-  return true;
+  co_return true;
 }
 /*//}*/
 
@@ -1626,17 +1633,17 @@ void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers
 
 /* callFailsafeService() //{ */
 
-bool EstimationManager::callFailsafeService() {
+mrs_lib::Task<bool> EstimationManager::callFailsafeService() {
 
   auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = srvch_failsafe_.callSync(request);
+  auto response = co_await srvch_failsafe_.callAwaitable(request);
 
   if (!response.has_value() || !response.value()->success) {
-    return false;
+    co_return false;
   }
 
-  return true;
+  co_return true;
 }
 
 //}

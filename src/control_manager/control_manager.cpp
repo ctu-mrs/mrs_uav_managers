@@ -74,7 +74,7 @@
 
 #include <pluginlib/class_loader.hpp>
 
-#include <eigen3/Eigen/Eigen>
+#include <Eigen/Core>
 
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -583,8 +583,8 @@ private:
 
   bool _parachute_enabled_ = false;
 
-  std::tuple<bool, std::string> deployParachute(void);
-  bool                          parachuteSrv(void);
+  mrs_lib::Task<std::tuple<bool, std::string>> deployParachute(void);
+  mrs_lib::Task<bool>                          parachuteSrv(void);
 
   // safety area routines
   mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics> sh_safety_area_diag_;
@@ -600,14 +600,14 @@ private:
   // | ------------------------ callbacks ----------------------- |
 
   // topic callbacks
-  void callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
-  void callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
-  void callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr msg);
-  void callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
-  void callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg);
+  mrs_lib::Task<> callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+  mrs_lib::Task<> callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
+  void            callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr msg);
+  void            callbackGNSS(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
+  mrs_lib::Task<> callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg);
 
   // topic timeouts
-  void timeoutUavState(const double &missing_for);
+  mrs_lib::Task<> timeoutUavState(const double &missing_for);
 
   // switching controller and tracker services
   bool callbackSwitchTracker(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
@@ -650,16 +650,21 @@ private:
                                         const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackGotoTrajectoryStart(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
                                    const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                  const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  bool callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  mrs_lib::Task<bool> callbackEHover(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                     const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  mrs_lib::Task<bool> callbackFailsafe(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  mrs_lib::Task<bool> callbackFailsafeEscalating(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                                 const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  mrs_lib::Task<bool> callbackEland(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                    const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  mrs_lib::Task<bool> callbackParachute(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                        const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool callbackToggleOutput(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
-  bool callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
-  bool callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                               const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  mrs_lib::Task<bool> callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                  const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+  bool                callbackEnableCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                              const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
   mrs_lib::Task<bool> callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request>  request,
@@ -715,20 +720,20 @@ private:
 
   // timer for issuing the failsafe landing
   std::shared_ptr<TimerType> timer_failsafe_;
-  void                       timerFailsafe();
+  mrs_lib::Task<>            timerFailsafe();
 
   // oneshot timer for running controllers and trackers
-  void              asyncControl(void);
+  mrs_lib::Task<>   asyncControl(void);
   std::atomic<bool> running_async_control_ = false;
   std::future<void> async_control_result_;
 
   // timer for issuing emergancy landing
   std::shared_ptr<TimerType> timer_eland_;
-  void                       timerEland();
+  mrs_lib::Task<>            timerEland();
 
   // timer for regular checking of controller errors
   std::shared_ptr<TimerType> timer_safety_;
-  void                       timerSafety();
+  mrs_lib::Task<void>        timerSafety();
   std::atomic<bool>          running_safety_timer_        = false;
   std::atomic<bool>          odometry_switch_in_progress_ = false;
 
@@ -805,7 +810,7 @@ private:
   // diagnostics publishing
   void publishDiagnostics(void);
 
-  void                                                  ungripSrv(void);
+  mrs_lib::Task<>                                       ungripSrv(void);
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_ungrip_;
 
   bool isFlyingNormally(void);
@@ -880,10 +885,10 @@ private:
   // | --------------------- other routines --------------------- |
 
   // this is called to update the trackers and to receive position control command from the active one
-  void updateTrackers(void);
+  mrs_lib::Task<> updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
-  void updateControllers(const mrs_msgs::msg::UavState &uav_state);
+  mrs_lib::Task<> updateControllers(const mrs_msgs::msg::UavState &uav_state);
 
   // sets the reference to the active tracker
   mrs_lib::Task<std::tuple<bool, std::string>> setReference(const mrs_msgs::msg::ReferenceStamped reference_in);
@@ -906,25 +911,26 @@ private:
   void initializeControlOutput(void);
 
   // tell the mrs_odometry to disable its callbacks
-  void odometryCallbacksSrv(const bool input);
+  mrs_lib::Task<> odometryCallbacksSrv(const bool input);
 
   mrs_msgs::msg::ReferenceStamped velocityReferenceToReference(const mrs_msgs::msg::VelocityReferenceStamped &vel_reference);
 
-  void                          setCallbacks(bool in);
-  bool                          isOffboard(void);
-  bool                          elandSrv(void);
-  std::tuple<bool, std::string> arming(const bool input);
+  void                                         setCallbacks(bool in);
+  bool                                         isOffboard(void);
+  mrs_lib::Task<bool>                          elandSrv(void);
+  mrs_lib::Task<std::tuple<bool, std::string>> arming(const bool input);
 
   // safety functions impl
-  std::tuple<bool, std::string> ehover(void);
-  std::tuple<bool, std::string> hover(void);
-  std::tuple<bool, std::string> startTrajectoryTracking(void);
-  std::tuple<bool, std::string> stopTrajectoryTracking(void);
-  std::tuple<bool, std::string> resumeTrajectoryTracking(void);
-  std::tuple<bool, std::string> gotoTrajectoryStart(void);
-  std::tuple<bool, std::string> eland(void);
-  std::tuple<bool, std::string> failsafe(void);
-  std::tuple<bool, std::string> escalatingFailsafe(void);
+  mrs_lib::Task<std::tuple<bool, std::string>> ehover(void);
+  std::tuple<bool, std::string>                hover(void);
+  std::tuple<bool, std::string>                startTrajectoryTracking(void);
+  std::tuple<bool, std::string>                stopTrajectoryTracking(void);
+  std::tuple<bool, std::string>                resumeTrajectoryTracking(void);
+  std::tuple<bool, std::string>                gotoTrajectoryStart(void);
+
+  mrs_lib::Task<std::tuple<bool, std::string>> escalatingFailsafe(void);
+  mrs_lib::Task<std::tuple<bool, std::string>> failsafe(void);
+  mrs_lib::Task<std::tuple<bool, std::string>> eland(void);
 
   EscalatingFailsafeStates_t getNextEscFailsafeState(void);
 };
@@ -1939,9 +1945,9 @@ void ControlManager::initialize(void) {
   shopts_co.subscription_options.callback_group = cbkgrp_co_subs_;
 
   if (_state_input_ == INPUT_UAV_STATE) {
-    sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "~/uav_state_in", &ControlManager::callbackUavState, this);
+    sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts_co, "~/uav_state_in", &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETRY) {
-    sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_in", &ControlManager::callbackOdometry, this);
+    sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts_co, "~/odometry_in", &ControlManager::callbackOdometry, this);
   }
 
   if (_odometry_innovation_check_enabled_) {
@@ -1953,7 +1959,7 @@ void ControlManager::initialize(void) {
   sh_safety_area_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(shopts, "~/safety_area_diag_in");
   sh_joystick_         = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts, "~/joystick_in", &ControlManager::callbackJoystick, this);
   sh_gnss_             = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_        = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_hw_api_rc_        = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts_co, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
 
   sh_hw_api_status_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus>(shopts, "~/hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
@@ -1971,20 +1977,17 @@ void ControlManager::initialize(void) {
   ss_hover_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/hover_in", std::bind(&ControlManager::callbackHover, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);
-  ss_ehover_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
-      node_, "~/ehover_in", std::bind(&ControlManager::callbackEHover, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
-  ss_failsafe_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
-      node_, "~/failsafe_in", std::bind(&ControlManager::callbackFailsafe, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+  ss_ehover_   = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/ehover_in", &ControlManager::callbackEHover, this, rclcpp::SystemDefaultsQoS(),
+                                                                       cbkgrp_ss_);
+  ss_failsafe_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/failsafe_in", &ControlManager::callbackFailsafe, this,
+                                                                       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_failsafe_escalating_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
-      node_, "~/failsafe_escalating_in", std::bind(&ControlManager::callbackFailsafeEscalating, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/failsafe_escalating_in", &ControlManager::callbackFailsafeEscalating, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_toggle_output_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/toggle_output_in", std::bind(&ControlManager::callbackToggleOutput, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_arm_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
-      node_, "~/arm_in", std::bind(&ControlManager::callbackArm, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_arm_ =
+      mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(node_, "~/arm_in", &ControlManager::callbackArm, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_enable_callbacks_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/enable_callbacks_in", std::bind(&ControlManager::callbackEnableCallbacks, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -1994,12 +1997,10 @@ void ControlManager::initialize(void) {
   ss_use_joystick_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/use_joystick_in", std::bind(&ControlManager::callbackUseJoystick, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_eland_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
-      node_, "~/eland_in", std::bind(&ControlManager::callbackEland, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
-  ss_parachute_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
-      node_, "~/parachute_in", std::bind(&ControlManager::callbackParachute, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+  ss_eland_ =
+      mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/eland_in", &ControlManager::callbackEland, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_parachute_           = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/parachute_in", &ControlManager::callbackParachute, this,
+                                                                                  rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_transform_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TransformReferenceSrv>(
       node_, "~/transform_reference_in", std::bind(&ControlManager::callbackTransformReference, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -2102,11 +2103,23 @@ void ControlManager::initialize(void) {
   timer_opts_start.autostart      = true;
   timer_opts_start.callback_group = cbkgrp_timers_;
 
+  mrs_lib::TimerHandlerOptions timer_opts_co_start;
+
+  timer_opts_co_start.node           = node_;
+  timer_opts_co_start.autostart      = true;
+  timer_opts_co_start.callback_group = cbkgrp_co_timers_;
+
   mrs_lib::TimerHandlerOptions timer_opts_no_start;
 
   timer_opts_no_start.node           = node_;
   timer_opts_no_start.autostart      = false;
   timer_opts_no_start.callback_group = cbkgrp_timers_;
+
+  mrs_lib::TimerHandlerOptions timer_opts_co_no_start;
+
+  timer_opts_co_no_start.node           = node_;
+  timer_opts_co_no_start.autostart      = false;
+  timer_opts_co_no_start.callback_group = cbkgrp_co_timers_;
 
   {
     std::function<void()> callback_fcn = std::bind(&ControlManager::timerStatus, this);
@@ -2114,11 +2127,7 @@ void ControlManager::initialize(void) {
     timer_status_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_status_timer_rate_, clock_), callback_fcn);
   }
 
-  {
-    std::function<void()> callback_fcn = std::bind(&ControlManager::timerSafety, this);
-
-    timer_safety_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_safety_timer_rate_, clock_), callback_fcn);
-  }
+  timer_safety_ = std::make_shared<TimerType>(timer_opts_co_start, rclcpp::Rate(_safety_timer_rate_, clock_), &ControlManager::timerSafety, this);
 
   {
     std::function<void()> callback_fcn = std::bind(&ControlManager::timerBumper, this);
@@ -2138,17 +2147,9 @@ void ControlManager::initialize(void) {
     timer_joystick_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_joystick_timer_rate_, clock_), callback_fcn);
   }
 
-  {
-    std::function<void()> callback_fcn = std::bind(&ControlManager::timerEland, this);
+  timer_eland_ = std::make_shared<TimerType>(timer_opts_co_no_start, rclcpp::Rate(_elanding_timer_rate_, clock_), &ControlManager::timerEland, this);
 
-    timer_eland_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_elanding_timer_rate_, clock_), callback_fcn);
-  }
-
-  {
-    std::function<void()> callback_fcn = std::bind(&ControlManager::timerFailsafe, this);
-
-    timer_failsafe_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_failsafe_timer_rate_, clock_), callback_fcn);
-  }
+  timer_failsafe_ = std::make_shared<TimerType>(timer_opts_co_no_start, rclcpp::Rate(_failsafe_timer_rate_, clock_), &ControlManager::timerFailsafe, this);
 
   {
     std::function<void()> callback_fcn = std::bind(&ControlManager::timerPirouette, this);
@@ -2617,12 +2618,12 @@ void ControlManager::timerStatus() {
 
 /* //{ timerSafety() */
 
-void ControlManager::timerSafety() {
+mrs_lib::Task<> ControlManager::timerSafety() {
 
   mrs_lib::AtomicScopeFlag unset_running(running_safety_timer_);
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerSafety");
@@ -2637,12 +2638,12 @@ void ControlManager::timerSafety() {
 
   if (!got_uav_state_ || (_state_input_ == INPUT_UAV_STATE && _odometry_innovation_check_enabled_ && !sh_odometry_innovation_.hasMsg()) ||
       active_tracker_idx == _null_tracker_idx_) {
-    return;
+    co_return;
   }
 
   if (odometry_switch_in_progress_) {
     RCLCPP_WARN(node_->get_logger(), "timerSafety tried to run while odometry switch in progress");
-    return;
+    co_return;
   }
 
   // | ------------------------ timeouts ------------------------ |
@@ -2651,7 +2652,7 @@ void ControlManager::timerSafety() {
     double missing_for = (clock_->now() - sh_uav_state_.lastMsgTime()).seconds();
 
     if (missing_for > _uav_state_max_missing_time_) {
-      timeoutUavState(missing_for);
+      co_await timeoutUavState(missing_for);
     }
   }
 
@@ -2659,7 +2660,7 @@ void ControlManager::timerSafety() {
     double missing_for = (clock_->now() - sh_odometry_.lastMsgTime()).seconds();
 
     if (missing_for > _uav_state_max_missing_time_) {
-      timeoutUavState(missing_for);
+      co_await timeoutUavState(missing_for);
     }
   }
 
@@ -2677,7 +2678,7 @@ void ControlManager::timerSafety() {
   // This means that the timerFailsafe only does its work when Controllers and Trackers produce valid output.
   // Cases when the commands are not valid should be handle in updateControllers() and updateTrackers() methods.
   if (!last_tracker_cmd || !last_control_output.control_output) {
-    return;
+    co_return;
   }
 
   {
@@ -2762,7 +2763,7 @@ void ControlManager::timerSafety() {
           RCLCPP_ERROR(node_->get_logger(), "activating failsafe land: control_error=%.2f/%.2f m (x: %.2f, y: %.2f, z: %.2f)", position_error->norm(),
                        _failsafe_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
-          failsafe();
+          co_await failsafe();
         }
       }
     }
@@ -2807,7 +2808,7 @@ void ControlManager::timerSafety() {
             RCLCPP_ERROR(node_->get_logger(), "activating emergency land: odometry innovation too large: %.2f/%.2f (x: %.2f, y: %.2f, z: %.2f, heading: %.2f)",
                          last_innovation, _odometry_innovation_threshold_, x, y, z, heading);
 
-            eland();
+            co_await eland();
           }
         }
       }
@@ -2831,7 +2832,7 @@ void ControlManager::timerSafety() {
         RCLCPP_ERROR(node_->get_logger(), "activating emergency land: tilt angle too large (%.2f/%.2f deg)", (180.0 / M_PI) * tilt_angle,
                      (180.0 / M_PI) * _tilt_limit_eland_);
 
-        eland();
+        co_await eland();
       }
     }
   }
@@ -2852,7 +2853,7 @@ void ControlManager::timerSafety() {
 
           RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "releasing payload due to large position error");
 
-          ungripSrv();
+          co_await ungripSrv();
         }
       }
     }
@@ -2868,7 +2869,7 @@ void ControlManager::timerSafety() {
           RCLCPP_ERROR(node_->get_logger(), "activating emergency land: position error %.2f/%.2f m (error x: %.2f, y: %.2f, z: %.2f)", error_size,
                        _eland_threshold_, position_error.value()(0), position_error.value()(1), position_error.value()(2));
 
-          eland();
+          co_await eland();
         }
       }
     }
@@ -2890,7 +2891,7 @@ void ControlManager::timerSafety() {
           RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "releasing payload: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
                                 (180.0 / M_PI) * _yaw_error_eland_ / 2.0);
 
-          ungripSrv();
+          co_await ungripSrv();
         }
       }
     }
@@ -2906,7 +2907,7 @@ void ControlManager::timerSafety() {
           RCLCPP_ERROR(node_->get_logger(), "activating emergency land: yaw error %.2f/%.2f deg", (180.0 / M_PI) * yaw_error.value(),
                        (180.0 / M_PI) * _yaw_error_eland_);
 
-          eland();
+          co_await eland();
         }
       }
     }
@@ -2920,7 +2921,7 @@ void ControlManager::timerSafety() {
     RCLCPP_ERROR(node_->get_logger(), "tilt angle too large, disarming: tilt angle=%.2f/%.2f deg", (180.0 / M_PI) * tilt_angle,
                  (180.0 / M_PI) * _tilt_limit_disarm_);
 
-    arming(false);
+    co_await arming(false);
   }
 
   // --------------------------------------------------------------
@@ -2988,7 +2989,7 @@ void ControlManager::timerSafety() {
         RCLCPP_ERROR(node_->get_logger(), "tilt error too large for %.2f s, disarming", tot);
 
         toggleOutput(false);
-        arming(false);
+        co_await arming(false);
       }
     }
   }
@@ -3008,10 +3009,10 @@ void ControlManager::timerSafety() {
 
 /* //{ timerEland() */
 
-void ControlManager::timerEland() {
+mrs_lib::Task<> ControlManager::timerEland() {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerEland");
@@ -3021,19 +3022,19 @@ void ControlManager::timerEland() {
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
   if (!last_control_output.control_output) {
-    return;
+    co_return;
   }
 
   auto throttle = extractThrottle(last_control_output);
 
   if (!throttle) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "TODO: implement landing detection mechanism for the current control modality");
-    return;
+    co_return;
   }
 
   if (current_state_landing_ == IDLE_STATE) {
 
-    return;
+    co_return;
 
   } else if (current_state_landing_ == LANDING_STATE) {
 
@@ -3048,7 +3049,7 @@ void ControlManager::timerEland() {
     if (!last_control_output.control_output) {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "timerEland: last_control_output has not been initialized, returning");
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "tip: the RC eland is probably triggered");
-      return;
+      co_return;
     }
 
     // recalculate the mass based on the throttle
@@ -3082,7 +3083,7 @@ void ControlManager::timerEland() {
       if (_eland_disarm_enabled_) {
 
         RCLCPP_INFO(node_->get_logger(), "calling for disarm");
-        arming(false);
+        co_await arming(false);
       }
 
       changeLandingState(IDLE_STATE);
@@ -3102,10 +3103,10 @@ void ControlManager::timerEland() {
 
 /* //{ timerFailsafe() */
 
-void ControlManager::timerFailsafe() {
+mrs_lib::Task<> ControlManager::timerFailsafe() {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   RCLCPP_INFO_ONCE(node_->get_logger(), "timerFailsafe() spinning");
@@ -3116,7 +3117,7 @@ void ControlManager::timerFailsafe() {
   // copy member variables
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
-  updateControllers(uav_state);
+  co_await updateControllers(uav_state);
 
   publish();
 
@@ -3124,14 +3125,14 @@ void ControlManager::timerFailsafe() {
 
   if (!last_control_output.control_output) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "timerFailsafe: the control output produced by the failsafe controller is empty!");
-    return;
+    co_return;
   }
 
   auto throttle = extractThrottle(last_control_output);
 
   if (!throttle) {
     RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "FailsafeTimer: could not extract throttle out of the last control output");
-    return;
+    co_return;
   }
 
   // --------------------------------------------------------------
@@ -3172,7 +3173,7 @@ void ControlManager::timerFailsafe() {
     toggleOutput(false);
 
     RCLCPP_INFO(node_->get_logger(), "calling for disarm");
-    arming(false);
+    co_await arming(false);
 
     RCLCPP_WARN(node_->get_logger(), "failsafe landing finished");
 
@@ -3222,7 +3223,7 @@ mrs_lib::Task<> ControlManager::timerJoystick() {
 
     joystick_failsafe_pressed_ = false;
 
-    failsafe();
+    co_await failsafe();
   }
 
   // if joypads were pressed and held for > 0.1 s
@@ -3234,7 +3235,7 @@ mrs_lib::Task<> ControlManager::timerJoystick() {
 
     joystick_failsafe_pressed_ = false;
 
-    eland();
+    co_await eland();
   }
 
   // if back was pressed and held for > 0.1 s
@@ -3527,10 +3528,10 @@ mrs_lib::Task<> ControlManager::timerPirouette() {
 
 /* asyncControl() //{ */
 
-void ControlManager::asyncControl(void) {
+mrs_lib::Task<> ControlManager::asyncControl(void) {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::AtomicScopeFlag unset_running(running_async_control_);
@@ -3557,11 +3558,11 @@ void ControlManager::asyncControl(void) {
       }
     }
 
-    timerSafety();
+    co_await timerSafety();
 
-    updateTrackers();
+    co_await updateTrackers();
 
-    updateControllers(uav_state);
+    co_await updateControllers(uav_state);
 
     if (got_constraints_) {
 
@@ -3622,10 +3623,10 @@ void ControlManager::asyncControl(void) {
 
 /* //{ callbackOdometry() */
 
-void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg) {
+mrs_lib::Task<> ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackOdometry");
@@ -3637,7 +3638,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
     std::scoped_lock lock(mutex_uav_state_);
 
     if (uav_state_.header.stamp == msg->header.stamp) {
-      return;
+      co_return;
     }
   }
 
@@ -3645,7 +3646,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
 
   if (!validateOdometry(node_, *msg, "callbackOdometry(): msg")) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "incoming 'odometry' contains invalid values, throwing it away");
-    return;
+    co_return;
   }
 
   // | ---------------------- frame switch ---------------------- |
@@ -3748,7 +3749,7 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
       } else {
         RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "could not transform the odometry speed from '%s' to '%s'", msg->child_frame_id.c_str(),
                               msg->header.frame_id.c_str());
-        return;
+        co_return;
       }
     }
 
@@ -3773,7 +3774,8 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
 
     running_async_control_ = true;
 
-    async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this);
+    /* async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this); */
+    co_await asyncControl();
   }
 }
 
@@ -3781,10 +3783,10 @@ void ControlManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstShared
 
 /* //{ callbackUavState() */
 
-void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg) {
+mrs_lib::Task<> ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackUavState");
@@ -3796,7 +3798,7 @@ void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShared
     std::scoped_lock lock(mutex_uav_state_);
 
     if (uav_state_.header.stamp == msg->header.stamp) {
-      return;
+      co_return;
     }
   }
 
@@ -3804,7 +3806,7 @@ void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShared
 
   if (!validateUavState(node_, *msg, "callbackUavState(): msg")) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "incoming 'uav_state' contains invalid values, throwing it away");
-    return;
+    co_return;
   }
 
   // | -------------------- check for hiccups ------------------- |
@@ -3950,7 +3952,8 @@ void ControlManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShared
 
     running_async_control_ = true;
 
-    async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this);
+    /* async_control_result_ = std::async(std::launch::async, &ControlManager::asyncControl, this); */
+    co_await asyncControl();
   }
 }
 
@@ -4145,10 +4148,10 @@ void ControlManager::callbackHwApiStatus(const mrs_msgs::msg::HwApiStatus::Const
 
 /* //{ callbackRC() */
 
-void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg) {
+mrs_lib::Task<> ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackRC");
@@ -4272,7 +4275,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "triggering escalating failsafe by RC");
 
-        auto [success, message] = escalatingFailsafe();
+        auto [success, message] = co_await escalatingFailsafe();
 
         if (success) {
           rc_escalating_failsafe_triggered_ = true;
@@ -4288,7 +4291,7 @@ void ControlManager::callbackRC(const mrs_msgs::msg::HwApiRcChannels::ConstShare
 
 /* timeoutUavState() //{ */
 
-void ControlManager::timeoutUavState(const double &missing_for) {
+mrs_lib::Task<> ControlManager::timeoutUavState(const double &missing_for) {
 
   auto last_control_output = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
 
@@ -4299,7 +4302,7 @@ void ControlManager::timeoutUavState(const double &missing_for) {
 
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 100, "not receiving uav_state/odometry for %.3f s, initiating failsafe land", missing_for);
 
-    failsafe();
+    co_await failsafe();
   }
 }
 
@@ -4448,11 +4451,11 @@ bool ControlManager::callbackTrackerResetStatic([[maybe_unused]] const std::shar
 
 /* //{ callbackEHover() */
 
-bool ControlManager::callbackEHover([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                    const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+mrs_lib::Task<bool> ControlManager::callbackEHover([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                   const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   if (failsafe_triggered_ || eland_triggered_) {
@@ -4465,28 +4468,28 @@ bool ControlManager::callbackEHover([[maybe_unused]] const std::shared_ptr<std_s
 
     RCLCPP_WARN_STREAM(node_->get_logger(), "" << ss.str());
 
-    return true;
+    co_return true;
   }
 
   RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "ehover trigger by callback");
 
-  auto [success, message] = ehover();
+  auto [success, message] = co_await ehover();
 
   response->success = success;
   response->message = message;
 
-  return true;
+  co_return true;
 }
 
 //}
 
 /* callbackFailsafe() //{ */
 
-bool ControlManager::callbackFailsafe([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                      const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+mrs_lib::Task<bool> ControlManager::callbackFailsafe([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                     const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   if (failsafe_triggered_) {
@@ -4499,35 +4502,35 @@ bool ControlManager::callbackFailsafe([[maybe_unused]] const std::shared_ptr<std
 
     RCLCPP_INFO_STREAM(node_->get_logger(), "" << ss.str());
 
-    return true;
+    co_return true;
   }
 
   RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "failsafe triggered by callback");
 
-  auto [success, message] = failsafe();
+  auto [success, message] = co_await failsafe();
 
   response->success = success;
   response->message = message;
 
-  return true;
+  co_return true;
 }
 
 //}
 
 /* callbackFailsafeEscalating() //{ */
 
-bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                                const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+mrs_lib::Task<bool> ControlManager::callbackFailsafeEscalating([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                               const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   if (_service_escalating_failsafe_enabled_) {
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "escalating failsafe triggered by callback");
 
-    auto [success, message] = escalatingFailsafe();
+    auto [success, message] = co_await escalatingFailsafe();
 
     response->success = success;
     response->message = message;
@@ -4543,39 +4546,39 @@ bool ControlManager::callbackFailsafeEscalating([[maybe_unused]] const std::shar
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "%s", ss.str().c_str());
   }
 
-  return true;
+  co_return true;
 }
 
 //}
 
 /* //{ callbackELand() */
 
-bool ControlManager::callbackEland([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                   const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+mrs_lib::Task<bool> ControlManager::callbackEland([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                  const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "eland triggered by callback");
 
-  auto [success, message] = eland();
+  auto [success, message] = co_await eland();
 
   response->success = success;
   response->message = message;
 
-  return true;
+  co_return true;
 }
 
 //}
 
 /* //{ callbackParachute() */
 
-bool ControlManager::callbackParachute([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                       const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+mrs_lib::Task<bool> ControlManager::callbackParachute([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                      const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   if (!_parachute_enabled_) {
@@ -4589,12 +4592,12 @@ bool ControlManager::callbackParachute([[maybe_unused]] const std::shared_ptr<st
 
   RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "parachute triggered by callback");
 
-  auto [success, message] = deployParachute();
+  auto [success, message] = co_await deployParachute();
 
   response->success = success;
   response->message = message;
 
-  return true;
+  co_return true;
 }
 
 //}
@@ -4668,11 +4671,11 @@ bool ControlManager::callbackToggleOutput(const std::shared_ptr<std_srvs::srv::S
 
 /* callbackArm() //{ */
 
-bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
-                                 const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+mrs_lib::Task<bool> ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
+                                                const std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "arming by service");
@@ -4689,7 +4692,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
     RCLCPP_ERROR_STREAM(node_->get_logger(), "" << ss.str());
     error_publisher_->addOneshotError("Cannot arm/disarm during failsafe or eland");
 
-    return true;
+    co_return true;
   }
 
   if (request->data) {
@@ -4701,7 +4704,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
 
   } else {
 
-    auto [success, message] = arming(false);
+    auto [success, message] = co_await arming(false);
 
     if (success) {
 
@@ -4720,7 +4723,7 @@ bool ControlManager::callbackArm(const std::shared_ptr<std_srvs::srv::SetBool::R
 
   response->message = ss.str();
 
-  return true;
+  co_return true;
 }
 
 //}
@@ -6874,7 +6877,7 @@ mrs_lib::Task<double> ControlManager::getMaxZ(const std::string &frame_id) {
     std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::GetReferenceStampedSrv::Request>();
 
 
-    auto response = sch_get_max_z_.callSync(request);
+    auto response = co_await sch_get_max_z_.callAwaitable(request);
 
     if (!response) {
       RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to get max_z from the safety area timed out");
@@ -7331,18 +7334,18 @@ std::tuple<bool, std::string> ControlManager::hover(void) {
 
 /* //{ ehover() */
 
-std::tuple<bool, std::string> ControlManager::ehover(void) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::ehover(void) {
 
   if (!is_initialized_) {
-    return std::tuple(false, "the ControlManager is not initialized");
+    co_return std::tuple(false, "the ControlManager is not initialized");
   }
 
   if (eland_triggered_) {
-    return std::tuple(false, "cannot ehover, eland already triggered");
+    co_return std::tuple(false, "cannot ehover, eland already triggered");
   }
 
   if (failsafe_triggered_) {
-    return std::tuple(false, "cannot ehover, failsafe already triggered");
+    co_return std::tuple(false, "cannot ehover, failsafe already triggered");
   }
 
   // copy the member variables
@@ -7355,10 +7358,10 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
     ss << "can not trigger ehover while not flying";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
-  ungripSrv();
+  co_await ungripSrv();
 
   {
 
@@ -7372,7 +7375,7 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
       ss << "error during switching to ehover tracker: '" << message << "'";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-      return std::tuple(success, ss.str());
+      co_return std::tuple(success, ss.str());
     }
   }
 
@@ -7395,25 +7398,25 @@ std::tuple<bool, std::string> ControlManager::ehover(void) {
 
   callbacks_enabled_ = false;
 
-  return std::tuple(true, ss.str());
+  co_return std::tuple(true, ss.str());
 }
 
 //}
 
 /* eland() //{ */
 
-std::tuple<bool, std::string> ControlManager::eland(void) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::eland(void) {
 
   if (!is_initialized_) {
-    return std::tuple(false, "the ControlManager is not initialized");
+    co_return std::tuple(false, "the ControlManager is not initialized");
   }
 
   if (eland_triggered_) {
-    return std::tuple(false, "cannot eland, eland already triggered");
+    co_return std::tuple(false, "cannot eland, eland already triggered");
   }
 
   if (failsafe_triggered_) {
-    return std::tuple(false, "cannot eland, failsafe already triggered");
+    co_return std::tuple(false, "cannot eland, failsafe already triggered");
   }
 
   // copy member variables
@@ -7426,14 +7429,14 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     ss << "can not trigger eland while not flying";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   if (_rc_emergency_handoff_) {
 
     toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, disabling output");
+    co_return std::tuple(true, "RC emergency handoff is ON, disabling output");
   }
 
   {
@@ -7447,7 +7450,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
       ss << "error during switching to eland tracker: '" << message << "'";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-      return std::tuple(success, ss.str());
+      co_return std::tuple(success, ss.str());
     }
   }
 
@@ -7469,11 +7472,13 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
   std::stringstream ss;
   bool              success;
 
-  if (elandSrv()) {
+  auto eland_succ = co_await elandSrv();
+
+  if (eland_succ) {
 
     changeLandingState(LANDING_STATE);
 
-    odometryCallbacksSrv(false);
+    co_await odometryCallbacksSrv(false);
 
     ss << "eland activated";
     RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
@@ -7490,14 +7495,14 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     success = false;
   }
 
-  return std::tuple(success, ss.str());
+  co_return std::tuple(success, ss.str());
 }
 
 //}
 
 /* failsafe() //{ */
 
-std::tuple<bool, std::string> ControlManager::failsafe(void) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::failsafe(void) {
 
   // copy member variables
   auto last_control_output   = mrs_lib::get_mutexed(mutex_last_control_output_, last_control_output_);
@@ -7505,11 +7510,11 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
   auto active_tracker_idx    = mrs_lib::get_mutexed(mutex_tracker_list_, active_tracker_idx_);
 
   if (!is_initialized_) {
-    return std::tuple(false, "the ControlManager is not initialized");
+    co_return std::tuple(false, "the ControlManager is not initialized");
   }
 
   if (failsafe_triggered_) {
-    return std::tuple(false, "cannot, failsafe already triggered");
+    co_return std::tuple(false, "cannot, failsafe already triggered");
   }
 
   if (active_tracker_idx == _null_tracker_idx_) {
@@ -7517,23 +7522,26 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
     std::stringstream ss;
     ss << "can not trigger failsafe while not flying";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   if (_rc_emergency_handoff_) {
 
     toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, disabling output");
+    co_return std::tuple(true, "RC emergency handoff is ON, disabling output");
   }
 
   if (getLowestOuput(_hw_api_inputs_) == POSITION) {
-    return eland();
+
+    auto res = co_await eland();
+
+    co_return res;
   }
 
   if (_parachute_enabled_) {
 
-    auto [success, message] = deployParachute();
+    auto [success, message] = co_await deployParachute();
 
     if (success) {
 
@@ -7541,7 +7549,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
       ss << "failsafe activated (parachute): '" << message << "'";
       RCLCPP_INFO_STREAM(node_->get_logger(), "" << ss.str());
 
-      return std::tuple(true, ss.str());
+      co_return std::tuple(true, ss.str());
 
     } else {
 
@@ -7581,7 +7589,7 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
       bumper_enabled_ = false;
 
-      odometryCallbacksSrv(false);
+      co_await odometryCallbacksSrv(false);
 
       callbacks_enabled_ = false;
 
@@ -7605,14 +7613,14 @@ std::tuple<bool, std::string> ControlManager::failsafe(void) {
 
   publishDiagnostics();
 
-  return std::tuple(true, "failsafe activated");
+  co_return std::tuple(true, "failsafe activated");
 }
 
 //}
 
 /* escalatingFailsafe() //{ */
 
-std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::escalatingFailsafe(void) {
 
   std::stringstream ss;
 
@@ -7621,7 +7629,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "too soon for escalating failsafe";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   if (!output_enabled_) {
@@ -7629,7 +7637,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "not escalating failsafe, output is disabled";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   RCLCPP_WARN(node_->get_logger(), "escalating failsafe triggered");
@@ -7651,7 +7659,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "escalating failsafe has run to impossible situation";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    return std::tuple(false, "escalating failsafe has run to impossible situation");
+    co_return std::tuple(false, "escalating failsafe has run to impossible situation");
 
     break;
   }
@@ -7661,13 +7669,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "escalating failsafe escalates to ehover";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    auto [success, message] = ehover();
+    auto [success, message] = co_await ehover();
 
     if (success) {
       state_escalating_failsafe_ = ESC_EHOVER_STATE;
     }
 
-    return {success, message};
+    co_return {success, message};
 
     break;
   }
@@ -7677,13 +7685,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "escalating failsafe escalates to eland";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    auto [success, message] = eland();
+    auto [success, message] = co_await eland();
 
     if (success) {
       state_escalating_failsafe_ = ESC_ELAND_STATE;
     }
 
-    return {success, message};
+    co_return {success, message};
 
     break;
   }
@@ -7695,13 +7703,13 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "escalating failsafe escalates to failsafe";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    auto [success, message] = failsafe();
+    auto [success, message] = co_await failsafe();
 
     if (success) {
       state_escalating_failsafe_ = ESC_FINISHED_STATE;
     }
 
-    return {success, message};
+    co_return {success, message};
 
     break;
   }
@@ -7713,7 +7721,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
     ss << "escalating failsafe has nothing more to do";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
 
-    return std::tuple(false, "escalating failsafe has nothing more to do");
+    co_return std::tuple(false, "escalating failsafe has nothing more to do");
 
     break;
   }
@@ -7726,7 +7734,7 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
   RCLCPP_ERROR(node_->get_logger(), "escalatingFailsafe() reached the final return, this should not happen!");
 
-  return std::tuple(false, "escalating failsafe exception");
+  co_return std::tuple(false, "escalating failsafe exception");
 }
 
 //}
@@ -7930,7 +7938,7 @@ std::tuple<bool, std::string> ControlManager::gotoTrajectoryStart(void) {
 
 /* arming() //{ */
 
-std::tuple<bool, std::string> ControlManager::arming(const bool input) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::arming(const bool input) {
 
   std::stringstream ss;
 
@@ -7938,21 +7946,21 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
     ss << "not allowed to arm using the ControlManager, maybe later when we don't do bugs";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   if (!input && !isOffboard()) {
 
     ss << "can not disarm, not in OFFBOARD mode";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   if (!input && _rc_emergency_handoff_) {
 
     toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, disabling output");
+    co_return std::tuple(true, "RC emergency handoff is ON, disabling output");
   }
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
@@ -7961,7 +7969,7 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for %s", input ? "arming" : "disarming");
 
-  auto response = sch_arming_.callSync(request);
+  auto response = co_await sch_arming_.callAwaitable(request);
 
   if (response) {
 
@@ -7993,14 +8001,14 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
   }
 
-  return std::tuple(response.value()->success, ss.str());
+  co_return std::tuple(response.value()->success, ss.str());
 }
 
 //}
 
 /* odometryCallbacksSrv() //{ */
 
-void ControlManager::odometryCallbacksSrv(const bool input) {
+mrs_lib::Task<> ControlManager::odometryCallbacksSrv(const bool input) {
 
   RCLCPP_INFO(node_->get_logger(), "switching odometry callbacks to %s", input ? "ON" : "OFF");
 
@@ -8008,7 +8016,7 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 
   request->data = input;
 
-  auto response = sch_set_odometry_callbacks_.callSync(request);
+  auto response = co_await sch_set_odometry_callbacks_.callAwaitable(request);
 
   if (response) {
 
@@ -8025,13 +8033,13 @@ void ControlManager::odometryCallbacksSrv(const bool input) {
 
 /* elandSrv() //{ */
 
-bool ControlManager::elandSrv(void) {
+mrs_lib::Task<bool> ControlManager::elandSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for eland");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = sch_eland_.callSync(request);
+  auto response = co_await sch_eland_.callAwaitable(request);
 
   if (response) {
 
@@ -8039,13 +8047,13 @@ bool ControlManager::elandSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for eland returned: '%s'", response.value()->message.c_str());
     }
 
-    return response.value()->success;
+    co_return static_cast<bool>(response.value()->success);
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for eland failed!");
 
-    return false;
+    co_return false;
   }
 }
 
@@ -8053,13 +8061,13 @@ bool ControlManager::elandSrv(void) {
 
 /* parachuteSrv() //{ */
 
-bool ControlManager::parachuteSrv(void) {
+mrs_lib::Task<bool> ControlManager::parachuteSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for parachute deployment");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = sch_parachute_.callSync(request);
+  auto response = co_await sch_parachute_.callAwaitable(request);
 
   if (response) {
 
@@ -8067,13 +8075,13 @@ bool ControlManager::parachuteSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for parachute deployment returned: '%s'", response.value()->message.c_str());
     }
 
-    return response.value()->success;
+    co_return static_cast<bool>(response.value()->success);
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for parachute deployment failed!");
 
-    return false;
+    co_return false;
   }
 }
 
@@ -8081,11 +8089,11 @@ bool ControlManager::parachuteSrv(void) {
 
 /* ungripSrv() //{ */
 
-void ControlManager::ungripSrv(void) {
+mrs_lib::Task<> ControlManager::ungripSrv(void) {
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = sch_ungrip_.callSync(request);
+  auto response = co_await sch_ungrip_.callAwaitable(request);
 
   if (response) {
 
@@ -8423,7 +8431,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
 /* updateTrackers() //{ */
 
-void ControlManager::updateTrackers(void) {
+mrs_lib::Task<> ControlManager::updateTrackers(void) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
@@ -8475,7 +8483,7 @@ void ControlManager::updateTrackers(void) {
     }
 
     if (active_tracker_idx == _null_tracker_idx_) {
-      return;
+      co_return;
     }
   }
 
@@ -8501,7 +8509,7 @@ void ControlManager::updateTrackers(void) {
 
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "the emergency tracker '%s' returned empty or invalid command!",
                             _tracker_names_.at(active_tracker_idx).c_str());
-      failsafe();
+      co_await failsafe();
 
     } else {
 
@@ -8509,11 +8517,11 @@ void ControlManager::updateTrackers(void) {
                             _tracker_names_.at(active_tracker_idx).c_str());
 
       if (_tracker_error_action_ == ELAND_STR) {
-        eland();
+        co_await eland();
       } else if (_tracker_error_action_ == EHOVER_STR) {
-        ehover();
+        co_await ehover();
       } else {
-        failsafe();
+        co_await failsafe();
       }
     }
   }
@@ -8523,7 +8531,7 @@ void ControlManager::updateTrackers(void) {
 
 /* updateControllers() //{ */
 
-void ControlManager::updateControllers(const mrs_msgs::msg::UavState &uav_state) {
+mrs_lib::Task<> ControlManager::updateControllers(const mrs_msgs::msg::UavState &uav_state) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateControllers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateControllers", scope_timer_logger_, scope_timer_enabled_);
@@ -8545,7 +8553,7 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState &uav_state)
       }
     }
 
-    return;
+    co_return;
   }
 
   Controller::ControlOutput control_output;
@@ -8621,13 +8629,13 @@ void ControlManager::updateControllers(const mrs_msgs::msg::UavState &uav_state)
 
         RCLCPP_ERROR(node_->get_logger(), "triggering failsafe, the active controller returned an empty command when eland was active");
 
-        failsafe();
+        co_await failsafe();
 
       } else {
 
         RCLCPP_ERROR(node_->get_logger(), "triggering eland, the active controller returned an empty command");
 
-        eland();
+        co_await eland();
       }
     }
   }
@@ -8760,14 +8768,14 @@ void ControlManager::publish(void) {
 
 /* deployParachute() //{ */
 
-std::tuple<bool, std::string> ControlManager::deployParachute(void) {
+mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::deployParachute(void) {
 
   // if not enabled, return false
   if (!_parachute_enabled_) {
 
     std::stringstream ss;
     ss << "can not deploy parachute, it is disabled";
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   // we can not disarm if the drone is not in offboard mode
@@ -8776,28 +8784,28 @@ std::tuple<bool, std::string> ControlManager::deployParachute(void) {
 
     std::stringstream ss;
     ss << "can not deploy parachute, not in offboard mode";
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 
   // call the parachute service
-  bool succ = parachuteSrv();
+  auto succ = co_await parachuteSrv();
 
   // if the deployment was successful,
   if (succ) {
 
-    arming(false);
+    co_await arming(false);
 
     std::stringstream ss;
     ss << "parachute deployed";
 
-    return std::tuple(true, ss.str());
+    co_return std::tuple(true, ss.str());
 
   } else {
 
     std::stringstream ss;
     ss << "error during deployment of parachute";
 
-    return std::tuple(false, ss.str());
+    co_return std::tuple(false, ss.str());
   }
 }
 
