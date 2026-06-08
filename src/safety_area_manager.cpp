@@ -33,6 +33,7 @@
 #include <limits>
 #include <memory>
 #include <cmath>
+#include <exception>
 
 #include <mrs_msgs/msg/point2_d.hpp>
 #include <mrs_msgs/msg/safety_area_manager_diagnostics.hpp>
@@ -1395,6 +1396,7 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
 
   if (matrix.rows() < 3) {
     RCLCPP_WARN(node_->get_logger(), "Invalid polygon, must have at least 3 points. Provided:  %zu", matrix.rows());
+    return nullptr;
   }
 
   std::vector<mrs_lib::safety_zone::Point2d> points;
@@ -1404,7 +1406,14 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
     points.emplace_back(mrs_lib::safety_zone::Point2d{matrix(i, 0), matrix(i, 1)});
   }
 
-  auto prism = std::make_unique<mrs_lib::safety_zone::Prism>(points, max_z, min_z, horizontal_frame, vertical_frame);
+  std::unique_ptr<mrs_lib::safety_zone::Prism> prism;
+  try {
+    prism = std::make_unique<mrs_lib::safety_zone::Prism>(points, max_z, min_z, horizontal_frame, vertical_frame);
+  }
+  catch (const std::exception &e) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to create prism from message: %s", e.what());
+    return nullptr;
+  }
 
   return prism;
 }
@@ -1419,6 +1428,7 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
 
   if (points.size() < 3) {
     RCLCPP_WARN(node_->get_logger(), "Invalid polygon, must have at least 3 points. Provided:  %zu", points.size());
+    return nullptr;
   }
 
   std::vector<mrs_lib::safety_zone::Point2d> tmp_points;
@@ -1429,7 +1439,14 @@ std::unique_ptr<mrs_lib::safety_zone::Prism> SafetyAreaManager::makePrism(const 
     tmp_points.emplace_back(mrs_lib::safety_zone::Point2d{point.x, point.y});
   }
 
-  auto prism = std::make_unique<mrs_lib::safety_zone::Prism>(tmp_points, max_z, min_z, horizontal_frame, vertical_frame);
+  std::unique_ptr<mrs_lib::safety_zone::Prism> prism;
+  try {
+    prism = std::make_unique<mrs_lib::safety_zone::Prism>(tmp_points, max_z, min_z, horizontal_frame, vertical_frame);
+  }
+  catch (const std::exception &e) {
+    RCLCPP_WARN(node_->get_logger(), "Failed to create prism from message: %s", e.what());
+    return nullptr;
+  }
 
   return prism;
 }
