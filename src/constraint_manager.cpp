@@ -60,6 +60,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_co_timers_;
 
   void initialize();
 
@@ -85,16 +86,17 @@ private:
 
   // | ------------- constraint management ------------- |
 
-  bool setConstraints(std::string constraints_names);
+  mrs_lib::Task<bool> setConstraints(std::string constraints_names);
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> ss_set_constraints_;
 
-  bool callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  mrs_lib::Task<bool> callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                             const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   std::string last_estimator_name_;
   std::mutex  mutex_last_estimator_name_;
 
-  void                       timerConstraintManagement();
+  mrs_lib::Task<>            timerConstraintManagement();
   std::shared_ptr<TimerType> timer_constraint_management_;
   double                     _constraint_management_rate_;
 
@@ -165,10 +167,11 @@ void ConstraintManager::initialize() {
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ConstraintManager", "main");
 
-  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_      = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_sc_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_co_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_timers_    = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   // | ------------------------- params ------------------------- |
 
@@ -310,9 +313,9 @@ void ConstraintManager::initialize() {
 
   // | ------------------------ services ------------------------ |
 
-  ss_set_constraints_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
-      node_, "~/set_constraints_in", std::bind(&ConstraintManager::callbackSetConstraints, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_set_constraints_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(node_, "~/set_constraints_in", &ConstraintManager::callbackSetConstraints, this,
+                                                                             rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+
   ss_constraints_override_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ConstraintsOverride>(
       node_, "~/constraints_override_in", std::bind(&ConstraintManager::callbackConstraintsOverride, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -337,22 +340,28 @@ void ConstraintManager::initialize() {
 
   // | ------------------------- timers ------------------------- |
 
-  mrs_lib::TimerHandlerOptions timer_opts_start;
-
-  timer_opts_start.node           = node_;
-  timer_opts_start.autostart      = true;
-  timer_opts_start.callback_group = cbkgrp_timers_;
 
   {
-    std::function<void()> callback_fcn = std::bind(&ConstraintManager::timerConstraintManagement, this);
+    mrs_lib::TimerHandlerOptions opts;
 
-    timer_constraint_management_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_constraint_management_rate_, clock_), callback_fcn);
+    opts.node           = node_;
+    opts.autostart      = true;
+    opts.callback_group = cbkgrp_co_timers_;
+
+    timer_constraint_management_ =
+        std::make_shared<TimerType>(opts, rclcpp::Rate(_constraint_management_rate_, clock_), &ConstraintManager::timerConstraintManagement, this);
   }
 
   {
+    mrs_lib::TimerHandlerOptions opts;
+
+    opts.node           = node_;
+    opts.autostart      = true;
+    opts.callback_group = cbkgrp_timers_;
+
     std::function<void()> callback_fcn = std::bind(&ConstraintManager::timerDiagnostics, this);
 
-    timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
+    timer_diagnostics_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
   }
 
   // | ------------------------ profiler ------------------------ |
@@ -386,7 +395,7 @@ void ConstraintManager::initialize() {
 
 /* setConstraints() //{ */
 
-bool ConstraintManager::setConstraints(std::string constraints_name) {
+mrs_lib::Task<bool> ConstraintManager::setConstraints(std::string constraints_name) {
 
   std::map<std::string, std::shared_ptr<mrs_msgs::srv::DynamicsConstraintsSrv::Request>>::iterator it;
   it = _constraints_.find(constraints_name);
@@ -394,7 +403,7 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
   if (it == _constraints_.end()) {
     RCLCPP_ERROR(node_->get_logger(), "could not setConstraints(), the constraint name '%s' is not on the list", constraints_name.c_str());
     error_publisher_->addOneshotError("Constraint name '" + constraints_name + "' is not on the list.");
-    return false;
+    co_return false;
   }
 
   auto request = std::make_shared<mrs_msgs::srv::DynamicsConstraintsSrv::Request>(*it->second);
@@ -419,24 +428,24 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
     }
   }
 
-  auto response = sc_set_constraints_.callSync(request);
+  auto response = co_await sc_set_constraints_.callAwaitable(request);
 
   if (!response) {
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the service for setting constraints has failed!");
-    return false;
+    co_return false;
 
   } else {
 
     if (response.value()->success) {
 
       mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
-      return true;
+      co_return true;
 
     } else {
 
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "set service for setting constraints returned: '%s'", response.value()->message.c_str());
-      return false;
+      co_return false;
     }
   }
 }
@@ -451,11 +460,11 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
 
 /* //{ callbackSetConstraints() */
 
-bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
-                                               const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+mrs_lib::Task<bool> ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                                              const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   std::stringstream ss;
@@ -469,7 +478,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
@@ -482,7 +491,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
   if (!stringInVector(request->value, _map_type_allowed_constraints_.at(estimation_diagnostics->current_state_estimator))) {
@@ -493,13 +502,15 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
   override_constraints_ = false;
 
+  auto res = co_await setConstraints(request->value);
+
   // try to set the constraints
-  if (!setConstraints(request->value)) {
+  if (!res) {
 
     ss << "the ControlManager could not set the constraints";
 
@@ -508,7 +519,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
 
   } else {
 
@@ -518,7 +529,7 @@ bool ConstraintManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::s
 
     response->message = ss.str();
     response->success = true;
-    return true;
+    co_return true;
   }
 }
 
@@ -558,10 +569,10 @@ bool ConstraintManager::callbackConstraintsOverride(const std::shared_ptr<mrs_ms
 
 /* timerConstraintManagement() //{ */
 
-void ConstraintManager::timerConstraintManagement() {
+mrs_lib::Task<> ConstraintManager::timerConstraintManagement() {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerConstraintManagement");
@@ -571,7 +582,7 @@ void ConstraintManager::timerConstraintManagement() {
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    return;
+    co_return;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
@@ -603,7 +614,9 @@ void ConstraintManager::timerConstraintManagement() {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the current constraints '%s' are not within the allowed constraints for '%s'",
                              current_constraints.c_str(), estimation_diagnostics->current_state_estimator.c_str());
 
-        if (setConstraints(it->second)) {
+        auto res = co_await setConstraints(it->second);
+
+        if (res) {
 
           last_estimator_name = estimation_diagnostics->current_state_estimator;
 
@@ -624,7 +637,9 @@ void ConstraintManager::timerConstraintManagement() {
 
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 100, "re-setting constraints with user value override");
 
-    if (setConstraints(it->second)) {
+    auto res = co_await setConstraints(it->second);
+
+    if (res) {
       constraints_override_updated_ = false;
     } else {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "could not re-set the constraints!");

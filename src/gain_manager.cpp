@@ -74,6 +74,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_co_timers_;
 
   void initialize();
 
@@ -101,16 +102,17 @@ private:
 
   // | --------------------- gain management -------------------- |
 
-  bool setGains(std::string gains_name);
+  mrs_lib::Task<bool> setGains(std::string gains_name);
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::String> ss_set_gains_;
 
-  bool callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request> request, const std::shared_ptr<mrs_msgs::srv::String::Response> response);
+  mrs_lib::Task<bool> callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                       const std::shared_ptr<mrs_msgs::srv::String::Response> response);
 
   std::string last_estimator_name_;
   std::mutex  mutex_last_estimator_name_;
 
-  void                       timerGainManagement();
+  mrs_lib::Task<>            timerGainManagement();
   std::shared_ptr<TimerType> timer_gain_management_;
   double                     _gain_management_rate_;
 
@@ -169,10 +171,11 @@ void GainManager::initialize() {
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "GainManager", "main");
 
-  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_      = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_sc_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_timers_    = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_co_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
   // | ------------------------- params ------------------------- |
 
@@ -306,9 +309,8 @@ void GainManager::initialize() {
 
   // | ------------------------ services ------------------------ |
 
-  ss_set_gains_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
-      node_, "~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+  ss_set_gains_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(node_, "~/set_gains_in", &GainManager::callbackSetGains, this,
+                                                                       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
   sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out", cbkgrp_sc_);
 
@@ -332,22 +334,28 @@ void GainManager::initialize() {
 
   // | ------------------------- timers ------------------------- |
   //
-  mrs_lib::TimerHandlerOptions timer_opts_start;
-
-  timer_opts_start.node           = node_;
-  timer_opts_start.autostart      = true;
-  timer_opts_start.callback_group = cbkgrp_timers_;
 
   {
-    std::function<void()> callback_fcn = std::bind(&GainManager::timerGainManagement, this);
 
-    timer_gain_management_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_gain_management_rate_, clock_), callback_fcn);
+    mrs_lib::TimerHandlerOptions opts;
+
+    opts.node           = node_;
+    opts.autostart      = true;
+    opts.callback_group = cbkgrp_co_timers_;
+
+    timer_gain_management_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_gain_management_rate_, clock_), &GainManager::timerGainManagement, this);
   }
 
   {
+    mrs_lib::TimerHandlerOptions opts;
+
+    opts.node           = node_;
+    opts.autostart      = true;
+    opts.callback_group = cbkgrp_timers_;
+
     std::function<void()> callback_fcn = std::bind(&GainManager::timerDiagnostics, this);
 
-    timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
+    timer_diagnostics_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_diagnostics_rate_, clock_), callback_fcn);
   }
 
   // | ------------------------ profiler ------------------------ |
@@ -377,14 +385,14 @@ void GainManager::initialize() {
 
 /* setGains() //{ */
 
-bool GainManager::setGains(std::string gains_name) {
+mrs_lib::Task<bool> GainManager::setGains(std::string gains_name) {
 
   std::map<std::string, Gains_t>::iterator it;
   it = _gains_.find(gains_name);
 
   if (it == _gains_.end()) {
     RCLCPP_WARN(node_->get_logger(), "can not set gains for '%s', the mode is not on a list!", gains_name.c_str());
-    return false;
+    co_return false;
   }
 
   auto request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
@@ -545,12 +553,12 @@ bool GainManager::setGains(std::string gains_name) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "setting up gains for '%s'", gains_name.c_str());
 
-  auto response = sc_set_gains_.callSync(request);
+  auto response = co_await sc_set_gains_.callAwaitable(request);
 
   if (!response) {
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the service for setting gains has failed!");
-    return false;
+    co_return false;
 
   } else {
 
@@ -562,7 +570,7 @@ bool GainManager::setGains(std::string gains_name) {
     }
 
     mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
-    return true;
+    co_return true;
   }
 }
 
@@ -576,11 +584,11 @@ bool GainManager::setGains(std::string gains_name) {
 
 /* //{ callbackSetGains() */
 
-bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
-                                   const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
+mrs_lib::Task<bool> GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::Request>  request,
+                                                  const std::shared_ptr<mrs_msgs::srv::String::Response> response) {
 
   if (!is_initialized_) {
-    return false;
+    co_return false;
   }
 
   std::stringstream ss;
@@ -594,7 +602,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
@@ -607,7 +615,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
   if (!stringInVector(request->value, _map_type_allowed_gains_.at(estimation_diagnostics->current_state_estimator))) {
@@ -618,11 +626,13 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
   }
 
+  auto res = co_await setGains(request->value);
+
   // try to set the gains
-  if (!setGains(request->value)) {
+  if (!res) {
 
     ss << "the Se3Controller could not set the gains";
 
@@ -631,7 +641,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     response->message = ss.str();
     response->success = false;
-    return true;
+    co_return true;
 
   } else {
 
@@ -641,7 +651,7 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
     response->message = ss.str();
     response->success = true;
-    return true;
+    co_return true;
   }
 }
 
@@ -653,21 +663,21 @@ bool GainManager::callbackSetGains(const std::shared_ptr<mrs_msgs::srv::String::
 
 /* timerGainManagement() //{ */
 
-void GainManager::timerGainManagement() {
+mrs_lib::Task<> GainManager::timerGainManagement() {
 
   if (!is_initialized_) {
-    return;
+    co_return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("gainManagementTimer");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "GainManager::gainManagementTimer", scope_timer_logger_, scope_timer_enabled_);
 
   if (!sh_estimation_diag_.hasMsg()) {
-    return;
+    co_return;
   }
 
   if (!sh_control_manager_diag_.hasMsg()) {
-    return;
+    co_return;
   }
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
@@ -704,7 +714,9 @@ void GainManager::timerGainManagement() {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the current gains '%s' are not within the allowed gains for '%s'", current_gains.c_str(),
                              estimation_diagnostics->current_state_estimator.c_str());
 
-        if (setGains(it->second)) {
+        auto res = co_await setGains(it->second);
+
+        if (res) {
 
           last_estimator_name = estimation_diagnostics->current_state_estimator;
 

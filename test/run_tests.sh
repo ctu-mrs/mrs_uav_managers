@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 MY_PATH=`pwd`
 
@@ -15,6 +15,6 @@ export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 colcon test-result --delete-yes
 
-colcon test --paths $MY_PATH/.. -p 1 --event-handlers console_direct+
+colcon test --paths $MY_PATH/.. --event-handlers console_direct+
 
 colcon test-result --all --verbose

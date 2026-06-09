@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 while [ ! -e "build/COLCON_IGNORE" ]; do
   cd ..
@@ -13,6 +13,6 @@ export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 colcon test-result --delete-yes
 
-colcon test --packages-select mrs_uav_managers --ctest-args -R 'bumper_with_rc_control' -p 1 --event-handlers console_direct+ console_stderr- console_start_end-
+colcon test --packages-select mrs_uav_managers --ctest-args -R 'escalating_failsafe_rc' --event-handlers console_direct+ console_stderr- console_start_end-
 
 colcon test-result --all --verbose
