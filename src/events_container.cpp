@@ -3,8 +3,7 @@
 #include <rclcpp_components/component_manager_isolated.hpp>
 #include <rclcpp/experimental/executors/events_executor/events_executor.hpp>
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
 
   // 1. Instantiate the Isolated Component Manager, templated with the EventsExecutor
@@ -15,7 +14,7 @@ int main(int argc, char * argv[])
   rclcpp::experimental::executors::EventsExecutor container_executor;
   container_executor.add_node(manager);
 
-  // 3. Spin the container's service thread. 
+  // 3. Spin the container's service thread.
   // As your launch file loads components, the manager will spin up separate threads for them automatically.
   container_executor.spin();
 
