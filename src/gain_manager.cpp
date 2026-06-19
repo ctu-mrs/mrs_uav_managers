@@ -309,8 +309,9 @@ void GainManager::initialize() {
 
   // | ------------------------ services ------------------------ |
 
-  ss_set_gains_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(node_, "~/set_gains_in", &GainManager::callbackSetGains, this,
-                                                                       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_set_gains_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
+      node_, "~/set_gains_in", std::bind(&GainManager::callbackSetGains, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
 
   sc_set_gains_ = mrs_lib::ServiceClientHandler<rcl_interfaces::srv::SetParameters>(node_, "~/set_gains_out", cbkgrp_sc_);
 
@@ -553,7 +554,7 @@ mrs_lib::Task<bool> GainManager::setGains(std::string gains_name) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "setting up gains for '%s'", gains_name.c_str());
 
-  auto response = co_await sc_set_gains_.callAwaitable(request);
+  auto response = sc_set_gains_.callSync(request);
 
   if (!response) {
 

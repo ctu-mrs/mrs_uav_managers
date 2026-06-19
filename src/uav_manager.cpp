@@ -560,15 +560,18 @@ void UavManager::initialize() {
 
   ss_takeoff_ =
       mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/takeoff_in", &UavManager::callbackTakeoff, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_land_ =
-      mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/land_in", &UavManager::callbackLand, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_land_home_         = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/land_home_in", &UavManager::callbackLandHome, this,
-                                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_land_there_        = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/land_there_in", &UavManager::callbackLandThere, this,
-                                                                                            rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_midair_activation_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/midair_activation_in", &UavManager::callbackMidairActivation, this,
-                                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_min_height_check_  = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
+  ss_land_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
+      node_, "~/land_in", std::bind(&UavManager::callbackLand, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_land_home_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
+      node_, "~/land_home_in", std::bind(&UavManager::callbackLandHome, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
+  ss_land_there_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
+      node_, "~/land_there_in", std::bind(&UavManager::callbackLandThere, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
+  ss_midair_activation_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
+      node_, "~/midair_activation_in", std::bind(&UavManager::callbackMidairActivation, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_min_height_check_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/enable_min_height_check_in", std::bind(&UavManager::callbackMinHeightCheck, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
@@ -1737,8 +1740,6 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       timer_takeoff_->start();
 
       takeoff_successful_ = takeoff_successful;
-
-      co_return true;
 
     } else {
 
