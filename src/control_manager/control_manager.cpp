@@ -242,8 +242,12 @@ private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
-  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
-  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_internal_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_public_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_internal_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_public_;
+
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
@@ -931,8 +935,12 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ControlManager", "main");
 
-  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_internal_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_subs_public_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  cbkgrp_ss_internal_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_public_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -942,7 +950,7 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
   shopts.no_message_timeout                  = mrs_lib::no_timeout;
   shopts.threadsafe                          = true;
   shopts.autostart                           = true;
-  shopts.subscription_options.callback_group = cbkgrp_subs_;
+  shopts.subscription_options.callback_group = cbkgrp_subs_internal_;
 
   sh_hw_api_capabilities_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities>(shopts, "~/hw_api_capabilities_in");
 
@@ -1911,116 +1919,124 @@ void ControlManager::initialize(void) {
 
   // | ----------------------- subscribers ---------------------- |
 
-  mrs_lib::SubscriberHandlerOptions shopts;
+  mrs_lib::SubscriberHandlerOptions shopts_internal;
 
-  shopts.node                                = node_;
-  shopts.no_message_timeout                  = mrs_lib::no_timeout;
-  shopts.threadsafe                          = true;
-  shopts.autostart                           = true;
-  shopts.subscription_options.callback_group = cbkgrp_subs_;
+  shopts_internal.node                                = node_;
+  shopts_internal.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts_internal.threadsafe                          = true;
+  shopts_internal.autostart                           = true;
+  shopts_internal.subscription_options.callback_group = cbkgrp_subs_internal_;
+
+  mrs_lib::SubscriberHandlerOptions shopts_public;
+
+  shopts_public.node                                = node_;
+  shopts_public.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts_public.threadsafe                          = true;
+  shopts_public.autostart                           = true;
+  shopts_public.subscription_options.callback_group = cbkgrp_subs_public_;
 
   if (_state_input_ == INPUT_UAV_STATE) {
-    sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "~/uav_state_in", &ControlManager::callbackUavState, this);
+    sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts_internal, "~/uav_state_in", &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETRY) {
-    sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_in", &ControlManager::callbackOdometry, this);
+    sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts_internal, "~/odometry_in", &ControlManager::callbackOdometry, this);
   }
 
   if (_odometry_innovation_check_enabled_) {
-    sh_odometry_innovation_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_innovation_in");
+    sh_odometry_innovation_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts_internal, "~/odometry_innovation_in");
   }
 
-  sh_bumper_           = mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors>(shopts, "~/bumper_sectors_in");
-  sh_max_z_            = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/max_z_in");
-  sh_safety_area_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(shopts, "~/safety_area_diag_in");
-  sh_joystick_         = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts, "~/joystick_in", &ControlManager::callbackJoystick, this);
-  sh_gnss_             = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &ControlManager::callbackGNSS, this);
-  sh_hw_api_rc_        = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
-
-  sh_hw_api_status_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus>(shopts, "~/hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
+  sh_bumper_           = mrs_lib::SubscriberHandler<mrs_msgs::msg::ObstacleSectors>(shopts_internal, "~/bumper_sectors_in");
+  sh_max_z_            = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts_internal, "~/max_z_in");
+  sh_safety_area_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(shopts_internal, "~/safety_area_diag_in");
+  sh_joystick_         = mrs_lib::SubscriberHandler<sensor_msgs::msg::Joy>(shopts_public, "~/joystick_in", &ControlManager::callbackJoystick, this);
+  sh_gnss_             = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts_internal, "~/gnss_in", &ControlManager::callbackGNSS, this);
+  sh_hw_api_rc_        = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcChannels>(shopts_internal, "~/hw_api_rc_in", &ControlManager::callbackRC, this);
+  sh_hw_api_status_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiStatus>(shopts_internal, "~/hw_api_status_in", &ControlManager::callbackHwApiStatus, this);
 
   // | -------------------- general services -------------------- |
 
   ss_switch_tracker_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
       node_, "~/switch_tracker_in", std::bind(&ControlManager::callbackSwitchTracker, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
   ss_switch_controller_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::String>(
       node_, "~/switch_controller_in", std::bind(&ControlManager::callbackSwitchController, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
   ss_reset_tracker_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/tracker_reset_static_in", std::bind(&ControlManager::callbackTrackerResetStatic, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
   ss_hover_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/hover_in", std::bind(&ControlManager::callbackHover, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
   ss_ehover_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/ehover_in", std::bind(&ControlManager::callbackEHover, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_internal_);
   ss_failsafe_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/failsafe_in", std::bind(&ControlManager::callbackFailsafe, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_internal_);
   ss_failsafe_escalating_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/failsafe_escalating_in", std::bind(&ControlManager::callbackFailsafeEscalating, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
   ss_toggle_output_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/toggle_output_in", std::bind(&ControlManager::callbackToggleOutput, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_arm_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
-      node_, "~/arm_in", std::bind(&ControlManager::callbackArm, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
+  ss_arm_              = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(node_, "~/arm_in",
+                                                                               std::bind(&ControlManager::callbackArm, this, std::placeholders::_1, std::placeholders::_2),
+                                                                               rclcpp::SystemDefaultsQoS(), cbkgrp_ss_internal_);
   ss_enable_callbacks_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/enable_callbacks_in", std::bind(&ControlManager::callbackEnableCallbacks, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_set_constraints_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::DynamicsConstraintsSrv>(
       node_, "~/set_constraints_in", std::bind(&ControlManager::callbackSetConstraints, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_use_joystick_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/use_joystick_in", std::bind(&ControlManager::callbackUseJoystick, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_eland_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/eland_in", std::bind(&ControlManager::callbackEland, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_internal_);
   ss_parachute_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/parachute_in", std::bind(&ControlManager::callbackParachute, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_internal_);
   ss_transform_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TransformReferenceSrv>(
       node_, "~/transform_reference_in", std::bind(&ControlManager::callbackTransformReference, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_transform_reference_array_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TransformReferenceArraySrv>(
       node_, "~/transform_reference_array_in", std::bind(&ControlManager::callbackTransformReferenceArray, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_transform_pose_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TransformPoseSrv>(
       node_, "~/transform_pose_in", std::bind(&ControlManager::callbackTransformPose, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_transform_vector3_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TransformVector3Srv>(
       node_, "~/transform_vector3_in", std::bind(&ControlManager::callbackTransformVector3, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_bumper_enabler_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/bumper_in", std::bind(&ControlManager::callbackEnableBumper, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
   ss_get_min_z_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetFloat64>(
       node_, "~/get_min_z_in", std::bind(&ControlManager::callbackGetMinZ, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
   ss_validate_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReference>(
       node_, "~/validate_reference_in", std::bind(&ControlManager::callbackValidateReference, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_validate_reference_2d_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReference>(
       node_, "~/validate_reference_2d_in", std::bind(&ControlManager::callbackValidateReference2d, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_validate_reference_array_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReferenceArray>(
       node_, "~/validate_reference_array_in", std::bind(&ControlManager::callbackValidateReferenceArray, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_start_trajectory_tracking_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/start_trajectory_tracking_in", std::bind(&ControlManager::callbackStartTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_stop_trajectory_tracking_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/stop_trajectory_tracking_in", std::bind(&ControlManager::callbackStopTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_resume_trajectory_tracking_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/resume_trajectory_tracking_in",
       std::bind(&ControlManager::callbackResumeTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
   ss_goto_trajectory_start_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/goto_trajectory_start_in", std::bind(&ControlManager::callbackGotoTrajectoryStart, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
 
   sch_arming_                  = mrs_lib::ServiceClientHandler<std_srvs::srv::SetBool>(node_, "~/hw_api_arming_out", cbkgrp_sc_);
   sch_eland_                   = mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>(node_, "~/eland_out", cbkgrp_sc_);
@@ -2043,46 +2059,46 @@ void ControlManager::initialize(void) {
   // human callable
   ss_goto_     = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
                                                                     std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
-                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
       node_, "~/goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
   ss_goto_relative_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
       node_, "~/goto_relative_in", std::bind(&ControlManager::callbackGotoRelative, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_goto_altitude_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
       node_, "~/goto_altitude_in", std::bind(&ControlManager::callbackGotoAltitude, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_goto_heading_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
       node_, "~/set_heading_in", std::bind(&ControlManager::callbackSetHeading, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_set_heading_relative_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
       node_, "~/set_heading_relative_in", std::bind(&ControlManager::callbackSetHeadingRelative, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
 
   ss_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
       node_, "~/reference_in", std::bind(&ControlManager::callbackReferenceService, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  sh_reference_          = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts, "~/reference_in", &ControlManager::callbackReferenceTopic, this);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
+  sh_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts_public, "~/reference_in", &ControlManager::callbackReferenceTopic, this);
   ss_velocity_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::VelocityReferenceStampedSrv>(
       node_, "~/velocity_reference_in", std::bind(&ControlManager::callbackVelocityReferenceService, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  sh_velocity_reference_   = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts, "~/velocity_reference_in",
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
+  sh_velocity_reference_   = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts_public, "~/velocity_reference_in",
                                                                                                  &ControlManager::callbackVelocityReferenceTopic, this);
   ss_trajectory_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TrajectoryReferenceSrv>(
       node_, "~/trajectory_reference_in", std::bind(&ControlManager::callbackTrajectoryReferenceService, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  sh_trajectory_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts, "~/trajectory_reference_in",
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
+  sh_trajectory_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts_public, "~/trajectory_reference_in",
                                                                                             &ControlManager::callbackTrajectoryReferenceTopic, this);
 
   // | --------------------- other services --------------------- |
 
   ss_emergency_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
       node_, "~/emergency_reference_in", std::bind(&ControlManager::callbackEmergencyReference, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_public_);
   ss_pirouette_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/pirouette_in", std::bind(&ControlManager::callbackPirouette, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
-      cbkgrp_ss_);
+      cbkgrp_ss_public_);
 
   // | ------------------------- timers ------------------------- |
 
