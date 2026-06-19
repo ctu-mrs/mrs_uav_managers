@@ -358,7 +358,7 @@ def generate_launch_description():
         namespace=uav_name,
         name=namespace+'_container',
         package='rclcpp_components',
-        executable='component_container_mt',
+        executable='component_container_events_cbg',
         output="screen",
         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         # prefix=["valgrind --gen-suppressions=all --suppressions=/home/klaxalk/ws_bug/valgrind.supp --leak-check=full --track-origins=yes --verbose --log-file=/tmp/valgrind.txt"],
