@@ -164,14 +164,11 @@ public:
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>             ss_min_height_check_;
 
   // service callbacks
-  mrs_lib::Task<bool> callbackTakeoff(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                      const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  mrs_lib::Task<bool> callbackLand(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  mrs_lib::Task<bool> callbackLandHome(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                       const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  mrs_lib::Task<bool> callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                        const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackTakeoff(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackLand(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackLandHome(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  bool callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                         const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   // service clients
   mrs_lib::ServiceClientHandler<mrs_msgs::srv::Vec1>                sch_takeoff_;
@@ -189,19 +186,19 @@ public:
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger>             sch_offboard_;
 
   // service client wrappers
-  mrs_lib::Task<bool> takeoffSrv(void);
-  mrs_lib::Task<bool> switchTrackerSrv(const std::string &tracker);
-  mrs_lib::Task<bool> switchControllerSrv(const std::string &controller);
-  mrs_lib::Task<bool> landSrv(void);
-  mrs_lib::Task<bool> elandSrv(void);
-  mrs_lib::Task<bool> ehoverSrv(void);
-  mrs_lib::Task<void> disarmSrv(void);
-  mrs_lib::Task<bool> emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal);
-  mrs_lib::Task<void> setOdometryCallbacksSrv(const bool &input);
-  mrs_lib::Task<void> setControlCallbacksSrv(const bool &input);
-  mrs_lib::Task<void> ungripSrv(void);
-  mrs_lib::Task<bool> toggleControlOutput(const bool &input);
-  mrs_lib::Task<bool> offboardSrv(const bool in);
+  bool takeoffSrv(void);
+  bool switchTrackerSrv(const std::string &tracker);
+  bool switchControllerSrv(const std::string &controller);
+  bool landSrv(void);
+  bool elandSrv(void);
+  bool ehoverSrv(void);
+  void disarmSrv(void);
+  bool emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal);
+  void setOdometryCallbacksSrv(const bool &input);
+  void setControlCallbacksSrv(const bool &input);
+  void ungripSrv(void);
+  bool toggleControlOutput(const bool &input);
+  bool offboardSrv(const bool in);
 
   std::shared_ptr<TimerType> timer_takeoff_;
   std::shared_ptr<TimerType> timer_max_height_;
@@ -213,13 +210,13 @@ public:
   std::shared_ptr<TimerType> timer_midair_activation_;
 
   // timer callbacks
-  mrs_lib::Task<> timerLanding();
-  mrs_lib::Task<> timerTakeoff();
-  mrs_lib::Task<> timerMaxHeight();
-  mrs_lib::Task<> timerMinHeight();
-  mrs_lib::Task<> timerFlightTime();
-  mrs_lib::Task<> timerMaxthrottle();
-  mrs_lib::Task<> timerDiagnostics();
+  void timerLanding();
+  void timerTakeoff();
+  void timerMaxHeight();
+  void timerMinHeight();
+  void timerFlightTime();
+  void timerMaxthrottle();
+  void timerDiagnostics();
 
   // publishers
   mrs_lib::PublisherHandler<mrs_msgs::msg::UavManagerDiagnostics> ph_diag_;
@@ -249,9 +246,9 @@ public:
   bool _gain_manager_required_       = false;
   bool _constraint_manager_required_ = false;
 
-  mrs_lib::Task<std::tuple<bool, std::string>> landImpl(void);
-  mrs_lib::Task<std::tuple<bool, std::string>> landWithDescendImpl(void);
-  mrs_lib::Task<std::tuple<bool, std::string>> midairActivationImpl(void);
+  std::tuple<bool, std::string> landImpl(void);
+  std::tuple<bool, std::string> landWithDescendImpl(void);
+  std::tuple<bool, std::string> midairActivationImpl(void);
 
   // saved takeoff coordinates and allows to land there again
   mrs_msgs::msg::ReferenceStamped land_there_reference_;
@@ -324,10 +321,10 @@ public:
   bool              _profiler_enabled_ = false;
 
   // midair activation
-  mrs_lib::Task<>     timerMidairActivation();
-  mrs_lib::Task<bool> callbackMidairActivation(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
-                                               const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
-  rclcpp::Time        midair_activation_started_;
+  void         timerMidairActivation();
+  bool         callbackMidairActivation(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                        const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+  rclcpp::Time midair_activation_started_;
 
   bool callbackMinHeightCheck(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
@@ -350,10 +347,10 @@ UavManager::UavManager(rclcpp::NodeOptions options) : mrs_lib::Node("uav_manager
   clock_ = node_->get_clock();
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "UavManager", "main");
-  cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_ss_       = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_sc_       = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
@@ -558,8 +555,9 @@ void UavManager::initialize() {
 
   // | --------------------- service servers -------------------- |
 
-  ss_takeoff_ =
-      mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(node_, "~/takeoff_in", &UavManager::callbackTakeoff, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_takeoff_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
+      node_, "~/takeoff_in", std::bind(&UavManager::callbackTakeoff, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
   ss_land_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/land_in", std::bind(&UavManager::callbackLand, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_land_home_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
@@ -613,43 +611,68 @@ void UavManager::initialize() {
   timer_opts_no_start.autostart      = false;
   timer_opts_no_start.callback_group = cbkgrp_timers_;
 
-
-  timer_landing_     = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_landing_timer_rate_, clock_), &UavManager::timerLanding, this);
-  timer_takeoff_     = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_takeoff_timer_rate_, clock_), &UavManager::timerTakeoff, this);
-  timer_flighttime_  = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_flighttime_timer_rate_, clock_), &UavManager::timerFlightTime, this);
-  timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_timer_rate_, clock_), &UavManager::timerDiagnostics, this);
-  timer_midair_activation_ =
-      std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_midair_activation_timer_rate_, clock_), &UavManager::timerMidairActivation, this);
-
   {
-    mrs_lib::TimerHandlerOptions opts;
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerLanding, this);
 
-    opts.node           = node_;
-    opts.autostart      = _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor;
-    opts.callback_group = cbkgrp_timers_;
-
-    timer_max_height_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_max_height_checking_rate_, clock_), &UavManager::timerMaxHeight, this);
+    timer_landing_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_landing_timer_rate_, clock_), callback_fcn);
   }
 
   {
-    mrs_lib::TimerHandlerOptions opts;
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerTakeoff, this);
 
-    opts.node           = node_;
-    opts.autostart      = min_height_check_ && hw_api_capabilities_.produces_distance_sensor;
-    opts.callback_group = cbkgrp_timers_;
-
-    timer_min_height_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_min_height_checking_rate_, clock_), &UavManager::timerMinHeight, this);
+    timer_takeoff_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_takeoff_timer_rate_, clock_), callback_fcn);
   }
 
   {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerFlightTime, this);
+
+    timer_flighttime_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_flighttime_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerDiagnostics, this);
+
+    timer_diagnostics_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_diagnostics_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerMidairActivation, this);
+
+    timer_midair_activation_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_midair_activation_timer_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerMaxHeight, this);
+
+    mrs_lib::TimerHandlerOptions opts;
+
+    opts.node      = node_;
+    opts.autostart = _max_height_enabled_ && hw_api_capabilities_.produces_distance_sensor;
+
+    timer_max_height_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_max_height_checking_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerMinHeight, this);
+
+    mrs_lib::TimerHandlerOptions opts;
+
+    opts.node      = node_;
+    opts.autostart = min_height_check_ && hw_api_capabilities_.produces_distance_sensor;
+
+    timer_min_height_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_min_height_checking_rate_, clock_), callback_fcn);
+  }
+
+  {
+    std::function<void()> callback_fcn = std::bind(&UavManager::timerMaxthrottle, this);
+
     mrs_lib::TimerHandlerOptions opts;
 
     opts.node      = node_;
     opts.autostart = hw_api_capabilities_.accepts_actuator_cmd || hw_api_capabilities_.accepts_control_group_cmd ||
                      hw_api_capabilities_.accepts_attitude_rate_cmd || hw_api_capabilities_.accepts_attitude_cmd;
-    opts.callback_group = cbkgrp_timers_;
 
-    timer_maxthrottle_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_maxthrottle_timer_rate_, clock_), &UavManager::timerMaxthrottle, this);
+    timer_maxthrottle_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_maxthrottle_timer_rate_, clock_), callback_fcn);
   }
 
   // | ----------------------- finish init ---------------------- |
@@ -735,10 +758,10 @@ void UavManager::timerHwApiCapabilities() {
 
 /* //{ timerLanding() */
 
-mrs_lib::Task<> UavManager::timerLanding() {
+void UavManager::timerLanding() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerLanding");
@@ -767,12 +790,12 @@ mrs_lib::Task<> UavManager::timerLanding() {
 
     RCLCPP_ERROR(node_->get_logger(), "could not transform the reference into the current frame! land by yourself pls.");
     error_publisher_->addOneshotError("Could not transform the landing reference into the current frame. Perform manual landing.");
-    co_return;
+    return;
   }
 
   if (current_state_landing_ == IDLE_STATE) {
 
-    co_return;
+    return;
 
   } else if (current_state_landing_ == GOTO_STATE) {
 
@@ -788,13 +811,13 @@ mrs_lib::Task<> UavManager::timerLanding() {
     catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
       error_publisher_->addOneshotError("Could not get heading from landing reference orientation.");
-      co_return;
+      return;
     }
 
     if (mrs_lib::geometry::dist(vec3_t(pos_x, pos_y, pos_z), vec3_t(ref_x, ref_y, ref_z)) < _landing_tracking_tolerance_translation_ &&
         fabs(radians::diff(pos_heading, ref_heading)) < _landing_tracking_tolerance_heading_) {
 
-      auto [success, message] = co_await landWithDescendImpl();
+      auto [success, message] = landWithDescendImpl();
 
       if (!success) {
 
@@ -840,7 +863,7 @@ mrs_lib::Task<> UavManager::timerLanding() {
         reference_out.reference       = land_there_reference_.reference;
       }
 
-      co_await emergencyReferenceSrv(reference_out);
+      emergencyReferenceSrv(reference_out);
     }
 
   } else if (current_state_landing_ == LANDING_STATE) {
@@ -874,15 +897,15 @@ mrs_lib::Task<> UavManager::timerLanding() {
 
         if (throttle_under_threshold_ && ((clock_->now() - throttle_mass_estimate_first_time_).seconds() > _landing_cutoff_mass_timeout_)) {
 
-          co_await switchTrackerSrv(_null_tracker_name_);
+          switchTrackerSrv(_null_tracker_name_);
 
-          co_await setControlCallbacksSrv(true);
+          setControlCallbacksSrv(true);
 
           if (_landing_disarm_) {
 
             RCLCPP_INFO(node_->get_logger(), "disarming after landing");
 
-            co_await disarmSrv();
+            disarmSrv();
           }
 
           changeLandingState(IDLE_STATE);
@@ -919,15 +942,15 @@ mrs_lib::Task<> UavManager::timerLanding() {
 
         if (velocity_under_threshold_ && ((clock_->now() - velocity_under_threshold_first_time_).seconds() > 3.0)) {
 
-          co_await switchTrackerSrv(_null_tracker_name_);
+          switchTrackerSrv(_null_tracker_name_);
 
-          co_await setControlCallbacksSrv(true);
+          setControlCallbacksSrv(true);
 
           if (_landing_disarm_) {
 
             RCLCPP_INFO(node_->get_logger(), "disarming after landing");
 
-            co_await disarmSrv();
+            disarmSrv();
           }
 
           changeLandingState(IDLE_STATE);
@@ -949,10 +972,10 @@ mrs_lib::Task<> UavManager::timerLanding() {
 
 /* //{ timerTakeoff() */
 
-mrs_lib::Task<> UavManager::timerTakeoff() {
+void UavManager::timerTakeoff() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerTakeoff");
@@ -970,7 +993,7 @@ mrs_lib::Task<> UavManager::timerTakeoff() {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for takeoff confirmation from the ControlManager");
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
 
-      co_return;
+      return;
     }
   }
 
@@ -987,7 +1010,7 @@ mrs_lib::Task<> UavManager::timerTakeoff() {
       catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
         RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
         error_publisher_->addOneshotError("Could not get heading during takeoff.");
-        co_return;
+        return;
       }
       // this is needed for land_home to work with vins_kickoff estimator
       // if there are any problems with this, it shoud be sufficient to only overwrite the frame_id, without the position and heading here
@@ -1002,11 +1025,11 @@ mrs_lib::Task<> UavManager::timerTakeoff() {
 
       RCLCPP_INFO(node_->get_logger(), "take off finished, switching to %s", _after_takeoff_tracker_name_.c_str());
 
-      co_await switchTrackerSrv(_after_takeoff_tracker_name_);
+      switchTrackerSrv(_after_takeoff_tracker_name_);
 
-      co_await switchControllerSrv(_after_takeoff_controller_name_);
+      switchControllerSrv(_after_takeoff_controller_name_);
 
-      co_await setOdometryCallbacksSrv(true);
+      setOdometryCallbacksSrv(true);
 
       timer_takeoff_->stop();
     }
@@ -1017,10 +1040,10 @@ mrs_lib::Task<> UavManager::timerTakeoff() {
 
 /* //{ timerMaxHeight() */
 
-mrs_lib::Task<> UavManager::timerMaxHeight() {
+void UavManager::timerMaxHeight() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerMaxHeight");
@@ -1044,14 +1067,13 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
     if (!sh_odometry_.hasMsg()) {
       error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
     }
-
-    co_return;
+    return;
   }
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
   if (!fixing_max_height_ && !control_manager_diag->flying_normally) {
-    co_return;
+    return;
   }
 
   auto   odometry = sh_odometry_.getMsg();
@@ -1070,7 +1092,7 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
     max_z_in_height = res->point.z;
   } else {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "timerMaxHeight() not working, cannot transform max z to the height frame");
-    co_return;
+    return;
   }
 
   auto [odometry_x, odometry_y, odometry_z] = mrs_lib::getPosition(odometry);
@@ -1082,7 +1104,7 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
   catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
     error_publisher_->addOneshotError("Could not get heading during max height checking.");
-    co_return;
+    return;
   }
 
   if (height > max_z_in_height) {
@@ -1099,9 +1121,9 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
 
     reference_out.reference.heading = odometry_heading;
 
-    co_await setControlCallbacksSrv(false);
+    setControlCallbacksSrv(false);
 
-    auto success = co_await emergencyReferenceSrv(reference_out);
+    bool success = emergencyReferenceSrv(reference_out);
 
     if (success) {
 
@@ -1113,13 +1135,13 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
 
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "could not descend");
       error_publisher_->addOneshotError("Could not descend during max height checking.");
-      co_await setControlCallbacksSrv(true);
+      setControlCallbacksSrv(true);
     }
   }
 
   if (fixing_max_height_ && height < max_z_in_height) {
 
-    co_await setControlCallbacksSrv(true);
+    setControlCallbacksSrv(true);
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "safe height reached");
 
@@ -1131,10 +1153,10 @@ mrs_lib::Task<> UavManager::timerMaxHeight() {
 
 /* //{ timerMinHeight() */
 
-mrs_lib::Task<> UavManager::timerMinHeight() {
+void UavManager::timerMinHeight() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   RCLCPP_INFO_ONCE(node_->get_logger(), "min height timer spinning");
@@ -1157,13 +1179,13 @@ mrs_lib::Task<> UavManager::timerMinHeight() {
       error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
     }
 
-    co_return;
+    return;
   }
 
   auto control_manager_diag = sh_control_manager_diag_.getMsg();
 
   if (!fixing_min_height_ && !control_manager_diag->flying_normally) {
-    co_return;
+    return;
   }
 
   auto   odometry = sh_odometry_.getMsg();
@@ -1179,7 +1201,7 @@ mrs_lib::Task<> UavManager::timerMinHeight() {
   catch (mrs_lib::AttitudeConverter::GetHeadingException &e) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "exception caught: '%s'", e.what());
     error_publisher_->addOneshotError("Could not get heading during min height checking.");
-    co_return;
+    return;
   }
 
   if (height < _min_height_) {
@@ -1196,9 +1218,9 @@ mrs_lib::Task<> UavManager::timerMinHeight() {
 
     reference_out.reference.heading = odometry_heading;
 
-    co_await setControlCallbacksSrv(false);
+    setControlCallbacksSrv(false);
 
-    bool success = co_await emergencyReferenceSrv(reference_out);
+    bool success = emergencyReferenceSrv(reference_out);
 
     if (success) {
 
@@ -1210,13 +1232,13 @@ mrs_lib::Task<> UavManager::timerMinHeight() {
 
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "could not ascend");
 
-      co_await setControlCallbacksSrv(true);
+      setControlCallbacksSrv(true);
     }
   }
 
   if (fixing_min_height_ && height > _min_height_) {
 
-    co_await setControlCallbacksSrv(true);
+    setControlCallbacksSrv(true);
 
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "safe height reached");
 
@@ -1228,10 +1250,10 @@ mrs_lib::Task<> UavManager::timerMinHeight() {
 
 /* //{ timerFlightTime() */
 
-mrs_lib::Task<> UavManager::timerFlightTime() {
+void UavManager::timerFlightTime() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerFlightTime");
@@ -1254,7 +1276,7 @@ mrs_lib::Task<> UavManager::timerFlightTime() {
 
       RCLCPP_INFO(node_->get_logger(), "max flight time reached, landing");
 
-      co_await landImpl();
+      landImpl();
     }
   }
 
@@ -1265,14 +1287,14 @@ mrs_lib::Task<> UavManager::timerFlightTime() {
 
 /* //{ timerMaxthrottle() */
 
-mrs_lib::Task<> UavManager::timerMaxthrottle() {
+void UavManager::timerMaxthrottle() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   if (!sh_throttle_.hasMsg() || (clock_->now() - sh_throttle_.lastMsgTime()).seconds() > 1.0) {
-    co_return;
+    return;
   }
 
   RCLCPP_INFO_ONCE(node_->get_logger(), "max throttle timer spinning");
@@ -1306,7 +1328,7 @@ mrs_lib::Task<> UavManager::timerMaxthrottle() {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "throttle over threshold (%.2f/%.2f) for more than %.2f s, ungripping payload", desired_throttle,
                          _maxthrottle_max_throttle_, _maxthrottle_ungrip_timeout_);
 
-    co_await ungripSrv();
+    ungripSrv();
   }
 
   if (maxthrottle_above_threshold_ && (clock_->now() - maxthrottle_first_time_).seconds() > _maxthrottle_eland_timeout_) {
@@ -1317,7 +1339,7 @@ mrs_lib::Task<> UavManager::timerMaxthrottle() {
                           desired_throttle, _maxthrottle_max_throttle_, _maxthrottle_eland_timeout_);
     error_publisher_->addOneshotError("Maxthrottle timer: throttle over threshold for too long, calling for emergency landing.");
 
-    co_await elandSrv();
+    elandSrv();
   }
 }
 
@@ -1325,10 +1347,10 @@ mrs_lib::Task<> UavManager::timerMaxthrottle() {
 
 /* //{ timerDiagnostics() */
 
-mrs_lib::Task<> UavManager::timerDiagnostics() {
+void UavManager::timerDiagnostics() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerDiagnostics");
@@ -1397,10 +1419,10 @@ mrs_lib::Task<> UavManager::timerDiagnostics() {
 
 /* //{ timerMidairActivation() */
 
-mrs_lib::Task<> UavManager::timerMidairActivation() {
+void UavManager::timerMidairActivation() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 100, "waiting for OFFBOARD");
@@ -1409,43 +1431,43 @@ mrs_lib::Task<> UavManager::timerMidairActivation() {
 
     RCLCPP_INFO(node_->get_logger(), "OFFBOARD detected");
 
-    co_await setOdometryCallbacksSrv(true);
+    setOdometryCallbacksSrv(true);
 
     {
-      bool controller_switched = co_await switchControllerSrv(_midair_activation_after_controller_);
+      bool controller_switched = switchControllerSrv(_midair_activation_after_controller_);
 
       if (!controller_switched) {
 
         RCLCPP_ERROR(node_->get_logger(), "could not activate '%s'", _midair_activation_after_controller_.c_str());
         error_publisher_->addOneshotError("Could not activate controller '" + _midair_activation_after_controller_ + "' after midair activation.");
 
-        co_await ehoverSrv();
+        ehoverSrv();
 
         timer_midair_activation_->stop();
 
-        co_return;
+        return;
       }
     }
 
     {
-      bool tracker_switched = co_await switchTrackerSrv(_midair_activation_after_tracker_);
+      bool tracker_switched = switchTrackerSrv(_midair_activation_after_tracker_);
 
       if (!tracker_switched) {
 
         RCLCPP_ERROR(node_->get_logger(), "could not activate '%s'", _midair_activation_after_tracker_.c_str());
         error_publisher_->addOneshotError("Could not activate tracker '" + _midair_activation_after_tracker_ + "' after midair activation.");
 
-        co_await ehoverSrv();
+        ehoverSrv();
 
         timer_midair_activation_->stop();
 
-        co_return;
+        return;
       }
     }
 
     timer_midair_activation_->stop();
 
-    co_return;
+    return;
   }
 
   if ((clock_->now() - midair_activation_started_).seconds() > 0.5) {
@@ -1453,11 +1475,11 @@ mrs_lib::Task<> UavManager::timerMidairActivation() {
     RCLCPP_ERROR(node_->get_logger(), "waiting for OFFBOARD timeouted, reverting");
     error_publisher_->addOneshotError("Waiting for OFFBOARD during midair activation timeouted, reverting to ehover.");
 
-    co_await toggleControlOutput(false);
+    toggleControlOutput(false);
 
     timer_midair_activation_->stop();
 
-    co_return;
+    return;
   }
 }
 
@@ -1502,12 +1524,11 @@ void UavManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr 
 
 /* //{ callbackTakeoff() */
 
-mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                                const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
-
+bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                 const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "takeoff called by service");
@@ -1523,7 +1544,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).seconds() > 5.0) {
@@ -1532,7 +1553,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_hw_api_status_.getMsg()->armed) {
@@ -1541,7 +1562,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addOneshotError("Cannot takeoff, UAV not armed!");
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_hw_api_status_.getMsg()->offboard) {
@@ -1550,7 +1571,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addOneshotError("Cannot takeoff, UAV not in OFFBOARD mode!");
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     {
@@ -1560,7 +1581,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
         error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
 
       if (_null_tracker_name_ != sh_control_manager_diag_.getMsg()->active_tracker) {
@@ -1569,7 +1590,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
         error_publisher_->addOneshotError("Cannot takeoff, NullTracker is not active!");
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
 
@@ -1579,7 +1600,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (_gain_manager_required_ && (!sh_gains_diag_.hasMsg() || (clock_->now() - sh_gains_diag_.lastMsgTime()).seconds() > 5.0)) {
@@ -1588,7 +1609,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addWaitingForNodeError({"GainManager", "main"});
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (_constraint_manager_required_ && (!sh_constraints_diag_.hasMsg() || (clock_->now() - sh_constraints_diag_.lastMsgTime()).seconds() > 5.0)) {
@@ -1597,7 +1618,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addWaitingForNodeError({"ConstraintManager", "main"});
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_control_manager_diag_.getMsg()->output_enabled) {
@@ -1607,7 +1628,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       error_publisher_->addOneshotError("Cannot takeoff, Control Manager's output is disabled!");
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (number_of_takeoffs_ > 0) {
@@ -1622,7 +1643,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
         error_publisher_->addOneshotError("Cannot takeoff, estimated mass difference is too large in " + _null_tracker_name_ + "!");
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
   }
@@ -1645,17 +1666,17 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
     response->message = ss.str();
     response->success = false;
-    co_return true;
+    return true;
   }
 
   RCLCPP_INFO(node_->get_logger(), "taking off");
 
-  co_await setOdometryCallbacksSrv(false);
+  setOdometryCallbacksSrv(false);
 
   // activating the takeoff controller
   {
     std::string old_controller      = sh_control_manager_diag_.getMsg()->active_controller;
-    bool        controller_switched = co_await switchControllerSrv(_takeoff_controller_name_);
+    bool        controller_switched = switchControllerSrv(_takeoff_controller_name_);
 
     // if it fails, activate back the old controller
     // this is no big deal since the control outputs are not used
@@ -1669,17 +1690,17 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       response->success = false;
       response->message = ss.str();
 
-      co_await toggleControlOutput(false);
-      co_await disarmSrv();
+      toggleControlOutput(false);
+      disarmSrv();
 
-      co_return true;
+      return true;
     }
   }
 
   // activate the takeoff tracker
   {
     std::string old_tracker      = sh_control_manager_diag_.getMsg()->active_tracker;
-    bool        tracker_switched = co_await switchTrackerSrv(_takeoff_tracker_name_);
+    bool        tracker_switched = switchTrackerSrv(_takeoff_tracker_name_);
 
     // if it fails, activate back the old tracker
     if (!tracker_switched) {
@@ -1691,10 +1712,10 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       response->success = false;
       response->message = ss.str();
 
-      co_await toggleControlOutput(false);
-      co_await disarmSrv();
+      toggleControlOutput(false);
+      disarmSrv();
 
-      co_return true;
+      return true;
     }
   }
 
@@ -1708,7 +1729,7 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
 
   // call the takeoff service at the takeoff tracker
   {
-    bool takeoff_successful = co_await takeoffSrv();
+    bool takeoff_successful = takeoffSrv();
 
     // if the takeoff was not successful, switch to NullTracker
     if (takeoff_successful) {
@@ -1751,22 +1772,22 @@ mrs_lib::Task<bool> UavManager::callbackTakeoff([[maybe_unused]] const std::shar
       response->message = ss.str();
 
       // if the call for takeoff fails, call for emergency landing
-      co_await elandSrv();
+      elandSrv();
     }
   }
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackLand() */
 
-mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                             const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+bool UavManager::callbackLand([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                              const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "land called by service");
@@ -1782,7 +1803,7 @@ mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
-      co_return true;
+      return true;
     }
 
     {
@@ -1792,7 +1813,7 @@ mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_
         response->success = false;
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
         error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-        co_return true;
+        return true;
       }
 
       if (_null_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
@@ -1801,7 +1822,7 @@ mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_
         error_publisher_->addOneshotError("Cannot land, NullTracker is active!");
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
 
@@ -1811,7 +1832,7 @@ mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-      co_return true;
+      return true;
     }
 
     if (!sh_tracker_cmd_.hasMsg()) {
@@ -1820,29 +1841,29 @@ mrs_lib::Task<bool> UavManager::callbackLand([[maybe_unused]] const std::shared_
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-      co_return true;
+      return true;
     }
   }
 
   //}
 
-  auto [success, message] = co_await landWithDescendImpl();
+  auto [success, message] = landWithDescendImpl();
 
   response->message = message;
   response->success = success;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackLandHome() */
 
-mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                                 const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+bool UavManager::callbackLandHome([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                  const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "land home called by service");
@@ -1857,7 +1878,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->message = ss.str();
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return true;
+      return true;
     }
 
     if (!sh_odometry_.hasMsg()) {
@@ -1866,7 +1887,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
-      co_return true;
+      return true;
     }
 
     {
@@ -1876,7 +1897,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
         response->success = false;
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
         error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-        co_return true;
+        return true;
       }
 
       if (_null_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
@@ -1885,7 +1906,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
         error_publisher_->addOneshotError("Cannot land home, NullTracker is active!");
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
 
@@ -1895,7 +1916,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-      co_return true;
+      return true;
     }
 
     if (!sh_tracker_cmd_.hasMsg()) {
@@ -1904,7 +1925,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
-      co_return true;
+      return true;
     }
 
     if (fixing_max_height_) {
@@ -1913,7 +1934,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Cannot land home, descending to safe height!");
-      co_return true;
+      return true;
     }
 
     if (current_state_landing_ != IDLE_STATE) {
@@ -1922,13 +1943,13 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Cannot land home, already landing!");
-      co_return true;
+      return true;
     }
   }
 
   //}
 
-  co_await ungripSrv();
+  ungripSrv();
 
   mrs_msgs::msg::ReferenceStamped reference_out;
 
@@ -1960,7 +1981,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
 
       response->success = false;
       response->message = ss.str();
-      co_return true;
+      return true;
     }
 
     reference_out.header.frame_id = land_there_reference_.header.frame_id;
@@ -1970,7 +1991,7 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
     land_there_reference_ = reference_out;
   }
 
-  auto service_success = co_await emergencyReferenceSrv(reference_out);
+  bool service_success = emergencyReferenceSrv(reference_out);
 
   if (service_success) {
 
@@ -2004,18 +2025,18 @@ mrs_lib::Task<bool> UavManager::callbackLandHome([[maybe_unused]] const std::sha
     response->message = ss.str();
   }
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackLandThere() */
 
-mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                                  const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                   const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "land there called by service");
@@ -2030,7 +2051,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
       response->message = ss.str();
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return true;
+      return true;
     }
 
     {
@@ -2039,7 +2060,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
         response->message = ss.str();
         response->success = false;
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-        co_return true;
+        return true;
       }
 
       if (_null_tracker_name_ == sh_control_manager_diag_.getMsg()->active_tracker) {
@@ -2047,7 +2068,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
 
@@ -2056,7 +2077,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
       response->message = ss.str();
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return true;
+      return true;
     }
 
     if (!sh_tracker_cmd_.hasMsg()) {
@@ -2064,7 +2085,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
       response->message = ss.str();
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return true;
+      return true;
     }
 
     if (fixing_max_height_) {
@@ -2072,13 +2093,13 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
       response->message = ss.str();
       response->success = false;
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return true;
+      return true;
     }
   }
 
   //}
 
-  co_await ungripSrv();
+  ungripSrv();
 
   auto odometry = sh_odometry_.getMsg();
 
@@ -2096,7 +2117,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
     response->message = ss.str();
     response->success = false;
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return true;
+    return true;
   }
 
   {
@@ -2107,7 +2128,7 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
     land_there_reference_.reference.position.z = odometry->pose.pose.position.z;
   }
 
-  bool service_success = co_await emergencyReferenceSrv(land_there_reference_);
+  bool service_success = emergencyReferenceSrv(land_there_reference_);
 
   if (service_success) {
 
@@ -2140,18 +2161,18 @@ mrs_lib::Task<bool> UavManager::callbackLandThere(const std::shared_ptr<mrs_msgs
     response->message = ss.str();
   }
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackMidairActivation() */
 
-mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-                                                         const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+bool UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                          const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   RCLCPP_INFO(node_->get_logger(), "midair activation called by service");
@@ -2166,7 +2187,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).seconds() > 5.0) {
@@ -2174,7 +2195,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (!sh_hw_api_status_.getMsg()->armed) {
@@ -2182,7 +2203,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (sh_hw_api_status_.getMsg()->offboard) {
@@ -2190,7 +2211,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     {
@@ -2199,7 +2220,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
 
       if (_null_tracker_name_ != sh_control_manager_diag_.getMsg()->active_tracker) {
@@ -2207,7 +2228,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
         RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
         response->message = ss.str();
         response->success = false;
-        co_return true;
+        return true;
       }
     }
 
@@ -2216,7 +2237,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (_gain_manager_required_ && (clock_->now() - sh_gains_diag_.lastMsgTime()).seconds() > 5.0) {
@@ -2224,7 +2245,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (_constraint_manager_required_ && (clock_->now() - sh_constraints_diag_.lastMsgTime()).seconds() > 5.0) {
@@ -2232,7 +2253,7 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
 
     if (number_of_takeoffs_ > 0) {
@@ -2240,18 +2261,18 @@ mrs_lib::Task<bool> UavManager::callbackMidairActivation([[maybe_unused]] const 
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       response->message = ss.str();
       response->success = false;
-      co_return true;
+      return true;
     }
   }
 
   //}
 
-  auto [success, message] = co_await midairActivationImpl();
+  auto [success, message] = midairActivationImpl();
 
   response->message = message;
   response->success = success;
 
-  co_return true;
+  return true;
 }
 
 //}
@@ -2291,12 +2312,12 @@ bool UavManager::callbackMinHeightCheck(const std::shared_ptr<std_srvs::srv::Set
 
 /* landImpl() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
+std::tuple<bool, std::string> UavManager::landImpl(void) {
 
   // activating the landing controller
   {
     std::string old_controller      = sh_control_manager_diag_.getMsg()->active_controller;
-    bool        controller_switched = co_await switchControllerSrv(_landing_controller_name_);
+    bool        controller_switched = switchControllerSrv(_landing_controller_name_);
 
     // if it fails, activate eland
     // Tomas: I pressume that its more important to get the UAV to the ground rather than
@@ -2308,16 +2329,16 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not activate '" + _takeoff_controller_name_ + "' for landing.");
 
-      co_await elandSrv();
+      elandSrv();
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
   // activate the landing tracker
   {
     std::string old_tracker      = sh_control_manager_diag_.getMsg()->active_tracker;
-    auto        tracker_switched = co_await switchTrackerSrv(_landing_tracker_name_);
+    bool        tracker_switched = switchTrackerSrv(_landing_tracker_name_);
 
     // if it fails, activate eland
     // Tomas: I pressume that its more important to get the UAV to the ground rather than
@@ -2329,15 +2350,15 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not activate '" + _takeoff_tracker_name_ + "' for landing.");
 
-      co_await elandSrv();
+      elandSrv();
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
   // call the landing service
   {
-    bool land_successful = co_await landSrv();
+    bool land_successful = landSrv();
 
     if (land_successful) {
 
@@ -2357,7 +2378,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
         last_mass_difference_ = controller_diagnostics->mass_difference;
       }
 
-      co_await setOdometryCallbacksSrv(false);
+      setOdometryCallbacksSrv(false);
 
       changeLandingState(LANDING_STATE);
 
@@ -2370,7 +2391,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
       ss << "landing initiated";
       RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-      co_return std::tuple(true, ss.str());
+      return std::tuple(true, ss.str());
 
     } else {
 
@@ -2379,9 +2400,9 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not land.");
 
-      co_await elandSrv();
+      elandSrv();
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 }
@@ -2390,7 +2411,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landImpl(void) {
 
 /* landWithDescendImpl() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landWithDescendImpl(void) {
+std::tuple<bool, std::string> UavManager::landWithDescendImpl(void) {
 
   // if the height information is available
   if (sh_height_.hasMsg()) {
@@ -2401,7 +2422,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landWithDescendImpl(voi
 
       auto odometry = sh_odometry_.getMsg();
 
-      co_await ungripSrv();
+      ungripSrv();
 
       {
         std::scoped_lock lock(mutex_land_there_reference_);
@@ -2415,7 +2436,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landWithDescendImpl(voi
         land_there_reference_.reference.heading    = mrs_lib::AttitudeConverter(odometry->pose.pose.orientation).getHeading();
       }
 
-      bool service_success = co_await emergencyReferenceSrv(land_there_reference_);
+      bool service_success = emergencyReferenceSrv(land_there_reference_);
 
       if (service_success) {
 
@@ -2435,7 +2456,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landWithDescendImpl(voi
 
         timer_landing_->start();
 
-        co_return std::tuple(true, ss.str());
+        return std::tuple(true, ss.str());
 
       } else {
 
@@ -2446,23 +2467,23 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::landWithDescendImpl(voi
     }
   }
 
-  auto [success, message] = co_await landImpl();
+  auto [success, message] = landImpl();
 
-  co_return std::tuple(success, message);
+  return std::tuple(success, message);
 }
 
 //}
 
 /* midairActivationImpl() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(void) {
+std::tuple<bool, std::string> UavManager::midairActivationImpl(void) {
 
   // 1. activate the mid-air activation controller
   // the controller will output hover-like control output
   std::string old_controller;
   {
     old_controller           = sh_control_manager_diag_.getMsg()->active_controller;
-    bool controller_switched = co_await switchControllerSrv(_midair_activation_during_controller_);
+    bool controller_switched = switchControllerSrv(_midair_activation_during_controller_);
 
     if (!controller_switched) {
 
@@ -2471,24 +2492,24 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(vo
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not activate '" + _midair_activation_during_controller_ + "' for midair activation.");
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
   // 2. turn Control Manager's output ON
   {
-    bool output_enabled = co_await toggleControlOutput(true);
+    bool output_enabled = toggleControlOutput(true);
 
     if (!output_enabled) {
 
-      co_await switchControllerSrv(old_controller);
+      switchControllerSrv(old_controller);
 
       std::stringstream ss;
       ss << "could not enable Control Manager's output";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not enable Control Manager's output.");
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -2498,19 +2519,19 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(vo
   {
     old_tracker = sh_control_manager_diag_.getMsg()->active_tracker;
 
-    bool tracker_switched = co_await switchTrackerSrv(_midair_activation_during_tracker_);
+    bool tracker_switched = switchTrackerSrv(_midair_activation_during_tracker_);
 
     if (!tracker_switched) {
 
-      co_await switchControllerSrv(old_controller);
-      co_await toggleControlOutput(false);
+      switchControllerSrv(old_controller);
+      toggleControlOutput(false);
 
       std::stringstream ss;
       ss << "could not activate '" << _midair_activation_during_tracker_ << "' for midair activation";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not activate '" + _midair_activation_during_tracker_ + "' for midair activation.");
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -2520,20 +2541,20 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(vo
   // 5. turn on the OFFBOARD MODE
   // since now, the UAV should be under our control
   {
-    bool offboard_set = co_await offboardSrv(true);
+    bool offboard_set = offboardSrv(true);
 
     if (!offboard_set) {
 
-      co_await switchTrackerSrv(old_tracker);
-      co_await switchControllerSrv(old_controller);
-      co_await toggleControlOutput(false);
+      switchTrackerSrv(old_tracker);
+      switchControllerSrv(old_controller);
+      toggleControlOutput(false);
 
       std::stringstream ss;
       ss << "could not activate offboard mode";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
       error_publisher_->addOneshotError("Could not activate offboard mode.");
 
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -2547,7 +2568,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(vo
   ss << "midair activation initiated, starting the timer";
   RCLCPP_INFO_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
 
-  co_return std::tuple(true, ss.str());
+  return std::tuple(true, ss.str());
 }
 
 //}
@@ -2556,7 +2577,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> UavManager::midairActivationImpl(vo
 
 /* setOdometryCallbacksSrv() //{ */
 
-mrs_lib::Task<void> UavManager::setOdometryCallbacksSrv(const bool &input) {
+void UavManager::setOdometryCallbacksSrv(const bool &input) {
 
   RCLCPP_INFO(node_->get_logger(), "switching odometry callbacks to %s", input ? "ON" : "OFF");
 
@@ -2564,7 +2585,7 @@ mrs_lib::Task<void> UavManager::setOdometryCallbacksSrv(const bool &input) {
 
   request->data = input;
 
-  auto response = co_await sch_odometry_callbacks_.callAwaitable(request);
+  auto response = sch_odometry_callbacks_.callSync(request);
 
   if (response) {
 
@@ -2575,15 +2596,13 @@ mrs_lib::Task<void> UavManager::setOdometryCallbacksSrv(const bool &input) {
   } else {
     RCLCPP_ERROR(node_->get_logger(), "service call for toggle odometry callbacks failed!");
   }
-
-  co_return;
 }
 
 //}
 
 /* setControlCallbacksSrv() //{ */
 
-mrs_lib::Task<void> UavManager::setControlCallbacksSrv(const bool &input) {
+void UavManager::setControlCallbacksSrv(const bool &input) {
 
   RCLCPP_INFO(node_->get_logger(), "switching control callbacks to %s", input ? "ON" : "OFF");
 
@@ -2591,7 +2610,7 @@ mrs_lib::Task<void> UavManager::setControlCallbacksSrv(const bool &input) {
 
   request->data = input;
 
-  auto response = co_await sch_control_callbacks_.callAwaitable(request);
+  auto response = sch_control_callbacks_.callSync(request);
 
   if (response) {
 
@@ -2602,21 +2621,19 @@ mrs_lib::Task<void> UavManager::setControlCallbacksSrv(const bool &input) {
   } else {
     RCLCPP_ERROR(node_->get_logger(), "service call for setting control callbacks failed!");
   }
-
-  co_return;
 }
 
 //}
 
 /* ungripSrv() //{ */
 
-mrs_lib::Task<void> UavManager::ungripSrv(void) {
+void UavManager::ungripSrv(void) {
 
   RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "ungripping payload");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = co_await sch_ungrip_.callAwaitable(request);
+  auto response = sch_ungrip_.callSync(request);
 
   if (response) {
 
@@ -2627,15 +2644,13 @@ mrs_lib::Task<void> UavManager::ungripSrv(void) {
   } else {
     RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for ungripping payload failed!");
   }
-
-  co_return;
 }
 
 //}
 
 /* toggleControlOutput() //{ */
 
-mrs_lib::Task<bool> UavManager::toggleControlOutput(const bool &input) {
+bool UavManager::toggleControlOutput(const bool &input) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "toggling control output %s", input ? "ON" : "OFF");
 
@@ -2643,20 +2658,20 @@ mrs_lib::Task<bool> UavManager::toggleControlOutput(const bool &input) {
 
   request->data = input;
 
-  auto response = co_await sch_toggle_control_output_.callAwaitable(request);
+  auto response = sch_toggle_control_output_.callSync(request);
 
   if (response) {
 
     if (!response.value()->success) {
       RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for control output returned: %s.", response.value()->message.c_str());
-      co_return false;
+      return false;
     } else {
-      co_return true;
+      return true;
     }
 
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for control output failed!");
-    co_return false;
+    return false;
   }
 }
 
@@ -2664,26 +2679,26 @@ mrs_lib::Task<bool> UavManager::toggleControlOutput(const bool &input) {
 
 /* offboardSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::offboardSrv(const bool in) {
+bool UavManager::offboardSrv(const bool in) {
 
   RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "setting offboard to %d", in);
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = co_await sch_offboard_.callAwaitable(request);
+  auto response = sch_offboard_.callSync(request);
 
   if (response) {
 
     if (!response.value()->success) {
       RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for offboard failed, returned: %s", response.value()->message.c_str());
-      co_return false;
+      return false;
     } else {
-      co_return true;
+      return true;
     }
 
   } else {
     RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for offboard failed!");
-    co_return false;
+    return false;
   }
 }
 
@@ -2691,13 +2706,13 @@ mrs_lib::Task<bool> UavManager::offboardSrv(const bool in) {
 
 /* disarmSrv() //{ */
 
-mrs_lib::Task<void> UavManager::disarmSrv(void) {
+void UavManager::disarmSrv(void) {
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
 
   request->data = false;
 
-  auto response = co_await sch_arm_.callAwaitable(request);
+  auto response = sch_arm_.callSync(request);
 
   if (response) {
 
@@ -2708,15 +2723,13 @@ mrs_lib::Task<void> UavManager::disarmSrv(void) {
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for disarming failed!");
   }
-
-  co_return;
 }
 
 //}
 
 /* switchControllerSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::switchControllerSrv(const std::string &controller) {
+bool UavManager::switchControllerSrv(const std::string &controller) {
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "activating controller '" << controller << "'");
 
@@ -2724,7 +2737,7 @@ mrs_lib::Task<bool> UavManager::switchControllerSrv(const std::string &controlle
 
   request->value = controller;
 
-  auto response = co_await sch_switch_controller_.callAwaitable(request);
+  auto response = sch_switch_controller_.callSync(request);
 
   if (response) {
 
@@ -2732,13 +2745,13 @@ mrs_lib::Task<bool> UavManager::switchControllerSrv(const std::string &controlle
       RCLCPP_WARN(node_->get_logger(), "service call for switching controller returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for switching controller failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2746,7 +2759,7 @@ mrs_lib::Task<bool> UavManager::switchControllerSrv(const std::string &controlle
 
 /* switchTrackerSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::switchTrackerSrv(const std::string &tracker) {
+bool UavManager::switchTrackerSrv(const std::string &tracker) {
 
   RCLCPP_INFO_STREAM(node_->get_logger(), "activating tracker '" << tracker << "'");
 
@@ -2754,7 +2767,7 @@ mrs_lib::Task<bool> UavManager::switchTrackerSrv(const std::string &tracker) {
 
   request->value = tracker;
 
-  auto response = co_await sch_switch_tracker_.callAwaitable(request);
+  auto response = sch_switch_tracker_.callSync(request);
 
   if (response) {
 
@@ -2762,13 +2775,13 @@ mrs_lib::Task<bool> UavManager::switchTrackerSrv(const std::string &tracker) {
       RCLCPP_WARN(node_->get_logger(), "service call for switching tracker returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for switching tracker failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2776,13 +2789,13 @@ mrs_lib::Task<bool> UavManager::switchTrackerSrv(const std::string &tracker) {
 
 /* landSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::landSrv(void) {
+bool UavManager::landSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for landing");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = co_await sch_land_.callAwaitable(request);
+  auto response = sch_land_.callSync(request);
 
   if (response) {
 
@@ -2790,13 +2803,13 @@ mrs_lib::Task<bool> UavManager::landSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for landing returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for landing failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2804,13 +2817,13 @@ mrs_lib::Task<bool> UavManager::landSrv(void) {
 
 /* elandSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::elandSrv(void) {
+bool UavManager::elandSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for eland");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = co_await sch_eland_.callAwaitable(request);
+  auto response = sch_eland_.callSync(request);
 
   if (response) {
 
@@ -2818,13 +2831,13 @@ mrs_lib::Task<bool> UavManager::elandSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for eland returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for eland failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2832,13 +2845,13 @@ mrs_lib::Task<bool> UavManager::elandSrv(void) {
 
 /* ehoverSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::ehoverSrv(void) {
+bool UavManager::ehoverSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for ehover");
 
   std::shared_ptr<std_srvs::srv::Trigger::Request> request = std::make_shared<std_srvs::srv::Trigger::Request>();
 
-  auto response = co_await sch_ehover_.callAwaitable(request);
+  auto response = sch_ehover_.callSync(request);
 
   if (response) {
 
@@ -2846,13 +2859,13 @@ mrs_lib::Task<bool> UavManager::ehoverSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for ehover returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for ehover failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2860,7 +2873,7 @@ mrs_lib::Task<bool> UavManager::ehoverSrv(void) {
 
 /* takeoffSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::takeoffSrv(void) {
+bool UavManager::takeoffSrv(void) {
 
   RCLCPP_INFO(node_->get_logger(), "calling for takeoff to height '%.2f m'", _takeoff_height_);
 
@@ -2868,7 +2881,7 @@ mrs_lib::Task<bool> UavManager::takeoffSrv(void) {
 
   request->goal = _takeoff_height_;
 
-  auto response = co_await sch_takeoff_.callAwaitable(request);
+  auto response = sch_takeoff_.callSync(request);
 
   if (response) {
 
@@ -2876,13 +2889,13 @@ mrs_lib::Task<bool> UavManager::takeoffSrv(void) {
       RCLCPP_WARN(node_->get_logger(), "service call for takeoff returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR(node_->get_logger(), "service call for takeoff failed!");
 
-    co_return false;
+    return false;
   }
 }
 
@@ -2890,7 +2903,7 @@ mrs_lib::Task<bool> UavManager::takeoffSrv(void) {
 
 /* emergencyReferenceSrv() //{ */
 
-mrs_lib::Task<bool> UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal) {
+bool UavManager::emergencyReferenceSrv(const mrs_msgs::msg::ReferenceStamped &goal) {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "calling for emergency reference");
 
@@ -2899,7 +2912,7 @@ mrs_lib::Task<bool> UavManager::emergencyReferenceSrv(const mrs_msgs::msg::Refer
   request->header    = goal.header;
   request->reference = goal.reference;
 
-  auto response = co_await sch_emergency_reference_.callAwaitable(request);
+  auto response = sch_emergency_reference_.callSync(request);
 
   if (response) {
 
@@ -2907,13 +2920,13 @@ mrs_lib::Task<bool> UavManager::emergencyReferenceSrv(const mrs_msgs::msg::Refer
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for emergency reference returned: '%s'", response.value()->message.c_str());
     }
 
-    co_return static_cast<bool>(response.value()->success);
+    return response.value()->success;
 
   } else {
 
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "service call for emergency reference failed!");
 
-    co_return false;
+    return false;
   }
 }
 
