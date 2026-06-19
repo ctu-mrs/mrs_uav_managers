@@ -243,11 +243,9 @@ private:
   rclcpp::Clock::SharedPtr clock_;
 
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
-  rclcpp::CallbackGroup::SharedPtr cbkgrp_co_subs_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_ss_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
-  rclcpp::CallbackGroup::SharedPtr cbkgrp_co_timers_;
 
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
@@ -590,12 +588,12 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::SafetyAreaManagerDiagnostics> sh_safety_area_diag_;
 
   // those are passed to trackers using the common_handlers object
-  mrs_lib::Task<bool>   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point);
-  mrs_lib::Task<bool>   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
-  mrs_lib::Task<bool>   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
-  mrs_lib::Task<bool>   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
-  mrs_lib::Task<double> getMinZ(const std::string &frame_id);
-  mrs_lib::Task<double> getMaxZ(const std::string &frame_id);
+  bool   isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point);
+  bool   isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  bool   isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &from, const mrs_msgs::msg::ReferenceStamped &to);
+  double getMinZ(const std::string &frame_id);
+  double getMaxZ(const std::string &frame_id);
 
   // | ------------------------ callbacks ----------------------- |
 
@@ -616,29 +614,23 @@ private:
                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   // reference callbacks
-  mrs_lib::Task<> callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg);
-  mrs_lib::Task<> callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg);
-  mrs_lib::Task<> callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg);
-
-  mrs_lib::Task<bool> callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
-  mrs_lib::Task<bool> callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                      const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
-  mrs_lib::Task<bool> callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                           const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
-  mrs_lib::Task<bool> callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                           const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
-  mrs_lib::Task<bool> callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                         const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
-  mrs_lib::Task<bool> callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                                 const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
-  mrs_lib::Task<bool> callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
-  mrs_lib::Task<bool> callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
-                                                       const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response);
-  mrs_lib::Task<bool> callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
-                                                         const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response);
-  mrs_lib::Task<bool> callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                                 const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  void callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg);
+  void callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg);
+  void callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg);
+  bool callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response);
+  bool callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response);
+  bool callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+  bool callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
+                                        const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response);
+  bool callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response);
+  bool callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                  const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
   // safety callbacks
   bool callbackHover(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
@@ -662,15 +654,14 @@ private:
                                const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   bool callbackEnableBumper(const std::shared_ptr<std_srvs::srv::SetBool::Request> request, const std::shared_ptr<std_srvs::srv::SetBool::Response> response);
 
-  mrs_lib::Task<bool> callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request>  request,
-                                      const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response);
+  bool callbackGetMinZ(const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request, const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response> response);
 
-  mrs_lib::Task<bool> callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                                const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
-  mrs_lib::Task<bool> callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                                  const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
-  mrs_lib::Task<bool> callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
-                                                     const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response);
+  bool callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                   const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response);
+  bool callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
+                                      const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response);
 
   // transformation callbacks
   bool callbackTransformReference(const std::shared_ptr<mrs_msgs::srv::TransformReferenceSrv::Request>  request,
@@ -734,7 +725,7 @@ private:
 
   // timer for issuing the pirouette
   std::shared_ptr<TimerType> timer_pirouette_;
-  mrs_lib::Task<>            timerPirouette();
+  void                       timerPirouette();
 
   // | --------------------- obstacle bumper -------------------- |
 
@@ -835,7 +826,7 @@ private:
   double _channel_mult_pitch_, _channel_mult_roll_, _channel_mult_heading_, _channel_mult_throttle_;
 
   std::shared_ptr<TimerType> timer_joystick_;
-  mrs_lib::Task<>            timerJoystick();
+  void                       timerJoystick();
   double                     _joystick_timer_rate_   = 0;
   std::atomic<bool>          running_timer_joystick_ = false;
 
@@ -886,13 +877,13 @@ private:
   void updateControllers(const mrs_msgs::msg::UavState &uav_state);
 
   // sets the reference to the active tracker
-  mrs_lib::Task<std::tuple<bool, std::string>> setReference(const mrs_msgs::msg::ReferenceStamped reference_in);
+  std::tuple<bool, std::string> setReference(const mrs_msgs::msg::ReferenceStamped reference_in);
 
   // sets the velocity reference to the active tracker
-  mrs_lib::Task<std::tuple<bool, std::string>> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in);
+  std::tuple<bool, std::string> setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in);
 
   // sets the reference trajectory to the active tracker
-  mrs_lib::Task<std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>>
+  std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>
   setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in);
 
   // publishes
@@ -940,12 +931,10 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
 
   error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "ControlManager", "main");
 
-  cbkgrp_subs_      = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_co_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_ss_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_sc_        = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  cbkgrp_timers_    = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_co_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_ss_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   mrs_lib::SubscriberHandlerOptions shopts;
 
@@ -1930,14 +1919,6 @@ void ControlManager::initialize(void) {
   shopts.autostart                           = true;
   shopts.subscription_options.callback_group = cbkgrp_subs_;
 
-  mrs_lib::SubscriberHandlerOptions shopts_co;
-
-  shopts_co.node                                = node_;
-  shopts_co.no_message_timeout                  = mrs_lib::no_timeout;
-  shopts_co.threadsafe                          = true;
-  shopts_co.autostart                           = true;
-  shopts_co.subscription_options.callback_group = cbkgrp_co_subs_;
-
   if (_state_input_ == INPUT_UAV_STATE) {
     sh_uav_state_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>(shopts, "~/uav_state_in", &ControlManager::callbackUavState, this);
   } else if (_state_input_ == INPUT_ODOMETRY) {
@@ -2015,14 +1996,18 @@ void ControlManager::initialize(void) {
   ss_bumper_enabler_ = mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool>(
       node_, "~/bumper_in", std::bind(&ControlManager::callbackEnableBumper, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);
-  ss_get_min_z_          = mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetFloat64>(node_, "~/get_min_z_in", &ControlManager::callbackGetMinZ, this,
-                                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_get_min_z_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::GetFloat64>(
+      node_, "~/get_min_z_in", std::bind(&ControlManager::callbackGetMinZ, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
   ss_validate_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReference>(
-      node_, "~/validate_reference_in", &ControlManager::callbackValidateReference, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/validate_reference_in", std::bind(&ControlManager::callbackValidateReference, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_validate_reference_2d_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReference>(
-      node_, "~/validate_reference_2d_in", &ControlManager::callbackValidateReference2d, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/validate_reference_2d_in", std::bind(&ControlManager::callbackValidateReference2d, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_validate_reference_array_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ValidateReferenceArray>(
-      node_, "~/validate_reference_array_in", &ControlManager::callbackValidateReferenceArray, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/validate_reference_array_in", std::bind(&ControlManager::callbackValidateReferenceArray, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_start_trajectory_tracking_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/start_trajectory_tracking_in", std::bind(&ControlManager::callbackStartTrajectoryTracking, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
@@ -2056,40 +2041,45 @@ void ControlManager::initialize(void) {
   // | ---------------- setpoint command services --------------- |
 
   // human callable
-  ss_goto_ =
-      mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in", &ControlManager::callbackGoto, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_fcu_in", &ControlManager::callbackGotoFcu, this, rclcpp::SystemDefaultsQoS(),
-                                                                    cbkgrp_ss_);
-  ss_goto_relative_        = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_relative_in", &ControlManager::callbackGotoRelative, this,
-                                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_goto_altitude_        = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(node_, "~/goto_altitude_in", &ControlManager::callbackGotoAltitude, this,
-                                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_goto_heading_         = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(node_, "~/set_heading_in", &ControlManager::callbackSetHeading, this,
-                                                                                rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-  ss_set_heading_relative_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(node_, "~/set_heading_relative_in", &ControlManager::callbackSetHeadingRelative,
-                                                                                this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_     = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(node_, "~/goto_in",
+                                                                    std::bind(&ControlManager::callbackGoto, this, std::placeholders::_1, std::placeholders::_2),
+                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_fcu_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
+      node_, "~/goto_fcu_in", std::bind(&ControlManager::callbackGotoFcu, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
+      cbkgrp_ss_);
+  ss_goto_relative_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec4>(
+      node_, "~/goto_relative_in", std::bind(&ControlManager::callbackGotoRelative, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_altitude_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
+      node_, "~/goto_altitude_in", std::bind(&ControlManager::callbackGotoAltitude, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_goto_heading_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
+      node_, "~/set_heading_in", std::bind(&ControlManager::callbackSetHeading, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  ss_set_heading_relative_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::Vec1>(
+      node_, "~/set_heading_relative_in", std::bind(&ControlManager::callbackSetHeadingRelative, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
 
-  ss_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/reference_in", &ControlManager::callbackReferenceService, this,
-                                                                                    rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-
-  sh_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts_co, "~/reference_in", &ControlManager::callbackReferenceTopic, this);
-
+  ss_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
+      node_, "~/reference_in", std::bind(&ControlManager::callbackReferenceService, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  sh_reference_          = mrs_lib::SubscriberHandler<mrs_msgs::msg::ReferenceStamped>(shopts, "~/reference_in", &ControlManager::callbackReferenceTopic, this);
   ss_velocity_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::VelocityReferenceStampedSrv>(
-      node_, "~/velocity_reference_in", &ControlManager::callbackVelocityReferenceService, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-
-  sh_velocity_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts_co, "~/velocity_reference_in",
-                                                                                               &ControlManager::callbackVelocityReferenceTopic, this);
-
+      node_, "~/velocity_reference_in", std::bind(&ControlManager::callbackVelocityReferenceService, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  sh_velocity_reference_   = mrs_lib::SubscriberHandler<mrs_msgs::msg::VelocityReferenceStamped>(shopts, "~/velocity_reference_in",
+                                                                                                 &ControlManager::callbackVelocityReferenceTopic, this);
   ss_trajectory_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::TrajectoryReferenceSrv>(
-      node_, "~/trajectory_reference_in", &ControlManager::callbackTrajectoryReferenceService, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
-
-  sh_trajectory_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts_co, "~/trajectory_reference_in",
+      node_, "~/trajectory_reference_in", std::bind(&ControlManager::callbackTrajectoryReferenceService, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  sh_trajectory_reference_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::TrajectoryReference>(shopts, "~/trajectory_reference_in",
                                                                                             &ControlManager::callbackTrajectoryReferenceTopic, this);
 
   // | --------------------- other services --------------------- |
 
   ss_emergency_reference_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
-      node_, "~/emergency_reference_in", &ControlManager::callbackEmergencyReference, this, rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+      node_, "~/emergency_reference_in", std::bind(&ControlManager::callbackEmergencyReference, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
   ss_pirouette_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
       node_, "~/pirouette_in", std::bind(&ControlManager::callbackPirouette, this, std::placeholders::_1, std::placeholders::_2), rclcpp::SystemDefaultsQoS(),
       cbkgrp_ss_);
@@ -2129,13 +2119,7 @@ void ControlManager::initialize(void) {
   {
     std::function<void()> callback_fcn = std::bind(&ControlManager::timerJoystick, this);
 
-    mrs_lib::TimerHandlerOptions opts;
-
-    opts.node           = node_;
-    opts.autostart      = true;
-    opts.callback_group = cbkgrp_co_timers_;
-
-    timer_joystick_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_joystick_timer_rate_, clock_), callback_fcn);
+    timer_joystick_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_joystick_timer_rate_, clock_), callback_fcn);
   }
 
   {
@@ -2153,13 +2137,7 @@ void ControlManager::initialize(void) {
   {
     std::function<void()> callback_fcn = std::bind(&ControlManager::timerPirouette, this);
 
-    mrs_lib::TimerHandlerOptions opts;
-
-    opts.node           = node_;
-    opts.autostart      = false;
-    opts.callback_group = cbkgrp_co_timers_;
-
-    timer_pirouette_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_pirouette_timer_rate_, clock_), callback_fcn);
+    timer_pirouette_ = std::make_shared<TimerType>(timer_opts_no_start, rclcpp::Rate(_pirouette_timer_rate_, clock_), callback_fcn);
   }
 
   // | ----------------------- finish init ---------------------- |
@@ -3186,12 +3164,12 @@ void ControlManager::timerFailsafe() {
 
 /* //{ timerJoystick() */
 
-mrs_lib::Task<> ControlManager::timerJoystick() {
+void ControlManager::timerJoystick() {
 
   mrs_lib::AtomicScopeFlag unset_running(running_timer_joystick_);
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerJoystick");
@@ -3269,7 +3247,7 @@ mrs_lib::Task<> ControlManager::timerJoystick() {
 
         std::shared_ptr<mrs_msgs::srv::Vec4::Response> response = std::make_shared<mrs_msgs::srv::Vec4::Response>();
 
-        co_await callbackGotoFcu(request, response);
+        callbackGotoFcu(request, response);
 
       } else if (_joystick_mode_ == 1) {
 
@@ -3302,7 +3280,7 @@ mrs_lib::Task<> ControlManager::timerJoystick() {
           trajectory.points.push_back(point);
         }
 
-        co_await setTrajectoryReference(trajectory);
+        setTrajectoryReference(trajectory);
       }
     }
   }
@@ -3382,7 +3360,7 @@ mrs_lib::Task<> ControlManager::timerJoystick() {
 
       callbacks_enabled_ = true;
 
-      co_await callbackVelocityReferenceService(request, response);
+      callbackVelocityReferenceService(request, response);
 
       callbacks_enabled_ = false;
 
@@ -3455,10 +3433,10 @@ void ControlManager::timerBumper() {
 
 /* //{ timerPirouette() */
 
-mrs_lib::Task<> ControlManager::timerPirouette() {
+void ControlManager::timerPirouette() {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerPirouette");
@@ -3477,7 +3455,7 @@ mrs_lib::Task<> ControlManager::timerPirouette() {
 
     setCallbacks(true);
 
-    co_return;
+    return;
   }
 
   // set the reference
@@ -3504,7 +3482,7 @@ mrs_lib::Task<> ControlManager::timerPirouette() {
     callbacks_enabled_ = true;
   }
 
-  co_await setReference(reference_request);
+  setReference(reference_request);
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -4792,11 +4770,11 @@ bool ControlManager::callbackSetConstraints(const std::shared_ptr<mrs_msgs::srv:
 
 /* //{ callbackEmergencyReference() */
 
-mrs_lib::Task<bool> ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool ControlManager::callbackEmergencyReference(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -4821,7 +4799,7 @@ mrs_lib::Task<bool> ControlManager::callbackEmergencyReference(const std::shared
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
     response->message = ss.str();
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
@@ -4861,7 +4839,7 @@ mrs_lib::Task<bool> ControlManager::callbackEmergencyReference(const std::shared
     }
   }
 
-  co_return true;
+  return true;
 }
 
 //}
@@ -5250,39 +5228,39 @@ bool ControlManager::callbackEnableBumper(const std::shared_ptr<std_srvs::srv::S
 
 /* //{ callbackGetMinZ() */
 
-mrs_lib::Task<bool> ControlManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request,
-                                                    const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response>                 response) {
+bool ControlManager::callbackGetMinZ([[maybe_unused]] const std::shared_ptr<mrs_msgs::srv::GetFloat64::Request> request,
+                                     const std::shared_ptr<mrs_msgs::srv::GetFloat64::Response>                 response) {
 
   if (!is_initialized_) {
-    co_return false;
+    return false;
   }
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
 
   response->success = true;
-  response->value   = co_await getMinZ(uav_state.header.frame_id);
+  response->value   = getMinZ(uav_state.header.frame_id);
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackValidateReference() */
 
-mrs_lib::Task<bool> ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                                              const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
+bool ControlManager::callbackValidateReference(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                               const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   if (!validateReference(node_, request->reference.reference, "callbackValidateReference(): request->reference.reference")) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'request->reference'!!!");
     response->message = "NaNs/infs in input!";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   // copy member variables
@@ -5301,18 +5279,16 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReference(const std::shared_
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the reference could not be transformed");
     response->message = "the reference could not be transformed";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
-  auto res = co_await isPointInSafetyArea3d(transformed_reference);
-
-  if (!res) {
+  if (!isPointInSafetyArea3d(transformed_reference)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "reference validation failed, the point is outside of the safety area!");
     response->message = "the point is outside of the safety area";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   if (last_tracker_cmd) {
@@ -5323,39 +5299,37 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReference(const std::shared_
     from_point.reference.position.y = last_tracker_cmd->position.y;
     from_point.reference.position.z = last_tracker_cmd->position.z;
 
-    auto is_safe = co_await isPathToPointInSafetyArea3d(from_point, transformed_reference);
-
-    if (!is_safe) {
+    if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "reference validation failed, the path is going outside the safety area!");
       response->message = "the path is going outside the safety area";
       response->success = false;
-      co_return true;
+      return true;
     }
   }
 
   response->message = "the reference is ok";
   response->success = true;
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackValidateReference2d() */
 
-mrs_lib::Task<bool> ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
-                                                                const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
+bool ControlManager::callbackValidateReference2d(const std::shared_ptr<mrs_msgs::srv::ValidateReference::Request>  request,
+                                                 const std::shared_ptr<mrs_msgs::srv::ValidateReference::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   if (!validateReference(node_, request->reference.reference, "callbackValidateReference2d(): request->reference.reference")) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'request->reference'!!!");
     response->message = "NaNs/infs in input!";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   // copy member variables
@@ -5374,18 +5348,16 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReference2d(const std::share
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the reference could not be transformed");
     response->message = "the reference could not be transformed";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
-  auto is_valid = co_await isPointInSafetyArea2d(transformed_reference);
-
-  if (!is_valid) {
+  if (!isPointInSafetyArea2d(transformed_reference)) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "reference validation failed, the point is outside of the safety area!");
     response->message = "the point is outside of the safety area";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   if (last_tracker_cmd) {
@@ -5396,31 +5368,29 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReference2d(const std::share
     from_point.reference.position.y = last_tracker_cmd->position.y;
     from_point.reference.position.z = last_tracker_cmd->position.z;
 
-    auto is_safe = co_await isPathToPointInSafetyArea2d(from_point, transformed_reference);
-
-    if (!is_safe) {
+    if (!isPathToPointInSafetyArea2d(from_point, transformed_reference)) {
       RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "reference validation failed, the path is going outside the safety area!");
       response->message = "the path is going outside the safety area";
       response->success = false;
-      co_return true;
+      return true;
     }
   }
 
   response->message = "the reference is ok";
   response->success = true;
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackValidateReferenceArray() */
 
-mrs_lib::Task<bool> ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
-                                                                   const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response) {
+bool ControlManager::callbackValidateReferenceArray(const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Request>  request,
+                                                    const std::shared_ptr<mrs_msgs::srv::ValidateReferenceArray::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
-    co_return false;
+    return false;
   }
 
   // copy member variables
@@ -5433,7 +5403,7 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReferenceArray(const std::sh
   if (!opt_tf) {
     RCLCPP_WARN(node_->get_logger(), "could not find transform for the reference's frame_id");
     response->message = "could not find transform for the reference's frame_id";
-    co_return true;
+    return true;
   }
 
   geometry_msgs::msg::TransformStamped tf = opt_tf.value();
@@ -5467,9 +5437,7 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReferenceArray(const std::sh
 
     // | --- check transformed reference agains the safety area --- |
 
-    auto is_valid = co_await isPointInSafetyArea3d(transformed_reference);
-
-    if (!is_valid) {
+    if (!isPointInSafetyArea3d(transformed_reference)) {
       response->success.at(i) = false;
     }
 
@@ -5483,16 +5451,14 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReferenceArray(const std::sh
       from_point.reference.position.y = last_tracker_cmd->position.y;
       from_point.reference.position.z = last_tracker_cmd->position.z;
 
-      auto is_safe = co_await isPathToPointInSafetyArea3d(from_point, transformed_reference);
-
-      if (!is_safe) {
+      if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
         response->success.at(i) = false;
       }
     }
   }
 
   response->message = "references were checked";
-  co_return true;
+  return true;
 }
 
 //}
@@ -5501,13 +5467,13 @@ mrs_lib::Task<bool> ControlManager::callbackValidateReferenceArray(const std::sh
 
 /* //{ callbackReferenceService() */
 
-mrs_lib::Task<bool> ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
-                                                             const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
+bool ControlManager::callbackReferenceService(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
+                                              const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceService");
@@ -5517,41 +5483,41 @@ mrs_lib::Task<bool> ControlManager::callbackReferenceService(const std::shared_p
   des_reference.header    = request->header;
   des_reference.reference = request->reference;
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackReferenceTopic() */
 
-mrs_lib::Task<> ControlManager::callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg) {
+void ControlManager::callbackReferenceTopic(const mrs_msgs::msg::ReferenceStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackReferenceTopic");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::callbackReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
-  co_await setReference(*msg);
+  setReference(*msg);
 }
 
 //}
 
 /* //{ callbackVelocityReferenceService() */
 
-mrs_lib::Task<bool> ControlManager::callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
-                                                                     const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response) {
+bool ControlManager::callbackVelocityReferenceService(const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Request>  request,
+                                                      const std::shared_ptr<mrs_msgs::srv::VelocityReferenceStampedSrv::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceService");
@@ -5560,47 +5526,47 @@ mrs_lib::Task<bool> ControlManager::callbackVelocityReferenceService(const std::
   mrs_msgs::msg::VelocityReferenceStamped des_reference;
   des_reference = request->reference;
 
-  auto [success, message] = co_await setVelocityReference(des_reference);
+  auto [success, message] = setVelocityReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackVelocityReferenceTopic() */
 
-mrs_lib::Task<> ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg) {
+void ControlManager::callbackVelocityReferenceTopic(const mrs_msgs::msg::VelocityReferenceStamped::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackVelocityReferenceTopic");
   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "ControlManager::callbackVelocityReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
-  co_await setVelocityReference(*msg);
+  setVelocityReference(*msg);
 }
 
 //}
 
 /* //{ callbackTrajectoryReferenceService() */
 
-mrs_lib::Task<bool> ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
-                                                                       const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response) {
+bool ControlManager::callbackTrajectoryReferenceService(const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Request>  request,
+                                                        const std::shared_ptr<mrs_msgs::srv::TrajectoryReferenceSrv::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceService");
   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "ControlManager::callbackTrajectoryReferenceService", scope_timer_logger_, scope_timer_enabled_);
 
-  auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = co_await setTrajectoryReference(request->trajectory);
+  auto [success, message, modified, tracker_names, tracker_successes, tracker_messages] = setTrajectoryReference(request->trajectory);
 
   response->success          = success;
   response->message          = message;
@@ -5612,23 +5578,23 @@ mrs_lib::Task<bool> ControlManager::callbackTrajectoryReferenceService(const std
     response->tracker_successes.push_back(tracker_successes.at(i));
   }
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackTrajectoryReferenceTopic() */
 
-mrs_lib::Task<> ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg) {
+void ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs::msg::TrajectoryReference::ConstSharedPtr msg) {
 
   if (!is_initialized_) {
-    co_return;
+    return;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackTrajectoryReferenceTopic");
   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "ControlManager::callbackTrajectoryReferenceTopic", scope_timer_logger_, scope_timer_enabled_);
 
-  co_await setTrajectoryReference(*msg);
+  setTrajectoryReference(*msg);
 }
 
 //}
@@ -5637,13 +5603,12 @@ mrs_lib::Task<> ControlManager::callbackTrajectoryReferenceTopic(const mrs_msgs:
 
 /* //{ callbackGoto() */
 
-mrs_lib::Task<bool> ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                                 const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
+bool ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs::srv::Vec4::Request> request, const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGoto");
@@ -5657,25 +5622,25 @@ mrs_lib::Task<bool> ControlManager::callbackGoto(const std::shared_ptr<mrs_msgs:
   des_reference.reference.position.z = request->goal.at(REF_Z);
   des_reference.reference.heading    = request->goal.at(REF_HEADING);
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackGotoFcu() */
 
-mrs_lib::Task<bool> ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                                    const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
+bool ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
+                                     const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoFcu");
@@ -5689,25 +5654,25 @@ mrs_lib::Task<bool> ControlManager::callbackGotoFcu(const std::shared_ptr<mrs_ms
   des_reference.reference.position.z = request->goal.at(REF_Z);
   des_reference.reference.heading    = request->goal.at(REF_HEADING);
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackGotoRelative() */
 
-mrs_lib::Task<bool> ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
-                                                         const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
+bool ControlManager::callbackGotoRelative(const std::shared_ptr<mrs_msgs::srv::Vec4::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::Vec4::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoRelative");
@@ -5718,7 +5683,7 @@ mrs_lib::Task<bool> ControlManager::callbackGotoRelative(const std::shared_ptr<m
   if (!last_tracker_cmd) {
     response->message = "not flying";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped des_reference;
@@ -5729,25 +5694,25 @@ mrs_lib::Task<bool> ControlManager::callbackGotoRelative(const std::shared_ptr<m
   des_reference.reference.position.z = last_tracker_cmd->position.z + request->goal.at(REF_Z);
   des_reference.reference.heading    = last_tracker_cmd->heading + request->goal.at(REF_HEADING);
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackGotoAltitude() */
 
-mrs_lib::Task<bool> ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                                         const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackGotoAltitude(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                          const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackGotoAltitude");
@@ -5758,7 +5723,7 @@ mrs_lib::Task<bool> ControlManager::callbackGotoAltitude(const std::shared_ptr<m
   if (!last_tracker_cmd) {
     response->message = "not flying";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped des_reference;
@@ -5769,25 +5734,25 @@ mrs_lib::Task<bool> ControlManager::callbackGotoAltitude(const std::shared_ptr<m
   des_reference.reference.position.z = request->goal;
   des_reference.reference.heading    = last_tracker_cmd->heading;
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackSetHeading() */
 
-mrs_lib::Task<bool> ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                                       const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackSetHeading(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                        const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeading");
@@ -5798,7 +5763,7 @@ mrs_lib::Task<bool> ControlManager::callbackSetHeading(const std::shared_ptr<mrs
   if (!last_tracker_cmd) {
     response->message = "not flying";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped des_reference;
@@ -5809,25 +5774,25 @@ mrs_lib::Task<bool> ControlManager::callbackSetHeading(const std::shared_ptr<mrs
   des_reference.reference.position.z = last_tracker_cmd->position.z;
   des_reference.reference.heading    = request->goal;
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
 
 /* //{ callbackSetHeadingRelative() */
 
-mrs_lib::Task<bool> ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
-                                                               const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
+bool ControlManager::callbackSetHeadingRelative(const std::shared_ptr<mrs_msgs::srv::Vec1::Request>  request,
+                                                const std::shared_ptr<mrs_msgs::srv::Vec1::Response> response) {
 
   if (!is_initialized_) {
     response->message = "not initialized";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("callbackSetHeadingRelative");
@@ -5838,7 +5803,7 @@ mrs_lib::Task<bool> ControlManager::callbackSetHeadingRelative(const std::shared
   if (!last_tracker_cmd) {
     response->message = "not flying";
     response->success = false;
-    co_return true;
+    return true;
   }
 
   mrs_msgs::msg::ReferenceStamped des_reference;
@@ -5849,12 +5814,12 @@ mrs_lib::Task<bool> ControlManager::callbackSetHeadingRelative(const std::shared
   des_reference.reference.position.z = last_tracker_cmd->position.z;
   des_reference.reference.heading    = last_tracker_cmd->heading + request->goal;
 
-  auto [success, message] = co_await setReference(des_reference);
+  auto [success, message] = setReference(des_reference);
 
   response->success = success;
   response->message = message;
 
-  co_return true;
+  return true;
 }
 
 //}
@@ -5865,20 +5830,20 @@ mrs_lib::Task<bool> ControlManager::callbackSetHeadingRelative(const std::shared
 
 /* setReference() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setReference(const mrs_msgs::msg::ReferenceStamped reference_in) {
+std::tuple<bool, std::string> ControlManager::setReference(const mrs_msgs::msg::ReferenceStamped reference_in) {
 
   std::stringstream ss;
 
   if (!callbacks_enabled_) {
     ss << "can not set the reference, the callbacks are disabled";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   if (!validateReference(node_, reference_in.reference, "setReference(): reference_in.reference")) {
     ss << "incoming reference is not finite!!!";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   // copy member variables
@@ -5892,18 +5857,16 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setReference(const 
 
     ss << "the reference could not be transformed";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   mrs_msgs::msg::ReferenceStamped transformed_reference = ret.value();
 
-  auto is_valid = co_await isPointInSafetyArea3d(transformed_reference);
-
   // safety area check
-  if (!is_valid) {
+  if (!isPointInSafetyArea3d(transformed_reference)) {
     ss << "failed to set the reference, the point is outside of the safety area!";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   if (last_tracker_cmd) {
@@ -5914,12 +5877,10 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setReference(const 
     from_point.reference.position.y = last_tracker_cmd->position.y;
     from_point.reference.position.z = last_tracker_cmd->position.z;
 
-    auto is_safe = co_await isPathToPointInSafetyArea3d(from_point, transformed_reference);
-
-    if (!is_safe) {
+    if (!isPathToPointInSafetyArea3d(from_point, transformed_reference)) {
       ss << "failed to set the reference, the path is going outside the safety area!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -5938,13 +5899,13 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setReference(const 
 
     if (tracker_response != nullptr) {
 
-      co_return std::tuple(tracker_response->success, tracker_response->message);
+      return std::tuple(tracker_response->success, tracker_response->message);
 
     } else {
 
       ss << "the tracker '" << _tracker_names_.at(active_tracker_idx_) << "' does not implement the 'setReference()' function!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "failed to set the reference: " << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 }
@@ -5953,22 +5914,20 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setReference(const 
 
 /* setVelocityReference() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in) {
+std::tuple<bool, std::string> ControlManager::setVelocityReference(const mrs_msgs::msg::VelocityReferenceStamped &reference_in) {
 
   std::stringstream ss;
 
   if (!callbacks_enabled_) {
     ss << "can not set the reference, the callbacks are disabled";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
-  auto is_valid = validateVelocityReference(node_, reference_in.reference, "setVelocityReference(): reference_in.reference");
-
-  if (!is_valid) {
+  if (!validateVelocityReference(node_, reference_in.reference, "setVelocityReference(): reference_in.reference")) {
     ss << "velocity command is not valid!";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   {
@@ -5977,7 +5936,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
     if (!last_tracker_cmd_) {
       ss << "could not set velocity command, not flying!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -5996,7 +5955,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
   if (!ret) {
     ss << "could not find tf from " << reference_in.header.frame_id << " to " << uav_state.header.frame_id;
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   } else {
     tf = ret.value();
   }
@@ -6015,7 +5974,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
 
       ss << "the velocity reference could not be transformed";
       RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
 
     } else {
       transformed_reference.reference.velocity.x = ret->vector.x;
@@ -6039,7 +5998,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
 
       ss << "the velocity reference could not be transformed";
       RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
 
     } else {
       transformed_reference.reference.altitude = ret->pose.position.z;
@@ -6058,13 +6017,11 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
   RCLCPP_DEBUG(node_->get_logger(), "equivalent reference: %.2f, %.2f, %.2f, %.2f", eqivalent_reference.reference.position.x,
                eqivalent_reference.reference.position.y, eqivalent_reference.reference.position.z, eqivalent_reference.reference.heading);
 
-  is_valid = co_await isPointInSafetyArea3d(eqivalent_reference);
-
   // safety area check
-  if (!is_valid) {
+  if (!isPointInSafetyArea3d(eqivalent_reference)) {
     ss << "failed to set the reference, the point is outside of the safety area!";
     RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str());
+    return std::tuple(false, ss.str());
   }
 
   if (last_tracker_cmd) {
@@ -6075,12 +6032,10 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
     from_point.reference.position.y = last_tracker_cmd->position.y;
     from_point.reference.position.z = last_tracker_cmd->position.z;
 
-    auto is_safe = co_await isPathToPointInSafetyArea3d(from_point, eqivalent_reference);
-
-    if (!is_safe) {
+    if (!isPathToPointInSafetyArea3d(from_point, eqivalent_reference)) {
       ss << "failed to set the reference, the path is going outside the safety area!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 
@@ -6095,13 +6050,13 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
 
     if (tracker_response != nullptr) {
 
-      co_return std::tuple(tracker_response->success, tracker_response->message);
+      return std::tuple(tracker_response->success, tracker_response->message);
 
     } else {
 
       ss << "the tracker '" << _tracker_names_.at(active_tracker_idx_) << "' does not implement the 'setVelocityReference()' function!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "failed to set the velocity reference: " << ss.str());
-      co_return std::tuple(false, ss.str());
+      return std::tuple(false, ss.str());
     }
   }
 }
@@ -6110,7 +6065,7 @@ mrs_lib::Task<std::tuple<bool, std::string>> ControlManager::setVelocityReferenc
 
 /* setTrajectoryReference() //{ */
 
-mrs_lib::Task<std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>>
+std::tuple<bool, std::string, bool, std::vector<std::string>, std::vector<bool>, std::vector<std::string>>
 ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference trajectory_in) {
 
   auto uav_state = mrs_lib::get_mutexed(mutex_uav_state_, uav_state_);
@@ -6120,7 +6075,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
   if (!callbacks_enabled_) {
     ss << "can not set the reference, the callbacks are disabled";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   /* validate the size and check for NaNs //{ */
@@ -6130,7 +6085,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
     ss << "can not load trajectory with size 0";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 
   for (int i = 0; i < int(trajectory_in.points.size()); i++) {
@@ -6142,7 +6097,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
       ss << "trajectory contains NaNs/infs.";
       RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
   }
 
@@ -6242,8 +6197,8 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
       int last_valid_idx    = 0;
       int first_invalid_idx = -1;
 
-      double min_z = co_await getMinZ(processed_trajectory.header.frame_id);
-      double max_z = co_await getMaxZ(processed_trajectory.header.frame_id);
+      double min_z = getMinZ(processed_trajectory.header.frame_id);
+      double max_z = getMaxZ(processed_trajectory.header.frame_id);
 
       for (int i = 0; i < trajectory_size; i++) {
 
@@ -6270,9 +6225,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
         des_reference.header    = processed_trajectory.header;
         des_reference.reference = processed_trajectory.points.at(i);
 
-        auto is_valid = co_await isPointInSafetyArea3d(des_reference);
-
-        if (!is_valid) {
+        if (!isPointInSafetyArea3d(des_reference)) {
 
           RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "the trajectory contains points outside of the safety area!");
           trajectory_modified = true;
@@ -6296,7 +6249,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
               ss << "the trajectory starts outside of the safety area!";
               RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-              co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+              return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
               // we have a valid point in the past
             } else {
@@ -6323,9 +6276,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
                 temp_point.reference.position.x = processed_trajectory.points.at(last_valid_idx).position.x + (j - last_valid_idx) * cos(angle) * step;
                 temp_point.reference.position.y = processed_trajectory.points.at(last_valid_idx).position.y + (j - last_valid_idx) * sin(angle) * step;
 
-                auto is_valid = co_await isPointInSafetyArea2d(temp_point);
-
-                if (!is_valid) {
+                if (!isPointInSafetyArea2d(temp_point)) {
                   interpolation_success = false;
                   break;
                 } else {
@@ -6351,7 +6302,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
             ss << "the whole trajectory is outside of the safety area!";
             RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-            co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+            return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
             // there is a good portion of the trajectory in the beginning
           } else {
@@ -6368,7 +6319,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
       ss << "the trajectory happened to be empty after all the checks! This message should not appear!";
       RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     //}
@@ -6386,7 +6337,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
     if (!tf_traj_state) {
       ss << "could not create TF transformer for the trajectory";
       RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     processed_trajectory.header.frame_id = transformer_->frame_to(*tf_traj_state);
@@ -6403,7 +6354,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
 
         ss << "trajectory cannnot be transformed";
         RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-        co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+        return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
 
       } else {
 
@@ -6420,7 +6371,7 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
     if (processed_trajectory.points.size() == 0) {
       ss << "reference trajectory was processing and it is now empty, this should not happen!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+      return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
     }
 
     // prepare the message for current tracker
@@ -6492,12 +6443,12 @@ ControlManager::setTrajectoryReference(const mrs_msgs::msg::TrajectoryReference 
       }
     }
 
-    co_return std::tuple(success, message, modified, tracker_names, tracker_successes, tracker_messages);
+    return std::tuple(success, message, modified, tracker_names, tracker_successes, tracker_messages);
   } else {
 
     ss << "safety area diagnostics message is not available, can not set trajectory";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-    co_return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
+    return std::tuple(false, ss.str(), false, std::vector<std::string>(), std::vector<bool>(), std::vector<std::string>());
   }
 }
 
@@ -6779,47 +6730,43 @@ double ControlManager::getMass(void) {
 // | ----------------------- safety area ---------------------- |
 
 /* //{ isPointInSafetyArea3d() */
-mrs_lib::Task<bool> ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
+bool ControlManager::isPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &point) {
   std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
 
   request->header    = point.header;
   request->reference = point.reference;
 
-  auto response = co_await sch_point_in_safety_area_3d_.callAwaitable(request);
-
+  auto response = sch_point_in_safety_area_3d_.callSync(request);
   if (!response) {
     RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
-    co_return false;
+    return false;
   }
-
-  co_return static_cast<bool>(response.value()->success);
+  return response.value()->success;
 }
 
 //}
 
 /* //{ isPointInSafetyArea2d() */
-mrs_lib::Task<bool> ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
+bool ControlManager::isPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &point) {
 
   std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
 
   request->header    = point.header;
   request->reference = point.reference;
 
-  auto response = co_await sch_point_in_safety_area_2d_.callAwaitable(request);
-
+  auto response = sch_point_in_safety_area_2d_.callSync(request);
   if (!response) {
     RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
-    co_return false;
+    return false;
   }
 
-  co_return static_cast<bool>(response.value()->success);
+  return response.value()->success;
 }
 
 //}
 
 /* //{ isPathToPointInSafetyArea3d() */
-mrs_lib::Task<bool> ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
-
+bool ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
   std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request = std::make_shared<mrs_msgs::srv::ValidatePathToPointSrv::Request>();
 
   request->start.header = start.header;
@@ -6828,22 +6775,19 @@ mrs_lib::Task<bool> ControlManager::isPathToPointInSafetyArea3d(const mrs_msgs::
   request->end.header = end.header;
   request->end.point  = end.reference.position;
 
-  auto response = co_await sch_path_to_point_in_safety_area_3d_.callAwaitable(request);
-
+  auto response = sch_path_to_point_in_safety_area_3d_.callSync(request);
   if (!response) {
     RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
-    co_return false;
+    return false;
   }
-
-  co_return static_cast<bool>(response.value()->success);
+  return response.value()->success;
 }
 
 
 //}
 
 /* //{ isPathToPointInSafetyArea2d() */
-mrs_lib::Task<bool> ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
-
+bool ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::msg::ReferenceStamped &start, const mrs_msgs::msg::ReferenceStamped &end) {
   std::shared_ptr<mrs_msgs::srv::ValidatePathToPointSrv::Request> request = std::make_shared<mrs_msgs::srv::ValidatePathToPointSrv::Request>();
   request->start.header                                                   = start.header;
   request->start.point                                                    = start.reference.position;
@@ -6851,21 +6795,19 @@ mrs_lib::Task<bool> ControlManager::isPathToPointInSafetyArea2d(const mrs_msgs::
   request->end.header = end.header;
   request->end.point  = end.reference.position;
 
-  auto response = co_await sch_path_to_point_in_safety_area_2d_.callAwaitable(request);
-
+  auto response = sch_path_to_point_in_safety_area_2d_.callSync(request);
   if (!response) {
     RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to check if the point is in the safety area failed");
-    co_return false;
+    return false;
   }
-
-  co_return static_cast<bool>(response.value()->success);
+  return response.value()->success;
 }
 
 //}
 
 /* //{ getMaxZ() */
 
-mrs_lib::Task<double> ControlManager::getMaxZ(const std::string &frame_id) {
+double ControlManager::getMaxZ(const std::string &frame_id) {
 
   double safety_area_max_z = std::numeric_limits<float>::max();
 
@@ -6921,9 +6863,9 @@ mrs_lib::Task<double> ControlManager::getMaxZ(const std::string &frame_id) {
   }
 
   if (estimation_manager_max_z < safety_area_max_z) {
-    co_return estimation_manager_max_z;
+    return estimation_manager_max_z;
   } else {
-    co_return safety_area_max_z;
+    return safety_area_max_z;
   }
 }
 
@@ -6931,16 +6873,16 @@ mrs_lib::Task<double> ControlManager::getMaxZ(const std::string &frame_id) {
 
 /* //{ getMinZ() */
 
-mrs_lib::Task<double> ControlManager::getMinZ(const std::string &frame_id) {
+double ControlManager::getMinZ(const std::string &frame_id) {
 
   {
     std::shared_ptr<mrs_msgs::srv::GetReferenceStampedSrv::Request> request = std::make_shared<mrs_msgs::srv::GetReferenceStampedSrv::Request>();
 
-    auto response = co_await sch_get_min_z_.callAwaitable(request);
+    auto response = sch_get_min_z_.callSync(request);
 
     if (!response) {
       RCLCPP_WARN(node_->get_logger(), "SafetyArea: Service call to get min_z from the safety area timed out");
-      co_return std::numeric_limits<double>::lowest();
+      return std::numeric_limits<double>::lowest();
     }
 
     geometry_msgs::msg::PointStamped point;
@@ -6952,10 +6894,10 @@ mrs_lib::Task<double> ControlManager::getMinZ(const std::string &frame_id) {
 
     if (!ret) {
       RCLCPP_WARN(node_->get_logger(), "SafetyArea: Could not transform safety area's min_z to '%s'", frame_id.c_str());
-      co_return std::numeric_limits<double>::lowest();
+      return std::numeric_limits<double>::lowest();
     }
 
-    co_return static_cast<double>(ret->point.z);
+    return ret->point.z;
   }
 }
 

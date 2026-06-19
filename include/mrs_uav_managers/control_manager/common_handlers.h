@@ -3,7 +3,6 @@
 
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/scope_timer.h>
-#include <mrs_lib/coro/task.hpp>
 #include <mrs_lib/quadratic_throttle_model.h>
 
 namespace mrs_uav_managers
@@ -14,10 +13,10 @@ namespace control_manager
 
 /* safety area handler //{ */
 
-typedef std::function<mrs_lib::Task<bool>(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea3d_t;
-typedef std::function<mrs_lib::Task<bool>(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea2d_t;
-typedef std::function<mrs_lib::Task<double>(const std::string &frame_id)>                getMaxZ_t;
-typedef std::function<mrs_lib::Task<double>(const std::string &frame_id)>                getMinZ_t;
+typedef std::function<bool(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea3d_t;
+typedef std::function<bool(const mrs_msgs::msg::ReferenceStamped &point)> isPointInSafetyArea2d_t;
+typedef std::function<double(const std::string &frame_id)>                getMaxZ_t;
+typedef std::function<double(const std::string &frame_id)>                getMinZ_t;
 
 struct SafetyArea_t
 {
