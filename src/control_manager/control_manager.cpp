@@ -2136,13 +2136,15 @@ void ControlManager::initialize(void) {
   }
 
   {
+    std::function<void()> callback_fcn = std::bind(&ControlManager::timerJoystick, this);
+
     mrs_lib::TimerHandlerOptions opts;
 
     opts.node           = node_;
     opts.autostart      = true;
     opts.callback_group = cbkgrp_co_timers_;
 
-    timer_joystick_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_joystick_timer_rate_, clock_), &ControlManager::timerJoystick, this);
+    timer_joystick_ = std::make_shared<TimerType>(opts, rclcpp::Rate(_joystick_timer_rate_, clock_), callback_fcn);
   }
 
   timer_eland_ = std::make_shared<TimerType>(timer_opts_co_no_start, rclcpp::Rate(_elanding_timer_rate_, clock_), &ControlManager::timerEland, this);
