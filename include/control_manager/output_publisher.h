@@ -44,7 +44,7 @@ private:
   class PublisherVisitor {
 
   public:
-    PublisherVisitor(OutputPublisher *obj) : obj_(obj) {};
+    PublisherVisitor(OutputPublisher *obj) : obj_(obj){};
 
     OutputPublisher *obj_;
 
