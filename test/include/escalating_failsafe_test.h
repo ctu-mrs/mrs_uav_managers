@@ -5,7 +5,7 @@ class EscalatingFailsafeTest : public mrs_uav_testing::TestGeneric {
 public:
   bool test();
 
-  EscalatingFailsafeTest() : mrs_uav_testing::TestGeneric(){};
+  EscalatingFailsafeTest() : mrs_uav_testing::TestGeneric() {};
 
   virtual std::optional<std::tuple<bool, std::string>> escalatingFailsafe() = 0;
 
