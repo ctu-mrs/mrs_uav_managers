@@ -228,15 +228,4 @@ def generate_launch_description():
 
     # #} end of own container
 
-    ld.add_action(
-        # Nodes under test
-        launch_ros.actions.Node(
-            package='tf2_ros',
-            namespace='',
-            executable='static_transform_publisher',
-            name='fcu_to_rtk_antenna',
-            arguments=["0.0", "0.0", "0.20", "0", "0", "0", [uav_name, "/fcu"], [uav_name, "/rtk_antenna"]],
-        )
-    )
-
     return ld
