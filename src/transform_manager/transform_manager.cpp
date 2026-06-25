@@ -153,6 +153,8 @@ private:
 
   std::optional<geometry_msgs::msg::Pose> transformRtkToFcu(const geometry_msgs::msg::PoseStamped &pose_in) const;
 
+  bool isRtkUsed() const;
+
   void publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
   void publishLocalTf();
@@ -474,7 +476,7 @@ void TransformManager::initialize() {
   sh_hw_api_orientation_ =
       mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, "~/orientation_in", &TransformManager::callbackHwApiOrientation, this);
 
-  if (utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin") {
+  if (isRtkUsed()) {
     sh_rtk_gps_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::RtkGps>(shopts, "~/rtk_gps_in", &TransformManager::callbackRtkGps, this);
   } else {
     sh_gnss_ = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/gnss_in", &TransformManager::callbackGnss, this);
@@ -493,24 +495,28 @@ void TransformManager::initialize() {
     error_publisher_->flushAndShutdown();
   }
 
-  // Check if the RTK antenna static tf is defined
-  bool got_rtk_antenna_tf = false;
-  for (int i = 0; i < 10; i++) {
-    auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, clock_->now());
-    if (res_tf_rtk) {
-      RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
-      got_rtk_antenna_tf = true;
-      break;
-    }
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
-    clock_->sleep_for(0.5s);
-  }
 
-  if (!got_rtk_antenna_tf) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
-                 getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
-    error_publisher_->addOneshotError("RTK antenna TF not available.");
-    error_publisher_->flushAndShutdown();
+  if (isRtkUsed()) {
+    // Check if the RTK antenna static tf is defined
+    bool got_rtk_antenna_tf = false;
+    for (int i = 0; i < 10; i++) {
+      auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, clock_->now());
+      if (res_tf_rtk) {
+        RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
+        got_rtk_antenna_tf = true;
+        break;
+      }
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(),
+                           Support::waiting_for_string.c_str());
+      clock_->sleep_for(0.5s);
+    }
+
+    if (!got_rtk_antenna_tf) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
+                   getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
+      error_publisher_->addOneshotError("RTK antenna TF not available.");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   is_initialized_ = true;
@@ -964,6 +970,12 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
   return true;
 }
 /*//}*/
+
+/* isRtkUsed() //{ */
+bool TransformManager::isRtkUsed() const {
+  return utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin";
+}
+//}
 
 /*//{ publishFcuUntiltedTf() */
 void TransformManager::publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg) {
