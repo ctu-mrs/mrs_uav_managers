@@ -30,6 +30,7 @@
 #include <geometry_msgs/msg/vector3_stamped.hpp>
 
 #include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
 
 #include <std_msgs/msg/empty.hpp>
 
@@ -373,6 +374,9 @@ private:
   double                  uav_heading_                 = 0;
   std::mutex              mutex_uav_state_;
 
+  nav_msgs::msg::Path path_accumulated_;
+  std::mutex          mutex_path_accumulated_;
+
   // odometry hiccup detection
   double uav_state_avg_dt_        = 1;
   double uav_state_hiccup_factor_ = 1;
@@ -435,6 +439,7 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::msg::DynamicsConstraints>       ph_current_constraints_;
   mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>            ph_heading_;
   mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>            ph_speed_;
+  mrs_lib::PublisherHandler<nav_msgs::msg::Path>                      ph_path_;
 
   // | --------------------- service servers -------------------- |
 
@@ -1874,6 +1879,16 @@ void ControlManager::initialize(void) {
   ph_speed_               = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/speed_out");
 
   {
+
+    mrs_lib::PublisherHandlerOptions opts;
+
+    opts.node          = node_;
+    opts.throttle_rate = 1.0;
+
+    ph_path_ = mrs_lib::PublisherHandler<nav_msgs::msg::Path>(opts, "~/accumulated_path_out");
+  }
+
+  {
     mrs_lib::PublisherHandlerOptions opts;
 
     opts.node          = node_;
@@ -2604,6 +2619,34 @@ void ControlManager::timerStatus() {
     mrs_msgs::msg::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
     ph_current_constraints_.publish(constraints);
+  }
+
+  // --------------------------------------------------------------
+  // |               publisher the accumulated path               |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_path_accumulated_);
+
+    // | --------- clear old data in the accumulated path --------- |
+
+    auto cutoff_it = path_accumulated_.poses.begin();
+
+    for (; cutoff_it != path_accumulated_.poses.end(); ++cutoff_it) {
+
+      rclcpp::Time pose_time(cutoff_it->header.stamp);
+
+      // TODO parametrize the time length of the path
+      if ((clock_->now() - pose_time).seconds() <= 10.0) {
+        break;
+      }
+    }
+
+    path_accumulated_.poses.erase(path_accumulated_.poses.begin(), cutoff_it);
+
+    // | -------------- publish the path (throttled) -------------- |
+
+    ph_path_.publish(path_accumulated_);
   }
 }
 
@@ -3556,6 +3599,19 @@ void ControlManager::asyncControl(void) {
     updateTrackers();
 
     updateControllers(uav_state);
+
+    {
+      std::scoped_lock lock(mutex_path_accumulated_);
+
+      path_accumulated_.header = uav_state.header;
+
+      geometry_msgs::msg::PoseStamped pose;
+
+      pose.pose   = uav_state.pose;
+      pose.header = uav_state.header;
+
+      path_accumulated_.poses.push_back(pose);
+    }
 
     if (got_constraints_) {
 

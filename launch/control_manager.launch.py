@@ -290,6 +290,7 @@ def generate_launch_description():
             ("~/current_constraints_out", "~/current_constraints"),
             ("~/heading_out", "~/heading"),
             ("~/speed_out", "~/speed"),
+            ("~/accumulated_path_out", "~/accumulated_path"),
             ("~/trajectory_original/poses_out", "~/trajectory_original/poses"),
             ("~/trajectory_original/markers_out", "~/trajectory_original/markers"),
             ("~/controller_diagnostics_out", "~/controller_diagnostics"),
