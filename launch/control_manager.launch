@@ -138,6 +138,7 @@
       <remap from="~current_constraints_out" to="~current_constraints" />
       <remap from="~heading_out" to="~heading" />
       <remap from="~speed_out" to="~speed" />
+      <remap from="~accumulated_path_out" to="~accumulated_path" />
       <remap from="~trajectory_original/poses_out" to="~trajectory_original/poses" />
       <remap from="~trajectory_original/markers_out" to="~trajectory_original/markers" />
       <remap from="~controller_diagnostics_out" to="~controller_diagnostics" />

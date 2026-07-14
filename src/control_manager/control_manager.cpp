@@ -30,6 +30,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/NavSatFix.h>
@@ -363,6 +364,9 @@ private:
   double             uav_heading_                 = 0;
   std::mutex         mutex_uav_state_;
 
+  nav_msgs::Path path_accumulated_;
+  std::mutex     mutex_path_accumulated_;
+
   // odometry hiccup detection
   double uav_state_avg_dt_        = 1;
   double uav_state_hiccup_factor_ = 1;
@@ -427,6 +431,7 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>       ph_current_constraints_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_heading_;
   mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>            ph_speed_;
+  mrs_lib::PublisherHandler<nav_msgs::Path>                      ph_path_;
 
   // | --------------------- service servers -------------------- |
 
@@ -1784,6 +1789,7 @@ void ControlManager::initialize(void) {
   ph_current_constraints_                = mrs_lib::PublisherHandler<mrs_msgs::DynamicsConstraints>(nh_, "current_constraints_out", 1);
   ph_heading_                            = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "heading_out", 1);
   ph_speed_                              = mrs_lib::PublisherHandler<mrs_msgs::Float64Stamped>(nh_, "speed_out", 1, false, 10.0);
+  ph_path_                               = mrs_lib::PublisherHandler<nav_msgs::Path>(nh_, "accumulated_path_out", 1, false, 1.0);
   pub_debug_original_trajectory_poses_   = mrs_lib::PublisherHandler<geometry_msgs::PoseArray>(nh_, "trajectory_original/poses_out", 1, true);
   pub_debug_original_trajectory_markers_ = mrs_lib::PublisherHandler<visualization_msgs::MarkerArray>(nh_, "trajectory_original/markers_out", 1, true);
 
@@ -2488,6 +2494,34 @@ void ControlManager::timerStatus(const ros::TimerEvent& event) {
     mrs_msgs::DynamicsConstraints constraints = sanitized_constraints.constraints;
 
     ph_current_constraints_.publish(constraints);
+  }
+
+  // --------------------------------------------------------------
+  // |                publishe the accumulated path               |
+  // --------------------------------------------------------------
+
+  {
+    std::scoped_lock lock(mutex_path_accumulated_);
+
+    // | --------- clear old data in the accumulated path --------- |
+
+    auto cutoff_it = path_accumulated_.poses.begin();
+
+    for (; cutoff_it != path_accumulated_.poses.end(); ++cutoff_it) {
+
+      ros::Time pose_time(cutoff_it->header.stamp);
+
+      // TODO parametrize the time length of the path
+      if ((ros::Time::now() - pose_time).toSec() <= 10.0) {
+        break;
+      }
+    }
+
+    path_accumulated_.poses.erase(path_accumulated_.poses.begin(), cutoff_it);
+
+    // | -------------- publish the path (throttled) -------------- |
+
+    ph_path_.publish(path_accumulated_);
   }
 }
 
@@ -3426,6 +3460,19 @@ void ControlManager::asyncControl(void) {
     updateTrackers();
 
     updateControllers(uav_state);
+
+    {
+      std::scoped_lock lock(mutex_path_accumulated_);
+
+      path_accumulated_.header = uav_state.header;
+
+      geometry_msgs::PoseStamped pose;
+
+      pose.pose   = uav_state.pose;
+      pose.header = uav_state.header;
+
+      path_accumulated_.poses.push_back(pose);
+    }
 
     if (got_constraints_) {
 
