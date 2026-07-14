@@ -27,6 +27,7 @@
 
 #include <nav_msgs/msg/odometry.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -154,6 +155,7 @@ private:
   std::optional<geometry_msgs::msg::Pose> transformRtkToFcu(const geometry_msgs::msg::PoseStamped &pose_in) const;
 
   bool isRtkUsed() const;
+  bool isGarminUsed() const;
 
   void publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
@@ -515,6 +517,29 @@ void TransformManager::initialize() {
       RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
                    getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
       error_publisher_->addOneshotError("RTK antenna TF not available.");
+      error_publisher_->flushAndShutdown();
+    }
+  }
+
+  if (isGarminUsed()) {
+    // Check if the garmin static tf is defined
+    const std::string ns_garmin     = ch_->uav_name + "/garmin";
+    bool              got_garmin_tf = false;
+    for (int i = 0; i < 10; i++) {
+      auto res_tf_garmin = ch_->transformer->getTransform(ns_garmin, ch_->frames.ns_fcu, clock_->now());
+      if (res_tf_garmin) {
+        RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to GARMIN", getPrintName().c_str());
+        got_garmin_tf = true;
+        break;
+      }
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to GARMIN", getPrintName().c_str(), Support::waiting_for_string.c_str());
+      clock_->sleep_for(0.5s);
+    }
+
+    if (!got_garmin_tf) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to GARMIN is not defined. Please provide static tf from %s to %s.",
+                   getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ns_garmin.c_str());
+      error_publisher_->addOneshotError("Garmin TF not available.");
       error_publisher_->flushAndShutdown();
     }
   }
@@ -974,6 +999,13 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
 /* isRtkUsed() //{ */
 bool TransformManager::isRtkUsed() const {
   return utm_source_name_ == "rtk" || utm_source_name_ == "rtk_garmin";
+}
+//}
+
+/* isGarminUsed() //{ */
+bool TransformManager::isGarminUsed() const {
+  return std::any_of(estimator_names_.begin(), estimator_names_.end(),
+                     [](const std::string &estimator_name) { return estimator_name.find("garmin") != std::string::npos; });
 }
 //}
 
