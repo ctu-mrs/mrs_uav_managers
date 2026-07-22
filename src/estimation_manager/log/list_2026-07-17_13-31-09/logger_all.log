@@ -1,0 +1,155 @@
+[0.065s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'list', '--base-paths', '/home/horynjir/ws_examples/install/..']
+[0.065s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, output_style='catkin_tools', verb_name='list', build_base='build', ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['/home/horynjir/ws_examples/install/..'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], topological_order=False, names_only=False, paths_only=False, topological_graph=False, topological_graph_dot=False, topological_graph_density=False, topological_graph_legend=False, topological_graph_dot_cluster=False, topological_graph_dot_include_skipped=False, mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0x74f1d1cccf50>, verb_extension=<colcon_package_information.verb.list.ListVerb object at 0x74f1d1ccc110>, main=<bound method ListVerb.main of <colcon_package_information.verb.list.ListVerb object at 0x74f1d1ccc110>>, mixin_verb=('list',))
+[0.089s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.090s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.090s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.090s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.090s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.090s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/horynjir/ws_examples'
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['ignore', 'ignore_ament_install']
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'ignore'
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'ignore_ament_install'
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['colcon_pkg']
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'colcon_pkg'
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['colcon_meta']
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'colcon_meta'
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['ros']
+[0.090s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'ros'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['cmake', 'python']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'cmake'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'python'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extensions ['python_setup_py']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/..) by extension 'python_setup_py'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../build) by extensions ['ignore', 'ignore_ament_install']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../build) by extension 'ignore'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../build) ignored
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../install) by extensions ['ignore', 'ignore_ament_install']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../install) by extension 'ignore'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../install) ignored
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../log) by extensions ['ignore', 'ignore_ament_install']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../log) by extension 'ignore'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../log) ignored
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['ignore', 'ignore_ament_install']
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'ignore'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'ignore_ament_install'
+[0.108s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['colcon_pkg']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'colcon_pkg'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['colcon_meta']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'colcon_meta'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['ros']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'ros'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['cmake', 'python']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'cmake'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'python'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extensions ['python_setup_py']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src) by extension 'python_setup_py'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extensions ['ignore', 'ignore_ament_install']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extension 'ignore'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extension 'ignore_ament_install'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extensions ['colcon_pkg']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extension 'colcon_pkg'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extensions ['colcon_meta']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extension 'colcon_meta'
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extensions ['ros']
+[0.109s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader) by extension 'ros'
+[0.111s] DEBUG:colcon.colcon_core.package_identification:Package '/home/horynjir/ws_examples/install/../src/mrs_uav_trajectory_loader' with type 'ros.ament_cmake' and name 'mrs_uav_trajectory_loader'
+[0.111s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['ignore', 'ignore_ament_install']
+[0.111s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'ignore'
+[0.111s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'ignore_ament_install'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['colcon_pkg']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'colcon_pkg'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['colcon_meta']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'colcon_meta'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['ros']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'ros'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['cmake', 'python']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'cmake'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'python'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extensions ['python_setup_py']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor) by extension 'python_setup_py'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/log) by extensions ['ignore', 'ignore_ament_install']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/log) by extension 'ignore'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/log) ignored
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['ignore', 'ignore_ament_install']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'ignore'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'ignore_ament_install'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['colcon_pkg']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'colcon_pkg'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['colcon_meta']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'colcon_meta'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['ros']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'ros'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['cmake', 'python']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'cmake'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'python'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extensions ['python_setup_py']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages) by extension 'python_setup_py'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extensions ['ignore', 'ignore_ament_install']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extension 'ignore'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extension 'ignore_ament_install'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extensions ['colcon_pkg']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extension 'colcon_pkg'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extensions ['colcon_meta']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extension 'colcon_meta'
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extensions ['ros']
+[0.112s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator) by extension 'ros'
+[0.113s] DEBUG:colcon.colcon_core.package_identification:Package '/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator' with type 'ros.ament_cmake' and name 'floating_estimator'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extensions ['ignore', 'ignore_ament_install']
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extension 'ignore'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extension 'ignore_ament_install'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extensions ['colcon_pkg']
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extension 'colcon_pkg'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extensions ['colcon_meta']
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extension 'colcon_meta'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extensions ['ros']
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin) by extension 'ros'
+[0.113s] DEBUG:colcon.colcon_core.package_identification:Package '/home/horynjir/ws_examples/install/../src/no_anchor/ros_packages/floating_estimator_plugin' with type 'ros.ament_cmake' and name 'floating_estimator_plugin'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['ignore', 'ignore_ament_install']
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'ignore'
+[0.113s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'ignore_ament_install'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['colcon_pkg']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'colcon_pkg'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['colcon_meta']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'colcon_meta'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['ros']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'ros'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['cmake', 'python']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'cmake'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'python'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extensions ['python_setup_py']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts) by extension 'python_setup_py'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['ignore', 'ignore_ament_install']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'ignore'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'ignore_ament_install'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['colcon_pkg']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'colcon_pkg'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['colcon_meta']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'colcon_meta'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['ros']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'ros'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['cmake', 'python']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'cmake'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'python'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extensions ['python_setup_py']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation) by extension 'python_setup_py'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['ignore', 'ignore_ament_install']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'ignore'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'ignore_ament_install'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['colcon_pkg']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'colcon_pkg'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['colcon_meta']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'colcon_meta'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['ros']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'ros'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['cmake', 'python']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'cmake'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'python'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extensions ['python_setup_py']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config) by extension 'python_setup_py'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config/log) by extensions ['ignore', 'ignore_ament_install']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config/log) by extension 'ignore'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/config/log) ignored
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/log) by extensions ['ignore', 'ignore_ament_install']
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/log) by extension 'ignore'
+[0.114s] Level 1:colcon.colcon_core.package_identification:_identify(/home/horynjir/ws_examples/install/../src/no_anchor/scripts/simulation/log) ignored
+[0.114s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults

@@ -28,6 +28,7 @@ struct WorldOrigin_t
 {
   double x;
   double y;
+  double z;
 };
 
 struct DebugTopics_t
@@ -58,6 +59,7 @@ struct CommonHandlers_t
   std::shared_ptr<mrs_lib::Transformer> transformer;
   double                                desired_uav_state_rate;
   double                                desired_diagnostics_rate;
+  bool                                  use_z_relative_to_home;
   WorldOrigin_t                         world_origin;
   ScopeTimer_t                          scope_timer;
   DebugTopics_t                         debug_topics;
