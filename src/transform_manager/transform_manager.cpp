@@ -832,6 +832,11 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
     return;
   }
 
+  if (msg->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NavSatFix has no GNSS fix!!!", getPrintName().c_str());
+    return;
+  }
+
   geometry_msgs::msg::Point utm_origin;
   utm_origin.x = out_x;
   utm_origin.y = out_y;
