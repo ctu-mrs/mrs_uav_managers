@@ -132,8 +132,8 @@ private:
   void                                                callbackUavState(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
   std::string                                         first_frame_id_;
   std::string                                         last_frame_id_;
-  bool                                                is_first_frame_id_set_        = false;
-  bool                                                is_local_static_tf_published_ = false;
+  std::atomic_bool                                    is_first_frame_id_set_        = false;
+  std::atomic_bool                                    is_local_static_tf_published_ = false;
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_height_agl_;
   void                                                      callbackHeightAgl(const mrs_msgs::msg::Float64Stamped::ConstSharedPtr msg);
@@ -966,6 +966,11 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
     // invalidate the stale reference so the utm/world tfs re-capture it in the new frame
     tf_sources_[i]->invalidateFirstMsg();
   }
+
+  // local_origin is anchored to the first uav_state, taken in the previous frame; drop it so the
+  // next uav_state re-anchors it, otherwise the frame stays offset by the world origin change
+  is_first_frame_id_set_        = false;
+  is_local_static_tf_published_ = false;
 
   response->success = true;
   response->message = "World origin set successfully";
