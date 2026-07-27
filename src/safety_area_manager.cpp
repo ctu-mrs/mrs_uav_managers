@@ -1158,9 +1158,19 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
   safety_zone_handler_.parameters.world_origin.y     = request->reference.position.y;
   safety_zone_handler_.parameters.world_origin.units = (request->header.frame_id.find("latlon_origin") != std::string::npos) ? "LATLON" : "UTM";
 
-  response->success     = true;
-  response->message     = "World origin set successfully";
-  world_origin_changed_ = true;
+  response->success = true;
+  response->message = "World origin set successfully";
+
+  // the area is defined in the world_origin frame and follows it through the tf, so a zero shift
+  // means the prisms would be rebuilt unchanged - skip it rather than tear down a correct zone.
+  // Re-sending the same origin cancels out exactly; the margin only absorbs rounding from the UTM
+  // conversions and is kept far below any shift that could matter, because failing to rebuild a
+  // genuinely moved area is the dangerous direction while an extra rebuild is not
+  const double min_significant_shift = 1e-3; // [m]
+
+  if (std::abs(delta_x) > min_significant_shift || std::abs(delta_y) > min_significant_shift) {
+    world_origin_changed_ = true;
+  }
 
   return true;
 }
