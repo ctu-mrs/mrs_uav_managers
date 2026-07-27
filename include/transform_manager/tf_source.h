@@ -201,6 +201,14 @@ public:
   }
   /*//}*/
 
+  /*//{ invalidateFirstMsg() */
+  // forces recapture of the reference odom msg; call after the estimator frame is re-anchored (e.g.
+  // world-origin change + estimator reset), else the stale reference offsets the utm/world tfs
+  void invalidateFirstMsg() {
+    got_first_msg_ = false;
+  }
+  /*//}*/
+
 private:
   const std::string name_;
   const std::string ns_fcu_frame_id_;
@@ -252,7 +260,7 @@ private:
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>               sh_tf_source_odom_;
   mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped> sh_tf_source_att_;
   nav_msgs::msg::Odometry::ConstSharedPtr                           first_msg_;
-  bool                                                              got_first_msg_ = false;
+  std::atomic_bool                                                  got_first_msg_ = false;
 
 
   /*//{ callbackTfSourceOdom()*/

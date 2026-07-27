@@ -967,6 +967,9 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
 
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setWorldOrigin(world_origin);
+    // the estimators are reset when the world origin changes, which re-anchors their odom frame;
+    // invalidate the stale reference so the utm/world tfs re-capture it in the new frame
+    tf_sources_[i]->invalidateFirstMsg();
   }
 
   response->success = true;
