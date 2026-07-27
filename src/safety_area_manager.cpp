@@ -1365,6 +1365,9 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
   // Copy parameters from previous safety zone if exists
   if (safety_zone_handler_.safety_zone) {
     safety_zone_handler.parameters = safety_zone_handler_.parameters;
+    // a freshly constructed zone defaults to disabled; carry over the current state so that
+    // rebuilding the zone (world-origin change, new border) does not silently drop the fence
+    safety_zone_handler.safety_zone->enableSafetyZone(safety_zone_handler_.safety_zone->safetyZoneEnabled());
   }
 
   return safety_zone_handler;
