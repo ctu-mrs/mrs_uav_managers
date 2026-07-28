@@ -416,6 +416,11 @@ private:
   bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
 
+  // with use_home_position the world origin is not known at startup, it is pushed in by
+  // TransformManager once the home position is captured
+  bool              world_origin_use_home_position_ = false;
+  std::atomic<bool> world_origin_set_               = false;
+
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> srvs_toggle_callbacks_;
 
   bool callbackToggleServiceCallbacks(const std::shared_ptr<std_srvs::srv::SetBool::Request>  request,
@@ -592,39 +597,14 @@ void EstimationManager::initialize() {
 
   /*//{ load world_origin parameters */
 
-  std::string world_origin_units;
-  bool        is_origin_param_ok = true;
-  double      world_origin_x     = 0;
-  double      world_origin_y     = 0;
+  {
+    double world_origin_x = 0;
+    double world_origin_y = 0;
 
-  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
+    Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getName(), world_origin_x, world_origin_y, world_origin_use_home_position_);
 
-  if (Support::toLowercase(world_origin_units) == "utm") {
-    RCLCPP_INFO(node_->get_logger(), "Loading world origin in UTM units.");
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
-
-  } else if (Support::toLowercase(world_origin_units) == "latlon") {
-    double lat, lon;
-    RCLCPP_INFO(node_->get_logger(), "Loading world origin in LatLon units.");
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
-    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-    RCLCPP_INFO(node_->get_logger(), "Converted to UTM x: %f, y: %f.", world_origin_x, world_origin_y);
-
-  } else {
-    RCLCPP_ERROR(node_->get_logger(), "world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", world_origin_units.c_str());
-    error_publisher_->addOneshotError("world_origin_units must be (\"UTM\"|\"LATLON\").");
-    error_publisher_->flushAndShutdown();
-  }
-
-  ch_->world_origin.x = world_origin_x;
-  ch_->world_origin.y = world_origin_y;
-
-  if (!is_origin_param_ok) {
-    RCLCPP_ERROR(node_->get_logger(), "Could not load all mandatory parameters from world file. Please check your world file.");
-    error_publisher_->addOneshotError("Could not load all mandatory parameters from world file.");
-    error_publisher_->flushAndShutdown();
+    ch_->world_origin.x = world_origin_x;
+    ch_->world_origin.y = world_origin_y;
   }
   /*//}*/
 
@@ -1144,10 +1124,19 @@ void EstimationManager::timerCheckHealth() {
 
   /*//{ start ready estimators, check switchable estimators */
 
+  // in home-position mode the world origin arrives at runtime; hold the estimators until then so
+  // they are never anchored to the placeholder origin and never have to be reset off it, which
+  // would re-anchor every frame derived from them
+  const bool waiting_for_world_origin = world_origin_use_home_position_ && !world_origin_set_;
+
+  if (waiting_for_world_origin) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s the home position before starting the estimators", Support::waiting_for_string.c_str());
+  }
+
   std::vector<std::string> switchable_estimator_names;
   for (auto estimator : estimator_list_) {
 
-    if (estimator->isReady()) {
+    if (estimator->isReady() && !waiting_for_world_origin) {
       try {
         RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "starting the estimator '%s'", estimator->getName().c_str());
         estimator->start();
@@ -1454,7 +1443,10 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
     return false;
   }
 
-  if (!callbacks_enabled_) {
+  // callbacks are only enabled from READY_FOR_FLIGHT onwards, which in home-position mode cannot be
+  // reached until this very call delivers the origin and releases the estimators; let it through in
+  // that case. The state check below still keeps the origin from being changed in flight.
+  if (!callbacks_enabled_ && !(world_origin_use_home_position_ && !world_origin_set_)) {
     response->success = false;
     response->message = ("Service callbacks are disabled");
     RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
@@ -1490,6 +1482,9 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
 
     ch_->world_origin.x = world_origin_x;
     ch_->world_origin.y = world_origin_y;
+
+    // releases the estimators in home-position mode, where they were held until the origin was known
+    world_origin_set_ = true;
 
     for (auto estimator : estimator_list_) {
 
