@@ -928,9 +928,15 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
   RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x,
               utm_origin.y, utm_origin.z);
 
+  geometry_msgs::msg::Point world_origin;
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    world_origin = world_origin_;
+  }
+
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
-    tf_sources_[i]->setWorldOrigin(world_origin_);
+    tf_sources_[i]->setWorldOrigin(world_origin);
   }
 
   got_utm_offset_ = true;
@@ -1007,9 +1013,15 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
   RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x,
               utm_origin.y, utm_origin.z);
 
+  geometry_msgs::msg::Point world_origin;
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    world_origin = world_origin_;
+  }
+
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
-    tf_sources_[i]->setWorldOrigin(world_origin_);
+    tf_sources_[i]->setWorldOrigin(world_origin);
   }
 
   got_utm_offset_ = true;
