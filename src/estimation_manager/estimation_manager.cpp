@@ -1130,7 +1130,9 @@ void EstimationManager::timerCheckHealth() {
   const bool waiting_for_world_origin = world_origin_use_home_position_ && !world_origin_set_;
 
   if (waiting_for_world_origin) {
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s the home position before starting the estimators", Support::waiting_for_string.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s a usable GNSS/RTK fix to establish the home-position world_origin",
+                         Support::waiting_for_string.c_str());
+    error_publisher_->addWaitingForNodeError({"TransformManager", "main"});
   }
 
   std::vector<std::string> switchable_estimator_names;
