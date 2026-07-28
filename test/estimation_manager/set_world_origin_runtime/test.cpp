@@ -22,6 +22,7 @@ public:
 
 private:
   std::optional<geometry_msgs::msg::Point> positionInFrame(const std::string &frame);
+  std::optional<geometry_msgs::msg::Point> waitForPositionInFrame(const std::string &frame, const double timeout);
 };
 
 /* positionInFrame() //{ */
@@ -48,6 +49,32 @@ std::optional<geometry_msgs::msg::Point> Tester::positionInFrame(const std::stri
   }
 
   return tfed->reference.position;
+}
+
+//}
+
+/* waitForPositionInFrame() //{ */
+
+// positionInFrame() can fail right after the system reports ready, before every static tf (e.g.
+// local_origin) has actually been broadcast yet; poll instead of querying once
+std::optional<geometry_msgs::msg::Point> Tester::waitForPositionInFrame(const std::string &frame, const double timeout) {
+
+  const rclcpp::Time start = clock_->now();
+
+  while (rclcpp::ok() && (clock_->now() - start).seconds() < timeout) {
+
+    auto position = positionInFrame(frame);
+
+    if (position) {
+      return position;
+    }
+
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for the transform to '%s'", frame.c_str());
+
+    this->sleep(0.1);
+  }
+
+  return std::nullopt;
 }
 
 //}
@@ -107,7 +134,7 @@ bool Tester::test(void) {
   geometry_msgs::msg::Point utm_before;
 
   {
-    auto position = positionInFrame(uav_name + "/utm_origin");
+    auto position = waitForPositionInFrame(uav_name + "/utm_origin", 5.0);
 
     if (!position) {
       RCLCPP_ERROR(node_->get_logger(), "could not get the UAV position in utm_origin before the world origin change");
@@ -148,7 +175,7 @@ bool Tester::test(void) {
   {
     const double max_drift = 2.0; // [m]
 
-    auto position = positionInFrame(uav_name + "/utm_origin");
+    auto position = waitForPositionInFrame(uav_name + "/utm_origin", 5.0);
 
     if (!position) {
       RCLCPP_ERROR(node_->get_logger(), "could not get the UAV position in utm_origin after the world origin change");
@@ -170,7 +197,7 @@ bool Tester::test(void) {
   {
     const double max_distance = 3.0; // [m]
 
-    auto position = positionInFrame(uav_name + "/local_origin");
+    auto position = waitForPositionInFrame(uav_name + "/local_origin", 5.0);
 
     if (!position) {
       RCLCPP_ERROR(node_->get_logger(), "could not get the UAV position in local_origin after the world origin change");
