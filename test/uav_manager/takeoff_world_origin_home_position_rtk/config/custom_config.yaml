@@ -1,0 +1,11 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # an RTK-based estimator so the home position is captured from the RTK callback rather than GNSS
+    state_estimators: [
+      "rtk_garmin",
+    ]
+
+    initial_state_estimator: "rtk_garmin"
+    agl_height_estimator: "garmin_agl"
