@@ -62,6 +62,7 @@ set(LIBRARIES
   MrsUavManagers_ConstraintManager
   MrsUavManagers_GainManager
   MrsUavManagers_SafetyAreaManager
+  MrsUavManagers_DiagnosticsManager
 )
 
 set(PLUGINS
@@ -106,6 +107,43 @@ target_link_libraries(MrsUavManagers_EstimationManager
 rclcpp_components_register_nodes(MrsUavManagers_EstimationManager "mrs_uav_managers::estimation_manager::EstimationManager")
 
 target_compile_definitions(MrsUavManagers_EstimationManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
+
+# Diagnostics Manager
+
+add_library(MrsUavManagers_DiagnosticsManager SHARED
+  src/diagnostics_manager/diagnostics_manager.cpp
+  src/diagnostics_manager/preflight_checker.cpp
+  src/diagnostics_manager/diagnostics_sensor_handler.cpp
+  src/diagnostics_manager/utils/flight_timer.cpp
+  src/diagnostics_manager/utils/host_stats.cpp
+  src/diagnostics_manager/utils/wh_drained_integrator.cpp
+)
+
+target_include_directories(MrsUavManagers_DiagnosticsManager
+  PRIVATE
+    "include"
+)
+
+target_link_libraries(MrsUavManagers_DiagnosticsManager
+  PRIVATE
+    rclcpp::rclcpp
+    rclcpp_components::component
+    mrs_lib::mrs_lib
+    pluginlib::pluginlib
+    mrs_uav_hw_api::mrs_uav_hw_api
+    Eigen3::Eigen
+    ${mrs_msgs_TARGETS}
+    ${geometry_msgs_TARGETS}
+    ${nav_msgs_TARGETS}
+    ${std_msgs_TARGETS}
+    ${sensor_msgs_TARGETS}
+    ${diagnostic_msgs_TARGETS}
+    nlohmann_json::nlohmann_json
+)
+
+rclcpp_components_register_nodes(MrsUavManagers_DiagnosticsManager "mrs_uav_managers::diagnostics_manager::DiagnosticsManager")
+
+target_compile_definitions(MrsUavManagers_DiagnosticsManager PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER} COVERAGE=${COVERAGE})
 
 # Transform Manager
 
@@ -361,6 +399,21 @@ target_sources(MrsUavManagers_MrsUavManagers
     "include/mrs_uav_managers/estimation_manager/private_handlers.h"
     "include/mrs_uav_managers/estimation_manager/support.h"
     "include/mrs_uav_managers/estimation_manager/types.h"
+    # include/mrs_uav_managers (diagnostics)
+    "include/mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/create_main_subscriber.tpp"
+    # include/mrs_uav_managers/diagnostics_manager
+    "include/mrs_uav_managers/diagnostics_manager/diagnostics_manager.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/preflight_checker.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/robot_type.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/tracker_state.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/uav_state.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/helpers/enum_helpers.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/helpers/enum_macros.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/utils/flight_timer.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/utils/host_stats.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/utils/wh_drained_integrator.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/utils/rate_tracker.hpp"
     # include/transform_manager
     "include/transform_manager/tf_mapping_origin.h"
     "include/transform_manager/tf_source.h"
@@ -381,6 +434,8 @@ target_link_libraries(MrsUavManagers_MrsUavManagers
     ${mrs_uav_hw_api_TARGETS}
     ${visualization_msgs_TARGETS}
     ${tf2_geometry_msgs_TARGETS}
+    ${diagnostic_msgs_TARGETS}
+    nlohmann_json::nlohmann_json
 )
 
 ## --------------------------------------------------------------
