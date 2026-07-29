@@ -1446,13 +1446,23 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
   }
 
   // callbacks are only enabled from READY_FOR_FLIGHT onwards, which in home-position mode cannot be
-  // reached until this very call delivers the origin and releases the estimators; let it through in
-  // that case. The state check below still keeps the origin from being changed in flight.
-  if (!callbacks_enabled_ && !(world_origin_use_home_position_ && !world_origin_set_)) {
+  // reached until this very call delivers the origin and releases the estimators; let the automated
+  // home-position push (identified by its frame_id marker, set only by TransformManager's own retry
+  // timer) through in that case, so an unrelated caller can't race it for the one-time origin adoption.
+  // The state check below still keeps the origin from being changed in flight.
+  const std::string home_position_marker  = "home_position_";
+  const bool        is_home_position_push = request->header.frame_id.find(home_position_marker) != std::string::npos;
+  if (!callbacks_enabled_ && !(world_origin_use_home_position_ && !world_origin_set_ && is_home_position_push)) {
     response->success = false;
     response->message = ("Service callbacks are disabled");
     RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
     return true;
+  }
+
+  // the marker above is only meaningful to this guard; strip it so the rest of this function and the
+  // forwarded calls to TransformManager/SafetyAreaManager see only the canonical frame_id
+  if (is_home_position_push) {
+    request->header.frame_id.erase(0, home_position_marker.size());
   }
 
   if (sm_->isInState(StateMachine::INITIALIZED_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {

@@ -1127,8 +1127,10 @@ void TransformManager::timerSetHomeWorldOrigin() {
                          getPrintName().c_str(), Support::waiting_for_string.c_str());
   }
 
+  // the "home_position_" prefix marks this as the automated push so EstimationManager can tell it
+  // apart from an unrelated caller during the boot window when its callback guard is relaxed
   auto request             = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
-  request->header.frame_id = "utm_origin";
+  request->header.frame_id = "home_position_utm_origin";
 
   {
     std::scoped_lock lock(mtx_broadcast_world_origin_);
