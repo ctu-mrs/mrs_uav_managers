@@ -18,8 +18,7 @@ namespace mrs_uav_managers::utils
  */
 class RateTracker {
 public:
-  explicit RateTracker(std::size_t window_size = 10)
-      : window_size_(window_size) {
+  explicit RateTracker(std::size_t window_size = 10) : window_size_(window_size) {
   }
 
   /** @brief Record a new message arrival at @p t. */

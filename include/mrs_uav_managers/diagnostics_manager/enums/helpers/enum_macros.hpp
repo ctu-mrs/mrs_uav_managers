@@ -25,8 +25,8 @@ inline constexpr Enum_T from_ros(Ros_T ros) {
   inline constexpr const char *to_string(enum_t v) {                                                                                                           \
     switch (v) {                                                                                                                                               \
       BOOST_PP_SEQ_FOR_EACH(X_DEFINE_ENUM_STRING_CONVERSIONS_TOSTRING_CASE, enum_t, enumerators)                                                               \
-      default:                                                                                                                                                 \
-        return "UNKNOWN";                                                                                                                                      \
+    default:                                                                                                                                                   \
+      return "UNKNOWN";                                                                                                                                        \
     }                                                                                                                                                          \
   }
 
@@ -51,8 +51,8 @@ inline constexpr Enum_T from_ros(Ros_T ros) {
   inline constexpr decltype(msg_t::elem_name) to_ros(enum_t v) {                                                                                               \
     switch (v) {                                                                                                                                               \
       BOOST_PP_SEQ_FOR_EACH(X_DEFINE_ENUM_MSG_CONVERSIONS_TOMSG_CASE, (enum_t, msg_t, elem_pre), enumerators)                                                  \
-      default:                                                                                                                                                 \
-        return msg_t::X_PPCAT(elem_pre, UNKNOWN);                                                                                                              \
+    default:                                                                                                                                                   \
+      return msg_t::X_PPCAT(elem_pre, UNKNOWN);                                                                                                                \
     }                                                                                                                                                          \
   }                                                                                                                                                            \
                                                                                                                                                                \

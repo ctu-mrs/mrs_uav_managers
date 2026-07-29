@@ -42,8 +42,8 @@ protected:
   // Rate monitoring
   std::string expected_publisher_node_;
   std::string expected_publisher_component_;
-  double expected_rate_  = 0.0;
-  double rate_tolerance_ = 0.3;
+  double      expected_rate_  = 0.0;
+  double      rate_tolerance_ = 0.3;
 
   // Grace period before reporting rate errors
   static constexpr double GRACE_PERIOD_S = 5.0;

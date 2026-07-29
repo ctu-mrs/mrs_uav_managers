@@ -9,16 +9,10 @@ template <typename Enum_T>
 struct enum_updater
 {
 public:
-  enum_updater(const rclcpp::Logger logger, const std::string_view name)
-      : m_name(name)
-      , m_enum(Enum_T::UNKNOWN)
-      , logger_(logger) {
+  enum_updater(const rclcpp::Logger logger, const std::string_view name) : m_name(name), m_enum(Enum_T::UNKNOWN), logger_(logger) {
   }
 
-  enum_updater(const rclcpp::Logger logger, const std::string_view name, const Enum_T init_value)
-      : m_name(name)
-      , m_enum(init_value)
-      , logger_(logger) {
+  enum_updater(const rclcpp::Logger logger, const std::string_view name, const Enum_T init_value) : m_name(name), m_enum(init_value), logger_(logger) {
   }
 
   Enum_T value() {
