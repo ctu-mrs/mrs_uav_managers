@@ -38,6 +38,31 @@ def generate_launch_description():
 
     # #} end of uav_name
 
+    # #{ uav_type, robot_type, available_sensors
+
+    uav_type = LaunchConfiguration('uav_type')
+    ld.add_action(DeclareLaunchArgument(
+        'uav_type',
+        default_value=os.getenv('UAV_TYPE', "x500"),
+        description="The uav type used for selecting platform configuration.",
+    ))
+
+    robot_type = LaunchConfiguration('robot_type')
+    ld.add_action(DeclareLaunchArgument(
+        'robot_type',
+        default_value=os.getenv('ROBOT_TYPE', "multirotor"),
+        description="The robot type used for selecting platform configuration.",
+    ))
+
+    available_sensors = LaunchConfiguration('available_sensors')
+    ld.add_action(DeclareLaunchArgument(
+        'available_sensors',
+        default_value=os.getenv('AVAILABLE_SENSORS', "pixhawk,garmin"),
+        description="The available sensors on the platform.",
+    ))
+
+    # #} end of uav_type, robot_type, available_sensors
+
     # #{ standalone
 
     standalone = LaunchConfiguration('standalone')
@@ -86,6 +111,10 @@ def generate_launch_description():
 
     # #{ platform_config
 
+    # Declared for argument-compatibility with core.launch.py's uniform pass-through to every
+    # manager launch file. Unlike its sibling managers, DiagnosticsManager does not read this
+    # parameter (state_monitor.launch.py never had it either) -- it is computed here but not
+    # forwarded to the node below.
     platform_config = LaunchConfiguration('platform_config')
 
     ld.add_action(DeclareLaunchArgument(
@@ -130,11 +159,11 @@ def generate_launch_description():
         name='diagnostics_manager',
 
         parameters=[
-            {"available_sensors": os.getenv('AVAILABLE_SENSORS', "pixhawk,garmin")},
+            {"available_sensors": available_sensors},
             {"custom_config": custom_config},
             {"robot_name": uav_name},
-            {"robot_type": os.getenv('ROBOT_TYPE', "multirotor")},
-            {"uav_type": os.getenv('UAV_TYPE', "x500")},
+            {"robot_type": robot_type},
+            {"uav_type": uav_type},
             {"use_sim_time": use_sim_time},
             {'config': this_pkg_path + '/config/private/diagnostics_manager/state_monitor_config.yaml'},
             {'preflight_check_config': this_pkg_path + '/config/private/diagnostics_manager/preflight_check_config.yaml'},
