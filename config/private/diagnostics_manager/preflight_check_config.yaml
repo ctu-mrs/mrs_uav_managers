@@ -1,9 +1,9 @@
 robot_diagnostics:
   # Ground-side pre-flight checks, mirrored from mrs_uav_autostart so that
-  # state_monitor can report takeoff readiness on its own (without depending
+  # DiagnosticsManager can report takeoff readiness on its own (without depending
   # on the autostart node being alive).
   preflight_check:
-    # When false, state_monitor skips all checks
+    # When false, DiagnosticsManager skips all checks
     enabled: true
     not_reporting_delay: 3.0 # [s] time after which a missing topic is considered a failure
 
