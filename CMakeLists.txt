@@ -40,12 +40,14 @@ set(DEPENDENCIES
   nav_msgs
   std_msgs
   sensor_msgs
+  diagnostic_msgs
   mrs_uav_hw_api
   visualization_msgs
   tf2_geometry_msgs
   Eigen3
   mrs_uav_testing
   backward_ros
+  nlohmann_json
 )
 
 foreach(DEP IN LISTS DEPENDENCIES)
