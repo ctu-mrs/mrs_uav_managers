@@ -34,25 +34,25 @@ DEFINE_ENUM_MSG_CONVERSIONS(X_ENUM_NAME, X_ENUM_MSG_TYPE, X_ENUM_MSG_MEMBER, X_E
 // some more helper functions related to this enum
 inline bool is_flying(state_t uav_state) {
   switch (uav_state) {
-    case state_t::DISARMED:
-    case state_t::ARMED:
-    case state_t::OFFBOARD:
-      return false;
-    default:
-      return true;
+  case state_t::DISARMED:
+  case state_t::ARMED:
+  case state_t::OFFBOARD:
+    return false;
+  default:
+    return true;
   }
 }
 
 // some more helper functions related to this enum
 inline bool is_flying_autonomously(state_t uav_state) {
   switch (uav_state) {
-    case state_t::DISARMED:
-    case state_t::ARMED:
-    case state_t::OFFBOARD:
-    case state_t::MANUAL:
-      return false;
-    default:
-      return true;
+  case state_t::DISARMED:
+  case state_t::ARMED:
+  case state_t::OFFBOARD:
+  case state_t::MANUAL:
+    return false;
+  default:
+    return true;
   }
 }
 

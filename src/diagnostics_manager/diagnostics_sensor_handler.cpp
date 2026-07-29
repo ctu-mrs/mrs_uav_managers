@@ -5,7 +5,7 @@ namespace mrs_uav_managers
 {
 
 bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
-                               rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
+                                          rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
 
   mrs_lib::ParamLoader param_loader(node, "DiagnosticsSensorHandler");
 
@@ -105,10 +105,10 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   // No messages ever received
   if (snapshot.msg_count == 0) {
     const double elapsed_since_init = (now - init_time_).seconds();
-    ss.ready   = false;
-    ss.rate    = 0.0;
-    ss.message = "No messages received for " + std::to_string(elapsed_since_init) + " seconds since startup";
-    ss.level   = mrs_msgs::msg::SensorStatus::ERROR;
+    ss.ready                        = false;
+    ss.rate                         = 0.0;
+    ss.message                      = "No messages received for " + std::to_string(elapsed_since_init) + " seconds since startup";
+    ss.level                        = mrs_msgs::msg::SensorStatus::ERROR;
     mrs_lib::errorgraph::node_id_t source_node;
     source_node.node      = expected_publisher_node_;
     source_node.component = expected_publisher_component_;
@@ -120,10 +120,10 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   // Topic gone silent — no message for 3x the expected period
   if (!isTopicFresh(now, snapshot.last_msg_wall_time)) {
     const double time_since_last = (now - snapshot.last_msg_wall_time).seconds();
-    ss.ready   = false;
-    ss.rate    = 0.0;
-    ss.message = "No messages received for " + std::to_string(time_since_last) + " seconds";
-    ss.level   = mrs_msgs::msg::SensorStatus::ERROR;
+    ss.ready                     = false;
+    ss.rate                      = 0.0;
+    ss.message                   = "No messages received for " + std::to_string(time_since_last) + " seconds";
+    ss.level                     = mrs_msgs::msg::SensorStatus::ERROR;
     mrs_lib::errorgraph::node_id_t source_node;
     source_node.node      = expected_publisher_node_;
     source_node.component = expected_publisher_component_;
@@ -158,7 +158,7 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
 }
 
 bool DiagnosticsSensorHandler::onInitialize([[maybe_unused]] rclcpp::Node::SharedPtr &node, [[maybe_unused]] const std::string &config_key,
-                                 [[maybe_unused]] const std::string &name_space, [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
+                                            [[maybe_unused]] const std::string &name_space, [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
   return true;
 }
 
