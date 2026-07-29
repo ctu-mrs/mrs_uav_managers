@@ -9,7 +9,7 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
                                                                                          const rclcpp::Duration          &timeout) {
 
   shopts_.node                                = node;
-  shopts_.node_name                           = "StateMonitor";
+  shopts_.node_name                           = "DiagnosticsManager";
   shopts_.no_message_timeout                  = timeout;
   shopts_.threadsafe                          = true;
   shopts_.autostart                           = true;
