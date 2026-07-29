@@ -16,7 +16,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   }
 
   param_loader.addYamlFileFromParam("config");
-  param_loader.setPrefix("robot_diagnostics/sensor_handlers/");
+  param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
 
   name_ = config_key; // default name is the config key
   // Load all common parameters using the YAML key (config_key)
