@@ -20,6 +20,9 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
 }
 
 void DiagnosticsManager::initialize() {
+
+  rclcpp::on_shutdown([this]() { this->shutdown(); });
+
   RCLCPP_INFO(node_->get_logger(), "Initializing...");
 
   /* load parameters */
@@ -275,6 +278,37 @@ void DiagnosticsManager::initialize() {
   RCLCPP_INFO(node_->get_logger(), " initialized ");
   RCLCPP_INFO(node_->get_logger(), "--------------------");
   is_initialized_ = true;
+}
+
+void DiagnosticsManager::shutdown() {
+
+  RCLCPP_INFO(node_->get_logger(), "shutdown(): called");
+
+  if (timer_main_) {
+    timer_main_->stop();
+  }
+
+  if (timer_uav_state_) {
+    timer_uav_state_->stop();
+  }
+
+  if (timer_error_publishing_) {
+    timer_error_publishing_->stop();
+  }
+
+  if (timer_update_sensor_status_) {
+    timer_update_sensor_status_->stop();
+  }
+
+  if (timer_host_info_) {
+    timer_host_info_->stop();
+  }
+
+  RCLCPP_INFO(node_->get_logger(), "shutdown(): unloading %zu sensor handlers", sensor_handlers_.size());
+
+  sensor_handlers_.clear();
+
+  RCLCPP_INFO(node_->get_logger(), "shutdown(): done");
 }
 
 // --------------------------------------------------------------
