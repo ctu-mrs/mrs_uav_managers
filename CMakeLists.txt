@@ -47,7 +47,6 @@ set(DEPENDENCIES
   Eigen3
   mrs_uav_testing
   backward_ros
-  nlohmann_json
 )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -138,7 +137,6 @@ target_link_libraries(MrsUavManagers_DiagnosticsManager
     ${std_msgs_TARGETS}
     ${sensor_msgs_TARGETS}
     ${diagnostic_msgs_TARGETS}
-    nlohmann_json::nlohmann_json
 )
 
 rclcpp_components_register_nodes(MrsUavManagers_DiagnosticsManager "mrs_uav_managers::diagnostics_manager::DiagnosticsManager")
@@ -435,7 +433,6 @@ target_link_libraries(MrsUavManagers_MrsUavManagers
     ${visualization_msgs_TARGETS}
     ${tf2_geometry_msgs_TARGETS}
     ${diagnostic_msgs_TARGETS}
-    nlohmann_json::nlohmann_json
 )
 
 ## --------------------------------------------------------------
