@@ -82,19 +82,19 @@ void DiagnosticsManager::initialize() {
   }
 
   std::string wifi_interface;
-  param_loader.loadParam("robot_diagnostics/wifi_interface", wifi_interface, std::string(""));
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/wifi_interface", wifi_interface, std::string(""));
 
-  auto       main_timer_rate             = param_loader.loadParam2<double>("robot_diagnostics/main_timer_rate");
-  const auto state_timer_rate            = param_loader.loadParam2<double>("robot_diagnostics/state_timer_rate");
-  auto       error_publisher_rate        = param_loader.loadParam2<double>("robot_diagnostics/error_publisher_rate");
-  const auto host_info_rate              = param_loader.loadParam2<double>("robot_diagnostics/host_info_rate");
-  const auto node_cpu_discovery_period_s = param_loader.loadParam2<double>("robot_diagnostics/node_cpu_discovery_period");
+  auto       main_timer_rate             = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/main_timer_rate");
+  const auto state_timer_rate            = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/state_timer_rate");
+  auto       error_publisher_rate        = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/error_publisher_rate");
+  const auto host_info_rate              = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/host_info_rate");
+  const auto node_cpu_discovery_period_s = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/node_cpu_discovery_period");
 
-  not_reporting_delay_ = param_loader.loadParam2<rclcpp::Duration>("robot_diagnostics/not_reporting_delay");
+  not_reporting_delay_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/not_reporting_delay");
 
   std::string available_sensors_string;
   param_loader.loadParam("available_sensors", available_sensors_string);
-  param_loader.setPrefix("robot_diagnostics/sensor_handlers/");
+  param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
   const auto update_status_rate = param_loader.loadParam2<double>("update_timer_rate");
 
   param_loader.loadParam("sensor_handler_names", _sensor_handler_names_);

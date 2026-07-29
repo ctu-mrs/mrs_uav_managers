@@ -165,8 +165,8 @@ def generate_launch_description():
             {"robot_type": robot_type},
             {"uav_type": uav_type},
             {"use_sim_time": use_sim_time},
-            {'config': this_pkg_path + '/config/private/diagnostics_manager/state_monitor_config.yaml'},
-            {'preflight_check_config': this_pkg_path + '/config/private/diagnostics_manager/preflight_check_config.yaml'},
+            {'config': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_manager.yaml'},
+            {'preflight_check_config': this_pkg_path + '/config/public/diagnostics_manager/preflight_check.yaml'},
         ],
 
         remappings=[

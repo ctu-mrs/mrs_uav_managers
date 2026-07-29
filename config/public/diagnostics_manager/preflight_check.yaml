@@ -1,0 +1,42 @@
+mrs_uav_managers:
+  diagnostics_manager:
+    # Ground-side pre-flight checks, mirrored from mrs_uav_autostart so that
+    # DiagnosticsManager can report takeoff readiness on its own (without depending
+    # on the autostart node being alive).
+    preflight_check:
+      # When false, DiagnosticsManager skips all checks
+      enabled: true
+      not_reporting_delay: 3.0 # [s] time after which a missing topic is considered a failure
+
+      # All conditions must hold for the last <time_window> seconds before
+      # the corresponding check is considered passing.
+      time_window: 5.0 # [s]
+
+      # Takeoff not allowed if the estimated speed exceeds <max_speed>.
+      speed_check:
+        enabled: true
+        max_speed: 0.3 # [m/s]
+
+      # Takeoff not allowed if the distance sensor reads above <max_height>.
+      # Gated by hw_api/capabilities.produces_distance_sensor.
+      height_check:
+        enabled: true
+        max_height: 0.8 # [m]
+
+      # Takeoff not allowed if any gyro axis exceeds <max_rate>.
+      # Gated by hw_api/capabilities.produces_imu.
+      gyro_check:
+        enabled: true
+        max_rate: 1.0 # [rad/s]
+
+      # Generic liveness check for arbitrary topics (e.g. heartbeats from
+      # other nodes). Topics whose names do not start with "/" are prefixed
+      # with /<robot_name>/ automatically.
+      topic_check:
+        enabled: true
+        timeout: 5.0 # [s] allowed gap between messages
+        topics:
+          [
+            "estimation_manager/uav_state:mrs_msgs/msg/UavState",
+            "control_manager/diagnostics:mrs_msgs/msg/ControlManagerDiagnostics",
+          ]

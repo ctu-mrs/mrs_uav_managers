@@ -28,22 +28,22 @@ void PreflightChecker::initialize(void) {
   param_loader.addYamlFileFromParam("preflight_check_config");
 
   // preflight check configuration
-  param_loader.loadParam("robot_diagnostics/preflight_check/enabled", preflight_cfg_.enabled);
-  param_loader.loadParam("robot_diagnostics/preflight_check/time_window", preflight_cfg_.time_window);
-  param_loader.loadParam("robot_diagnostics/preflight_check/not_reporting_delay", preflight_cfg_.not_reporting_delay);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/enabled", preflight_cfg_.enabled);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/time_window", preflight_cfg_.time_window);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/not_reporting_delay", preflight_cfg_.not_reporting_delay);
 
-  param_loader.loadParam("robot_diagnostics/preflight_check/speed_check/enabled", preflight_cfg_.speed_check_enabled);
-  param_loader.loadParam("robot_diagnostics/preflight_check/speed_check/max_speed", preflight_cfg_.speed_check_max);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/enabled", preflight_cfg_.speed_check_enabled);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/max_speed", preflight_cfg_.speed_check_max);
 
-  param_loader.loadParam("robot_diagnostics/preflight_check/height_check/enabled", preflight_cfg_.height_check_enabled);
-  param_loader.loadParam("robot_diagnostics/preflight_check/height_check/max_height", preflight_cfg_.height_check_max);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/height_check/enabled", preflight_cfg_.height_check_enabled);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/height_check/max_height", preflight_cfg_.height_check_max);
 
-  param_loader.loadParam("robot_diagnostics/preflight_check/gyro_check/enabled", preflight_cfg_.gyro_check_enabled);
-  param_loader.loadParam("robot_diagnostics/preflight_check/gyro_check/max_rate", preflight_cfg_.gyro_check_max);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/gyro_check/enabled", preflight_cfg_.gyro_check_enabled);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/gyro_check/max_rate", preflight_cfg_.gyro_check_max);
 
-  param_loader.loadParam("robot_diagnostics/preflight_check/topic_check/enabled", preflight_cfg_.topic_check_enabled);
-  param_loader.loadParam("robot_diagnostics/preflight_check/topic_check/timeout", preflight_cfg_.topic_check_timeout);
-  param_loader.loadParam("robot_diagnostics/preflight_check/topic_check/topics", preflight_cfg_.topic_check_topics);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/topic_check/enabled", preflight_cfg_.topic_check_enabled);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/topic_check/timeout", preflight_cfg_.topic_check_timeout);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/topic_check/topics", preflight_cfg_.topic_check_topics);
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "Failed to load all parameters for PreflightChecker");
