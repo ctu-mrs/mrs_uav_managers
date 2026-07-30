@@ -1,10 +1,14 @@
 #pragma once
 
+/* includes //{ */
+
 #include <cstddef>
 #include <deque>
 #include <mutex>
 
 #include <rclcpp/rclcpp.hpp>
+
+//}
 
 namespace mrs_uav_managers::utils
 {
@@ -18,8 +22,14 @@ namespace mrs_uav_managers::utils
  */
 class RateTracker {
 public:
+  /* RateTracker() //{ */
+
   explicit RateTracker(std::size_t window_size = 10) : window_size_(window_size) {
   }
+
+  //}
+
+  /* record() //{ */
 
   /** @brief Record a new message arrival at @p t. */
   void record(const rclcpp::Time &t) {
@@ -29,6 +39,10 @@ public:
       timestamps_.pop_front();
     }
   }
+
+  //}
+
+  /* rate() //{ */
 
   /** @brief Average rate over the current window, or 0.0 if insufficient samples. */
   double rate() const {
@@ -43,10 +57,16 @@ public:
     return static_cast<double>(timestamps_.size() - 1) / span;
   }
 
+  //}
+
+  /* clear() //{ */
+
   void clear() {
     std::scoped_lock lck(mtx_);
     timestamps_.clear();
   }
+
+  //}
 
 private:
   mutable std::mutex       mtx_;

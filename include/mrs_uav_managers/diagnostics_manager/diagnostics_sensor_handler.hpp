@@ -1,4 +1,7 @@
 #pragma once
+
+/* includes //{ */
+
 #include <diagnostic_msgs/msg/key_value.hpp>
 #include <mrs_lib/errorgraph/error_publisher.h>
 #include <mrs_lib/param_loader.h>
@@ -9,6 +12,8 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <mrs_uav_managers/diagnostics_manager/utils/rate_tracker.hpp>
+
+//}
 
 namespace mrs_uav_managers
 {

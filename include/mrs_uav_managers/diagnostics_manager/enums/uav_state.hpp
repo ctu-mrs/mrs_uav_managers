@@ -43,6 +43,8 @@ DEFINE_ENUM_WITH_CONVERSIONS(X_ENUM_NAME, X_ENUM_BASE_TYPE, X_ENUM_SEQ)
 // generate the to_ros() conversion
 DEFINE_ENUM_MSG_CONVERSIONS(X_ENUM_NAME, X_ENUM_MSG_TYPE, X_ENUM_MSG_MEMBER, X_ENUM_MSG_PREFIX, X_ENUM_SEQ)
 
+/* is_flying() //{ */
+
 // some more helper functions related to this enum
 inline bool is_flying(state_t uav_state) {
   switch (uav_state) {
@@ -54,6 +56,10 @@ inline bool is_flying(state_t uav_state) {
     return true;
   }
 }
+
+//}
+
+/* is_flying_autonomously() //{ */
 
 // some more helper functions related to this enum
 inline bool is_flying_autonomously(state_t uav_state) {
@@ -67,5 +73,7 @@ inline bool is_flying_autonomously(state_t uav_state) {
     return true;
   }
 }
+
+//}
 
 } // namespace mrs_uav_managers

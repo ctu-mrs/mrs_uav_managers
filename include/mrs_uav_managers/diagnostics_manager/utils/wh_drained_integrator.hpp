@@ -1,5 +1,7 @@
 #pragma once
 
+/* includes //{ */
+
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -7,6 +9,8 @@
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
+
+//}
 
 namespace mrs_uav_managers::utils
 {
