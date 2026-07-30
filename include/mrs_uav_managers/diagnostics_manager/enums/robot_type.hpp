@@ -8,7 +8,11 @@
 
 #define X_ENUM_NAME robot_type_t
 #define X_ENUM_BASE_TYPE uint8_t
-#define X_ENUM_SEQ (MULTIROTOR)(BOAT)
+// clang-format off
+#define X_ENUM_SEQ \
+  (MULTIROTOR)     \
+  (BOAT)
+// clang-format on
 
 namespace mrs_uav_managers
 {
