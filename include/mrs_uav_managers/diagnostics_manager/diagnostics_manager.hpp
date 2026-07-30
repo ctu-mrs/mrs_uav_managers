@@ -263,11 +263,6 @@ private:
   /** @brief Callback for incoming error graph elements from other nodes. */
   void cbk_errorgraph_element(const mrs_msgs::msg::ErrorgraphElement::ConstSharedPtr element_msg);
 
-  // | ------------------ Additional functions ------------------ |
-
-  /** @brief Split a whitespace-delimited string into a vector of tokens. */
-  std::vector<std::string> extractComponents(const std::string &input);
-
   /**
    * @brief Check a subscriber for new messages, applying the not-reporting timeout.
    * @tparam sh_T The ROS message type of the subscriber.

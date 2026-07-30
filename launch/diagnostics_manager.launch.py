@@ -38,7 +38,7 @@ def generate_launch_description():
 
     # #} end of uav_name
 
-    # #{ uav_type, robot_type, available_sensors
+    # #{ uav_type, robot_type
 
     uav_type = LaunchConfiguration('uav_type')
     ld.add_action(DeclareLaunchArgument(
@@ -54,14 +54,7 @@ def generate_launch_description():
         description="The robot type used for selecting platform configuration.",
     ))
 
-    available_sensors = LaunchConfiguration('available_sensors')
-    ld.add_action(DeclareLaunchArgument(
-        'available_sensors',
-        default_value=os.getenv('AVAILABLE_SENSORS', "pixhawk,garmin"),
-        description="The available sensors on the platform.",
-    ))
-
-    # #} end of uav_type, robot_type, available_sensors
+    # #} end of uav_type, robot_type
 
     # #{ standalone
 
@@ -159,7 +152,6 @@ def generate_launch_description():
         name='diagnostics_manager',
 
         parameters=[
-            {"available_sensors": available_sensors},
             {"custom_config": custom_config},
             {"robot_name": uav_name},
             {"robot_type": robot_type},

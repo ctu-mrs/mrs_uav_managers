@@ -98,8 +98,6 @@ void DiagnosticsManager::initialize() {
 
   not_reporting_timeout_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/timeout/not_reporting");
 
-  std::string available_sensors_string;
-  param_loader.loadParam("available_sensors", available_sensors_string);
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
   const auto update_status_rate = param_loader.loadParam2<double>("update_timer_rate");
 
@@ -148,19 +146,6 @@ void DiagnosticsManager::initialize() {
     rclcpp::shutdown();
     return;
   }
-
-  mrs_msgs::msg::SensorStatus ss_msg;
-  ss_msg.ready = true;
-  ss_msg.rate  = -1;
-  // ss_msg.status = "NOT_IMPLEMENTED";
-
-  std::vector<std::string> components = extractComponents(available_sensors_string);
-  RCLCPP_INFO(node_->get_logger(), "components size: %zu", components.size());
-  for (const auto &comp : components) {
-    ss_msg.name = comp;
-    available_sensors_.push_back(ss_msg);
-  }
-
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -491,18 +476,6 @@ Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov) {
     for (int c = 0; c < 3; c++)
       cov(r, c) = msg_cov.at(r + 3 * c);
   return cov;
-}
-
-std::vector<std::string> DiagnosticsManager::extractComponents(const std::string &input) {
-  std::vector<std::string> result;
-  std::stringstream        ss(input);
-  std::string              item;
-
-  // stream extraction operator automatically skips delimiters
-  while (ss >> item) {
-    result.push_back(item);
-  }
-  return result;
 }
 
 robot_type_t DiagnosticsManager::parse_robot_type(const std::string &robot_type_str) {
