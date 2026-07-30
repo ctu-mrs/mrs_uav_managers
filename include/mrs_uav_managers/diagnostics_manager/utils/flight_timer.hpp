@@ -1,5 +1,7 @@
 #pragma once
 
+/* includes //{ */
+
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -10,6 +12,7 @@
 #include <fstream>
 #include <stdexcept>
 
+//}
 
 namespace mrs_uav_managers::utils
 {
@@ -35,10 +38,14 @@ public:
    */
   void tick(bool null_tracker);
 
+  /* secsFlown() //{ */
+
   /** @brief Current accumulated flight time. */
   uint32_t secsFlown() const {
     return secs_flown_.load();
   }
+
+  //}
 
 private:
   void loadFromDisk();

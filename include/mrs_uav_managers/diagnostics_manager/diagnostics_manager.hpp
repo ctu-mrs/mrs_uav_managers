@@ -14,6 +14,8 @@
 
 #pragma once
 
+/* includes //{ */
+
 #include <rclcpp/rclcpp.hpp>
 #include <pluginlib/class_loader.hpp>
 
@@ -86,6 +88,8 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
+//}
 
 namespace mrs_uav_managers
 {
@@ -329,6 +333,8 @@ private:
   mrs_msgs::msg::StateEstimationInfo init_state_estimation_info();
 };
 
+/* processIncomingMessage() //{ */
+
 /**
  * @brief Template definition for processIncomingMessage.
  *
@@ -348,6 +354,8 @@ DiagnosticsManager::subscriptionResult_t<sh_T> DiagnosticsManager::processIncomi
   }
   return msg;
 }
+
+//}
 
 } // namespace diagnostics_manager
 } // namespace mrs_uav_managers

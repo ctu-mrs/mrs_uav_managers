@@ -1,5 +1,7 @@
 #pragma once
 
+/* includes //{ */
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -19,6 +21,8 @@
 #include <vector>
 
 #include <mrs_msgs/msg/cpu_load.hpp>
+
+//}
 
 namespace mrs_uav_managers::utils
 {
