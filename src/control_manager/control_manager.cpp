@@ -1834,13 +1834,15 @@ void ControlManager::initialize(void) {
   ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "~/diagnostics_out");
   ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "~/offboard_on_out");
   ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/tilt_error_out");
+
   {
     mrs_lib::PublisherHandlerOptions opts;
-    opts.node = node_;
-    opts.qos  = rclcpp::QoS(1).transient_local();
+    opts.node        = node_;
+    opts.qos         = rclcpp::QoS(1).transient_local();
     ph_mass_nominal_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "~/mass_nominal_out");
   }
-  ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
+
+  ph_control_error_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
 
   {
     mrs_lib::PublisherHandlerOptions opts;
