@@ -33,15 +33,8 @@ class SystemHealthBridge(Node):
 
     def _callback(self, msg: SystemHealthInfo) -> None:
         payload = dict(message_to_ordereddict(msg))
+        # SystemHealthInfo has no top-level stamp or header.
         ros_stamp = None
-
-        if hasattr(msg, "stamp"):
-            ros_stamp = {"sec": msg.stamp.sec, "nanosec": msg.stamp.nanosec}
-        elif hasattr(msg, "header") and hasattr(msg.header, "stamp"):
-            ros_stamp = {"sec": msg.header.stamp.sec, "nanosec": msg.header.stamp.nanosec}
-        else:
-            # SystemHealthInfo in this package has no top-level stamp.
-            ros_stamp = payload.get("stamp")
 
         with self._lock:
             self._latest_payload = payload
