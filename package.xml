@@ -41,12 +41,14 @@
 
   <depend>backward_ros</depend>
 
+  <depend>rclpy</depend>
+  <exec_depend>python3-uvicorn</exec_depend>
+
   <test_depend>ament_cmake_ros</test_depend>
   <test_depend>launch</test_depend>
   <test_depend>launch_ros</test_depend>
   <test_depend>launch_testing</test_depend>
   <test_depend>launch_testing_ament_cmake</test_depend>
-  <test_depend>rclpy</test_depend>
 
   <!-- Linters -->
   <test_depend>ament_cmake_clang_format</test_depend>
