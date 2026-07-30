@@ -7,7 +7,7 @@ namespace diagnostics_manager
 
 DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
     : mrs_lib::Node("diagnostics_manager", options), uav_state_(this_node_ptr()->get_logger(), "UAV STATE", state_t::UNKNOWN),
-      errorgraph_(this_node_ptr()->get_clock()), not_reporting_delay_(rclcpp::Duration::from_seconds(0.0)) {
+      errorgraph_(this_node_ptr()->get_clock()), not_reporting_timeout_(rclcpp::Duration::from_seconds(0.0)) {
 
 
   node_  = this_node_ptr();
@@ -36,7 +36,9 @@ void DiagnosticsManager::initialize() {
     param_loader.addYamlFile(custom_config_path);
   }
 
-  param_loader.addYamlFileFromParam("config");
+  param_loader.addYamlFileFromParam("private_config");
+  param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("sensor_handlers_config");
 
   std::string robot_type;
   param_loader.loadParam("robot_name", _robot_name_);
@@ -84,20 +86,20 @@ void DiagnosticsManager::initialize() {
   std::string wifi_interface;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/wifi_interface", wifi_interface, std::string(""));
 
-  auto       main_timer_rate             = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/main_timer_rate");
-  const auto state_timer_rate            = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/state_timer_rate");
-  auto       error_publisher_rate        = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/error_publisher_rate");
-  const auto host_info_rate              = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/host_info_rate");
+  auto       main_timer_rate             = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/rate/main");
+  const auto state_timer_rate            = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/rate/state");
+  auto       error_publisher_timer_rate  = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/rate/error_publisher");
+  const auto host_info_timer_rate        = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/rate/host_info");
   const auto node_cpu_discovery_period_s = param_loader.loadParam2<double>("mrs_uav_managers/diagnostics_manager/node_cpu_discovery_period");
 
-  not_reporting_delay_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/not_reporting_delay");
+  not_reporting_timeout_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/timeout/not_reporting");
 
   std::string available_sensors_string;
   param_loader.loadParam("available_sensors", available_sensors_string);
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
   const auto update_status_rate = param_loader.loadParam2<double>("update_timer_rate");
 
-  param_loader.loadParam("sensor_handler_names", _sensor_handler_names_);
+  param_loader.loadParam("active_sensor_handlers", _sensor_handler_names_);
 
   sensor_handler_loader_ =
       std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::DiagnosticsSensorHandler");
@@ -162,7 +164,7 @@ void DiagnosticsManager::initialize() {
   mrs_lib::SubscriberHandlerOptions shopts;
   shopts.node                                = node_;
   shopts.node_name                           = "DiagnosticsManager";
-  shopts.no_message_timeout                  = rclcpp::Duration(not_reporting_delay_);
+  shopts.no_message_timeout                  = rclcpp::Duration(not_reporting_timeout_);
   shopts.timeout_manager                     = tim_mgr_;
   shopts.threadsafe                          = true;
   shopts.autostart                           = true;
@@ -213,10 +215,10 @@ void DiagnosticsManager::initialize() {
   host_stats_ = std::make_unique<utils::HostStats>();
   host_stats_->setWifiInterface(wifi_interface);
   {
-    // Derive sample period from host_info_rate; discovery period from the loaded param.
-    const double safe_host_info_rate = (host_info_rate > 0.0) ? host_info_rate : 1.0;
-    const auto   sample_ms           = std::chrono::milliseconds(static_cast<long>(1000.0 / safe_host_info_rate));
-    const auto   discovery_ms        = std::chrono::milliseconds(static_cast<long>(node_cpu_discovery_period_s * 1000.0));
+    // Derive sample period from host_info_timer_rate; discovery period from the loaded param.
+    const double safe_host_info_timer_rate = (host_info_timer_rate > 0.0) ? host_info_timer_rate : 1.0;
+    const auto   sample_ms                 = std::chrono::milliseconds(static_cast<long>(1000.0 / safe_host_info_timer_rate));
+    const auto   discovery_ms              = std::chrono::milliseconds(static_cast<long>(node_cpu_discovery_period_s * 1000.0));
     host_stats_->setNodeCpuPeriods(sample_ms, discovery_ms);
   }
   flight_timer_          = std::make_unique<utils::FlightTimer>(clock_);
@@ -258,7 +260,7 @@ void DiagnosticsManager::initialize() {
   {
     std::function<void()> callback_fcn = std::bind(&DiagnosticsManager::timerErrorPublishing, this);
 
-    timer_error_publishing_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(error_publisher_rate, clock_), callback_fcn);
+    timer_error_publishing_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(error_publisher_timer_rate, clock_), callback_fcn);
   }
 
   {
@@ -270,7 +272,7 @@ void DiagnosticsManager::initialize() {
   {
     std::function<void()> callback_fcn = std::bind(&DiagnosticsManager::timerHostInfo, this);
 
-    timer_host_info_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(host_info_rate, clock_), callback_fcn);
+    timer_host_info_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(host_info_timer_rate, clock_), callback_fcn);
   }
 
   // | --------------------- finish the init -------------------- |

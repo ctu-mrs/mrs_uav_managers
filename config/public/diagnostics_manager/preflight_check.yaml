@@ -6,7 +6,7 @@ mrs_uav_managers:
     preflight_check:
       # When false, DiagnosticsManager skips all checks
       enabled: true
-      not_reporting_delay: 3.0 # [s] time after which a missing topic is considered a failure
+      not_reporting_timeout: 3.0 # [s] time after which a missing topic is considered a failure
 
       # All conditions must hold for the last <time_window> seconds before
       # the corresponding check is considered passing.

@@ -68,7 +68,7 @@ public:
    * @brief Configure the cadences used inside readNodeCpuLoads().
    *
    * @param node_cpu_sample_period  How often to compute per-PID CPU loads.
-   *                                Should match the host_info_rate period.
+   *                                Should match the host_info_timer_rate period.
    * @param pid_discovery_period    How often to re-scan /proc for new ROS PIDs.
    *                                Defaults to 5 × node_cpu_sample_period if unset.
    */

@@ -30,7 +30,7 @@ void PreflightChecker::initialize(void) {
   // preflight check configuration
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/enabled", preflight_cfg_.enabled);
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/time_window", preflight_cfg_.time_window);
-  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/not_reporting_delay", preflight_cfg_.not_reporting_delay);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/not_reporting_timeout", preflight_cfg_.not_reporting_timeout);
 
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/enabled", preflight_cfg_.speed_check_enabled);
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/max_speed", preflight_cfg_.speed_check_max);
@@ -60,7 +60,7 @@ void PreflightChecker::initialize(void) {
   mrs_lib::SubscriberHandlerOptions shopts;
   shopts.node                                = node_;
   shopts.node_name                           = "DiagnosticsManager_PreflightChecker";
-  shopts.no_message_timeout                  = rclcpp::Duration::from_seconds(preflight_cfg_.not_reporting_delay);
+  shopts.no_message_timeout                  = rclcpp::Duration::from_seconds(preflight_cfg_.not_reporting_timeout);
   shopts.timeout_manager                     = tim_mgr_;
   shopts.threadsafe                          = true;
   shopts.autostart                           = true;
