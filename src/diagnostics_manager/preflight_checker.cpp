@@ -1,9 +1,7 @@
 #include <mrs_uav_managers/diagnostics_manager/preflight_checker.hpp>
 #include <sstream>
 
-namespace mrs_uav_managers
-{
-namespace diagnostics_manager
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 /* PreflightChecker() //{ */
@@ -392,5 +390,4 @@ void PreflightChecker::genericTopicCallback([[maybe_unused]] const std::shared_p
 }
 
 //}
-} // namespace diagnostics_manager
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager
