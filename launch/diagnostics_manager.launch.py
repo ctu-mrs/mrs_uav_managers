@@ -38,7 +38,7 @@ def generate_launch_description():
 
     # #} end of uav_name
 
-    # #{ uav_type, robot_type
+    # #{ uav_type
 
     uav_type = LaunchConfiguration('uav_type')
     ld.add_action(DeclareLaunchArgument(
@@ -46,6 +46,9 @@ def generate_launch_description():
         default_value=os.getenv('UAV_TYPE', "x500"),
         description="The uav type used for selecting platform configuration.",
     ))
+    # #} end of uav_type
+
+    # #{ robot_type
 
     robot_type = LaunchConfiguration('robot_type')
     ld.add_action(DeclareLaunchArgument(
@@ -54,7 +57,7 @@ def generate_launch_description():
         description="The robot type used for selecting platform configuration.",
     ))
 
-    # #} end of uav_type, robot_type
+    # #} end of robot_type
 
     # #{ standalone
 
