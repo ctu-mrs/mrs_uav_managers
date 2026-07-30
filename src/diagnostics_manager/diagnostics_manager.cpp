@@ -38,7 +38,8 @@ void DiagnosticsManager::initialize() {
 
   param_loader.addYamlFileFromParam("private_config");
   param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("sensor_handlers_config");
+  param_loader.addYamlFileFromParam("private_sensor_handlers");
+  param_loader.addYamlFileFromParam("public_sensor_handlers");
 
   std::string robot_type;
   param_loader.loadParam("robot_name", _robot_name_);

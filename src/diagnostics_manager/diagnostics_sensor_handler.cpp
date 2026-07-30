@@ -16,6 +16,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   }
 
   param_loader.addYamlFileFromParam("public_config");
+  param_loader.addYamlFileFromParam("public_sensor_handlers");
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
 
   name_ = config_key; // default name is the config key
