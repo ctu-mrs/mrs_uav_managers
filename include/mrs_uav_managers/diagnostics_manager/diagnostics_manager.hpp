@@ -91,9 +91,7 @@
 
 //}
 
-namespace mrs_uav_managers
-{
-namespace diagnostics_manager
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 /**
@@ -239,10 +237,10 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ErrorgraphElement>     sh_errorgraph_error_msg_;
 
   // | -------------------- Sensor handlers --------------------- |
-  std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
-  std::vector<std::string>                                                            _sensor_handler_names_;
-  std::vector<std::shared_ptr<mrs_uav_managers::DiagnosticsSensorHandler>>            sensor_handlers_;
-  std::mutex                                                                          mutex_sensor_handler_list_;
+  std::unique_ptr<pluginlib::ClassLoader<DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
+  std::vector<std::string>                                          _sensor_handler_names_;
+  std::vector<std::shared_ptr<DiagnosticsSensorHandler>>            sensor_handlers_;
+  std::mutex                                                        mutex_sensor_handler_list_;
 
   // | ----------------------- Timers --------------------------- |
 
@@ -357,5 +355,4 @@ DiagnosticsManager::subscriptionResult_t<sh_T> DiagnosticsManager::processIncomi
 
 //}
 
-} // namespace diagnostics_manager
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager

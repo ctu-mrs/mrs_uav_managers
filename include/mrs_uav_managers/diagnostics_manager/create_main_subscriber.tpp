@@ -1,6 +1,6 @@
 #pragma once
 
-namespace mrs_uav_managers
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 /* create_main_subscriber() //{ */
@@ -33,4 +33,4 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
 
 //}
 
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager

@@ -1,7 +1,7 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp>
 #include <unordered_map>
 
-namespace mrs_uav_managers
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 /* initialize() //{ */
@@ -253,4 +253,4 @@ Eigen::Matrix3d DiagnosticsSensorHandler::cov2eigen(const std::array<double, 9> 
 
 //}
 
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager
