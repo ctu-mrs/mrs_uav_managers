@@ -27,8 +27,12 @@ public:
 protected:
   // Hook for derived classes to do additional initialization (e.g. create subscribers) after the base class has loaded parameters and set up rate monitoring.
   // config_key is the YAML key (e.g. "GPS") used for loading plugin-specific parameters.
+  // plugin_config_path is the (optional, may be empty) value of this instance's "plugin_config" field from the central config -- derived classes that need
+  // their own fields should fall back to a package-owned default file (e.g. keyed by config_key) when it's empty, rather than requiring the central config
+  // to declare plugin-specific fields.
   virtual bool onInitialize([[maybe_unused]] rclcpp::Node::SharedPtr &node, [[maybe_unused]] const std::string &config_key,
-                            [[maybe_unused]] const std::string &name_space, [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
+                            [[maybe_unused]] const std::string &name_space, [[maybe_unused]] const std::string &plugin_config_path,
+                            [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
 
   // Hook for derived classes to provide additional details in the SensorStatus message
   // By default, returns an empty JSON object, but derived classes can override this to include custom details about the sensor status (e.g. last message

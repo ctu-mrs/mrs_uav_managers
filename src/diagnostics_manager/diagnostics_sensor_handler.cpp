@@ -15,7 +15,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
     param_loader.addYamlFile(custom_config_path);
   }
 
-  param_loader.addYamlFileFromParam("config");
+  param_loader.addYamlFileFromParam("public_config");
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
 
   name_ = config_key; // default name is the config key
@@ -30,6 +30,9 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
 
   std::string qos_reliability;
   param_loader.loadParam(config_key + "/qos_reliability", qos_reliability, std::string("reliable"));
+
+  std::string plugin_config_path;
+  param_loader.loadParam(config_key + "/plugin_config", plugin_config_path, std::string(""));
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node->get_logger(), "[DiagnosticsSensorHandler] Failed to load config for sensor handler '%s', not initializing", config_key.c_str());
@@ -61,7 +64,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   rate_tracker_.clear();
 
 
-  const bool initialized = onInitialize(node, config_key, name_space, cbkgrp_subs);
+  const bool initialized = onInitialize(node, config_key, name_space, plugin_config_path, cbkgrp_subs);
   is_initialized_        = initialized;
 
   return initialized;
@@ -158,7 +161,8 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
 }
 
 bool DiagnosticsSensorHandler::onInitialize([[maybe_unused]] rclcpp::Node::SharedPtr &node, [[maybe_unused]] const std::string &config_key,
-                                            [[maybe_unused]] const std::string &name_space, [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
+                                            [[maybe_unused]] const std::string &name_space, [[maybe_unused]] const std::string &plugin_config_path,
+                                            [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
   return true;
 }
 

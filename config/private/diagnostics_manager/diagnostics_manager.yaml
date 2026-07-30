@@ -1,0 +1,16 @@
+mrs_uav_managers:
+  diagnostics_manager:
+    rate:
+      main: 10.0 # [Hz]
+      state: 100.0 # [Hz]
+      error_publisher: 2.0 # [Hz]
+      host_info: 1.0 # [Hz]
+
+    timeout:
+      not_reporting: 3.0 # [s]
+
+    node_cpu_discovery_period: 5.0 # [s]
+
+    sensor_handlers:
+      # the rate at which the sensor handlers will be updated, this is the rate at which the diagnostics will be published
+      update_timer_rate: 1.0 # [Hz]

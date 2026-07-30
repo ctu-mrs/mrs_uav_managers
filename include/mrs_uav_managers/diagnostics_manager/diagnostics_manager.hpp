@@ -144,8 +144,8 @@ private:
 
   std::mutex errorgraph_mtx_; ///< guards errorgraph_ across timer and subscriber callbacks
 
-  mrs_lib::errorgraph::Errorgraph      errorgraph_;          ///< dependency/error graph for readiness tracking
-  rclcpp::Duration                     not_reporting_delay_; ///< timeout before marking a topic as not reporting
+  mrs_lib::errorgraph::Errorgraph      errorgraph_;            ///< dependency/error graph for readiness tracking
+  rclcpp::Duration                     not_reporting_timeout_; ///< timeout before marking a topic as not reporting
   const mrs_lib::errorgraph::node_id_t autostart_node_id_ = {"AutomaticStart", "main"};
 
   std::string  _robot_name_;
@@ -274,7 +274,7 @@ private:
    * @param sh The subscriber handler to check.
    * @return subscriptionResult_t with the latest message and whether it is new.
    *
-   * If the subscriber has not received a message within not_reporting_delay_,
+   * If the subscriber has not received a message within not_reporting_timeout_,
    * the message is set to nullptr and hasNewMessage is set to true (to trigger
    * downstream handling of the "not reporting" case).
    */
@@ -337,7 +337,7 @@ DiagnosticsManager::subscriptionResult_t<sh_T> DiagnosticsManager::processIncomi
   msg.hasNewMessage = sh.newMsg();
   msg.message       = msg.hasNewMessage ? sh.getMsg() : sh.peekMsg();
   if (msg.message != nullptr) {
-    if (clock_->now() - sh.lastMsgTime() > not_reporting_delay_) {
+    if (clock_->now() - sh.lastMsgTime() > not_reporting_timeout_) {
       msg.message       = nullptr;
       msg.hasNewMessage = true;
     }
