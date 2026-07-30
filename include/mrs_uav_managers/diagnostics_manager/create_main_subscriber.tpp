@@ -3,6 +3,8 @@
 namespace mrs_uav_managers
 {
 
+/* create_main_subscriber() //{ */
+
 template <typename MessageType>
 mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_subscriber(rclcpp::Node::SharedPtr &node, const std::string &topic_name,
                                                                                          rclcpp::CallbackGroup::SharedPtr cbkgrp_subs,
@@ -28,5 +30,7 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
 
   return mrs_lib::SubscriberHandler<MessageType>(shopts_, topic_name, callback);
 }
+
+//}
 
 } // namespace mrs_uav_managers

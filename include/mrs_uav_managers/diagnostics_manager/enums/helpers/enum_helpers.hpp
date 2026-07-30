@@ -9,15 +9,25 @@ template <typename Enum_T>
 struct enum_updater
 {
 public:
+  /* enum_updater() //{ */
+
   enum_updater(const rclcpp::Logger logger, const std::string_view name) : m_name(name), m_enum(Enum_T::UNKNOWN), logger_(logger) {
   }
 
   enum_updater(const rclcpp::Logger logger, const std::string_view name, const Enum_T init_value) : m_name(name), m_enum(init_value), logger_(logger) {
   }
 
+  //}
+
+  /* value() //{ */
+
   Enum_T value() {
     return m_enum;
   }
+
+  //}
+
+  /* set() //{ */
 
   void set(const Enum_T new_value) {
     if (m_enum == new_value)
@@ -28,13 +38,23 @@ public:
     m_enum = new_value;
   }
 
+  //}
+
+  /* operator==() //{ */
+
   bool operator==(const Enum_T other) {
     return other == m_enum;
   }
 
+  //}
+
+  /* operator!=() //{ */
+
   bool operator!=(const Enum_T other) {
     return other != m_enum;
   }
+
+  //}
 
 private:
   std::string    m_name;
