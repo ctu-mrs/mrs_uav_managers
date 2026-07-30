@@ -13,8 +13,9 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
-  cbkgrp_subs_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "DiagnosticsManager", "main");
+  cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   initialize();
 }
@@ -107,7 +108,7 @@ void DiagnosticsManager::initialize() {
       std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::DiagnosticsSensorHandler");
 
   // For each plugin: load pluginlib address, create instance, and initialize.
-  // Only handlers that load AND initialize successfully are kept.
+  // A load or initialization failure is fatal (matches EstimationManager/ControlManager).
   for (const auto &config_key : _sensor_handler_names_) {
 
     std::string address;
@@ -119,23 +120,29 @@ void DiagnosticsManager::initialize() {
       handler = sensor_handler_loader_->createSharedInstance(address);
     }
     catch (pluginlib::CreateClassException &ex1) {
-      RCLCPP_WARN(node_->get_logger(), "CreateClassException for sensor handler '%s': %s", config_key.c_str(), ex1.what());
-      continue;
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for sensor handler '%s': %s", config_key.c_str(), ex1.what());
+      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex1.what());
+      error_publisher_->flushAndShutdown();
     }
     catch (pluginlib::PluginlibException &ex) {
-      RCLCPP_WARN(node_->get_logger(), "PluginlibException for sensor handler '%s': %s", config_key.c_str(), ex.what());
-      continue;
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for sensor handler '%s': %s", config_key.c_str(), ex.what());
+      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex.what());
+      error_publisher_->flushAndShutdown();
     }
 
     try {
       if (!handler->initialize(node_, config_key, _robot_name_, cbkgrp_subs_)) {
-        RCLCPP_WARN(node_->get_logger(), "Sensor handler '%s' failed to initialize, skipping", config_key.c_str());
+        RCLCPP_ERROR(node_->get_logger(), "Sensor handler '%s' failed to initialize", config_key.c_str());
+        error_publisher_->addOneshotError("Sensor handler " + config_key + " failed to initialize");
+        error_publisher_->flushAndShutdown();
         continue;
       }
       sensor_handlers_.push_back(handler);
     }
     catch (std::runtime_error &ex) {
-      RCLCPP_WARN(node_->get_logger(), "Exception during sensor handler '%s' initialization: %s", config_key.c_str(), ex.what());
+      RCLCPP_ERROR(node_->get_logger(), "Exception during sensor handler '%s' initialization: %s", config_key.c_str(), ex.what());
+      error_publisher_->addOneshotError("Exception during sensor handler " + config_key + " initialization: " + ex.what());
+      error_publisher_->flushAndShutdown();
     }
   }
 

@@ -52,6 +52,7 @@
 #include <sensor_msgs/msg/range.hpp>
 
 #include <mrs_lib/errorgraph/errorgraph.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/node.h>
 #include <mrs_lib/param_loader.h>
@@ -147,6 +148,8 @@ private:
   mrs_lib::errorgraph::Errorgraph      errorgraph_;            ///< dependency/error graph for readiness tracking
   rclcpp::Duration                     not_reporting_timeout_; ///< timeout before marking a topic as not reporting
   const mrs_lib::errorgraph::node_id_t autostart_node_id_ = {"AutomaticStart", "main"};
+
+  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_; ///< reports this manager's own fatal errors to the errorgraph
 
   std::string  _robot_name_;
   std::string  robot_ip_address_;
