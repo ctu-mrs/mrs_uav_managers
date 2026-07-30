@@ -3,19 +3,19 @@ mrs_uav_managers:
     sensor_handlers:
       # pluginlib class addresses for the "running" instances defined in the public config
       SimulationCamera:
-        address: "mrs_robot_diagnostics/CameraSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/CameraSensorHandler"
 
       PX4:
-        address: "mrs_robot_diagnostics/GenericSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
 
       Rangefinder:
-        address: "mrs_robot_diagnostics/GenericSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
 
       GNSS:
-        address: "mrs_robot_diagnostics/GNSSSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/GNSSSensorHandler"
 
       Magnetometer:
-        address: "mrs_robot_diagnostics/MagnetometerSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/MagnetometerSensorHandler"
 
       RemoteController:
-        address: "mrs_robot_diagnostics/RCSensorHandler"
+        address: "mrs_uav_diagnostics_sensors/RCSensorHandler"
