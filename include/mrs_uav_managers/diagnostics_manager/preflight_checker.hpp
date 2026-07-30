@@ -20,10 +20,7 @@
 
 //}
 
-namespace mrs_uav_managers
-{
-
-namespace diagnostics_manager
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 class PreflightChecker
@@ -138,5 +135,4 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>    sh_control_manager_diagnostics_;
 };
 
-} // namespace diagnostics_manager
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager

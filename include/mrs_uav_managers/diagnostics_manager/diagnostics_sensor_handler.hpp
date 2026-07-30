@@ -15,7 +15,7 @@
 
 //}
 
-namespace mrs_uav_managers
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 class DiagnosticsSensorHandler {
@@ -96,6 +96,7 @@ protected:
                                                                  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr,
                                                                  const rclcpp::Duration          &timeout     = mrs_lib::no_timeout);
 };
-} // namespace mrs_uav_managers
+
+} // namespace mrs_uav_managers::diagnostics_manager
 
 #include <mrs_uav_managers/diagnostics_manager/create_main_subscriber.tpp>

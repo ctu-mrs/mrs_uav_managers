@@ -1,8 +1,6 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_manager.hpp>
 
-namespace mrs_uav_managers
-{
-namespace diagnostics_manager
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 /* DiagnosticsManager() //{ */
@@ -258,8 +256,8 @@ void DiagnosticsManager::resolveRobotIpAddress() {
 
 void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) {
 
-  sensor_handler_loader_ =
-      std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::DiagnosticsSensorHandler");
+  sensor_handler_loader_ = std::make_unique<pluginlib::ClassLoader<DiagnosticsSensorHandler>>(
+      "mrs_uav_managers", "mrs_uav_managers::diagnostics_manager::DiagnosticsSensorHandler");
 
   // For each plugin: load pluginlib address, create instance, and initialize.
   // A load or initialization failure is fatal (matches EstimationManager/ControlManager).
@@ -268,7 +266,7 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
     std::string address;
     param_loader.loadParam(config_key + "/address", address);
 
-    std::shared_ptr<mrs_uav_managers::DiagnosticsSensorHandler> handler;
+    std::shared_ptr<DiagnosticsSensorHandler> handler;
     try {
       RCLCPP_INFO(node_->get_logger(), "Loading sensor handler '%s' (%s)", config_key.c_str(), address.c_str());
       handler = sensor_handler_loader_->createSharedInstance(address);
@@ -964,8 +962,7 @@ mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::init_state_estimation_inf
 
 //}
 
-} // namespace diagnostics_manager
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(mrs_uav_managers::diagnostics_manager::DiagnosticsManager)
