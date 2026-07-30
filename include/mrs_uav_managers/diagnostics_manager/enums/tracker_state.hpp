@@ -7,7 +7,16 @@
 
 #define X_ENUM_NAME tracker_state_t
 #define X_ENUM_BASE_TYPE uint8_t
-#define X_ENUM_SEQ (INVALID)(IDLE)(TAKEOFF)(HOVER)(REFERENCE)(TRAJECTORY)(LAND)
+// clang-format off
+#define X_ENUM_SEQ \
+  (INVALID)        \
+  (IDLE)           \
+  (TAKEOFF)        \
+  (HOVER)          \
+  (REFERENCE)      \
+  (TRAJECTORY)     \
+  (LAND)
+// clang-format on
 
 namespace mrs_uav_managers
 {
