@@ -7,30 +7,18 @@ import time
 from typing import Any
 
 import rclpy
-from mrs_msgs.msg import SystemHealthInfo
+from mrs_msgs.msg import SensorStatus, SystemHealthInfo
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rosidl_runtime_py.convert import message_to_ordereddict
 
 
-SENSOR_LEVEL_MAP = {
-    0: "OK",
-    1: "WARN",
-    2: "ERROR",
-    3: "STALE",
-}
+# Derived from the compiled message so these labels can never drift out of
+# sync with mrs_msgs/SensorStatus's actual enum values.
+SENSOR_LEVEL_MAP = {getattr(SensorStatus, name): name for name in ("OK", "WARN", "ERROR", "STALE")}
 
 SENSOR_TYPE_MAP = {
-    0: "AUTOPILOT",
-    1: "RANGEFINDER",
-    2: "GNSS",
-    3: "IMU",
-    4: "BAROMETER",
-    5: "MAGNETOMETER",
-    6: "LIDAR",
-    7: "CAMERA",
-    8: "REMOTE_CONTROLLER",
-    9: "UNKNOWN",
+    getattr(SensorStatus, name): name.removeprefix("TYPE_") for name in dir(SensorStatus) if name.startswith("TYPE_")
 }
 
 
