@@ -9,7 +9,19 @@
 
 #define X_ENUM_NAME state_t
 #define X_ENUM_BASE_TYPE uint8_t
-#define X_ENUM_SEQ (DISARMED)(ARMED)(OFFBOARD)(MANUAL)(TAKEOFF)(LAND)(RC_MODE)(HOVER)(GOTO)(TRAJECTORY)
+// clang-format off
+#define X_ENUM_SEQ \
+  (DISARMED)       \
+  (ARMED)          \
+  (OFFBOARD)       \
+  (MANUAL)         \
+  (TAKEOFF)        \
+  (LAND)           \
+  (RC_MODE)        \
+  (HOVER)          \
+  (GOTO)           \
+  (TRAJECTORY)
+// clang-format on
 
 // optional macro variables for enum to ROS message conversions
 #undef X_ENUM_MSG_TYPE
