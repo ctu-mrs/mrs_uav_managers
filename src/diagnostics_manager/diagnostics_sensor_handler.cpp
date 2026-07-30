@@ -4,6 +4,8 @@
 namespace mrs_uav_managers
 {
 
+/* initialize() //{ */
+
 bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
                                           rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
 
@@ -70,6 +72,10 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
 
   return initialized;
 }
+
+//}
+
+/* updateStatus() //{ */
 
 mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   mrs_msgs::msg::SensorStatus ss;
@@ -161,31 +167,55 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   return ss;
 }
 
+//}
+
+/* onInitialize() //{ */
+
 bool DiagnosticsSensorHandler::onInitialize([[maybe_unused]] rclcpp::Node::SharedPtr &node, [[maybe_unused]] const std::string &config_key,
                                             [[maybe_unused]] const std::string &name_space, [[maybe_unused]] const std::string &plugin_config_path,
                                             [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
   return true;
 }
 
+//}
+
+/* fill_details() //{ */
+
 std::vector<diagnostic_msgs::msg::KeyValue> DiagnosticsSensorHandler::fill_details() {
   return {};
 }
 
+//}
+
 // | -------------------- sensor-health helpers ------------------- |
+
+/* getMeasuredRate() //{ */
 
 double DiagnosticsSensorHandler::getMeasuredRate() const {
   return rate_tracker_.rate();
 }
 
+//}
+
+/* isInGracePeriod() //{ */
+
 bool DiagnosticsSensorHandler::isInGracePeriod(const rclcpp::Time &now) const {
   return (now - init_time_).seconds() < GRACE_PERIOD_S;
 }
+
+//}
+
+/* isTopicFresh() //{ */
 
 bool DiagnosticsSensorHandler::isTopicFresh(const rclcpp::Time &now, const rclcpp::Time &last_msg) const {
   return (now - last_msg).seconds() <= (1.0 / expected_rate_) * 3.0;
 }
 
+//}
+
 // | -------------------- support functions ------------------- |
+
+/* mapSensorType() //{ */
 
 uint8_t DiagnosticsSensorHandler::mapSensorType(const std::string &type_str) {
   static const std::unordered_map<std::string, uint8_t> type_map = {
@@ -209,6 +239,10 @@ uint8_t DiagnosticsSensorHandler::mapSensorType(const std::string &type_str) {
   return mrs_msgs::msg::SensorStatus::TYPE_UNKNOWN;
 }
 
+//}
+
+/* cov2eigen() //{ */
+
 Eigen::Matrix3d DiagnosticsSensorHandler::cov2eigen(const std::array<double, 9> &msg_cov) {
   Eigen::Matrix3d cov;
   for (int r = 0; r < 3; r++)
@@ -216,5 +250,7 @@ Eigen::Matrix3d DiagnosticsSensorHandler::cov2eigen(const std::array<double, 9> 
       cov(r, c) = msg_cov.at(r + 3 * c);
   return cov;
 }
+
+//}
 
 } // namespace mrs_uav_managers

@@ -6,6 +6,8 @@ namespace mrs_uav_managers
 namespace diagnostics_manager
 {
 
+/* PreflightChecker() //{ */
+
 PreflightChecker::PreflightChecker(rclcpp::Node::SharedPtr node, const std::string &robot_name)
     : node_(node), clock_(node_->get_clock()), robot_name_(robot_name) {
 
@@ -13,6 +15,10 @@ PreflightChecker::PreflightChecker(rclcpp::Node::SharedPtr node, const std::stri
 
   initialize();
 }
+
+//}
+
+/* initialize() //{ */
 
 void PreflightChecker::initialize(void) {
   // Load parameters, set up subscribers, etc.
@@ -132,6 +138,10 @@ void PreflightChecker::initialize(void) {
   }
 }
 
+//}
+
+/* collectPreflightData() //{ */
+
 PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
 
   PreflightChecker::PreflightInputs preflight_inputs;
@@ -173,6 +183,10 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
   return preflight_inputs;
 }
 
+//}
+
+/* runPreflightChecks() //{ */
+
 PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks() {
 
   if (!preflight_cfg_.enabled) {
@@ -183,6 +197,10 @@ PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks() {
 
   return runPreflightChecks(collectPreflightData());
 }
+
+//}
+
+/* runPreflightChecks(const PreflightInputs&) //{ */
 
 PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks(const PreflightInputs &inputs) {
   PreflightResult result;
@@ -232,6 +250,10 @@ PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks(const Pre
   return result;
 }
 
+//}
+
+/* preflightCheckSpeed() //{ */
+
 std::optional<std::string> PreflightChecker::preflightCheckSpeed(const std::optional<geometry_msgs::msg::Vector3> &velocity) {
   if (!preflight_cfg_.speed_check_enabled)
     return std::nullopt;
@@ -261,6 +283,10 @@ std::optional<std::string> PreflightChecker::preflightCheckSpeed(const std::opti
   }
   return std::nullopt;
 }
+
+//}
+
+/* preflightCheckHeight() //{ */
 
 std::optional<std::string> PreflightChecker::preflightCheckHeight(const std::optional<sensor_msgs::msg::Range> &distance_sensor_range,
                                                                   bool                                          has_distance_sensor) {
@@ -292,6 +318,10 @@ std::optional<std::string> PreflightChecker::preflightCheckHeight(const std::opt
   return std::nullopt;
 }
 
+//}
+
+/* preflightCheckGyro() //{ */
+
 std::optional<std::string> PreflightChecker::preflightCheckGyro(const std::optional<geometry_msgs::msg::Vector3> &angular_rate, bool has_imu) {
   if (!preflight_cfg_.gyro_check_enabled || !has_imu)
     return std::nullopt;
@@ -321,6 +351,10 @@ std::optional<std::string> PreflightChecker::preflightCheckGyro(const std::optio
   return std::nullopt;
 }
 
+//}
+
+/* preflightCheckTopics() //{ */
+
 std::optional<std::vector<std::string>> PreflightChecker::preflightCheckTopics() {
   std::scoped_lock lck(topic_heartbeats_mutex_);
   if (!preflight_cfg_.topic_check_enabled)
@@ -345,6 +379,10 @@ std::optional<std::vector<std::string>> PreflightChecker::preflightCheckTopics()
   }
 }
 
+//}
+
+/* genericTopicCallback() //{ */
+
 void PreflightChecker::genericTopicCallback([[maybe_unused]] const std::shared_ptr<rclcpp::SerializedMessage> msg, size_t id) {
   std::scoped_lock lck(topic_heartbeats_mutex_);
   if (id >= topic_heartbeats_.size())
@@ -352,5 +390,7 @@ void PreflightChecker::genericTopicCallback([[maybe_unused]] const std::shared_p
   topic_heartbeats_.at(id).last_msg_time = clock_->now();
   topic_heartbeats_.at(id).ever_seen     = true;
 }
+
+//}
 } // namespace diagnostics_manager
 } // namespace mrs_uav_managers
