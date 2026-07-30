@@ -5,7 +5,7 @@ import os
 
 from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
         LaunchConfiguration,
@@ -241,5 +241,42 @@ def generate_launch_description():
     ld.add_action(standalone_container)
 
     # #} end of own container
+
+    # #{ optional HTTP bridge for system health info
+
+    system_health_http_enabled = LaunchConfiguration('system_health_http_enabled')
+    ld.add_action(DeclareLaunchArgument(
+        'system_health_http_enabled',
+        default_value='false',
+        description='If true, start an ASGI server exposing system_health_info over HTTP.',
+    ))
+
+    system_health_http_host = LaunchConfiguration('system_health_http_host')
+    ld.add_action(DeclareLaunchArgument(
+        'system_health_http_host',
+        default_value='127.0.0.1',
+        description='Host/IP used by the ASGI HTTP bridge.',
+    ))
+
+    system_health_http_port = LaunchConfiguration('system_health_http_port')
+    ld.add_action(DeclareLaunchArgument(
+        'system_health_http_port',
+        default_value='8081',
+        description='Port used by the ASGI HTTP bridge.',
+    ))
+
+    system_health_http_server = ExecuteProcess(
+        cmd=[
+            'ros2', 'run', pkg_name, 'system_health_http_server.py',
+            '--robot-name', uav_name,
+            '--host', system_health_http_host,
+            '--port', system_health_http_port,
+        ],
+        output='screen',
+        condition=IfCondition(system_health_http_enabled),
+    )
+    ld.add_action(system_health_http_server)
+
+    # #} end of optional HTTP bridge
 
     return ld
