@@ -21,16 +21,16 @@ SENSOR_LEVEL_MAP = {
 }
 
 SENSOR_TYPE_MAP = {
-    0: "UNKNOWN",
-    1: "AUTOPILOT",
-    2: "RANGEFINDER",
-    3: "GNSS",
-    4: "IMU",
-    5: "BAROMETER",
-    6: "MAGNETOMETER",
+    0: "AUTOPILOT",
+    1: "RANGEFINDER",
+    2: "GNSS",
+    3: "IMU",
+    4: "BAROMETER",
+    5: "MAGNETOMETER",
+    6: "LIDAR",
     7: "CAMERA",
-    8: "LIDAR",
-    9: "REMOTE_CONTROLLER",
+    8: "REMOTE_CONTROLLER",
+    9: "UNKNOWN",
 }
 
 
