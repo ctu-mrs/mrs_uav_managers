@@ -80,9 +80,9 @@ private:
   /** @brief Static configuration for the preflight check suite. */
   struct PreflightConfig
   {
-    bool   enabled             = false;
-    double time_window         = 5.0;
-    double not_reporting_delay = 3.0;
+    bool   enabled               = false;
+    double time_window           = 5.0;
+    double not_reporting_timeout = 3.0;
 
     bool   speed_check_enabled = false;
     double speed_check_max     = 0.0;

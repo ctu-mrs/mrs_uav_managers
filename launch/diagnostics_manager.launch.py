@@ -165,7 +165,9 @@ def generate_launch_description():
             {"robot_type": robot_type},
             {"uav_type": uav_type},
             {"use_sim_time": use_sim_time},
-            {'config': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_manager.yaml'},
+            {'private_config': this_pkg_path + '/config/private/diagnostics_manager/diagnostics_manager.yaml'},
+            {'public_config': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_manager.yaml'},
+            {'sensor_handlers_config': this_pkg_path + '/config/private/diagnostics_sensor_handlers.yaml'},
             {'preflight_check_config': this_pkg_path + '/config/public/diagnostics_manager/preflight_check.yaml'},
         ],
 
