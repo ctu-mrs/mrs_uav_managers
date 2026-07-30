@@ -134,6 +134,12 @@ private:
   /** @brief Graceful shutdown. */
   void shutdown();
 
+  /** @brief Resolve and log this robot's IP address from its hostname, storing it in robot_ip_address_. Requires _robot_name_ to already be set. */
+  void resolveRobotIpAddress();
+
+  /** @brief Load and initialize every sensor handler plugin listed in _sensor_handler_names_, populating sensor_handlers_. */
+  void loadSensorHandlers(mrs_lib::ParamLoader &param_loader);
+
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
   std::string       _body_frame_;

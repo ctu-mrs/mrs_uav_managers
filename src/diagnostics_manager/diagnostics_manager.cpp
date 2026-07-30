@@ -5,6 +5,8 @@ namespace mrs_uav_managers
 namespace diagnostics_manager
 {
 
+/* DiagnosticsManager() //{ */
+
 DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
     : mrs_lib::Node("diagnostics_manager", options), uav_state_(this_node_ptr()->get_logger(), "UAV STATE", state_t::UNKNOWN),
       errorgraph_(this_node_ptr()->get_clock()), not_reporting_timeout_(rclcpp::Duration::from_seconds(0.0)) {
@@ -20,6 +22,10 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
   initialize();
 }
 
+//}
+
+/* initialize() //{ */
+
 void DiagnosticsManager::initialize() {
 
   rclcpp::on_shutdown([this]() { this->shutdown(); });
@@ -29,7 +35,7 @@ void DiagnosticsManager::initialize() {
   auto use_intra = node_->get_node_options().use_intra_process_comms();
   RCLCPP_INFO(node_->get_logger(), "Intra-process comms is: %s", use_intra ? "ON" : "OFF");
 
-  /* load parameters */
+  /*//{ load parameters */
   mrs_lib::ParamLoader param_loader(node_, "DiagnosticsManager");
 
   std::string custom_config_path;
@@ -50,43 +56,9 @@ void DiagnosticsManager::initialize() {
   param_loader.loadParam("robot_type", robot_type);
 
   robot_type_ = parse_robot_type(robot_type);
+  /*//}*/
 
-  std::vector<char> hostname(1024);
-
-  if (gethostname(hostname.data(), hostname.size()) == 0) {
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Hostname: " << hostname.data());
-  } else {
-    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to get hostname");
-  }
-
-  if (hostname.data() != _robot_name_) {
-    RCLCPP_WARN_STREAM(node_->get_logger(), "Hostname '"
-                                                << hostname.data() << "' does not match the robot name '" << _robot_name_
-                                                << "'. This might lead to issues in IP resolution, if you are using the hostname to connect to the robot, "
-                                                   "please check your network configuration and make sure the hostname is correct");
-  }
-
-  addrinfo hints{};
-  hints.ai_family   = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-
-  addrinfo *res = nullptr;
-
-  if (getaddrinfo(hostname.data(), nullptr, &hints, &res) != 0) {
-    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to resolve "
-                                                << hostname.data()
-                                                << ", skipping IP resolution for this robot, if you are using the hostname to connect to the robot, "
-                                                   "please check your network configuration and make sure the hostname is correct");
-  } else {
-    char  ip[INET_ADDRSTRLEN];
-    void *addr = &((sockaddr_in *)res->ai_addr)->sin_addr;
-    inet_ntop(AF_INET, addr, ip, sizeof(ip));
-
-    robot_ip_address_ = std::string(ip);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Resolved IP address: " << robot_ip_address_);
-
-    freeaddrinfo(res);
-  }
+  resolveRobotIpAddress();
 
   std::string wifi_interface;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/wifi_interface", wifi_interface, std::string(""));
@@ -104,49 +76,7 @@ void DiagnosticsManager::initialize() {
 
   param_loader.loadParam("active_sensor_handlers", _sensor_handler_names_);
 
-  sensor_handler_loader_ =
-      std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::DiagnosticsSensorHandler");
-
-  // For each plugin: load pluginlib address, create instance, and initialize.
-  // A load or initialization failure is fatal (matches EstimationManager/ControlManager).
-  for (const auto &config_key : _sensor_handler_names_) {
-
-    std::string address;
-    param_loader.loadParam(config_key + "/address", address);
-
-    std::shared_ptr<mrs_uav_managers::DiagnosticsSensorHandler> handler;
-    try {
-      RCLCPP_INFO(node_->get_logger(), "Loading sensor handler '%s' (%s)", config_key.c_str(), address.c_str());
-      handler = sensor_handler_loader_->createSharedInstance(address);
-    }
-    catch (pluginlib::CreateClassException &ex1) {
-      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for sensor handler '%s': %s", config_key.c_str(), ex1.what());
-      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex1.what());
-      error_publisher_->flushAndShutdown();
-    }
-    catch (pluginlib::PluginlibException &ex) {
-      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for sensor handler '%s': %s", config_key.c_str(), ex.what());
-      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex.what());
-      error_publisher_->flushAndShutdown();
-    }
-
-    try {
-      if (!handler->initialize(node_, config_key, _robot_name_, cbkgrp_subs_)) {
-        RCLCPP_ERROR(node_->get_logger(), "Sensor handler '%s' failed to initialize", config_key.c_str());
-        error_publisher_->addOneshotError("Sensor handler " + config_key + " failed to initialize");
-        error_publisher_->flushAndShutdown();
-        continue;
-      }
-      sensor_handlers_.push_back(handler);
-    }
-    catch (std::runtime_error &ex) {
-      RCLCPP_ERROR(node_->get_logger(), "Exception during sensor handler '%s' initialization: %s", config_key.c_str(), ex.what());
-      error_publisher_->addOneshotError("Exception during sensor handler " + config_key + " initialization: " + ex.what());
-      error_publisher_->flushAndShutdown();
-    }
-  }
-
-  RCLCPP_INFO(node_->get_logger(), "%zu sensor handlers initialized successfully", sensor_handlers_.size());
+  loadSensorHandlers(param_loader);
 
   if (!param_loader.loadedSuccessfully()) {
     RCLCPP_ERROR(node_->get_logger(), "Could not load all parameters!");
@@ -278,6 +208,105 @@ void DiagnosticsManager::initialize() {
   is_initialized_ = true;
 }
 
+//}
+
+/* resolveRobotIpAddress() //{ */
+
+void DiagnosticsManager::resolveRobotIpAddress() {
+
+  std::vector<char> hostname(1024);
+
+  if (gethostname(hostname.data(), hostname.size()) == 0) {
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Hostname: " << hostname.data());
+  } else {
+    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to get hostname");
+  }
+
+  if (hostname.data() != _robot_name_) {
+    RCLCPP_WARN_STREAM(node_->get_logger(), "Hostname '"
+                                                << hostname.data() << "' does not match the robot name '" << _robot_name_
+                                                << "'. This might lead to issues in IP resolution, if you are using the hostname to connect to the robot, "
+                                                   "please check your network configuration and make sure the hostname is correct");
+  }
+
+  addrinfo hints{};
+  hints.ai_family   = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  addrinfo *res = nullptr;
+
+  if (getaddrinfo(hostname.data(), nullptr, &hints, &res) != 0) {
+    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to resolve "
+                                                << hostname.data()
+                                                << ", skipping IP resolution for this robot, if you are using the hostname to connect to the robot, "
+                                                   "please check your network configuration and make sure the hostname is correct");
+  } else {
+    char  ip[INET_ADDRSTRLEN];
+    void *addr = &((sockaddr_in *)res->ai_addr)->sin_addr;
+    inet_ntop(AF_INET, addr, ip, sizeof(ip));
+
+    robot_ip_address_ = std::string(ip);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Resolved IP address: " << robot_ip_address_);
+
+    freeaddrinfo(res);
+  }
+}
+
+//}
+
+/* loadSensorHandlers() //{ */
+
+void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) {
+
+  sensor_handler_loader_ =
+      std::make_unique<pluginlib::ClassLoader<mrs_uav_managers::DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::DiagnosticsSensorHandler");
+
+  // For each plugin: load pluginlib address, create instance, and initialize.
+  // A load or initialization failure is fatal (matches EstimationManager/ControlManager).
+  for (const auto &config_key : _sensor_handler_names_) {
+
+    std::string address;
+    param_loader.loadParam(config_key + "/address", address);
+
+    std::shared_ptr<mrs_uav_managers::DiagnosticsSensorHandler> handler;
+    try {
+      RCLCPP_INFO(node_->get_logger(), "Loading sensor handler '%s' (%s)", config_key.c_str(), address.c_str());
+      handler = sensor_handler_loader_->createSharedInstance(address);
+    }
+    catch (pluginlib::CreateClassException &ex1) {
+      RCLCPP_ERROR(node_->get_logger(), "CreateClassException for sensor handler '%s': %s", config_key.c_str(), ex1.what());
+      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex1.what());
+      error_publisher_->flushAndShutdown();
+    }
+    catch (pluginlib::PluginlibException &ex) {
+      RCLCPP_ERROR(node_->get_logger(), "PluginlibException for sensor handler '%s': %s", config_key.c_str(), ex.what());
+      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex.what());
+      error_publisher_->flushAndShutdown();
+    }
+
+    try {
+      if (!handler->initialize(node_, config_key, _robot_name_, cbkgrp_subs_)) {
+        RCLCPP_ERROR(node_->get_logger(), "Sensor handler '%s' failed to initialize", config_key.c_str());
+        error_publisher_->addOneshotError("Sensor handler " + config_key + " failed to initialize");
+        error_publisher_->flushAndShutdown();
+        continue;
+      }
+      sensor_handlers_.push_back(handler);
+    }
+    catch (std::runtime_error &ex) {
+      RCLCPP_ERROR(node_->get_logger(), "Exception during sensor handler '%s' initialization: %s", config_key.c_str(), ex.what());
+      error_publisher_->addOneshotError("Exception during sensor handler " + config_key + " initialization: " + ex.what());
+      error_publisher_->flushAndShutdown();
+    }
+  }
+
+  RCLCPP_INFO(node_->get_logger(), "%zu sensor handlers initialized successfully", sensor_handlers_.size());
+}
+
+//}
+
+/* shutdown() //{ */
+
 void DiagnosticsManager::shutdown() {
 
   RCLCPP_INFO(node_->get_logger(), "shutdown(): called");
@@ -309,9 +338,13 @@ void DiagnosticsManager::shutdown() {
   RCLCPP_INFO(node_->get_logger(), "shutdown(): done");
 }
 
+//}
+
 // --------------------------------------------------------------
 // |                           timers                           |
 // --------------------------------------------------------------
+
+/* timerMain() //{ */
 
 void DiagnosticsManager::timerMain() {
   if (!is_initialized_) {
@@ -394,6 +427,10 @@ void DiagnosticsManager::timerMain() {
     sh_mass_nominal_.setNoMessageTimeout(mrs_lib::no_timeout);
 }
 
+//}
+
+/* timerUavState() //{ */
+
 void DiagnosticsManager::timerUavState() {
   if (!is_initialized_) {
     return;
@@ -415,6 +452,10 @@ void DiagnosticsManager::timerUavState() {
   ph_uav_state_.publish(uav_state_msg);
 }
 
+//}
+
+/* timerErrorPublishing() //{ */
+
 void DiagnosticsManager::timerErrorPublishing() {
   if (!is_initialized_) {
     return;
@@ -434,6 +475,10 @@ void DiagnosticsManager::timerErrorPublishing() {
   ph_root_errors_.publish(root_errors_msg);
 }
 
+//}
+
+/* timerUpdateSensorStatus() //{ */
+
 void DiagnosticsManager::timerUpdateSensorStatus() {
 
   if (!is_initialized_) {
@@ -448,6 +493,10 @@ void DiagnosticsManager::timerUpdateSensorStatus() {
   }
 }
 
+//}
+
+/* timerHostInfo() //{ */
+
 void DiagnosticsManager::timerHostInfo() {
   if (!is_initialized_) {
     return;
@@ -455,12 +504,20 @@ void DiagnosticsManager::timerHostInfo() {
   host_stats_->update();
 }
 
+//}
+
 // | ------------------------ callbacks ----------------------- |
+
+/* cbk_errorgraph_element() //{ */
 
 void DiagnosticsManager::cbk_errorgraph_element(const mrs_msgs::msg::ErrorgraphElement::ConstSharedPtr element_msg) {
   std::scoped_lock lck(errorgraph_mtx_);
   errorgraph_.add_element_from_msg(*element_msg);
 }
+
+//}
+
+/* rate-counting callbacks //{ */
 
 // Rate-counting callbacks — record the arrival timestamp exactly once per message.
 void DiagnosticsManager::cbk_hw_api_odometry_rate(const nav_msgs::msg::Odometry::ConstSharedPtr /*msg*/) {
@@ -475,7 +532,11 @@ void DiagnosticsManager::cbk_control_manager_diag_rate(const mrs_msgs::msg::Cont
   rate_control_manager_diag_.record(clock_->now());
 }
 
+//}
+
 // | -------------------- support functions ------------------- |
+
+/* cov2eigen() //{ */
 
 Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov) {
   Eigen::Matrix3d cov;
@@ -484,6 +545,10 @@ Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov) {
       cov(r, c) = msg_cov.at(r + 3 * c);
   return cov;
 }
+
+//}
+
+/* parse_robot_type() //{ */
 
 robot_type_t DiagnosticsManager::parse_robot_type(const std::string &robot_type_str) {
 
@@ -500,7 +565,11 @@ robot_type_t DiagnosticsManager::parse_robot_type(const std::string &robot_type_
   }
 }
 
+//}
+
 // | --------------------- Parsing methods -------------------- |
+
+/* parse_tracker_state() //{ */
 
 tracker_state_t DiagnosticsManager::parse_tracker_state(mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics) {
 
@@ -530,6 +599,10 @@ tracker_state_t DiagnosticsManager::parse_tracker_state(mrs_msgs::msg::ControlMa
     return tracker_state_t::UNKNOWN;
   }
 }
+
+//}
+
+/* parse_uav_state() //{ */
 
 state_t DiagnosticsManager::parse_uav_state(mrs_msgs::msg::HwApiStatus::ConstSharedPtr               hw_api_status,
                                             mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics) {
@@ -580,6 +653,10 @@ state_t DiagnosticsManager::parse_uav_state(mrs_msgs::msg::HwApiStatus::ConstSha
   }
 }
 
+//}
+
+/* parse_general_robot_info() //{ */
+
 mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sensor_msgs::msg::BatteryState::ConstSharedPtr battery_state) {
   mrs_msgs::msg::GeneralRobotInfo msg;
   msg.stamp            = clock_->now();
@@ -598,6 +675,8 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   const bool state_offboard = uav_state == state_t::OFFBOARD;
 
   msg.problems_preventing_start.clear();
+
+  /*//{ diagnose problems preventing start */
 
   // If not flying, explain why we're not ready. When flying autonomously, we
   // assume everything was fine at takeoff and skip the diagnosis.
@@ -625,6 +704,7 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
       break;
     }
   }
+  /*//}*/
 
   { // find all errors
     std::scoped_lock lck(errorgraph_mtx_);
@@ -649,6 +729,10 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   }
   return msg;
 }
+
+//}
+
+/* parse_state_estimation_info() //{ */
 
 mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::parse_state_estimation_info(mrs_msgs::msg::EstimationDiagnostics::ConstSharedPtr estimation_diagnostics,
                                                                                    mrs_msgs::msg::Float64Stamped::ConstSharedPtr        local_heading,
@@ -701,6 +785,10 @@ mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::parse_state_estimation_in
   return msg;
 }
 
+//}
+
+/* parse_control_info() //{ */
+
 mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr    control_manager_diagnostics,
                                                                   mrs_msgs::msg::ConstraintManagerDiagnostics::ConstSharedPtr constraint_manager_diagnostics,
                                                                   mrs_msgs::msg::GainManagerDiagnostics::ConstSharedPtr       gain_manager_diagnostics,
@@ -748,6 +836,10 @@ mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg:
   return msg;
 }
 
+//}
+
+/* parse_collision_avoidance_info() //{ */
+
 mrs_msgs::msg::CollisionAvoidanceInfo
 DiagnosticsManager::parse_collision_avoidance_info(mrs_msgs::msg::MpcTrackerDiagnostics::ConstSharedPtr     mpc_tracker_diagnostics,
                                                    mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics) {
@@ -768,6 +860,10 @@ DiagnosticsManager::parse_collision_avoidance_info(mrs_msgs::msg::MpcTrackerDiag
 
   return msg;
 }
+
+//}
+
+/* parse_uav_info() //{ */
 
 mrs_msgs::msg::UavInfo DiagnosticsManager::parse_uav_info(mrs_msgs::msg::HwApiStatus::ConstSharedPtr hw_api_status,
                                                           std_msgs::msg::Float64::ConstSharedPtr     mass_nominal,
@@ -790,6 +886,10 @@ mrs_msgs::msg::UavInfo DiagnosticsManager::parse_uav_info(mrs_msgs::msg::HwApiSt
 
   return msg;
 }
+
+//}
+
+/* parse_system_health_info() //{ */
 
 mrs_msgs::msg::SystemHealthInfo DiagnosticsManager::parse_system_health_info() {
   mrs_msgs::msg::SystemHealthInfo msg;
@@ -819,7 +919,12 @@ mrs_msgs::msg::SystemHealthInfo DiagnosticsManager::parse_system_health_info() {
   return msg;
 }
 
+//}
+
 // | -------------------- Msg init methods -------------------- |
+
+/* init_state_estimation_info() //{ */
+
 mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::init_state_estimation_info() {
   mrs_msgs::msg::StateEstimationInfo msg;
 
@@ -856,6 +961,8 @@ mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::init_state_estimation_inf
 
   return msg;
 }
+
+//}
 
 } // namespace diagnostics_manager
 } // namespace mrs_uav_managers
