@@ -287,6 +287,16 @@ private:
   template <typename sh_T>
   subscriptionResult_t<sh_T> processIncomingMessage(mrs_lib::SubscriberHandler<sh_T> &sh);
 
+  /**
+   * @brief Non-consuming equivalent of processIncomingMessage(), for fast-path readers that must not
+   * steal the newMsg() flag processIncomingMessage() relies on elsewhere.
+   * @tparam sh_T The ROS message type of the subscriber.
+   * @param sh The subscriber handler to check.
+   * @return The last received message, or nullptr if none was received within not_reporting_timeout_.
+   */
+  template <typename sh_T>
+  typename sh_T::ConstSharedPtr peekFreshMsg(const mrs_lib::SubscriberHandler<sh_T> &sh) const;
+
   // | -------------------- Parsing methods --------------------- |
 
   /** @brief Map ControlManagerDiagnostics tracker status to internal tracker_state_t. */
@@ -351,6 +361,23 @@ DiagnosticsManager::subscriptionResult_t<sh_T> DiagnosticsManager::processIncomi
     }
   }
   return msg;
+}
+
+//}
+
+/* peekFreshMsg() //{ */
+
+/**
+ * @brief Template definition for peekFreshMsg.
+ *
+ * Must be in the header because it is a template method instantiated
+ * with multiple message types in the .cpp file.
+ */
+template <typename sh_T>
+typename sh_T::ConstSharedPtr DiagnosticsManager::peekFreshMsg(const mrs_lib::SubscriberHandler<sh_T> &sh) const {
+  if (!sh.hasMsg() || clock_->now() - sh.lastMsgTime() > not_reporting_timeout_)
+    return nullptr;
+  return sh.peekMsg();
 }
 
 //}
