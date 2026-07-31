@@ -144,7 +144,7 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
 
   PreflightChecker::PreflightInputs preflight_inputs;
 
-  if (sh_estimation_diagnostics_.hasMsg()) {
+  if (hasFreshMsg(sh_estimation_diagnostics_)) {
     auto                        estimation_diag = sh_estimation_diagnostics_.getMsg();
     geometry_msgs::msg::Vector3 velocity_msg;
     velocity_msg.x            = estimation_diag->velocity.linear.x;
@@ -153,18 +153,20 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
     preflight_inputs.velocity = velocity_msg;
   }
 
+  // capabilities is a hardware-support declaration, not telemetry: intentionally not staleness-gated, so a dead
+  // hw_api doesn't mask itself by also flipping has_distance_sensor/has_imu false and short-circuiting the checks below
   if (sh_hw_api_capabilities_.hasMsg()) {
     auto hw_api_capabilities             = sh_hw_api_capabilities_.getMsg();
     preflight_inputs.has_distance_sensor = hw_api_capabilities->produces_distance_sensor;
     preflight_inputs.has_imu             = hw_api_capabilities->produces_imu;
   }
 
-  if (sh_hw_api_distance_sensor_.hasMsg()) {
+  if (hasFreshMsg(sh_hw_api_distance_sensor_)) {
     auto distance_sensor_msg               = sh_hw_api_distance_sensor_.getMsg();
     preflight_inputs.distance_sensor_range = *distance_sensor_msg;
   }
 
-  if (sh_hw_api_imu_.hasMsg()) {
+  if (hasFreshMsg(sh_hw_api_imu_)) {
     auto                        imu_msg = sh_hw_api_imu_.getMsg();
     geometry_msgs::msg::Vector3 angular_velocity_msg;
     angular_velocity_msg.x        = imu_msg->angular_velocity.x;
@@ -173,7 +175,7 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
     preflight_inputs.angular_rate = angular_velocity_msg;
   }
 
-  if (sh_safety_area_manager_diagnostics_.hasMsg()) {
+  if (hasFreshMsg(sh_safety_area_manager_diagnostics_)) {
     auto safety_area_diag           = sh_safety_area_manager_diagnostics_.getMsg();
     preflight_inputs.position_valid = safety_area_diag->position_valid_2d;
   }
@@ -208,7 +210,7 @@ PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks(const Pre
     return result;
   }
 
-  if (sh_control_manager_diagnostics_.hasMsg()) {
+  if (hasFreshMsg(sh_control_manager_diagnostics_)) {
     auto control_manager_diag = sh_control_manager_diagnostics_.getMsg();
     if (!control_manager_diag->output_enabled) {
       result.control_enabled = false;

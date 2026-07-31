@@ -125,6 +125,12 @@ private:
   /** @brief Gather all inputs for the preflight checks from the various subscribed topics. */
   PreflightInputs collectPreflightData(void);
 
+  /** @brief True if the handler has a message no older than not_reporting_timeout. */
+  template <typename T>
+  bool hasFreshMsg(const mrs_lib::SubscriberHandler<T> &sh) const {
+    return sh.hasMsg() && (clock_->now() - sh.lastMsgTime()).seconds() <= preflight_cfg_.not_reporting_timeout;
+  }
+
   // | ---------------------- ROS subscribers --------------------- |
   std::shared_ptr<mrs_lib::TimeoutManager>                                tim_mgr_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics>        sh_estimation_diagnostics_;
