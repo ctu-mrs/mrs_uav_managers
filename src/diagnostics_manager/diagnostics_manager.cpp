@@ -156,7 +156,7 @@ void DiagnosticsManager::initialize() {
     wh_drained_integrator_ = std::make_unique<utils::WhDrainedIntegrator>(clock_);
   }
 
-  preflight_checker_ = std::make_unique<PreflightChecker>(node_, _robot_name_);
+  preflight_checker_ = std::make_unique<PreflightChecker>(node_, _robot_name_, not_reporting_timeout_);
 
   // | -------------------- SystemHealthInfo -------------------- |
   ph_system_health_info_ = mrs_lib::PublisherHandler<mrs_msgs::msg::SystemHealthInfo>(node_, "~/system_health_info_out");
