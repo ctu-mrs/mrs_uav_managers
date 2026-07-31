@@ -437,7 +437,9 @@ void DiagnosticsManager::timerUavState() {
 
   // Non-consuming peeks: this fast path must not steal the newMsg() flags that
   // timerMain relies on to (re)publish uav_info from the same hw_api/status.
-  const auto new_state = parse_uav_state(sh_hw_api_status_.peekMsg(), sh_control_manager_diagnostics_.peekMsg());
+  // peekFreshMsg() applies the same not_reporting_timeout_ staleness gate as
+  // processIncomingMessage(), so this path and timerMain() agree on stale data.
+  const auto new_state = parse_uav_state(peekFreshMsg(sh_hw_api_status_), peekFreshMsg(sh_control_manager_diagnostics_));
 
   if (new_state == uav_state_.value())
     return;
