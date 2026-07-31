@@ -20,9 +20,12 @@ namespace mrs_uav_managers::diagnostics_manager
 
 class DiagnosticsSensorHandler {
 public:
+  // Called once by DiagnosticsManager to load parameters, set up rate monitoring, and invoke onInitialize().
+  // Returns false on failure (e.g. onInitialize() returning false or a config error).
   bool initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
                   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
 
+  // Called periodically by DiagnosticsManager to get this handler's current health (rate/staleness plus fill_details()).
   virtual mrs_msgs::msg::SensorStatus updateStatus();
 
   virtual ~DiagnosticsSensorHandler() = default;
