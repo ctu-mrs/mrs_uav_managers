@@ -139,6 +139,17 @@ def generate_launch_description():
 
     # #} end of use_sim_time
 
+    # #{ env-based params
+
+    run_type = os.getenv('RUN_TYPE', "realworld")
+
+    if run_type == "simulation":
+        simulation = True
+    else:
+        simulation = False
+
+    # #} end of env-based params
+
     # #{ log_level
 
     ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
@@ -159,6 +170,7 @@ def generate_launch_description():
             {"robot_name": uav_name},
             {"robot_type": robot_type},
             {"uav_type": uav_type},
+            {"simulation": simulation},
             {"use_sim_time": use_sim_time},
             {'private_config': this_pkg_path + '/config/private/diagnostics_manager/diagnostics_manager.yaml'},
             {'public_config': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_manager.yaml'},

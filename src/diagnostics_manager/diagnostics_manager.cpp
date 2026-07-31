@@ -52,6 +52,7 @@ void DiagnosticsManager::initialize() {
   std::string robot_type;
   param_loader.loadParam("robot_name", _robot_name_);
   param_loader.loadParam("robot_type", robot_type);
+  param_loader.loadParam("simulation", _simulation_);
 
   robot_type_ = parse_robot_type(robot_type);
   /*//}*/
@@ -145,8 +146,15 @@ void DiagnosticsManager::initialize() {
     const auto   discovery_ms              = std::chrono::milliseconds(static_cast<long>(node_cpu_discovery_period_s * 1000.0));
     host_stats_->setNodeCpuPeriods(sample_ms, discovery_ms);
   }
-  flight_timer_          = std::make_unique<utils::FlightTimer>(clock_);
-  wh_drained_integrator_ = std::make_unique<utils::WhDrainedIntegrator>(clock_);
+  // Default paths match mrs_uav_status's legacy data_acquisition node (real robots: one host per UAV).
+  // In simulation multiple UAVs share a host, so namespace by robot name there to avoid cross-UAV corruption.
+  if (_simulation_) {
+    flight_timer_          = std::make_unique<utils::FlightTimer>(clock_, "/tmp/mrs_status_flight_time_" + _robot_name_ + ".txt");
+    wh_drained_integrator_ = std::make_unique<utils::WhDrainedIntegrator>(clock_, "/tmp/mrs_status_wh_drained_" + _robot_name_ + ".txt");
+  } else {
+    flight_timer_          = std::make_unique<utils::FlightTimer>(clock_);
+    wh_drained_integrator_ = std::make_unique<utils::WhDrainedIntegrator>(clock_);
+  }
 
   preflight_checker_ = std::make_unique<PreflightChecker>(node_, _robot_name_);
 
