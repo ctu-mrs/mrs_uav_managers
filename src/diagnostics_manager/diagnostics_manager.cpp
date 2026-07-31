@@ -283,11 +283,13 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
       RCLCPP_ERROR(node_->get_logger(), "CreateClassException for sensor handler '%s': %s", config_key.c_str(), ex1.what());
       error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex1.what());
       error_publisher_->flushAndShutdown();
+      continue;
     }
     catch (pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "PluginlibException for sensor handler '%s': %s", config_key.c_str(), ex.what());
       error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex.what());
       error_publisher_->flushAndShutdown();
+      continue;
     }
 
     try {
