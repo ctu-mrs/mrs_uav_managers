@@ -162,6 +162,7 @@ private:
   std::string  _robot_name_;
   std::string  robot_ip_address_;
   robot_type_t robot_type_;
+  bool         _simulation_;
 
   std::vector<mrs_msgs::msg::SensorStatus> available_sensors_;
 
