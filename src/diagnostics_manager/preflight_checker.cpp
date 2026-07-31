@@ -6,10 +6,12 @@ namespace mrs_uav_managers::diagnostics_manager
 
 /* PreflightChecker() //{ */
 
-PreflightChecker::PreflightChecker(rclcpp::Node::SharedPtr node, const std::string &robot_name)
+PreflightChecker::PreflightChecker(rclcpp::Node::SharedPtr node, const std::string &robot_name, const rclcpp::Duration &not_reporting_timeout)
     : node_(node), clock_(node_->get_clock()), robot_name_(robot_name) {
 
   cbkgrp_subs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  preflight_cfg_.not_reporting_timeout = not_reporting_timeout.seconds();
 
   initialize();
 }
@@ -34,7 +36,6 @@ void PreflightChecker::initialize(void) {
   // preflight check configuration
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/enabled", preflight_cfg_.enabled);
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/time_window", preflight_cfg_.time_window);
-  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/not_reporting_timeout", preflight_cfg_.not_reporting_timeout);
 
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/enabled", preflight_cfg_.speed_check_enabled);
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/preflight_check/speed_check/max_speed", preflight_cfg_.speed_check_max);

@@ -27,7 +27,7 @@ class PreflightChecker
 
 {
 public:
-  PreflightChecker(rclcpp::Node::SharedPtr node, const std::string &robot_name);
+  PreflightChecker(rclcpp::Node::SharedPtr node, const std::string &robot_name, const rclcpp::Duration &not_reporting_timeout);
 
   /** @brief Result of running the full preflight check suite. */
   struct PreflightResult
