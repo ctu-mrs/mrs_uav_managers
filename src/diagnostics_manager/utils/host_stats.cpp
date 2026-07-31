@@ -1,6 +1,6 @@
 #include <mrs_uav_managers/diagnostics_manager/utils/host_stats.hpp>
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 namespace
@@ -443,4 +443,4 @@ void HostStats::readWifi() {
   }
 }
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils

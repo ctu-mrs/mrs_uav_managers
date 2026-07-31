@@ -24,7 +24,7 @@
 
 //}
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 /**
@@ -124,4 +124,4 @@ private:
   std::chrono::milliseconds             node_cpu_sample_period_{1000};
 };
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils

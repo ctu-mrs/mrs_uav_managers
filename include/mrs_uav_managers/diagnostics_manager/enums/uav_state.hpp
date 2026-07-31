@@ -32,7 +32,7 @@
 #define X_ENUM_MSG_MEMBER state
 #define X_ENUM_MSG_PREFIX STATE_
 
-namespace mrs_uav_managers
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 #include <mrs_uav_managers/diagnostics_manager/enums/helpers/enum_macros.hpp>
@@ -76,4 +76,4 @@ inline bool is_flying_autonomously(state_t uav_state) {
 
 //}
 
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager
