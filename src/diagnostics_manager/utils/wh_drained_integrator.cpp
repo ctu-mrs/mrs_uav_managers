@@ -1,6 +1,6 @@
 #include <mrs_uav_managers/diagnostics_manager/utils/wh_drained_integrator.hpp>
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 WhDrainedIntegrator::WhDrainedIntegrator(rclcpp::Clock::SharedPtr clock, std::string persist_path)
@@ -63,4 +63,4 @@ void WhDrainedIntegrator::persistToDisk() {
   file << wh_drained_;
 }
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils

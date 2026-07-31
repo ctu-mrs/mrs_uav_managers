@@ -10,7 +10,7 @@
 
 //}
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 /**
@@ -74,4 +74,4 @@ private:
   std::deque<rclcpp::Time> timestamps_;
 };
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils

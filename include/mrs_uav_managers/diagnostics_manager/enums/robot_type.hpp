@@ -14,7 +14,7 @@
   (BOAT)
 // clang-format on
 
-namespace mrs_uav_managers
+namespace mrs_uav_managers::diagnostics_manager
 {
 
 #include <mrs_uav_managers/diagnostics_manager/enums/helpers/enum_macros.hpp>
@@ -22,4 +22,4 @@ namespace mrs_uav_managers
 // generate the enum and the to_string() conversion
 DEFINE_ENUM_WITH_CONVERSIONS(X_ENUM_NAME, X_ENUM_BASE_TYPE, X_ENUM_SEQ)
 
-} // namespace mrs_uav_managers
+} // namespace mrs_uav_managers::diagnostics_manager

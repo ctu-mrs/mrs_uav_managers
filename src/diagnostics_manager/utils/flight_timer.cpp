@@ -1,6 +1,6 @@
 #include <mrs_uav_managers/diagnostics_manager/utils/flight_timer.hpp>
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 FlightTimer::FlightTimer(rclcpp::Clock::SharedPtr clock, std::string persist_path)
@@ -57,4 +57,4 @@ void FlightTimer::persistToDisk() {
   file << secs_flown_.load();
 }
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils

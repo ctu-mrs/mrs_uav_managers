@@ -12,7 +12,7 @@
 
 //}
 
-namespace mrs_uav_managers::utils
+namespace mrs_uav_managers::diagnostics_manager::utils
 {
 
 /**
@@ -53,4 +53,4 @@ private:
   bool                     have_sample_ = false;
 };
 
-} // namespace mrs_uav_managers::utils
+} // namespace mrs_uav_managers::diagnostics_manager::utils
