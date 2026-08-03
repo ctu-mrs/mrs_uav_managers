@@ -143,8 +143,6 @@ private:
   void loadSensorHandlers(mrs_lib::ParamLoader &param_loader);
 
   std::atomic<bool> is_initialized_ = false;
-  std::string       _uav_name_;
-  std::string       _body_frame_;
 
   std::shared_ptr<mrs_lib::ParamLoader> param_loader_;
 
@@ -153,9 +151,8 @@ private:
 
   std::mutex errorgraph_mtx_; ///< guards errorgraph_ across timer and subscriber callbacks
 
-  mrs_lib::errorgraph::Errorgraph      errorgraph_;            ///< dependency/error graph for readiness tracking
-  rclcpp::Duration                     not_reporting_timeout_; ///< timeout before marking a topic as not reporting
-  const mrs_lib::errorgraph::node_id_t autostart_node_id_ = {"AutomaticStart", "main"};
+  mrs_lib::errorgraph::Errorgraph errorgraph_;            ///< dependency/error graph for readiness tracking
+  rclcpp::Duration                not_reporting_timeout_; ///< timeout before marking a topic as not reporting
 
   std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_; ///< reports this manager's own fatal errors to the errorgraph
 
