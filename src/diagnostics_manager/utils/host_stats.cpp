@@ -163,6 +163,7 @@ void HostStats::readCpuLoad() {
 
 void HostStats::readCpuTemperature() {
   long max_temp = 0;
+  bool found     = false;
   for (int i = 0; i < 11; ++i) {
     const std::string path = "/sys/class/thermal/thermal_zone" + std::to_string(i) + "/temp";
     if (!std::filesystem::exists(path)) {
@@ -178,12 +179,13 @@ void HostStats::readCpuTemperature() {
       if (t > max_temp) {
         max_temp = t;
       }
+      found = true;
     }
     catch (const std::exception &) {
       continue;
     }
   }
-  snap_.cpu_temperature = static_cast<float>(max_temp) / 1000.0f;
+  snap_.cpu_temperature = found ? static_cast<float>(max_temp) / 1000.0f : -1.0f;
 }
 
 void HostStats::readCpuCoreCount() {
