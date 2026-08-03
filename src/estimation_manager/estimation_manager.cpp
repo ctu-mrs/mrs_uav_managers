@@ -606,6 +606,7 @@ void EstimationManager::initialize() {
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
 
   } else if (Support::toLowercase(world_origin_units) == "latlon") {
     double lat, lon;
@@ -613,6 +614,7 @@ void EstimationManager::initialize() {
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
     is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
+    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
     mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
     RCLCPP_INFO(node_->get_logger(), "Converted to UTM x: %f, y: %f.", world_origin_x, world_origin_y);
 
@@ -626,6 +628,8 @@ void EstimationManager::initialize() {
   ch_->world_origin.y = world_origin_y;
   ch_->world_origin.z = world_origin_z;
   ch_->use_z_relative_to_home = use_z_relative_to_home;
+    
+  RCLCPP_INFO(node_->get_logger(), "Z origin. %f, use z relative to home: %d", world_origin_z, use_z_relative_to_home);
 
   if (!is_origin_param_ok) {
     RCLCPP_ERROR(node_->get_logger(), "Could not load all mandatory parameters from world file. Please check your world file.");
