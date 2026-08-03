@@ -38,16 +38,6 @@ def generate_launch_description():
 
     # #} end of uav_name
 
-    # #{ uav_type
-
-    uav_type = LaunchConfiguration('uav_type')
-    ld.add_action(DeclareLaunchArgument(
-        'uav_type',
-        default_value=os.getenv('UAV_TYPE', "x500"),
-        description="The uav type used for selecting platform configuration.",
-    ))
-    # #} end of uav_type
-
     # #{ robot_type
 
     robot_type = LaunchConfiguration('robot_type')
@@ -169,7 +159,6 @@ def generate_launch_description():
             {"custom_config": custom_config},
             {"robot_name": uav_name},
             {"robot_type": robot_type},
-            {"uav_type": uav_type},
             {"simulation": simulation},
             {"use_sim_time": use_sim_time},
             {'private_config': this_pkg_path + '/config/private/diagnostics_manager/diagnostics_manager.yaml'},
