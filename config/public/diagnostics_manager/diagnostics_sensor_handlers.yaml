@@ -5,7 +5,7 @@ mrs_uav_managers:
       # TEMPLATE (not an active instance -- copy/paste and rename to use)
       #
       # ExampleHandler:
-      #   type: "Example" # Example, Autopilot, Camera, Lidar, IMU, GNSS, Battery, Barometer, Magnetometer, RangeFinder
+      #   type: "Example" # Example, Autopilot, Rangefinder, GNSS, IMU, Barometer, Magnetometer, Lidar, Camera, RemoteController
       #   topic: "example_node/topic" # Don't add the leading slash, the name will be resolved relative to the node's namespace
       #   expected_publisher:
       #     node: "example_node" # Name of the node expected to publish the topic (optional, used for more specific diagnostics)
