@@ -68,6 +68,7 @@ inline bool is_flying_autonomously(state_t uav_state) {
   case state_t::ARMED:
   case state_t::OFFBOARD:
   case state_t::MANUAL:
+  case state_t::UNKNOWN:
     return false;
   default:
     return true;
