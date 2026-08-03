@@ -16,7 +16,7 @@ mrs_uav_managers:
       #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about
       #                      # (e.g. message_type, status_topic); if empty, the plugin falls back to its own package-provided default
       #
-      # NOTE: the pluginlib class address for each of these is defined in config/private/diagnostics_sensor_handlers.yaml
+      # NOTE: the pluginlib class address for each of these is defined in config/private/diagnostics_manager/diagnostics_sensor_handlers.yaml
       # NOTE: the list of "running" instances is selected in config/public/diagnostics_manager/diagnostics_manager.yaml
       # -------------------------------------------------------------------
 
