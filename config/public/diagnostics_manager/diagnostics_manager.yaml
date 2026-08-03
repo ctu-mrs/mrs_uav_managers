@@ -1,5 +1,8 @@
 mrs_uav_managers:
   diagnostics_manager:
+    # name of the network interface to report wifi link quality for (e.g. "wlan0"); leave empty to disable
+    wifi_interface: ""
+
     sensor_handlers:
       # the list of sensors to monitor
       active_sensor_handlers: [
