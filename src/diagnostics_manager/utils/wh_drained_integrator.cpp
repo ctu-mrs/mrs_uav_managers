@@ -59,8 +59,12 @@ void WhDrainedIntegrator::loadFromDisk() {
 }
 
 void WhDrainedIntegrator::persistToDisk() {
-  std::ofstream file(persist_path_);
-  file << wh_drained_;
+  const std::string tmp_path = persist_path_ + ".tmp";
+  {
+    std::ofstream file(tmp_path, std::ios::trunc);
+    file << wh_drained_;
+  }
+  std::filesystem::rename(tmp_path, persist_path_);
 }
 
 } // namespace mrs_uav_managers::diagnostics_manager::utils

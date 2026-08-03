@@ -53,8 +53,12 @@ void FlightTimer::loadFromDisk() {
 }
 
 void FlightTimer::persistToDisk() {
-  std::ofstream file(persist_path_);
-  file << secs_flown_.load();
+  const std::string tmp_path = persist_path_ + ".tmp";
+  {
+    std::ofstream file(tmp_path, std::ios::trunc);
+    file << secs_flown_.load();
+  }
+  std::filesystem::rename(tmp_path, persist_path_);
 }
 
 } // namespace mrs_uav_managers::diagnostics_manager::utils
