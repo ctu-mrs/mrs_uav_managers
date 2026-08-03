@@ -2205,6 +2205,19 @@ bool UavManager::callbackMidairActivation([[maybe_unused]] const std::shared_ptr
       return true;
     }
 
+    {
+      auto res = sch_is_world_origin_ready_.callSync(std::make_shared<std_srvs::srv::Trigger::Request>());
+
+      if (!res || !res.value()->success) {
+        ss << "can not activate, world_origin is not ready yet!";
+        RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
+        error_publisher_->addWaitingForNodeError({"TransformManager", "main"});
+        response->message = ss.str();
+        response->success = false;
+        return true;
+      }
+    }
+
     if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).seconds() > 5.0) {
       ss << "can not activate, missing HW API status!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
