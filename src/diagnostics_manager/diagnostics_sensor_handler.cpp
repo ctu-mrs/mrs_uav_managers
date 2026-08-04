@@ -38,11 +38,11 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   param_loader.loadParam(config_key + "/plugin_config", plugin_config_path, std::string(""));
 
   if (!param_loader.loadedSuccessfully()) {
-    RCLCPP_ERROR(node->get_logger(), "[DiagnosticsSensorHandler] Failed to load config for sensor handler '%s', not initializing", config_key.c_str());
+    RCLCPP_ERROR(node->get_logger(), "[%s]: failed to load config, not initializing", config_key.c_str());
     return false;
   }
 
-  RCLCPP_INFO(node->get_logger(), "[DiagnosticsSensorHandler] Loaded config for '%s' (topic: '%s')", name_.c_str(), topic_.c_str());
+  RCLCPP_INFO(node->get_logger(), "[%s]: loaded config (topic: '%s')", name_.c_str(), topic_.c_str());
 
   std::string handler_instance = name_ + " handler (" + topic_ + ")";
   error_publisher_             = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node, node->get_clock(), "DiagnosticsManager", handler_instance);
