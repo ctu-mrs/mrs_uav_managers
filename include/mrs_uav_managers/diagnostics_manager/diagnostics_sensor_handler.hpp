@@ -42,9 +42,10 @@ protected:
                             [[maybe_unused]] const std::string &name_space, [[maybe_unused]] const std::string &plugin_config_path,
                             [[maybe_unused]] rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
 
-  // Hook for derived classes to provide additional details in the SensorStatus message
-  // By default, returns an empty JSON object, but derived classes can override this to include custom details about the sensor status (e.g. last message
-  // timestamp, error counts, etc.)
+  // Hook for derived classes to provide additional details in the SensorStatus message, as flat string-valued key/value pairs
+  // (e.g. last message timestamp, error counts, etc.). By default, returns an empty vector.
+  // If a sensor's details are inherently structured/nested rather than flat key/value pairs, a plugin may instead publish its
+  // own mrs_msgs::msg::SensorInfo message (see CameraSensorHandler for a worked example) and leave this at its default.
   virtual std::vector<diagnostic_msgs::msg::KeyValue> fill_details();
 
   std::string topic_;
