@@ -1,4 +1,5 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp>
+#include <cmath>
 #include <unordered_map>
 
 namespace mrs_uav_managers::diagnostics_manager
@@ -249,6 +250,14 @@ Eigen::Matrix3d DiagnosticsSensorHandler::cov2eigen(const std::array<double, 9> 
     for (int c = 0; c < 3; c++)
       cov(r, c) = msg_cov.at(r + 3 * c);
   return cov;
+}
+
+//}
+
+/* covUncertainty() //{ */
+
+double DiagnosticsSensorHandler::covUncertainty(const std::array<double, 9> &msg_cov) {
+  return std::pow(cov2eigen(msg_cov).determinant(), 1.0 / 6.0);
 }
 
 //}
