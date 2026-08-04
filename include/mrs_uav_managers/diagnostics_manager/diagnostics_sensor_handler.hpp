@@ -95,6 +95,10 @@ protected:
   uint8_t         mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str);
   Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov);
 
+  /** @brief Scalar "spread" of a covariance matrix, in the same units as the underlying quantity: pow(det(cov), 1/6). The determinant of a 3x3
+   * covariance is units^2, so the 6th root (not the more common cube root) is needed to bring it back to units^1. */
+  double covUncertainty(const std::array<double, 9> &msg_cov);
+
   template <typename MessageType>
   mrs_lib::SubscriberHandler<MessageType> create_main_subscriber(rclcpp::Node::SharedPtr &node, const std::string &topic_name,
                                                                  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr,
