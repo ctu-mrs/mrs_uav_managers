@@ -47,7 +47,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   std::string handler_instance = name_ + " handler (" + topic_ + ")";
   error_publisher_             = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node, node->get_clock(), "DiagnosticsManager", handler_instance);
 
-  sensor_type_uint_ = mapSensorType(sensor_type_str);
+  sensor_type_uint_ = mapSensorType(node, sensor_type_str);
 
   // Create QoS profile based on config
   qos_profile_ = rclcpp::QoS(10);
@@ -217,7 +217,7 @@ bool DiagnosticsSensorHandler::isTopicFresh(const rclcpp::Time &now, const rclcp
 
 /* mapSensorType() //{ */
 
-uint8_t DiagnosticsSensorHandler::mapSensorType(const std::string &type_str) {
+uint8_t DiagnosticsSensorHandler::mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str) {
   static const std::unordered_map<std::string, uint8_t> type_map = {
       {"Autopilot", mrs_msgs::msg::SensorStatus::TYPE_AUTOPILOT},
       {"Rangefinder", mrs_msgs::msg::SensorStatus::TYPE_RANGEFINDER},
@@ -235,7 +235,7 @@ uint8_t DiagnosticsSensorHandler::mapSensorType(const std::string &type_str) {
     return it->second;
   }
 
-  RCLCPP_WARN(rclcpp::get_logger("GenericSensorHandler"), "Unknown sensor type '%s'", type_str.c_str());
+  RCLCPP_WARN(node->get_logger(), "[%s]: unknown sensor type '%s'", name_.c_str(), type_str.c_str());
   return mrs_msgs::msg::SensorStatus::TYPE_UNKNOWN;
 }
 
