@@ -91,6 +91,11 @@ protected:
   /** @brief True if @p last_msg is recent enough (within 3× the expected period). */
   bool isTopicFresh(const rclcpp::Time &now, const rclcpp::Time &last_msg) const;
 
+  /** @brief Records rate/staleness bookkeeping for the arrival of one message. Call once per message from every subscription callback --
+   * create_main_subscriber()'s SubscriberHandler<T> callback does this automatically; a plugin using a generic/type-erased subscription
+   * (which can't use create_main_subscriber()) must call this itself from its own callback. */
+  void recordMessageReceived();
+
   // | -------------------- support functions ------------------- |
   uint8_t         mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str);
   Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov);
