@@ -1,8 +1,14 @@
 #pragma once
 #include <boost/preprocessor.hpp>
+#include <string>
 
 template <typename Enum_T, typename Ros_T>
 inline constexpr Enum_T from_ros(Ros_T ros) {
+  return Enum_T::UNKNOWN;
+}
+
+template <typename Enum_T>
+inline Enum_T from_string(const std::string &str) {
   return Enum_T::UNKNOWN;
 }
 
@@ -34,6 +40,27 @@ inline constexpr Enum_T from_ros(Ros_T ros) {
     default:                                                          \
       return "UNKNOWN";                                               \
     }                                                                 \
+  }
+
+// a helper macro to generate an if-branch in the format
+// if (str == "ELEMENT_NAME") return enum_t::element_name;
+#define X_DEFINE_ENUM_STRING_CONVERSIONS_FROM_STRING_CASE(r, enum_t, elem) \
+  if (str == BOOST_PP_STRINGIZE(elem))                                  \
+    return enum_t::elem;
+
+// this macro defines a from_string() string to enum conversion function, the inverse of to_string() above.
+// Opt-in and separate from DEFINE_ENUM_WITH_CONVERSIONS (rather than folded into it) so enums that don't
+// need to be parsed from a string (e.g. ones only ever produced internally, never read from config) don't
+// pick up an unused specialization. Call as from_string<enum_t>(str); an unmatched str returns enum_t::UNKNOWN.
+#define DEFINE_ENUM_STRING_PARSE(enum_t, enumerators)                 \
+  template <>                                                         \
+  inline enum_t from_string<enum_t>(const std::string &str) {         \
+    BOOST_PP_SEQ_FOR_EACH(                                            \
+        X_DEFINE_ENUM_STRING_CONVERSIONS_FROM_STRING_CASE,            \
+        enum_t,                                                       \
+        enumerators                                                   \
+    )                                                                 \
+    return enum_t::UNKNOWN;                                           \
   }
 
 // some helper macros for expanding and concatenating macro variables using black magic
