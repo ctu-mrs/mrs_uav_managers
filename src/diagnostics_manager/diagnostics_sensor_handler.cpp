@@ -214,6 +214,18 @@ bool DiagnosticsSensorHandler::isTopicFresh(const rclcpp::Time &now, const rclcp
 
 //}
 
+/* recordMessageReceived() //{ */
+
+void DiagnosticsSensorHandler::recordMessageReceived() {
+  const rclcpp::Time now = rclcpp::Clock(RCL_STEADY_TIME).now();
+  rate_tracker_.record(now);
+  std::scoped_lock lock(mutex_state_);
+  state_.msg_count++;
+  state_.last_msg_wall_time = now;
+}
+
+//}
+
 // | -------------------- support functions ------------------- |
 
 /* mapSensorType() //{ */

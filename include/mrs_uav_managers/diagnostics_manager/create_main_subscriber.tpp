@@ -18,15 +18,7 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
   shopts_.subscription_options.callback_group = cbkgrp_subs;
   shopts_.qos                                 = qos_profile_;
 
-  auto callback = [this]([[maybe_unused]] const typename MessageType::ConstPtr &msg) {
-    const rclcpp::Time now = rclcpp::Clock(RCL_STEADY_TIME).now();
-    rate_tracker_.record(now);
-    {
-      std::scoped_lock lock(mutex_state_);
-      state_.msg_count++;
-      state_.last_msg_wall_time = now;
-    }
-  };
+  auto callback = [this]([[maybe_unused]] const typename MessageType::ConstPtr &msg) { recordMessageReceived(); };
 
   return mrs_lib::SubscriberHandler<MessageType>(shopts_, topic_name, callback);
 }
