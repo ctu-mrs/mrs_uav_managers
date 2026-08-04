@@ -404,6 +404,7 @@ target_sources(MrsUavManagers_MrsUavManagers
     "include/mrs_uav_managers/diagnostics_manager/diagnostics_manager.hpp"
     "include/mrs_uav_managers/diagnostics_manager/preflight_checker.hpp"
     "include/mrs_uav_managers/diagnostics_manager/enums/robot_type.hpp"
+    "include/mrs_uav_managers/diagnostics_manager/enums/sensor_type.hpp"
     "include/mrs_uav_managers/diagnostics_manager/enums/tracker_state.hpp"
     "include/mrs_uav_managers/diagnostics_manager/enums/uav_state.hpp"
     "include/mrs_uav_managers/diagnostics_manager/enums/helpers/enum_helpers.hpp"

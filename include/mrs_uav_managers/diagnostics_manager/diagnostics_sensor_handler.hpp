@@ -9,8 +9,10 @@
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_msgs/msg/sensor_status.hpp>
 #include <mutex>
+#include <optional>
 #include <rclcpp/rclcpp.hpp>
 
+#include <mrs_uav_managers/diagnostics_manager/enums/sensor_type.hpp>
 #include <mrs_uav_managers/diagnostics_manager/utils/rate_tracker.hpp>
 
 //}
@@ -97,8 +99,13 @@ protected:
   void recordMessageReceived();
 
   // | -------------------- support functions ------------------- |
-  uint8_t         mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str);
-  Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov);
+  /** @brief Maps a config type: string to its mrs_msgs::msg::SensorStatus::TYPE_* constant, via sensor_type_t (enums/sensor_type.hpp) --
+   * X_ENUM_SEQ there is the single source of truth for the set of valid strings, so a genuinely new sensor type that's missing its
+   * mrs_msgs::msg::SensorStatus::TYPE_* constant fails to compile rather than silently degrading at runtime. Returns std::nullopt for
+   * an unmapped string (a typo in config, since the compile-time gap above is already ruled out) -- the caller treats this as fatal,
+   * since silently degrading to TYPE_UNKNOWN would hide the mistake instead of making the operator fix it. */
+  std::optional<uint8_t> mapSensorType(const std::string &type_str);
+  Eigen::Matrix3d        cov2eigen(const std::array<double, 9> &msg_cov);
 
   /** @brief Scalar "spread" of a covariance matrix, in the same units as the underlying quantity: pow(det(cov), 1/6). The determinant of a 3x3
    * covariance is units^2, so the 6th root (not the more common cube root) is needed to bring it back to units^1. */
