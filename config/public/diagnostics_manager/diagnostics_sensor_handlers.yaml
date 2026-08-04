@@ -5,7 +5,7 @@ mrs_uav_managers:
       # TEMPLATE (not an active instance -- copy/paste and rename to use)
       #
       # ExampleHandler:
-      #   type: "Example" # Example, Autopilot, Rangefinder, GNSS, IMU, Barometer, Magnetometer, Lidar, Camera, RemoteController
+      #   type: "Example" # Example, AUTOPILOT, RANGEFINDER, GNSS, IMU, BAROMETER, MAGNETOMETER, LIDAR, CAMERA, REMOTE_CONTROLLER
       #   topic: "example_node/topic" # Don't add the leading slash, the name will be resolved relative to the node's namespace
       #   expected_publisher:
       #     node: "example_node" # Name of the node expected to publish the topic (optional, used for more specific diagnostics)
@@ -22,7 +22,7 @@ mrs_uav_managers:
 
       # define "running" instances of plugins, there can be multiple instances of the same plugin
       SimulationCamera:
-        type: "Camera"
+        type: "CAMERA"
         topic: "servo_camera/camera_info"
         qos_reliability: "reliable"
         expected_rate: 60.0
@@ -30,14 +30,14 @@ mrs_uav_managers:
 
       # Using generic handler
       PX4:
-        type: "Autopilot"
+        type: "AUTOPILOT"
         topic: "hw_api/status"
         qos_reliability: "reliable"
         expected_rate: 100.0
         rate_tolerance: 0.3
 
       Rangefinder:
-        type: "Rangefinder"
+        type: "RANGEFINDER"
         topic: "hw_api/distance_sensor"
         qos_reliability: "reliable"
         expected_rate: 100.0
@@ -51,14 +51,14 @@ mrs_uav_managers:
         rate_tolerance: 0.3
 
       Magnetometer:
-        type: "Magnetometer"
+        type: "MAGNETOMETER"
         topic: "hw_api/magnetic_field"
         qos_reliability: "reliable"
         expected_rate: 15.0
         rate_tolerance: 0.3
 
       RemoteController:
-        type: "RemoteController"
+        type: "REMOTE_CONTROLLER"
         topic: "hw_api/rc_rssi"
         qos_reliability: "reliable"
         expected_rate: 10.0

@@ -1,6 +1,5 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp>
 #include <cmath>
-#include <unordered_map>
 
 namespace mrs_uav_managers::diagnostics_manager
 {
@@ -48,7 +47,12 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   std::string handler_instance = name_ + " handler (" + topic_ + ")";
   error_publisher_             = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node, node->get_clock(), "DiagnosticsManager", handler_instance);
 
-  sensor_type_uint_ = mapSensorType(node, sensor_type_str);
+  const auto sensor_type = mapSensorType(sensor_type_str);
+  if (!sensor_type.has_value()) {
+    RCLCPP_ERROR(node->get_logger(), "[%s]: unknown sensor type '%s'", name_.c_str(), sensor_type_str.c_str());
+    return false;
+  }
+  sensor_type_uint_ = sensor_type.value();
 
   // Create QoS profile based on config
   qos_profile_ = rclcpp::QoS(10);
@@ -230,26 +234,13 @@ void DiagnosticsSensorHandler::recordMessageReceived() {
 
 /* mapSensorType() //{ */
 
-uint8_t DiagnosticsSensorHandler::mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str) {
-  static const std::unordered_map<std::string, uint8_t> type_map = {
-      {"Autopilot", mrs_msgs::msg::SensorStatus::TYPE_AUTOPILOT},
-      {"Rangefinder", mrs_msgs::msg::SensorStatus::TYPE_RANGEFINDER},
-      {"GNSS", mrs_msgs::msg::SensorStatus::TYPE_GNSS},
-      {"IMU", mrs_msgs::msg::SensorStatus::TYPE_IMU},
-      {"Barometer", mrs_msgs::msg::SensorStatus::TYPE_BAROMETER},
-      {"Magnetometer", mrs_msgs::msg::SensorStatus::TYPE_MAGNETOMETER},
-      {"Lidar", mrs_msgs::msg::SensorStatus::TYPE_LIDAR},
-      {"Camera", mrs_msgs::msg::SensorStatus::TYPE_CAMERA},
-      {"RemoteController", mrs_msgs::msg::SensorStatus::TYPE_REMOTE_CONTROLLER},
-  };
-
-  auto it = type_map.find(type_str);
-  if (it != type_map.end()) {
-    return it->second;
+std::optional<uint8_t> DiagnosticsSensorHandler::mapSensorType(const std::string &type_str) {
+  const sensor_type_t sensor_type = from_string<sensor_type_t>(type_str);
+  if (sensor_type == sensor_type_t::UNKNOWN) {
+    return std::nullopt;
   }
 
-  RCLCPP_WARN(node->get_logger(), "[%s]: unknown sensor type '%s'", name_.c_str(), type_str.c_str());
-  return mrs_msgs::msg::SensorStatus::TYPE_UNKNOWN;
+  return to_ros(sensor_type);
 }
 
 //}
