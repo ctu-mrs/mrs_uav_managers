@@ -546,18 +546,6 @@ void DiagnosticsManager::cbk_control_manager_diag_rate(const mrs_msgs::msg::Cont
 
 // | -------------------- support functions ------------------- |
 
-/* cov2eigen() //{ */
-
-Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov) {
-  Eigen::Matrix3d cov;
-  for (int r = 0; r < 3; r++)
-    for (int c = 0; c < 3; c++)
-      cov(r, c) = msg_cov.at(r + 3 * c);
-  return cov;
-}
-
-//}
-
 /* parse_robot_type() //{ */
 
 robot_type_t DiagnosticsManager::parse_robot_type(const std::string &robot_type_str) {
