@@ -91,7 +91,7 @@ protected:
   bool isTopicFresh(const rclcpp::Time &now, const rclcpp::Time &last_msg) const;
 
   // | -------------------- support functions ------------------- |
-  uint8_t         mapSensorType(const std::string &type_str);
+  uint8_t         mapSensorType(const rclcpp::Node::SharedPtr &node, const std::string &type_str);
   Eigen::Matrix3d cov2eigen(const std::array<double, 9> &msg_cov);
 
   template <typename MessageType>
