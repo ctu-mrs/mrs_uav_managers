@@ -45,7 +45,7 @@ DEFINE_ENUM_MSG_CONVERSIONS(X_ENUM_NAME, X_ENUM_MSG_TYPE, X_ENUM_MSG_MEMBER, X_E
 
 /* is_flying() //{ */
 
-// some more helper functions related to this enum
+// True for any state beyond OFFBOARD, whether under autonomous or manual (RC) control.
 inline bool is_flying(state_t uav_state) {
   switch (uav_state) {
   case state_t::DISARMED:
@@ -61,7 +61,7 @@ inline bool is_flying(state_t uav_state) {
 
 /* is_flying_autonomously() //{ */
 
-// some more helper functions related to this enum
+// Like is_flying(), but also false for MANUAL (RC_MODE) and UNKNOWN -- true only while a tracker/controller is actually in command.
 inline bool is_flying_autonomously(state_t uav_state) {
   switch (uav_state) {
   case state_t::DISARMED:

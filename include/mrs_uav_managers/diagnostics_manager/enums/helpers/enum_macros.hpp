@@ -2,11 +2,13 @@
 #include <boost/preprocessor.hpp>
 #include <string>
 
+// Default from_ros(): returns UNKNOWN for any (Enum_T, Ros_T) pair without a DEFINE_ENUM_MSG_CONVERSIONS-generated specialization.
 template <typename Enum_T, typename Ros_T>
 inline constexpr Enum_T from_ros(Ros_T ros) {
   return Enum_T::UNKNOWN;
 }
 
+// Default from_string(): returns UNKNOWN for any Enum_T without a DEFINE_ENUM_STRING_PARSE-generated specialization.
 template <typename Enum_T>
 inline Enum_T from_string(const std::string &str) {
   return Enum_T::UNKNOWN;
