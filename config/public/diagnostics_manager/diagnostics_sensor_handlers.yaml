@@ -13,6 +13,7 @@ mrs_uav_managers:
       #   qos_reliability: "reliable" # QoS reliability setting (default: "reliable")
       #   expected_rate: 10.0 # Hz, or "N+" (e.g. "10+") to check only the floor and skip the "rate too high" check
       #   rate_tolerance: 0.3 # 30% deviation allowed (default); still applies to the floor when using "N+"
+      #   check_frame_transform: true # WARN if this sensor's frame can't transform to body_frame (default: true)
       #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about
       #                      # (e.g. message_type, status_topic); if empty, the plugin falls back to its own package-provided default
       #
