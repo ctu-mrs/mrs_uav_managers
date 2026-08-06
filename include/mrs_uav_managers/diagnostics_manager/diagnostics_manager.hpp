@@ -30,9 +30,7 @@
 #include <mrs_msgs/msg/constraint_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/gain_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/general_robot_info.hpp>
-#include <mrs_msgs/msg/gps_info.hpp>
 #include <mrs_msgs/msg/hw_api_capabilities.hpp>
-#include <mrs_msgs/msg/hw_api_rc_rssi.hpp>
 #include <mrs_msgs/msg/hw_api_status.hpp>
 #include <mrs_msgs/msg/mpc_tracker_diagnostics.hpp>
 #include <mrs_msgs/msg/safety_area_manager_diagnostics.hpp>
@@ -50,7 +48,6 @@
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <sensor_msgs/msg/magnetic_field.hpp>
 #include <sensor_msgs/msg/range.hpp>
 
 #include <mrs_lib/errorgraph/errorgraph.h>
@@ -144,8 +141,6 @@ private:
 
   std::atomic<bool> is_initialized_ = false;
 
-  std::shared_ptr<mrs_lib::ParamLoader> param_loader_;
-
   std::mutex                          uav_state_mutex_; ///< guards uav_state_ across timer callbacks
   enum_helpers::enum_updater<state_t> uav_state_;
 
@@ -176,10 +171,8 @@ private:
   mrs_msgs::msg::StateEstimationInfo                               last_state_estimation_info_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::EstimationDiagnostics> sh_estimation_diagnostics_;
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>          sh_hw_api_gnss_;
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::GpsInfo>               sh_hw_api_gnss_status_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>        sh_control_manager_heading_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>        sh_hw_api_mag_heading_;
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcRssi>           sh_hw_api_rc_rssi_;
 
   // | ----------------------- ControlInfo ---------------------- |
   mrs_lib::PublisherHandler<mrs_msgs::msg::ControlInfo>                   ph_control_info_;
@@ -205,7 +198,6 @@ private:
   // | -------------------- SystemHealthInfo -------------------- |
   mrs_lib::PublisherHandler<mrs_msgs::msg::SystemHealthInfo>  ph_system_health_info_;
   mrs_msgs::msg::SystemHealthInfo                             last_system_health_info_;
-  mrs_lib::SubscriberHandler<sensor_msgs::msg::MagneticField> sh_hw_api_magnetic_field_;
   mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>         sh_hw_api_odometry_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>         sh_estimator_uav_state_;
 
