@@ -9,7 +9,10 @@ namespace mrs_uav_managers::diagnostics_manager
 /* initialize() //{ */
 
 bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
-                                          rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
+                                          const DiagnosticsCommonHandlers_t &common_handlers, rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
+
+  transformer_ = common_handlers.transformer;
+  body_frame_  = common_handlers.body_frame;
 
   mrs_lib::ParamLoader param_loader(node, "DiagnosticsSensorHandler");
 
@@ -33,6 +36,7 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   std::string expected_rate_str;
   param_loader.loadParam(config_key + "/expected_rate", expected_rate_str);
   param_loader.loadParam(config_key + "/rate_tolerance", rate_tolerance_, 0.3);
+  param_loader.loadParam(config_key + "/check_frame_transform", check_frame_transform_, true);
 
   std::string qos_reliability;
   param_loader.loadParam(config_key + "/qos_reliability", qos_reliability, std::string("reliable"));
@@ -171,6 +175,12 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
     ss.ready   = true;
     ss.level   = mrs_msgs::msg::SensorStatus::OK;
     ss.message = "Rate within expected range";
+
+    if (check_frame_transform_ && snapshot.last_frame_id.has_value() && !transformer_->getTransform(*snapshot.last_frame_id, body_frame_).has_value()) {
+      ss.ready   = false;
+      ss.level   = mrs_msgs::msg::SensorStatus::WARN;
+      ss.message = "Frame '" + *snapshot.last_frame_id + "' cannot be transformed to '" + body_frame_ + "'";
+    }
   } else if (measured_rate < lower_bound) {
     ss.ready   = false;
     ss.level   = mrs_msgs::msg::SensorStatus::WARN;
@@ -240,6 +250,12 @@ void DiagnosticsSensorHandler::recordMessageReceived() {
   std::scoped_lock lock(mutex_state_);
   state_.msg_count++;
   state_.last_msg_wall_time = now;
+}
+
+void DiagnosticsSensorHandler::recordMessageReceived(const std::string &frame_id) {
+  recordMessageReceived();
+  std::scoped_lock lock(mutex_state_);
+  state_.last_frame_id = frame_id;
 }
 
 //}

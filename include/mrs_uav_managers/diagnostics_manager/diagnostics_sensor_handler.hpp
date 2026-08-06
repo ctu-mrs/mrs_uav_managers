@@ -7,6 +7,7 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/transformer.h>
 #include <mrs_msgs/msg/sensor_status.hpp>
 #include <mutex>
 #include <optional>
@@ -21,12 +22,19 @@
 namespace mrs_uav_managers::diagnostics_manager
 {
 
+/** @brief Values shared by every DiagnosticsSensorHandler instance (transformer, body frame). */
+struct DiagnosticsCommonHandlers_t
+{
+  std::shared_ptr<mrs_lib::Transformer> transformer;
+  std::string                           body_frame;
+};
+
 class DiagnosticsSensorHandler {
 public:
   // Called once by DiagnosticsManager to load parameters, set up rate monitoring, and invoke onInitialize().
   // Returns false on failure (e.g. onInitialize() returning false or a config error).
   bool initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
-                  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
+                  const DiagnosticsCommonHandlers_t &common_handlers, rclcpp::CallbackGroup::SharedPtr cbkgrp_subs = nullptr);
 
   // Called periodically by DiagnosticsManager to get this handler's current health (rate/staleness plus fill_details()).
   virtual mrs_msgs::msg::SensorStatus updateStatus();
@@ -69,8 +77,9 @@ protected:
   // Runtime state updated from subscriber callbacks
   struct RuntimeState
   {
-    rclcpp::Time last_msg_wall_time{0, 0, RCL_STEADY_TIME};
-    uint64_t     msg_count{0};
+    rclcpp::Time               last_msg_wall_time{0, 0, RCL_STEADY_TIME};
+    uint64_t                   msg_count{0};
+    std::optional<std::string> last_frame_id; // set by recordMessageReceived(frame_id)
   };
   mutable std::mutex mutex_state_;
   RuntimeState       state_;
@@ -83,6 +92,11 @@ protected:
 
   // Error publisher for reporting detailed errors (optional, can be used by derived classes)
   std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
+
+  // Frame transform check (check_frame_transform_ is a per-sensor opt-out)
+  std::shared_ptr<mrs_lib::Transformer> transformer_;
+  std::string                           body_frame_;
+  bool                                  check_frame_transform_ = true;
 
   // | -------------------- sensor-health helpers ------------------- |
 
@@ -99,6 +113,9 @@ protected:
    * create_main_subscriber()'s SubscriberHandler<T> callback does this automatically; a plugin using a generic/type-erased subscription
    * (which can't use create_main_subscriber()) must call this itself from its own callback. */
   void recordMessageReceived();
+
+  /** @brief Also records the message's frame_id, for updateStatus()'s frame-transformability check. */
+  void recordMessageReceived(const std::string &frame_id);
 
   // | -------------------- support functions ------------------- |
   /** @brief Maps a config type: string to its mrs_msgs::msg::SensorStatus::TYPE_* constant, via sensor_type_t (enums/sensor_type.hpp) --
