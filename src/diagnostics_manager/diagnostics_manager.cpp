@@ -905,9 +905,20 @@ mrs_msgs::msg::SystemHealthInfo DiagnosticsManager::parse_system_health_info() {
   msg.onboard_computer_info.wifi_signal_dbm   = snap.wifi_signal_dbm;
   msg.onboard_computer_info.wifi_link_quality = snap.wifi_link_quality;
 
-  msg.hw_api_rate           = static_cast<float>(rate_hw_api_odometry_.rate());
-  msg.control_manager_rate  = static_cast<float>(rate_control_manager_diag_.rate());
-  msg.state_estimation_rate = static_cast<float>(rate_estimator_uav_state_.rate());
+  // RateTracker doesn't decay on its own, so gate each rate on topic freshness. hasMsg() must be
+  // checked first -- lastMsgTime() defaults to a different clock type before any message arrives,
+  // and subtracting it from clock_->now() throws.
+  msg.hw_api_rate = (sh_hw_api_odometry_.hasMsg() && clock_->now() - sh_hw_api_odometry_.lastMsgTime() <= not_reporting_timeout_)
+                        ? static_cast<float>(rate_hw_api_odometry_.rate())
+                        : 0.0f;
+  msg.control_manager_rate =
+      (sh_control_manager_diagnostics_.hasMsg() && clock_->now() - sh_control_manager_diagnostics_.lastMsgTime() <= not_reporting_timeout_)
+          ? static_cast<float>(rate_control_manager_diag_.rate())
+          : 0.0f;
+  msg.state_estimation_rate =
+      (sh_estimator_uav_state_.hasMsg() && clock_->now() - sh_estimator_uav_state_.lastMsgTime() <= not_reporting_timeout_)
+          ? static_cast<float>(rate_estimator_uav_state_.rate())
+          : 0.0f;
 
   {
     std::scoped_lock lck(mutex_sensor_handler_list_);
