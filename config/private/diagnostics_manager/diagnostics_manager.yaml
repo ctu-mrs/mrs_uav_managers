@@ -14,3 +14,6 @@ mrs_uav_managers:
     sensor_handlers:
       # the rate at which the sensor handlers will be updated, this is the rate at which the diagnostics will be published
       update_timer_rate: 1.0 # [Hz]
+
+    # body-fixed frame sensors must transform to; bare name, namespaced with robot_name in code; required
+    body_frame: "fcu"

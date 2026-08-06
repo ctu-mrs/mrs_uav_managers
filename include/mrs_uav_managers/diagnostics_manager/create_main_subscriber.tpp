@@ -18,7 +18,13 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
   shopts_.subscription_options.callback_group = cbkgrp_subs;
   shopts_.qos                                 = qos_profile_;
 
-  auto callback = [this]([[maybe_unused]] const typename MessageType::ConstPtr &msg) { recordMessageReceived(); };
+  auto callback = [this](const typename MessageType::ConstPtr &msg) {
+    if constexpr (requires { msg->header.frame_id; }) {
+      recordMessageReceived(msg->header.frame_id);
+    } else {
+      recordMessageReceived();
+    }
+  };
 
   return mrs_lib::SubscriberHandler<MessageType>(shopts_, topic_name, callback);
 }

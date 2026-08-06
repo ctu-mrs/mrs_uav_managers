@@ -70,6 +70,10 @@ void DiagnosticsManager::initialize() {
 
   not_reporting_timeout_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/timeout/not_reporting");
 
+  common_handlers_.transformer = std::make_shared<mrs_lib::Transformer>(node_);
+  param_loader.loadParam("mrs_uav_managers/diagnostics_manager/body_frame", common_handlers_.body_frame);
+  common_handlers_.body_frame = _robot_name_ + "/" + common_handlers_.body_frame;
+
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");
   const auto update_status_rate = param_loader.loadParam2<double>("update_timer_rate");
 
@@ -292,7 +296,7 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
     }
 
     try {
-      if (!handler->initialize(node_, config_key, _robot_name_, cbkgrp_subs_)) {
+      if (!handler->initialize(node_, config_key, _robot_name_, common_handlers_, cbkgrp_subs_)) {
         RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to initialize", config_key.c_str());
         error_publisher_->addOneshotError("Sensor handler " + config_key + " failed to initialize");
         error_publisher_->flushAndShutdown();
@@ -914,10 +918,9 @@ mrs_msgs::msg::SystemHealthInfo DiagnosticsManager::parse_system_health_info() {
       (sh_control_manager_diagnostics_.hasMsg() && clock_->now() - sh_control_manager_diagnostics_.lastMsgTime() <= not_reporting_timeout_)
           ? static_cast<float>(rate_control_manager_diag_.rate())
           : 0.0f;
-  msg.state_estimation_rate =
-      (sh_estimator_uav_state_.hasMsg() && clock_->now() - sh_estimator_uav_state_.lastMsgTime() <= not_reporting_timeout_)
-          ? static_cast<float>(rate_estimator_uav_state_.rate())
-          : 0.0f;
+  msg.state_estimation_rate = (sh_estimator_uav_state_.hasMsg() && clock_->now() - sh_estimator_uav_state_.lastMsgTime() <= not_reporting_timeout_)
+                                  ? static_cast<float>(rate_estimator_uav_state_.rate())
+                                  : 0.0f;
 
   {
     std::scoped_lock lck(mutex_sensor_handler_list_);

@@ -61,6 +61,7 @@
 #include <mrs_lib/service_client_handler.h>
 #include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/transformer.h>
 
 #include <mrs_uav_managers/diagnostics_manager/enums/helpers/enum_helpers.hpp>
 #include <mrs_uav_managers/diagnostics_manager/enums/robot_type.hpp>
@@ -196,10 +197,10 @@ private:
   mrs_lib::SubscriberHandler<std_msgs::msg::Float64>        sh_mass_estimate_;
 
   // | -------------------- SystemHealthInfo -------------------- |
-  mrs_lib::PublisherHandler<mrs_msgs::msg::SystemHealthInfo>  ph_system_health_info_;
-  mrs_msgs::msg::SystemHealthInfo                             last_system_health_info_;
-  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>         sh_hw_api_odometry_;
-  mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>         sh_estimator_uav_state_;
+  mrs_lib::PublisherHandler<mrs_msgs::msg::SystemHealthInfo> ph_system_health_info_;
+  mrs_msgs::msg::SystemHealthInfo                            last_system_health_info_;
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>        sh_hw_api_odometry_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::UavState>        sh_estimator_uav_state_;
 
   void cbk_hw_api_odometry_rate(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void cbk_estimator_uav_state_rate(const mrs_msgs::msg::UavState::ConstSharedPtr msg);
@@ -227,6 +228,7 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ErrorgraphElement>     sh_errorgraph_error_msg_;
 
   // | -------------------- Sensor handlers --------------------- |
+  DiagnosticsCommonHandlers_t                                       common_handlers_;       ///< transformer/body_frame shared with every sensor handler
   std::unique_ptr<pluginlib::ClassLoader<DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
   std::vector<std::string>                                          _sensor_handler_names_;
   std::vector<std::shared_ptr<DiagnosticsSensorHandler>>            sensor_handlers_;
