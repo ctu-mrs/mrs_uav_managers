@@ -110,7 +110,6 @@ void DiagnosticsManager::initialize() {
   sh_hw_api_gnss_             = mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix>(shopts, "~/hw_api_gnss_in");
   sh_control_manager_heading_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/control_manager_heading_in");
   sh_hw_api_mag_heading_      = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/hw_api_mag_heading_in");
-  sh_hw_api_rc_rssi_          = mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiRcRssi>(shopts, "~/hw_api_rc_rssi_in");
 
   // | ----------------------- ControlInfo ---------------------- |
   ph_control_info_                   = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlInfo>(node_, "~/control_info_out");

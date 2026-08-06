@@ -188,7 +188,6 @@ def generate_launch_description():
             ("~/gain_manager_diagnostics_in", "gain_manager/diagnostics"),
             ("~/hw_api_gnss_in", "hw_api/gnss"),
             ("~/hw_api_mag_heading_in", "hw_api/mag_heading"),
-            ("~/hw_api_rc_rssi_in", "hw_api/rc_rssi"),
             ("~/hw_api_status_in", "hw_api/status"),
             ("~/hw_api_odometry_in", "hw_api/odometry"),
             ("~/estimator_uav_state_in", "estimation_manager/uav_state"),
