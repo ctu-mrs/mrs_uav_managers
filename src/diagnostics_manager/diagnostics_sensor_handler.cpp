@@ -1,8 +1,19 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp>
 #include <cmath>
+#include <cstdio>
 
 namespace mrs_uav_managers::diagnostics_manager
 {
+
+namespace
+{
+// std::to_string(double) always prints 6 decimals -- this trims Hz values in SensorStatus.message to 1.
+std::string formatHz(double value) {
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.1f", value);
+  return std::string(buf);
+}
+} // namespace
 
 /* initialize() //{ */
 
@@ -160,11 +171,11 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   } else if (measured_rate < lower_bound) {
     ss.ready   = false;
     ss.level   = mrs_msgs::msg::SensorStatus::WARN;
-    ss.message = "Rate too low: expected " + std::to_string(expected_rate_) + " Hz, got " + std::to_string(measured_rate) + " Hz";
+    ss.message = "Rate too low: expected " + formatHz(expected_rate_) + " Hz, got " + formatHz(measured_rate) + " Hz";
   } else {
     ss.ready   = true;
     ss.level   = mrs_msgs::msg::SensorStatus::WARN;
-    ss.message = "Rate too high: expected " + std::to_string(expected_rate_);
+    ss.message = "Rate too high: expected " + formatHz(expected_rate_);
   }
 
   ss.details = fill_details();
