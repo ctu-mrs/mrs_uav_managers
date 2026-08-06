@@ -1,19 +1,10 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_sensor_handler.hpp>
 #include <cmath>
 #include <cstdio>
+#include <stdexcept>
 
 namespace mrs_uav_managers::diagnostics_manager
 {
-
-namespace
-{
-// std::to_string(double) always prints 6 decimals -- this trims Hz values in SensorStatus.message to 1.
-std::string formatHz(double value) {
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "%.1f", value);
-  return std::string(buf);
-}
-} // namespace
 
 /* initialize() //{ */
 
@@ -39,7 +30,8 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   param_loader.loadParam(config_key + "/type", sensor_type_str);
   param_loader.loadParam(config_key + "/expected_publisher/node", expected_publisher_node_, std::string("HwApiManager"));
   param_loader.loadParam(config_key + "/expected_publisher/component", expected_publisher_component_, std::string("main"));
-  param_loader.loadParam(config_key + "/expected_rate", expected_rate_);
+  std::string expected_rate_str;
+  param_loader.loadParam(config_key + "/expected_rate", expected_rate_str);
   param_loader.loadParam(config_key + "/rate_tolerance", rate_tolerance_, 0.3);
 
   std::string qos_reliability;
@@ -64,6 +56,15 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
     return false;
   }
   sensor_type_uint_ = sensor_type.value();
+
+  const auto parsed_rate = parseExpectedRate(expected_rate_str);
+  if (!parsed_rate.has_value()) {
+    RCLCPP_ERROR(node->get_logger(), "[%s]: invalid expected_rate '%s' (expected a positive number, optionally suffixed with '+')", name_.c_str(),
+                 expected_rate_str.c_str());
+    return false;
+  }
+  expected_rate_       = parsed_rate->first;
+  no_upper_rate_limit_ = parsed_rate->second;
 
   // Create QoS profile based on config
   qos_profile_ = rclcpp::QoS(10);
@@ -164,7 +165,9 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   const double lower_bound = expected_rate_ * (1.0 - rate_tolerance_);
   const double upper_bound = expected_rate_ * (1.0 + rate_tolerance_);
 
-  if (measured_rate >= lower_bound && measured_rate <= upper_bound) {
+  const bool within_upper = no_upper_rate_limit_ || measured_rate <= upper_bound;
+
+  if (measured_rate >= lower_bound && within_upper) {
     ss.ready   = true;
     ss.level   = mrs_msgs::msg::SensorStatus::OK;
     ss.message = "Rate within expected range";
@@ -272,6 +275,41 @@ Eigen::Matrix3d DiagnosticsSensorHandler::cov2eigen(const std::array<double, 9> 
 
 double DiagnosticsSensorHandler::covUncertainty(const std::array<double, 9> &msg_cov) {
   return std::pow(cov2eigen(msg_cov).determinant(), 1.0 / 6.0);
+}
+
+//}
+
+/* parseExpectedRate() //{ */
+
+std::optional<std::pair<double, bool>> DiagnosticsSensorHandler::parseExpectedRate(const std::string &raw) {
+  const bool        floor_only = !raw.empty() && raw.back() == '+';
+  const std::string numeric    = floor_only ? raw.substr(0, raw.size() - 1) : raw;
+
+  if (numeric.empty()) {
+    return std::nullopt;
+  }
+
+  try {
+    std::size_t  consumed = 0;
+    const double value    = std::stod(numeric, &consumed);
+    if (consumed != numeric.size() || value <= 0.0) {
+      return std::nullopt;
+    }
+    return std::make_pair(value, floor_only);
+  }
+  catch (const std::exception &) {
+    return std::nullopt;
+  }
+}
+
+//}
+
+/* formatHz() //{ */
+
+std::string DiagnosticsSensorHandler::formatHz(double value) {
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.1f", value);
+  return std::string(buf);
 }
 
 //}

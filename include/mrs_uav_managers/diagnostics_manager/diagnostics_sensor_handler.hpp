@@ -11,6 +11,7 @@
 #include <mutex>
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
+#include <utility>
 
 #include <mrs_uav_managers/diagnostics_manager/enums/sensor_type.hpp>
 #include <mrs_uav_managers/diagnostics_manager/utils/rate_tracker.hpp>
@@ -57,8 +58,9 @@ protected:
   // Rate monitoring
   std::string expected_publisher_node_;
   std::string expected_publisher_component_;
-  double      expected_rate_  = 0.0;
-  double      rate_tolerance_ = 0.3;
+  double      expected_rate_       = 0.0;
+  double      rate_tolerance_      = 0.3;
+  bool        no_upper_rate_limit_ = false; // set when expected_rate config used the "N+" (floor-only) syntax
 
   // Grace period before reporting rate errors
   static constexpr double GRACE_PERIOD_S = 5.0;
@@ -110,6 +112,13 @@ protected:
   /** @brief Scalar "spread" of a covariance matrix, in the same units as the underlying quantity: pow(det(cov), 1/6). The determinant of a 3x3
    * covariance is units^2, so the 6th root (not the more common cube root) is needed to bring it back to units^1. */
   double covUncertainty(const std::array<double, 9> &msg_cov);
+
+  /** @brief Parses expected_rate: a number checks both bounds; a trailing '+' ("10+") checks only the floor.
+   * std::nullopt means malformed -- the caller treats that as fatal. */
+  std::optional<std::pair<double, bool>> parseExpectedRate(const std::string &raw);
+
+  /** @brief Formats a Hz value with 1 decimal place for SensorStatus.message (std::to_string() always prints 6). */
+  std::string formatHz(double value);
 
   template <typename MessageType>
   mrs_lib::SubscriberHandler<MessageType> create_main_subscriber(rclcpp::Node::SharedPtr &node, const std::string &topic_name,

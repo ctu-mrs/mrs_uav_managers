@@ -11,8 +11,8 @@ mrs_uav_managers:
       #     node: "example_node" # Name of the node expected to publish the topic (optional, used for more specific diagnostics)
       #     component: "example_component" # Name of the component within the node expected to publish the topic (optional)
       #   qos_reliability: "reliable" # QoS reliability setting (default: "reliable")
-      #   expected_rate: 10.0 # Hz
-      #   rate_tolerance: 0.3 # 30% deviation allowed (default)
+      #   expected_rate: 10.0 # Hz, or "N+" (e.g. "10+") to check only the floor and skip the "rate too high" check
+      #   rate_tolerance: 0.3 # 30% deviation allowed (default); still applies to the floor when using "N+"
       #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about
       #                      # (e.g. message_type, status_topic); if empty, the plugin falls back to its own package-provided default
       #
@@ -54,7 +54,7 @@ mrs_uav_managers:
         type: "MAGNETOMETER"
         topic: "hw_api/magnetic_field"
         qos_reliability: "reliable"
-        expected_rate: 15.0
+        expected_rate: "10+"
         rate_tolerance: 0.3
 
       RemoteController:
