@@ -134,8 +134,8 @@ protected:
    * std::nullopt means malformed -- the caller treats that as fatal. */
   std::optional<std::pair<double, bool>> parseExpectedRate(const std::string &raw);
 
-  /** @brief Formats a Hz value with 1 decimal place for SensorStatus.message (std::to_string() always prints 6). */
-  std::string formatHz(double value);
+  /** @brief Formats a value with 1 decimal place for SensorStatus.message (std::to_string() always prints 6). */
+  std::string formatDecimal(double value);
 
   template <typename MessageType>
   mrs_lib::SubscriberHandler<MessageType> create_main_subscriber(rclcpp::Node::SharedPtr &node, const std::string &topic_name,

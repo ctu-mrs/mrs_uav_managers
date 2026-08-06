@@ -138,7 +138,7 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
     const double elapsed_since_init = (now - init_time_).seconds();
     ss.ready                        = false;
     ss.rate                         = 0.0;
-    ss.message                      = "No messages received for " + std::to_string(elapsed_since_init) + " seconds since startup";
+    ss.message                      = "No messages received for " + formatDecimal(elapsed_since_init) + " seconds since startup";
     ss.level                        = mrs_msgs::msg::SensorStatus::ERROR;
     mrs_lib::errorgraph::node_id_t source_node;
     source_node.node      = expected_publisher_node_;
@@ -153,7 +153,7 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
     const double time_since_last = (now - snapshot.last_msg_wall_time).seconds();
     ss.ready                     = false;
     ss.rate                      = 0.0;
-    ss.message                   = "No messages received for " + std::to_string(time_since_last) + " seconds";
+    ss.message                   = "No messages received for " + formatDecimal(time_since_last) + " seconds";
     ss.level                     = mrs_msgs::msg::SensorStatus::ERROR;
     mrs_lib::errorgraph::node_id_t source_node;
     source_node.node      = expected_publisher_node_;
@@ -184,11 +184,11 @@ mrs_msgs::msg::SensorStatus DiagnosticsSensorHandler::updateStatus() {
   } else if (measured_rate < lower_bound) {
     ss.ready   = false;
     ss.level   = mrs_msgs::msg::SensorStatus::WARN;
-    ss.message = "Rate too low: expected " + formatHz(expected_rate_) + " Hz, got " + formatHz(measured_rate) + " Hz";
+    ss.message = "Rate too low: expected " + formatDecimal(expected_rate_) + " Hz, got " + formatDecimal(measured_rate) + " Hz";
   } else {
     ss.ready   = true;
     ss.level   = mrs_msgs::msg::SensorStatus::WARN;
-    ss.message = "Rate too high: expected " + formatHz(expected_rate_);
+    ss.message = "Rate too high: expected " + formatDecimal(expected_rate_);
   }
 
   ss.details = fill_details();
@@ -320,9 +320,9 @@ std::optional<std::pair<double, bool>> DiagnosticsSensorHandler::parseExpectedRa
 
 //}
 
-/* formatHz() //{ */
+/* formatDecimal() //{ */
 
-std::string DiagnosticsSensorHandler::formatHz(double value) {
+std::string DiagnosticsSensorHandler::formatDecimal(double value) {
   char buf[32];
   std::snprintf(buf, sizeof(buf), "%.1f", value);
   return std::string(buf);
