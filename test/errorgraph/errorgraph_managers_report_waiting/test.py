@@ -21,8 +21,6 @@ def generate_test_description():
 
     ld = launch.LaunchDescription()
 
-    ld.add_action(SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp'))
-
     uav_type="x500"
     uav_name="uav1"
     platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/"+uav_type+".yaml"
@@ -31,6 +29,19 @@ def generate_test_description():
     launch_dir = os.path.dirname(launch_file_path)
 
     test_name = os.path.basename(launch_dir)
+
+    current_rmw = os.environ.get('RMW_IMPLEMENTATION', '')
+
+    if current_rmw == 'rmw_zenoh_cpp':
+        ld.add_action(
+            launch_ros.actions.Node(
+                package='rmw_zenoh_cpp',
+                namespace='',
+                executable='rmw_zenohd',
+                name='zenoh_router',
+                output='screen'
+            )
+        )
 
     ld.add_action(
         GroupAction([
