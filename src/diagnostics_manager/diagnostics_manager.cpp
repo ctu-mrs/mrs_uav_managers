@@ -70,7 +70,10 @@ void DiagnosticsManager::initialize() {
 
   not_reporting_timeout_ = param_loader.loadParam2<rclcpp::Duration>("mrs_uav_managers/diagnostics_manager/timeout/not_reporting");
 
-  common_handlers_.transformer = std::make_shared<mrs_lib::Transformer>(node_);
+  tim_mgr_ = std::make_shared<mrs_lib::TimeoutManager>(node_, rclcpp::Rate(1.0));
+
+  common_handlers_.transformer     = std::make_shared<mrs_lib::Transformer>(node_);
+  common_handlers_.timeout_manager = tim_mgr_;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/body_frame", common_handlers_.body_frame);
   common_handlers_.body_frame = _robot_name_ + "/" + common_handlers_.body_frame;
 
@@ -89,7 +92,6 @@ void DiagnosticsManager::initialize() {
 
   // | ----------------------- subscribers ---------------------- |
 
-  tim_mgr_ = std::make_shared<mrs_lib::TimeoutManager>(node_, rclcpp::Rate(1.0));
   mrs_lib::SubscriberHandlerOptions shopts;
   shopts.node                                = node_;
   shopts.node_name                           = "DiagnosticsManager";
