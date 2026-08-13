@@ -13,6 +13,7 @@ mrs_lib::SubscriberHandler<MessageType> DiagnosticsSensorHandler::create_main_su
   shopts_.node                                = node;
   shopts_.node_name                           = "DiagnosticsManager";
   shopts_.no_message_timeout                  = timeout;
+  shopts_.timeout_manager                     = timeout_manager_;
   shopts_.threadsafe                          = true;
   shopts_.autostart                           = true;
   shopts_.subscription_options.callback_group = cbkgrp_subs;

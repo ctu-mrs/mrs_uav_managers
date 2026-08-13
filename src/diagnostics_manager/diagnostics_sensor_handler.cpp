@@ -11,8 +11,9 @@ namespace mrs_uav_managers::diagnostics_manager
 bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
                                           const DiagnosticsCommonHandlers_t &common_handlers, rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
 
-  transformer_ = common_handlers.transformer;
-  body_frame_  = common_handlers.body_frame;
+  transformer_     = common_handlers.transformer;
+  body_frame_      = common_handlers.body_frame;
+  timeout_manager_ = common_handlers.timeout_manager;
 
   mrs_lib::ParamLoader param_loader(node, "DiagnosticsSensorHandler");
 
