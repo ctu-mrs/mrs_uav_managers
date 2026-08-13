@@ -7,6 +7,7 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/timeout_manager.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_msgs/msg/sensor_status.hpp>
 #include <mutex>
@@ -22,11 +23,12 @@
 namespace mrs_uav_managers::diagnostics_manager
 {
 
-/** @brief Values shared by every DiagnosticsSensorHandler instance (transformer, body frame). */
+/** @brief Values shared by every DiagnosticsSensorHandler instance (transformer, body frame, timeout manager). */
 struct DiagnosticsCommonHandlers_t
 {
-  std::shared_ptr<mrs_lib::Transformer> transformer;
-  std::string                           body_frame;
+  std::shared_ptr<mrs_lib::Transformer>    transformer;
+  std::string                              body_frame;
+  std::shared_ptr<mrs_lib::TimeoutManager> timeout_manager;
 };
 
 class DiagnosticsSensorHandler {
@@ -87,8 +89,9 @@ protected:
   // Sliding-window rate tracker (internally synchronised)
   utils::RateTracker rate_tracker_;
 
-  mrs_lib::SubscriberHandlerOptions shopts_;
-  rclcpp::QoS                       qos_profile_{10};
+  mrs_lib::SubscriberHandlerOptions        shopts_;
+  rclcpp::QoS                              qos_profile_{10};
+  std::shared_ptr<mrs_lib::TimeoutManager> timeout_manager_;
 
   // Error publisher for reporting detailed errors (optional, can be used by derived classes)
   std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
