@@ -177,6 +177,11 @@ add_library(MrsUavManagers_SafetyAreaManager SHARED
   src/safety_area_manager.cpp
 )
 
+target_include_directories(MrsUavManagers_SafetyAreaManager
+  PRIVATE
+    "include"
+)
+
 target_link_libraries(MrsUavManagers_SafetyAreaManager
   PRIVATE
     rclcpp::rclcpp

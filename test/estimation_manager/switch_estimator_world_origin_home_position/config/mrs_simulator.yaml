@@ -1,0 +1,12 @@
+# the individual takeoff platform lifts the UAV ~2 m off the ground, which trips automatic_start's
+# height preflight check and prevents takeoff() - disable it so the UAV spawns on the ground
+individual_takeoff_platform:
+  enabled: false
+
+uav1:
+  type: "x500"
+  spawn:
+    x: 10.0
+    y: 20.0
+    z: 0.5
+    heading: 1.2

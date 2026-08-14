@@ -16,6 +16,8 @@
 #include <mrs_lib/service_server_handler.h>
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/gps_conversions.h>
+#include <mrs_uav_managers/estimation_manager/support.h>
 #include <mrs_lib/utils.h>
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/estimation_diagnostics.hpp>
@@ -85,6 +87,9 @@ private:
   std::atomic<bool>                     world_origin_changed_  = false;
   double                                world_origin_offset_x_ = 0.0;
   double                                world_origin_offset_y_ = 0.0;
+
+  bool              world_origin_use_home_position_ = false;
+  std::atomic<bool> home_origin_adopted_            = false;
 
   // | ------------------- scope timer logger ------------------- |
 
@@ -1125,29 +1130,38 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
     return true;
   }
 
-  // Get the difference between the new and old world origin
-  const double R = 6371000.0; // Earth radius in meters
-  const double p = M_PI / 180.0;
+  double delta_x, delta_y;
 
-  double lat1_rad = safety_zone_handler_.parameters.world_origin.x * p;
-  double lat2_rad = request->reference.position.x * p;
+  if (world_origin_use_home_position_ && !home_origin_adopted_) {
 
-  double dLat = (request->reference.position.x - safety_zone_handler_.parameters.world_origin.x) * p;
-  double dLon = (request->reference.position.y - safety_zone_handler_.parameters.world_origin.y) * p;
+    // first adoption of the runtime-determined home origin: the safety polygon is already defined
+    // relative to it, so it must not be shifted - only record the new baseline below
+    delta_x              = 0;
+    delta_y              = 0;
+    home_origin_adopted_ = true;
 
-  // Haversine distance
-  double a        = std::sin(dLat / 2) * std::sin(dLat / 2) + std::cos(lat1_rad) * std::cos(lat2_rad) * std::sin(dLon / 2) * std::sin(dLon / 2);
-  double c        = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
-  double distance = R * c;
+  } else {
 
-  // Calculate bearing (forward azimuth)
-  double y       = std::sin(dLon) * std::cos(lat2_rad);
-  double x       = std::cos(lat1_rad) * std::sin(lat2_rad) - std::sin(lat1_rad) * std::cos(lat2_rad) * std::cos(dLon);
-  double bearing = std::atan2(y, x);
+    // both origins converted to UTM meters first; haversine is only valid if both are already in LATLON
+    double old_utm_x, old_utm_y;
+    if (estimation_manager::Support::toLowercase(safety_zone_handler_.parameters.world_origin.units) == "latlon") {
+      mrs_lib::UTM(safety_zone_handler_.parameters.world_origin.x, safety_zone_handler_.parameters.world_origin.y, &old_utm_x, &old_utm_y);
+    } else {
+      old_utm_x = safety_zone_handler_.parameters.world_origin.x;
+      old_utm_y = safety_zone_handler_.parameters.world_origin.y;
+    }
 
-  // Convert distance and bearing to Cartesian offsets
-  double delta_x = distance * std::sin(bearing);
-  double delta_y = distance * std::cos(bearing);
+    double new_utm_x, new_utm_y;
+    if (request->header.frame_id.find("latlon_origin") != std::string::npos) {
+      mrs_lib::UTM(request->reference.position.x, request->reference.position.y, &new_utm_x, &new_utm_y);
+    } else {
+      new_utm_x = request->reference.position.x;
+      new_utm_y = request->reference.position.y;
+    }
+
+    delta_x = new_utm_x - old_utm_x;
+    delta_y = new_utm_y - old_utm_y;
+  }
 
   world_origin_offset_x_ = delta_x;
   world_origin_offset_y_ = delta_y;
@@ -1190,15 +1204,23 @@ bool SafetyAreaManager::initializationFromFile(mrs_lib::ParamLoader &param_loade
   }
 
   std::string world_origin_units;
-  double      origin_x;
-  double      origin_y;
+  double      origin_x = 0.0;
+  double      origin_y = 0.0;
   std::string horizontal_frame;
   std::string vertical_frame;
   bool        safety_area_enabled;
 
-  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
-  param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", origin_x);
-  param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", origin_y);
+  param_loader.loadParam("mrs_uav_managers/world_origin/use_home_position", world_origin_use_home_position_, false);
+
+  if (!world_origin_use_home_position_) {
+    param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
+    param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", origin_x);
+    param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", origin_y);
+  } else {
+    // the home position (and thus the world origin) is only known at runtime; the safety polygon is
+    // defined relative to it, so it must not be shifted when the home origin is first adopted
+    world_origin_units = "UTM";
+  }
   param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/enabled", safety_area_enabled);
   param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/horizontal/frame_name", horizontal_frame);
   param_loader.loadParam("mrs_uav_managers/safety_area_manager/safety_area/vertical/frame_name", vertical_frame);
@@ -1912,9 +1934,8 @@ std::tuple<bool, bool> SafetyAreaManager::isPositionValid(mrs_msgs::msg::UavStat
   current_position.header.frame_id    = uav_state.header.frame_id;
   current_position.reference.position = uav_state.pose.position;
 
-  RCLCPP_INFO_STREAM_ONCE(node_->get_logger(), "Initial current position x:  " << current_position.reference.position.x
-                                                                               << " y: " << current_position.reference.position.y
-                                                                               << " z: " << current_position.reference.position.z);
+  RCLCPP_INFO_ONCE(node_->get_logger(), "Initial current position (frame: %s) x: %.3f y: %.3f z: %.3f", current_position.header.frame_id.c_str(),
+                   current_position.reference.position.x, current_position.reference.position.y, current_position.reference.position.z);
 
   auto is_position_valid_2d = isPointInSafetyArea2d(current_position);
   auto is_position_valid_3d = isPointInSafetyArea3d(current_position);

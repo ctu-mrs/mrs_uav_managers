@@ -7,6 +7,8 @@
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/publisher_handler.h>
 #include <mrs_lib/service_server_handler.h>
+#include <mrs_lib/service_client_handler.h>
+#include <mrs_lib/timer_handler.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/transform_broadcaster.h>
@@ -18,6 +20,7 @@
 #include <mrs_msgs/msg/hw_api_altitude.hpp>
 #include <mrs_msgs/msg/rtk_gps.hpp>
 #include <mrs_msgs/srv/reference_stamped_srv.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
@@ -46,6 +49,16 @@ using namespace std::chrono_literals;
 
 //}
 
+/* typedefs //{ */
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
+//}
+
 namespace mrs_uav_managers
 {
 
@@ -67,6 +80,8 @@ public:
   std::string getPrintName() const;
 
 private:
+  // | ---------------------- node & config ---------------------- |
+
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
@@ -82,6 +97,8 @@ private:
   const std::string package_name_ = "mrs_uav_managers";
   const std::string nodelet_name_ = "TransformManager";
   const std::string name_         = "transform_manager";
+
+  // | ------------------ tf publishing config ------------------- |
 
   bool publish_fcu_untilted_tf_;
 
@@ -104,12 +121,46 @@ private:
   std::string ns_amsl_origin_child_frame_id_;
   bool        publish_amsl_origin_tf_;
 
-  std::string               world_origin_units_;
+  // | ------------------- static world_origin ------------------- |
+
   geometry_msgs::msg::Point world_origin_;
+  bool                      world_origin_use_home_position_;
 
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
   bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+
+  // | ------------- home-position world_origin push ------------ |
+
+  // With use_home_position the world origin is not known at startup, so the estimators come up on
+  // the configured (0, 0) origin and report full UTM coordinates. Once the first usable fix arrives
+  // the origin is pushed out through the existing runtime path - EstimationManager, which resets the
+  // estimators onto the new origin and forwards it back here and to SafetyAreaManager - and takeoff
+  // is gated on that round trip completing (is_world_origin_ready).
+  //
+  // The reset re-anchors every estimator's odometry frame, and anything holding a reference taken
+  // before it keeps describing the old frame unless it is dropped in callbackSetWorldOrigin. That
+  // has already caught TfSource::first_msg_, the local_origin latches (pose_first_ and its static
+  // tf) and the safety area, which is rebuilt around the new origin. Treat any new one-shot capture
+  // derived from the estimator frame as needing the same treatment.
+
+  void captureHomeWorldOrigin(const geometry_msgs::msg::Point &utm_origin);
+
+  mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv> srvch_set_world_origin_out_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
+  std::shared_ptr<TimerType>       timer_set_home_world_origin_;
+  void                             timerSetHomeWorldOrigin();
+
+  std::atomic<bool>                                                                                home_position_ready_     = false;
+  std::atomic<bool>                                                                                home_position_confirmed_ = false;
+  std::optional<std::shared_future<std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response>>> home_position_pending_future_;
+
+  mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger> srvs_is_world_origin_ready_;
+  bool                                                  callbackIsWorldOriginReady(const std::shared_ptr<std_srvs::srv::Trigger::Request>  request,
+                                                                                   const std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+
+  // | ---------------- tf sources & broadcasting ---------------- |
 
   std::vector<std::string>               tf_source_names_, estimator_names_;
   std::vector<std::unique_ptr<TfSource>> tf_sources_;
@@ -126,6 +177,8 @@ private:
   std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
 
   std::unique_ptr<TfMappingOrigin> tf_mapping_origin_;
+
+  // | ----------------- subscribers & callbacks ----------------- |
 
   void timeoutCallback(const std::string &topic, const rclcpp::Time &last_msg);
 
@@ -156,6 +209,8 @@ private:
 
   bool isRtkUsed() const;
   bool isGarminUsed() const;
+
+  // | ----------------- tf publishing routines ------------------ |
 
   void publishFcuUntiltedTf(const geometry_msgs::msg::QuaternionStamped::ConstSharedPtr msg);
 
@@ -249,46 +304,16 @@ void TransformManager::initialize() {
 
   /*//{ load world_origin parameters */
 
-  bool   is_origin_param_ok = true;
-  double world_origin_x     = 0;
-  double world_origin_y     = 0;
+  {
+    double world_origin_x = 0;
+    double world_origin_y = 0;
 
-  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units_);
+    Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getPrintName(), world_origin_x, world_origin_y,
+                             world_origin_use_home_position_);
 
-  if (Support::toLowercase(world_origin_units_) == "utm") {
-
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in UTM units.", getPrintName().c_str());
-
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
-
-  } else if (Support::toLowercase(world_origin_units_) == "latlon") {
-
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Loading world origin in LatLon units.", getPrintName().c_str());
-
-    double lat, lon;
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
-
-    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-
-    RCLCPP_INFO(node_->get_logger(), "[%s]: Converted to UTM x: %f, y: %f.", getPrintName().c_str(), world_origin_x, world_origin_y);
-
-  } else {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", getPrintName().c_str(),
-                 world_origin_units_.c_str());
-    error_publisher_->addOneshotError("Invalid world_origin/units: must be 'UTM' or 'LATLON'.");
-    error_publisher_->flushAndShutdown();
-  }
-
-  world_origin_.x = world_origin_x;
-  world_origin_.y = world_origin_y;
-  world_origin_.z = 0;
-
-  if (!is_origin_param_ok) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: Could not load all mandatory parameters from world file. Please check your world file.", getPrintName().c_str());
-    error_publisher_->addOneshotError("Could not load all mandatory parameters from world file.");
-    error_publisher_->flushAndShutdown();
+    world_origin_.x = world_origin_x;
+    world_origin_.y = world_origin_y;
+    world_origin_.z = 0;
   }
 
   /*//}*/
@@ -489,6 +514,28 @@ void TransformManager::initialize() {
   srvs_set_world_origin_ = mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv>(
       node_, "~/set_world_origin_in", std::bind(&TransformManager::callbackSetWorldOrigin, this, std::placeholders::_1, std::placeholders::_2),
       rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+
+  srvs_is_world_origin_ready_ = mrs_lib::ServiceServerHandler<std_srvs::srv::Trigger>(
+      node_, "~/is_world_origin_ready_in", std::bind(&TransformManager::callbackIsWorldOriginReady, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::SystemDefaultsQoS(), cbkgrp_ss_);
+  /*//}*/
+
+  /*//{ initialize home-position world_origin push */
+  if (world_origin_use_home_position_) {
+
+    srvch_set_world_origin_out_ = mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "~/set_world_origin_out");
+
+    cbkgrp_timers_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    mrs_lib::TimerHandlerOptions topts;
+    topts.node           = node_;
+    topts.autostart      = true;
+    topts.callback_group = cbkgrp_timers_;
+
+    std::function<void()> callback_fcn = std::bind(&TransformManager::timerSetHomeWorldOrigin, this);
+
+    timer_set_home_world_origin_ = std::make_shared<TimerType>(topts, rclcpp::Rate(1.0, clock_), callback_fcn);
+  }
   /*//}*/
 
   if (!param_loader.loadedSuccessfully()) {
@@ -873,12 +920,23 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
     return;
   }
 
+  // in home-position mode, pin the world_origin to this first usable fix
+  if (world_origin_use_home_position_) {
+    captureHomeWorldOrigin(utm_origin);
+  }
+
   RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from GNSS", getPrintName().c_str(), utm_origin.x,
               utm_origin.y, utm_origin.z);
 
+  geometry_msgs::msg::Point world_origin;
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    world_origin = world_origin_;
+  }
+
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
-    tf_sources_[i]->setWorldOrigin(world_origin_);
+    tf_sources_[i]->setWorldOrigin(world_origin);
   }
 
   got_utm_offset_ = true;
@@ -947,12 +1005,23 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
     return;
   }
 
+  // in home-position mode, pin the world_origin to this first usable fix
+  if (world_origin_use_home_position_) {
+    captureHomeWorldOrigin(utm_origin);
+  }
+
   RCLCPP_INFO(node_->get_logger(), "[%s]: utm_origin position calculated as: x: %.2f, y: %.2f, z: %.2f from RTK msg", getPrintName().c_str(), utm_origin.x,
               utm_origin.y, utm_origin.z);
 
+  geometry_msgs::msg::Point world_origin;
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    world_origin = world_origin_;
+  }
+
   for (size_t i = 0; i < tf_sources_.size(); i++) {
     tf_sources_[i]->setUtmOrigin(utm_origin);
-    tf_sources_[i]->setWorldOrigin(world_origin_);
+    tf_sources_[i]->setWorldOrigin(world_origin);
   }
 
   got_utm_offset_ = true;
@@ -997,13 +1066,88 @@ bool TransformManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::sr
     tf_sources_[i]->invalidateFirstMsg();
   }
 
-  // local_origin is anchored to the first uav_state, taken in the previous frame; drop it so the
-  // next uav_state re-anchors it, otherwise the frame stays offset by the world origin change
+  // local_origin is anchored to the first uav_state, which was received in the pre-reset frame; drop
+  // it so the next uav_state re-anchors it, otherwise the frame stays offset by the world origin
   is_first_frame_id_set_        = false;
   is_local_static_tf_published_ = false;
 
   response->success = true;
   response->message = "World origin set successfully";
+
+  return true;
+}
+/*//}*/
+
+/*//{ captureHomeWorldOrigin() */
+// Pins the world_origin to the first usable GNSS/RTK fix, so the UAV starts at (0, 0) in the
+// world_origin frame. The world_origin frame is therefore offset from utm_origin by exactly these
+// UTM coordinates of the home position.
+void TransformManager::captureHomeWorldOrigin(const geometry_msgs::msg::Point &utm_origin) {
+
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    world_origin_.x = utm_origin.x;
+    world_origin_.y = utm_origin.y;
+    world_origin_.z = 0;
+  }
+
+  home_position_ready_ = true;
+}
+/*//}*/
+
+/*//{ timerSetHomeWorldOrigin() */
+void TransformManager::timerSetHomeWorldOrigin() {
+
+  if (home_position_confirmed_) {
+    timer_set_home_world_origin_->stop();
+    return;
+  }
+
+  if (!home_position_ready_) {
+    return;
+  }
+
+  if (home_position_pending_future_.has_value()) {
+
+    if (home_position_pending_future_->wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+      return;
+    }
+
+    const auto res = home_position_pending_future_->get();
+    home_position_pending_future_.reset();
+
+    if (res && res->success) {
+      RCLCPP_INFO(node_->get_logger(), "[%s]: home-position world_origin confirmed by EstimationManager", getPrintName().c_str());
+      home_position_confirmed_ = true;
+      timer_set_home_world_origin_->stop();
+      return;
+    }
+
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s EstimationManager to accept the home-position world_origin, retrying",
+                         getPrintName().c_str(), Support::waiting_for_string.c_str());
+  }
+
+  // the "home_position_" prefix marks this as the automated push so EstimationManager can tell it
+  // apart from an unrelated caller during the boot window when its callback guard is relaxed
+  auto request             = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
+  request->header.frame_id = "home_position_utm_origin";
+
+  {
+    std::scoped_lock lock(mtx_broadcast_world_origin_);
+    request->reference.position.x = world_origin_.x;
+    request->reference.position.y = world_origin_.y;
+  }
+
+  home_position_pending_future_ = srvch_set_world_origin_out_.callAsync(request);
+}
+/*//}*/
+
+/*//{ callbackIsWorldOriginReady() */
+bool TransformManager::callbackIsWorldOriginReady([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                                                  const std::shared_ptr<std_srvs::srv::Trigger::Response>                 response) {
+
+  response->success = !world_origin_use_home_position_ || home_position_confirmed_;
+  response->message = response->success ? "" : "waiting for home-position world_origin to be confirmed by EstimationManager";
 
   return true;
 }

@@ -1,0 +1,11 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # a GNSS-based estimator so the simulator produces the fix the home-position mode captures
+    state_estimators: [
+      "gps_garmin",
+    ]
+
+    initial_state_estimator: "gps_garmin"
+    agl_height_estimator: "garmin_agl"
