@@ -1,6 +1,21 @@
 mrs_uav_managers:
   diagnostics_manager:
     sensor_handlers:
+      # the list of sensors to monitor; only instances named here are actually loaded
+      active_sensor_handlers: [
+          # Example sensor handlers
+          "PX4",
+          "Rangefinder",
+          "GNSS",
+          "Magnetometer",
+          "RemoteController",
+          # "SimulationCamera"
+          # "LidarHandler",
+          # "IMUHandler",
+          # "BatteryHandler",
+          # "RangeFinderHandler",
+        ]
+
       # -------------------------------------------------------------------
       # TEMPLATE (not an active instance -- copy/paste and rename to use)
       #
@@ -15,15 +30,13 @@ mrs_uav_managers:
       #   expected_rate: 10.0 # Hz, or "N+" (e.g. "10+") to check only the floor and skip the "rate too high" check
       #   rate_tolerance: 0.3 # 30% deviation allowed (default); still applies to the floor when using "N+"
       #   check_frame_transform: true # WARN if this sensor's frame can't transform to body_frame (default: true)
-      #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about (e.g. message_type,
-      #                      # status_topic). These fields are NOT read from this file -- if plugin_config is left empty, the plugin
-      #                      # falls back to its own package's config/public/<InstanceName>.yaml (only exists for shipped instances).
+      #   message_type: "sensor_msgs/msg/Range" # example plugin-specific field (GenericSensorHandler here); declare
+      #                                          # it alongside the others, no separate file needed
+      #   plugin_config: "" # optional path to an external YAML file for plugin-specific fields instead, e.g. if reused
+      #                      # across instances
       #
-      # NOTE: the list of "running" instances is selected in config/public/diagnostics_manager/diagnostics_manager.yaml
-      #
-      # NOTE: to add your own sensor without touching this package, override active_sensor_handlers (full list, not just
-      # the addition) and define the new instance -- including any plugin-specific fields such as message_type -- in your
-      # deployment's custom_config, e.g.:
+      # NOTE: to add your own sensor without touching this package, override active_sensor_handlers (full list, not
+      # just the addition) and define the new instance -- same shape as an entry below -- in your deployment's custom_config:
       #   mrs_uav_managers:
       #     diagnostics_manager:
       #       sensor_handlers:
@@ -32,7 +45,7 @@ mrs_uav_managers:
       #           address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
       #           type: "LIDAR"
       #           topic: "my_lidar/range"
-      #           message_type: "sensor_msgs/msg/Range" # GenericSensorHandler-specific; only resolves from custom_config or plugin_config
+      #           message_type: "sensor_msgs/msg/Range"
       #           expected_rate: 10.0
       # -------------------------------------------------------------------
 
@@ -50,6 +63,7 @@ mrs_uav_managers:
         address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
         type: "AUTOPILOT"
         topic: "hw_api/status"
+        message_type: "mrs_msgs/msg/HwApiStatus"
         qos_reliability: "reliable"
         expected_rate: 100.0
         rate_tolerance: 0.3
@@ -59,6 +73,7 @@ mrs_uav_managers:
         address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
         type: "RANGEFINDER"
         topic: "hw_api/distance_sensor"
+        message_type: "sensor_msgs/msg/Range"
         qos_reliability: "reliable"
         expected_rate: 100.0
         rate_tolerance: 0.3
@@ -68,6 +83,7 @@ mrs_uav_managers:
         address: "mrs_uav_diagnostics_sensors/GNSSSensorHandler"
         type: "GNSS"
         topic: "hw_api/gnss"
+        status_topic: "hw_api/gnss_status" # GNSSSensorHandler-specific
         qos_reliability: "reliable"
         expected_rate: 50.0
         rate_tolerance: 0.3
