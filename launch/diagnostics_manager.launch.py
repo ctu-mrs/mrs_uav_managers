@@ -163,7 +163,7 @@ def generate_launch_description():
             {"use_sim_time": use_sim_time},
             {'private_config': this_pkg_path + '/config/private/diagnostics_manager/diagnostics_manager.yaml'},
             {'public_config': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_manager.yaml'},
-            {'public_sensor_handlers': this_pkg_path + '/config/public/diagnostics_manager/diagnostics_sensor_handlers.yaml'},
+            {'public_sensor_handlers': this_pkg_path + '/config/public/diagnostics_manager/sensor_handlers.yaml'},
             {'preflight_check_config': this_pkg_path + '/config/public/diagnostics_manager/preflight_check.yaml'},
         ],
 

@@ -3,22 +3,7 @@ mrs_uav_managers:
     # name of the network interface to report wifi link quality for (e.g. "wlan0"); leave empty to disable
     wifi_interface: ""
 
-    sensor_handlers:
-      # the list of sensors to monitor
-      active_sensor_handlers: [
-          # Example sensor handlers
-          "PX4",
-          "Rangefinder",
-          "GNSS",
-          "Magnetometer",
-          "RemoteController",
-          # "SimulationCamera"
-          # "LidarHandler",
-          # "IMUHandler",
-          # "BatteryHandler",
-          # "RangeFinderHandler",
-        ]
-      # NOTE: per-instance tuning (type/topic/expected_rate/...) lives in
-      # config/public/diagnostics_manager/diagnostics_sensor_handlers.yaml
-      # NOTE: to add a sensor without touching this package, override active_sensor_handlers (full list, not just the
-      # addition) and define the new instance entirely in your deployment's custom_config -- see that file's template
+    # NOTE: sensor handlers (active_sensor_handlers, per-instance tuning) live in
+    # config/public/diagnostics_manager/sensor_handlers.yaml
+    # NOTE: preflight checks (enabled, speed/height/gyro thresholds, ...) live in
+    # config/public/diagnostics_manager/preflight_check.yaml
