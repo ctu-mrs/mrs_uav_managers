@@ -137,7 +137,8 @@ private:
   /** @brief Resolve and log this robot's IP address from its hostname, storing it in robot_ip_address_. Requires _robot_name_ to already be set. */
   void resolveRobotIpAddress();
 
-  /** @brief Load and initialize every sensor handler plugin listed in _sensor_handler_names_, populating sensor_handlers_. */
+  /** @brief Load and initialize every sensor handler plugin listed in _sensor_handler_names_, populating sensor_handlers_.
+   * A plugin that fails to load/initialize is skipped and recorded in failed_sensor_handlers_, not fatal. */
   void loadSensorHandlers(mrs_lib::ParamLoader &param_loader);
 
   std::atomic<bool> is_initialized_ = false;
@@ -232,6 +233,7 @@ private:
   std::unique_ptr<pluginlib::ClassLoader<DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
   std::vector<std::string>                                          _sensor_handler_names_;
   std::vector<std::shared_ptr<DiagnosticsSensorHandler>>            sensor_handlers_;
+  std::vector<mrs_msgs::msg::SensorStatus>                          failed_sensor_handlers_; ///< ERROR statuses for sensors that failed to load/initialize
   std::mutex                                                        mutex_sensor_handler_list_;
 
   // | ----------------------- Timers --------------------------- |
