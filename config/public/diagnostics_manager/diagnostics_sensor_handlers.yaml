@@ -36,6 +36,7 @@ mrs_uav_managers:
         qos_reliability: "reliable"
         expected_rate: 100.0
         rate_tolerance: 0.3
+        check_frame_transform: false # no-op, no header.frame_id
 
       Rangefinder:
         type: "RANGEFINDER"
@@ -43,6 +44,7 @@ mrs_uav_managers:
         qos_reliability: "reliable"
         expected_rate: 100.0
         rate_tolerance: 0.3
+        check_frame_transform: false # no-op, no header.frame_id
 
       GNSS:
         type: "GNSS"
@@ -50,6 +52,7 @@ mrs_uav_managers:
         qos_reliability: "reliable"
         expected_rate: 50.0
         rate_tolerance: 0.3
+        check_frame_transform: false # TODO: re-enable once estimators report this via errorgraph
 
       Magnetometer:
         type: "MAGNETOMETER"
@@ -57,6 +60,7 @@ mrs_uav_managers:
         qos_reliability: "reliable"
         expected_rate: "10+"
         rate_tolerance: 0.3
+        check_frame_transform: false # TODO: re-enable once estimators report this via errorgraph
 
       RemoteController:
         type: "REMOTE_CONTROLLER"
@@ -64,3 +68,4 @@ mrs_uav_managers:
         qos_reliability: "reliable"
         expected_rate: 10.0
         rate_tolerance: 0.3
+        check_frame_transform: false # no-op, no header.frame_id
