@@ -72,7 +72,6 @@ void DiagnosticsManager::initialize() {
 
   tim_mgr_ = std::make_shared<mrs_lib::TimeoutManager>(node_, rclcpp::Rate(1.0));
 
-  common_handlers_.transformer     = std::make_shared<mrs_lib::Transformer>(node_);
   common_handlers_.timeout_manager = tim_mgr_;
   common_handlers_.error_publisher = error_publisher_;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/body_frame", common_handlers_.body_frame);
@@ -82,6 +81,16 @@ void DiagnosticsManager::initialize() {
   const auto update_status_rate = param_loader.loadParam2<double>("update_timer_rate");
 
   param_loader.loadParam("active_sensor_handlers", _sensor_handler_names_);
+
+  // only construct a Transformer (and its /tf, /tf_static subscriptions) if actually needed
+  for (const auto &config_key : _sensor_handler_names_) {
+    bool check_frame_transform = true;
+    param_loader.loadParam(config_key + "/check_frame_transform", check_frame_transform, true);
+    if (check_frame_transform) {
+      common_handlers_.transformer = std::make_shared<mrs_lib::Transformer>(node_);
+      break;
+    }
+  }
 
   loadSensorHandlers(param_loader);
 
