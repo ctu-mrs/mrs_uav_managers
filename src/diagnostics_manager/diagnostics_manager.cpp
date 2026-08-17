@@ -13,7 +13,7 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
   node_  = this_node_ptr();
   clock_ = node_->get_clock();
 
-  error_publisher_ = std::make_unique<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "DiagnosticsManager", "main");
+  error_publisher_ = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "DiagnosticsManager", "main");
   cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -74,6 +74,7 @@ void DiagnosticsManager::initialize() {
 
   common_handlers_.transformer     = std::make_shared<mrs_lib::Transformer>(node_);
   common_handlers_.timeout_manager = tim_mgr_;
+  common_handlers_.error_publisher = error_publisher_;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/body_frame", common_handlers_.body_frame);
   common_handlers_.body_frame = _robot_name_ + "/" + common_handlers_.body_frame;
 

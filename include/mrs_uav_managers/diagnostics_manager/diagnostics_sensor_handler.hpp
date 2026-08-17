@@ -23,12 +23,13 @@
 namespace mrs_uav_managers::diagnostics_manager
 {
 
-/** @brief Values shared by every DiagnosticsSensorHandler instance (transformer, body frame, timeout manager). */
+/** @brief Values shared by every DiagnosticsSensorHandler instance. */
 struct DiagnosticsCommonHandlers_t
 {
-  std::shared_ptr<mrs_lib::Transformer>    transformer;
-  std::string                              body_frame;
-  std::shared_ptr<mrs_lib::TimeoutManager> timeout_manager;
+  std::shared_ptr<mrs_lib::Transformer>                transformer;
+  std::string                                          body_frame;
+  std::shared_ptr<mrs_lib::TimeoutManager>             timeout_manager;
+  std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher;
 };
 
 class DiagnosticsSensorHandler {
@@ -93,7 +94,7 @@ protected:
   rclcpp::QoS                              qos_profile_{10};
   std::shared_ptr<mrs_lib::TimeoutManager> timeout_manager_;
 
-  // Error publisher for reporting detailed errors (optional, can be used by derived classes)
+  // Shared with the manager and all other handlers (flushAndShutdown() terminates the whole node)
   std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
 
   // Frame transform check (check_frame_transform_ is a per-sensor opt-out)

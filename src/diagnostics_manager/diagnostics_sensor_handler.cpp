@@ -14,6 +14,12 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   transformer_     = common_handlers.transformer;
   body_frame_      = common_handlers.body_frame;
   timeout_manager_ = common_handlers.timeout_manager;
+  error_publisher_ = common_handlers.error_publisher;
+
+  if (!error_publisher_) {
+    RCLCPP_ERROR(node->get_logger(), "[%s]: no error publisher provided in the common handlers, not initializing", config_key.c_str());
+    return false;
+  }
 
   mrs_lib::ParamLoader param_loader(node, "DiagnosticsSensorHandler");
 
@@ -51,9 +57,6 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
   }
 
   RCLCPP_INFO(node->get_logger(), "[%s]: loaded config (topic: '%s')", name_.c_str(), topic_.c_str());
-
-  std::string handler_instance = name_ + " handler (" + topic_ + ")";
-  error_publisher_             = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node, node->get_clock(), "DiagnosticsManager", handler_instance);
 
   const auto sensor_type = mapSensorType(sensor_type_str);
   if (!sensor_type.has_value()) {
