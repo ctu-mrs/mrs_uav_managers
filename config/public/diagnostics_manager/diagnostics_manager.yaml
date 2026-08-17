@@ -20,3 +20,5 @@ mrs_uav_managers:
         ]
       # NOTE: per-instance tuning (type/topic/expected_rate/...) lives in
       # config/public/diagnostics_manager/diagnostics_sensor_handlers.yaml
+      # NOTE: to add a sensor without touching this package, override active_sensor_handlers (full list, not just the
+      # addition) and define the new instance entirely in your deployment's custom_config -- see that file's template

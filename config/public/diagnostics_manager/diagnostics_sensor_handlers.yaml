@@ -5,6 +5,7 @@ mrs_uav_managers:
       # TEMPLATE (not an active instance -- copy/paste and rename to use)
       #
       # ExampleHandler:
+      #   address: "mrs_uav_diagnostics_sensors/GenericSensorHandler" # pluginlib class backing this instance
       #   type: "Example" # Example, AUTOPILOT, RANGEFINDER, GNSS, IMU, BAROMETER, MAGNETOMETER, LIDAR, CAMERA, REMOTE_CONTROLLER
       #   topic: "example_node/topic" # Don't add the leading slash, the name will be resolved relative to the node's namespace
       #   expected_publisher:
@@ -14,15 +15,30 @@ mrs_uav_managers:
       #   expected_rate: 10.0 # Hz, or "N+" (e.g. "10+") to check only the floor and skip the "rate too high" check
       #   rate_tolerance: 0.3 # 30% deviation allowed (default); still applies to the floor when using "N+"
       #   check_frame_transform: true # WARN if this sensor's frame can't transform to body_frame (default: true)
-      #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about
-      #                      # (e.g. message_type, status_topic); if empty, the plugin falls back to its own package-provided default
+      #   plugin_config: "" # optional path to a plugin-owned YAML file for fields this manager doesn't know about (e.g. message_type,
+      #                      # status_topic). These fields are NOT read from this file -- if plugin_config is left empty, the plugin
+      #                      # falls back to its own package's config/public/<InstanceName>.yaml (only exists for shipped instances).
       #
-      # NOTE: the pluginlib class address for each of these is defined in config/private/diagnostics_manager/diagnostics_sensor_handlers.yaml
       # NOTE: the list of "running" instances is selected in config/public/diagnostics_manager/diagnostics_manager.yaml
+      #
+      # NOTE: to add your own sensor without touching this package, override active_sensor_handlers (full list, not just
+      # the addition) and define the new instance -- including any plugin-specific fields such as message_type -- in your
+      # deployment's custom_config, e.g.:
+      #   mrs_uav_managers:
+      #     diagnostics_manager:
+      #       sensor_handlers:
+      #         active_sensor_handlers: ["PX4", "Rangefinder", ..., "MyLidar"]
+      #         MyLidar:
+      #           address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
+      #           type: "LIDAR"
+      #           topic: "my_lidar/range"
+      #           message_type: "sensor_msgs/msg/Range" # GenericSensorHandler-specific; only resolves from custom_config or plugin_config
+      #           expected_rate: 10.0
       # -------------------------------------------------------------------
 
       # define "running" instances of plugins, there can be multiple instances of the same plugin
       SimulationCamera:
+        address: "mrs_uav_diagnostics_sensors/CameraSensorHandler"
         type: "CAMERA"
         topic: "servo_camera/camera_info"
         qos_reliability: "reliable"
@@ -31,6 +47,7 @@ mrs_uav_managers:
 
       # Using generic handler
       PX4:
+        address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
         type: "AUTOPILOT"
         topic: "hw_api/status"
         qos_reliability: "reliable"
@@ -39,6 +56,7 @@ mrs_uav_managers:
         check_frame_transform: false # no-op, no header.frame_id
 
       Rangefinder:
+        address: "mrs_uav_diagnostics_sensors/GenericSensorHandler"
         type: "RANGEFINDER"
         topic: "hw_api/distance_sensor"
         qos_reliability: "reliable"
@@ -47,6 +65,7 @@ mrs_uav_managers:
         check_frame_transform: false # no-op, no header.frame_id
 
       GNSS:
+        address: "mrs_uav_diagnostics_sensors/GNSSSensorHandler"
         type: "GNSS"
         topic: "hw_api/gnss"
         qos_reliability: "reliable"
@@ -55,6 +74,7 @@ mrs_uav_managers:
         check_frame_transform: false # TODO: re-enable once estimators report this via errorgraph
 
       Magnetometer:
+        address: "mrs_uav_diagnostics_sensors/MagnetometerSensorHandler"
         type: "MAGNETOMETER"
         topic: "hw_api/magnetic_field"
         qos_reliability: "reliable"
@@ -63,6 +83,7 @@ mrs_uav_managers:
         check_frame_transform: false # TODO: re-enable once estimators report this via errorgraph
 
       RemoteController:
+        address: "mrs_uav_diagnostics_sensors/RCSensorHandler"
         type: "REMOTE_CONTROLLER"
         topic: "hw_api/rc_rssi"
         qos_reliability: "reliable"
