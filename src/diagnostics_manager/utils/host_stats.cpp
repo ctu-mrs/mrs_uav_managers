@@ -163,7 +163,7 @@ void HostStats::readCpuLoad() {
 
 void HostStats::readCpuTemperature() {
   long max_temp = 0;
-  bool found     = false;
+  bool found    = false;
   for (int i = 0; i < 11; ++i) {
     const std::string path = "/sys/class/thermal/thermal_zone" + std::to_string(i) + "/temp";
     if (!std::filesystem::exists(path)) {
