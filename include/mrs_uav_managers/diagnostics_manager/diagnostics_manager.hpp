@@ -150,7 +150,7 @@ private:
   mrs_lib::errorgraph::Errorgraph errorgraph_;            ///< dependency/error graph for readiness tracking
   rclcpp::Duration                not_reporting_timeout_; ///< timeout before marking a topic as not reporting
 
-  std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_; ///< reports this manager's own fatal errors to the errorgraph
+  std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_; ///< errorgraph reporting, shared with every sensor handler
 
   std::string  _robot_name_;
   std::string  robot_ip_address_;
