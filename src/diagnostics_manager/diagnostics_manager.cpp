@@ -282,12 +282,28 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
   sensor_handler_loader_ =
       std::make_unique<pluginlib::ClassLoader<DiagnosticsSensorHandler>>("mrs_uav_managers", "mrs_uav_managers::diagnostics_manager::DiagnosticsSensorHandler");
 
-  // For each plugin: load pluginlib address, create instance, and initialize.
-  // A load or initialization failure is fatal (matches EstimationManager/ControlManager).
+  // Diagnostics must stay up to report errors, so a broken sensor is skipped, not fatal
+  // (unlike EstimationManager/ControlManager, where a missing plugin is flight-unsafe).
   for (const auto &config_key : _sensor_handler_names_) {
 
+    auto record_failure = [this, &config_key](const std::string &message) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: %s", config_key.c_str(), message.c_str());
+      error_publisher_->addOneshotError("Sensor handler " + config_key + ": " + message);
+      mrs_msgs::msg::SensorStatus ss;
+      ss.name    = config_key;
+      ss.type    = mrs_msgs::msg::SensorStatus::TYPE_UNKNOWN;
+      ss.ready   = false;
+      ss.level   = mrs_msgs::msg::SensorStatus::ERROR;
+      ss.message = message;
+      failed_sensor_handlers_.push_back(ss);
+    };
+
     std::string address;
-    param_loader.loadParam(config_key + "/address", address);
+    param_loader.loadParam(config_key + "/address", address, std::string(""));
+    if (address.empty()) {
+      record_failure("missing or empty \"address\" parameter");
+      continue;
+    }
 
     std::shared_ptr<DiagnosticsSensorHandler> handler;
     try {
@@ -295,35 +311,27 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
       handler = sensor_handler_loader_->createSharedInstance(address);
     }
     catch (pluginlib::CreateClassException &ex1) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: CreateClassException: %s", config_key.c_str(), ex1.what());
-      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex1.what());
-      error_publisher_->flushAndShutdown();
+      record_failure(std::string("CreateClassException: ") + ex1.what());
       continue;
     }
     catch (pluginlib::PluginlibException &ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: PluginlibException: %s", config_key.c_str(), ex.what());
-      error_publisher_->addOneshotError("Failed to load the sensor handler " + config_key + ": " + ex.what());
-      error_publisher_->flushAndShutdown();
+      record_failure(std::string("PluginlibException: ") + ex.what());
       continue;
     }
 
     try {
       if (!handler->initialize(node_, config_key, _robot_name_, common_handlers_, cbkgrp_subs_)) {
-        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to initialize", config_key.c_str());
-        error_publisher_->addOneshotError("Sensor handler " + config_key + " failed to initialize");
-        error_publisher_->flushAndShutdown();
+        record_failure("failed to initialize");
         continue;
       }
       sensor_handlers_.push_back(handler);
     }
     catch (std::runtime_error &ex) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: exception during initialization: %s", config_key.c_str(), ex.what());
-      error_publisher_->addOneshotError("Exception during sensor handler " + config_key + " initialization: " + ex.what());
-      error_publisher_->flushAndShutdown();
+      record_failure(std::string("exception during initialization: ") + ex.what());
     }
   }
 
-  RCLCPP_INFO(node_->get_logger(), "%zu sensor handlers initialized successfully", sensor_handlers_.size());
+  RCLCPP_INFO(node_->get_logger(), "%zu sensor handlers initialized successfully, %zu failed", sensor_handlers_.size(), failed_sensor_handlers_.size());
 }
 
 //}
@@ -516,6 +524,8 @@ void DiagnosticsManager::timerUpdateSensorStatus() {
     auto sensor_status_msg = handler->updateStatus();
     available_sensors_.push_back(sensor_status_msg);
   }
+  // failed sensors have no handler to poll, so report their static ERROR status instead of omitting them
+  available_sensors_.insert(available_sensors_.end(), failed_sensor_handlers_.begin(), failed_sensor_handlers_.end());
 }
 
 //}
