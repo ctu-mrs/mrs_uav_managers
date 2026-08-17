@@ -16,6 +16,7 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
   error_publisher_ = std::make_shared<mrs_lib::errorgraph::ErrorPublisher>(node_, clock_, "DiagnosticsManager", "main");
   cbkgrp_subs_     = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   cbkgrp_timers_   = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_tf_       = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   initialize();
 }
@@ -86,7 +87,7 @@ void DiagnosticsManager::initialize() {
     bool check_frame_transform = true;
     param_loader.loadParam(config_key + "/check_frame_transform", check_frame_transform, true);
     if (check_frame_transform) {
-      common_handlers_.transformer = std::make_shared<mrs_lib::Transformer>(node_);
+      common_handlers_.transformer = std::make_shared<mrs_lib::Transformer>(node_, false, cbkgrp_tf_);
       break;
     }
   }
