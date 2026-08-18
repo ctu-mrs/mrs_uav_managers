@@ -287,7 +287,8 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
 
     auto record_failure = [this, &config_key](const std::string &message) {
       RCLCPP_ERROR(node_->get_logger(), "[%s]: %s", config_key.c_str(), message.c_str());
-      error_publisher_->addOneshotError("Sensor handler " + config_key + ": " + message);
+      // errorgraph reporting happens in timerErrorPublishing() via addGeneralError(), re-asserted every
+      // tick since this failure persists until restart (not a one-off addOneshotError()).
       mrs_msgs::msg::SensorStatus ss;
       ss.name    = config_key;
       ss.type    = mrs_msgs::msg::SensorStatus::TYPE_UNKNOWN;
@@ -300,7 +301,7 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
     std::string address;
     param_loader.loadParam(config_key + "/address", address, std::string(""));
     if (address.empty()) {
-      record_failure("missing or empty \"address\" parameter");
+      record_failure("diagnostics sensor plugin \"address\" parameter is missing or empty");
       continue;
     }
 
@@ -310,23 +311,23 @@ void DiagnosticsManager::loadSensorHandlers(mrs_lib::ParamLoader &param_loader) 
       handler = sensor_handler_loader_->createSharedInstance(address);
     }
     catch (pluginlib::CreateClassException &ex1) {
-      record_failure(std::string("CreateClassException: ") + ex1.what());
+      record_failure(std::string("failed to load diagnostics sensor plugin (CreateClassException): ") + ex1.what());
       continue;
     }
     catch (pluginlib::PluginlibException &ex) {
-      record_failure(std::string("PluginlibException: ") + ex.what());
+      record_failure(std::string("failed to load diagnostics sensor plugin (PluginlibException): ") + ex.what());
       continue;
     }
 
     try {
       if (!handler->initialize(node_, config_key, _robot_name_, common_handlers_, cbkgrp_subs_)) {
-        record_failure("failed to initialize");
+        record_failure("failed to initialize diagnostics sensor plugin");
         continue;
       }
       sensor_handlers_.push_back(handler);
     }
     catch (std::runtime_error &ex) {
-      record_failure(std::string("exception during initialization: ") + ex.what());
+      record_failure(std::string("exception during diagnostics sensor plugin initialization: ") + ex.what());
     }
   }
 
@@ -491,6 +492,12 @@ void DiagnosticsManager::timerUavState() {
 void DiagnosticsManager::timerErrorPublishing() {
   if (!is_initialized_) {
     return;
+  }
+
+  // ErrorPublisher clears its errors after every publish, so persistent errors must be re-added every tick.
+  for (size_t i = 0; i < failed_sensor_handlers_.size(); i++) {
+    const auto &failed = failed_sensor_handlers_[i];
+    error_publisher_->addGeneralError(static_cast<mrs_lib::errorgraph::ErrorPublisher::error_id_t>(i), "Sensor handler " + failed.name + ": " + failed.message);
   }
 
   std::scoped_lock lck(errorgraph_mtx_);
