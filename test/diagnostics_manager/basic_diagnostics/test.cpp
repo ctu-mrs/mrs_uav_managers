@@ -31,9 +31,8 @@ bool Tester::test(void) {
 
   std::shared_ptr<mrs_msgs::msg::UavInfo> received_msg;
 
-  auto sub = node_->create_subscription<mrs_msgs::msg::UavInfo>(
-      "/" + uav_name + "/diagnostics_manager/uav_info", rclcpp::SystemDefaultsQoS(),
-      [&received_msg](const mrs_msgs::msg::UavInfo::SharedPtr msg) { received_msg = msg; });
+  auto sub = node_->create_subscription<mrs_msgs::msg::UavInfo>("/" + uav_name + "/diagnostics_manager/uav_info", rclcpp::SystemDefaultsQoS(),
+                                                                [&received_msg](const mrs_msgs::msg::UavInfo::SharedPtr msg) { received_msg = msg; });
 
   const auto deadline = node_->get_clock()->now() + rclcpp::Duration(20s);
 
@@ -42,7 +41,8 @@ bool Tester::test(void) {
   }
 
   if (!received_msg) {
-    RCLCPP_ERROR(node_->get_logger(), "no message received on 'diagnostics_manager/uav_info' within 20s — DiagnosticsManager is not running as part of the core stack");
+    RCLCPP_ERROR(node_->get_logger(),
+                 "no message received on 'diagnostics_manager/uav_info' within 20s — DiagnosticsManager is not running as part of the core stack");
     return false;
   }
 
