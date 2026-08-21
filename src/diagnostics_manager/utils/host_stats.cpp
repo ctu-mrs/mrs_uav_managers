@@ -350,17 +350,10 @@ void HostStats::sampleNodeCpuLoads(std::chrono::steady_clock::time_point now) {
       continue; // No previous sample yet; wait for the next interval.
     }
 
-    const long diff = ticks - last_it->second;
-    if (diff <= 0) {
-      if (diff < 0) {
-        pid_is_ros_.erase(pid);
-        pid_name_cache_.erase(pid);
-        stale_ros_pids.push_back(pid);
-      }
-      continue;
-    }
-
-    const float load_pct = 100.0f * static_cast<float>(diff) * static_cast<float>(cpu_cores_) / static_cast<float>(node_cpu_total_diff_accum_);
+    // diff <= 0 just means no measurable CPU this tick (common for near-idle processes);
+    // report 0% instead of omitting the process from the list.
+    const long  diff     = ticks - last_it->second;
+    const float load_pct = diff > 0 ? 100.0f * static_cast<float>(diff) * static_cast<float>(cpu_cores_) / static_cast<float>(node_cpu_total_diff_accum_) : 0.0f;
 
     auto name_it = pid_name_cache_.find(pid);
     if (name_it == pid_name_cache_.end()) {
