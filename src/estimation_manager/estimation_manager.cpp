@@ -576,22 +576,58 @@ void EstimationManager::initialize() {
   param_loader.loadParam("world_config", _world_config_);
 
   if (_custom_config_ != "") {
-    param_loader.addYamlFile(_custom_config_);
+    if (!param_loader.addYamlFile(_custom_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
+      error_publisher_->addOneshotError("failed to load custom_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_platform_config_ != "") {
-    param_loader.addYamlFile(_platform_config_);
+    if (!param_loader.addYamlFile(_platform_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
+      error_publisher_->addOneshotError("failed to load platform_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_world_config_ != "") {
-    param_loader.addYamlFile(_world_config_);
+    if (!param_loader.addYamlFile(_world_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
+      error_publisher_->addOneshotError("failed to load world_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
-  param_loader.addYamlFileFromParam("private_config");
-  param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("uav_manager_config");
-  param_loader.addYamlFileFromParam("estimators_config");
-  param_loader.addYamlFileFromParam("active_estimators_config");
+  if (!param_loader.addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
+    error_publisher_->addOneshotError("failed to load private_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("public_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
+    error_publisher_->addOneshotError("failed to load public_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("uav_manager_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load uav_manager_config");
+    error_publisher_->addOneshotError("failed to load uav_manager_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("estimators_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load estimators_config");
+    error_publisher_->addOneshotError("failed to load estimators_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("active_estimators_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load active_estimators_config");
+    error_publisher_->addOneshotError("failed to load active_estimators_config");
+    error_publisher_->flushAndShutdown();
+  }
 
   param_loader.loadParam("uav_name", ch_->uav_name);
 

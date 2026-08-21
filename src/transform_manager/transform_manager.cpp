@@ -276,20 +276,46 @@ void TransformManager::initialize() {
   param_loader.loadParam("world_config", _world_config_);
 
   if (_custom_config_ != "") {
-    param_loader.addYamlFile(_custom_config_);
+    if (!param_loader.addYamlFile(_custom_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load custom_config", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load custom_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_platform_config_ != "") {
-    param_loader.addYamlFile(_platform_config_);
+    if (!param_loader.addYamlFile(_platform_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load platform_config", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load platform_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_world_config_ != "") {
-    param_loader.addYamlFile(_world_config_);
+    if (!param_loader.addYamlFile(_world_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load world_config", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load world_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
-  param_loader.addYamlFileFromParam("private_config");
-  param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("estimators_config");
+  if (!param_loader.addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load private_config", getPrintName().c_str());
+    error_publisher_->addOneshotError("failed to load private_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("public_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load public_config", getPrintName().c_str());
+    error_publisher_->addOneshotError("failed to load public_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("estimators_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load estimators_config", getPrintName().c_str());
+    error_publisher_->addOneshotError("failed to load estimators_config");
+    error_publisher_->flushAndShutdown();
+  }
 
   const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
@@ -408,20 +434,46 @@ void TransformManager::initialize() {
     auto source_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/" + tf_source_name);
 
     if (_custom_config_ != "") {
-      source_param_loader->addYamlFile(_custom_config_);
+      if (!source_param_loader->addYamlFile(_custom_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load custom_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+        error_publisher_->addOneshotError("failed to load custom_config for tf source '" + tf_source_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_platform_config_ != "") {
-      source_param_loader->addYamlFile(_platform_config_);
+      if (!source_param_loader->addYamlFile(_platform_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load platform_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+        error_publisher_->addOneshotError("failed to load platform_config for tf source '" + tf_source_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_world_config_ != "") {
-      source_param_loader->addYamlFile(_world_config_);
+      if (!source_param_loader->addYamlFile(_world_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load world_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+        error_publisher_->addOneshotError("failed to load world_config for tf source '" + tf_source_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
-    source_param_loader->addYamlFileFromParam("private_config");
-    source_param_loader->addYamlFileFromParam("public_config");
-    source_param_loader->addYamlFileFromParam("estimators_config");
+    if (!source_param_loader->addYamlFileFromParam("private_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load private_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+      error_publisher_->addOneshotError("failed to load private_config for tf source '" + tf_source_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!source_param_loader->addYamlFileFromParam("public_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load public_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+      error_publisher_->addOneshotError("failed to load public_config for tf source '" + tf_source_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!source_param_loader->addYamlFileFromParam("estimators_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load estimators_config for tf source '%s'", getPrintName().c_str(), tf_source_name.c_str());
+      error_publisher_->addOneshotError("failed to load estimators_config for tf source '" + tf_source_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
 
     tf_sources_.push_back(std::make_unique<TfSource>(tf_source_name, node_, source_param_loader, broadcaster_, ch_, is_utm_source));
   }
@@ -437,20 +489,46 @@ void TransformManager::initialize() {
     auto estimator_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/" + estimator_name);
 
     if (_custom_config_ != "") {
-      estimator_param_loader->addYamlFile(_custom_config_);
+      if (!estimator_param_loader->addYamlFile(_custom_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load custom_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+        error_publisher_->addOneshotError("failed to load custom_config for estimator '" + estimator_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_platform_config_ != "") {
-      estimator_param_loader->addYamlFile(_platform_config_);
+      if (!estimator_param_loader->addYamlFile(_platform_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load platform_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+        error_publisher_->addOneshotError("failed to load platform_config for estimator '" + estimator_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_world_config_ != "") {
-      estimator_param_loader->addYamlFile(_world_config_);
+      if (!estimator_param_loader->addYamlFile(_world_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load world_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+        error_publisher_->addOneshotError("failed to load world_config for estimator '" + estimator_name + "'");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
-    estimator_param_loader->addYamlFileFromParam("private_config");
-    estimator_param_loader->addYamlFileFromParam("public_config");
-    estimator_param_loader->addYamlFileFromParam("estimators_config");
+    if (!estimator_param_loader->addYamlFileFromParam("private_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load private_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+      error_publisher_->addOneshotError("failed to load private_config for estimator '" + estimator_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!estimator_param_loader->addYamlFileFromParam("public_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load public_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+      error_publisher_->addOneshotError("failed to load public_config for estimator '" + estimator_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!estimator_param_loader->addYamlFileFromParam("estimators_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load estimators_config for estimator '%s'", getPrintName().c_str(), estimator_name.c_str());
+      error_publisher_->addOneshotError("failed to load estimators_config for estimator '" + estimator_name + "'");
+      error_publisher_->flushAndShutdown();
+    }
 
     tf_sources_.push_back(std::make_unique<TfSource>(estimator_name, node_, estimator_param_loader, broadcaster_, ch_, is_utm_source));
   }
@@ -464,20 +542,46 @@ void TransformManager::initialize() {
     auto mapping_param_loader = std::make_shared<mrs_lib::ParamLoader>(node_, "TransformManager/mapping_origin_tf");
 
     if (_custom_config_ != "") {
-      mapping_param_loader->addYamlFile(_custom_config_);
+      if (!mapping_param_loader->addYamlFile(_custom_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load custom_config for mapping_origin_tf", getPrintName().c_str());
+        error_publisher_->addOneshotError("failed to load custom_config for mapping_origin_tf");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_platform_config_ != "") {
-      mapping_param_loader->addYamlFile(_platform_config_);
+      if (!mapping_param_loader->addYamlFile(_platform_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load platform_config for mapping_origin_tf", getPrintName().c_str());
+        error_publisher_->addOneshotError("failed to load platform_config for mapping_origin_tf");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
     if (_world_config_ != "") {
-      mapping_param_loader->addYamlFile(_world_config_);
+      if (!mapping_param_loader->addYamlFile(_world_config_)) {
+        RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load world_config for mapping_origin_tf", getPrintName().c_str());
+        error_publisher_->addOneshotError("failed to load world_config for mapping_origin_tf");
+        error_publisher_->flushAndShutdown();
+      }
     }
 
-    mapping_param_loader->addYamlFileFromParam("private_config");
-    mapping_param_loader->addYamlFileFromParam("public_config");
-    mapping_param_loader->addYamlFileFromParam("estimators_config");
+    if (!mapping_param_loader->addYamlFileFromParam("private_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load private_config for mapping_origin_tf", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load private_config for mapping_origin_tf");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!mapping_param_loader->addYamlFileFromParam("public_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load public_config for mapping_origin_tf", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load public_config for mapping_origin_tf");
+      error_publisher_->flushAndShutdown();
+    }
+
+    if (!mapping_param_loader->addYamlFileFromParam("estimators_config")) {
+      RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load estimators_config for mapping_origin_tf", getPrintName().c_str());
+      error_publisher_->addOneshotError("failed to load estimators_config for mapping_origin_tf");
+      error_publisher_->flushAndShutdown();
+    }
 
     tf_mapping_origin_ = std::make_unique<TfMappingOrigin>(node_, mapping_param_loader, broadcaster_, ch_);
   }

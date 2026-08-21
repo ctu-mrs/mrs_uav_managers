@@ -501,14 +501,23 @@ std::optional<DetailedModelParams_t> loadDetailedUavModelParams(const rclcpp::No
   mrs_lib::ParamLoader param_loader(node);
 
   if (custom_config != "") {
-    param_loader.addYamlFile(custom_config);
+    if (!param_loader.addYamlFile(custom_config)) {
+      RCLCPP_WARN(node->get_logger(), "failed to load custom_config, detailed UAV model params will not be available");
+      return {};
+    }
   }
 
   if (platform_config != "") {
-    param_loader.addYamlFile(platform_config);
+    if (!param_loader.addYamlFile(platform_config)) {
+      RCLCPP_WARN(node->get_logger(), "failed to load platform_config, detailed UAV model params will not be available");
+      return {};
+    }
   }
 
-  param_loader.addYamlFileFromParam("detailed_uav_dynamics_params_config");
+  if (!param_loader.addYamlFileFromParam("detailed_uav_dynamics_params_config")) {
+    RCLCPP_WARN(node->get_logger(), "failed to load detailed_uav_dynamics_params_config, detailed UAV model params will not be available");
+    return {};
+  }
 
   double mass;
   double arm_length;

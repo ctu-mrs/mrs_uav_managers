@@ -395,37 +395,37 @@ void UavManager::initialize() {
   if (custom_config_path != "") {
     if (!param_loader.addYamlFile(custom_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load custom_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (platform_config_path != "") {
     if (!param_loader.addYamlFile(platform_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load platform_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (world_config_path != "") {
     if (!param_loader.addYamlFile(world_config_path)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load world_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (!param_loader.addYamlFileFromParam("private_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load private_config");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader.addYamlFileFromParam("public_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load public_config");
+    error_publisher_->flushAndShutdown();
   }
 
   const std::string yaml_prefix = "mrs_uav_managers/uav_manager/";
