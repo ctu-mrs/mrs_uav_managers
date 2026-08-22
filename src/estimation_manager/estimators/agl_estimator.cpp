@@ -26,14 +26,14 @@ void AglEstimator::publishCovariance() const {
 bool AglEstimator::isCompatibleWithHwApi(const mrs_msgs::msg::HwApiCapabilities::ConstSharedPtr &hw_api_capabilities) const {
 
   if (!ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/private/" + getName() + "/" + getName() +
-                                     ".yaml")) {
+                                      ".yaml")) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load private config", getPrintName().c_str());
     error_publisher_->addOneshotError("failed to load private config");
     error_publisher_->flushAndShutdown();
   }
 
   if (!ph_->param_loader->addYamlFile(ament_index_cpp::get_package_share_directory(package_name_) + "/config/public/" + getName() + "/" + getName() +
-                                     ".yaml")) {
+                                      ".yaml")) {
     RCLCPP_ERROR(node_->get_logger(), "[%s]: failed to load public config", getPrintName().c_str());
     error_publisher_->addOneshotError("failed to load public config");
     error_publisher_->flushAndShutdown();
