@@ -782,6 +782,9 @@ private:
   bool                       rc_escalating_failsafe_triggered_ = false;
   EscalatingFailsafeStates_t state_escalating_failsafe_        = ESC_NONE_STATE;
 
+  std::atomic<bool> eland_from_escalating_ = false;
+  std::atomic<bool> disarm_from_eland_     = false;
+
   std::string _tracker_error_action_;
 
   // emergancy landing state machine
@@ -3126,6 +3129,9 @@ void ControlManager::timerEland() {
       if (_eland_disarm_enabled_) {
 
         RCLCPP_INFO(node_->get_logger(), "calling for disarm");
+
+        disarm_from_eland_ = true;
+
         arming(false);
       }
 
@@ -7450,7 +7456,7 @@ std::tuple<bool, std::string> ControlManager::eland(void) {
     return std::tuple(false, ss.str());
   }
 
-  if (_rc_emergency_handoff_) {
+  if (!eland_from_escalating_ && _rc_emergency_handoff_) {
 
     toggleOutput(false);
 
@@ -7697,6 +7703,8 @@ std::tuple<bool, std::string> ControlManager::escalatingFailsafe(void) {
 
     ss << "escalating failsafe escalates to eland";
     RCLCPP_WARN_STREAM_THROTTLE(node_->get_logger(), *clock_, 100, "" << ss.str());
+
+    eland_from_escalating_ = true;
 
     auto [success, message] = eland();
 
@@ -7969,11 +7977,11 @@ std::tuple<bool, std::string> ControlManager::arming(const bool input) {
     return std::tuple(false, ss.str());
   }
 
-  if (!input && _rc_emergency_handoff_) {
+  if (!input && _rc_emergency_handoff_ && !disarm_from_eland_) {
 
     toggleOutput(false);
 
-    return std::tuple(true, "RC emergency handoff is ON, disabling output");
+    return std::tuple(false, "RC emergency handoff is ON, disabling output");
   }
 
   std::shared_ptr<std_srvs::srv::SetBool::Request> request = std::make_shared<std_srvs::srv::SetBool::Request>();
