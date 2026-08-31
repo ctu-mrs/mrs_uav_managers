@@ -621,9 +621,9 @@ void SafetyAreaManager::timerStatus() {
 
     std::vector<mrs_lib::safety_zone::Point2d> new_points;
 
-    // Add offset to border points
+    // world_origin already moved by +offset; subtract it here to keep the point physically fixed
     for (auto &point : current_points) {
-      new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() + world_origin_offset_x_, point.get<1>() + world_origin_offset_y_});
+      new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
     }
 
     auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", "world_origin");
@@ -638,7 +638,7 @@ void SafetyAreaManager::timerStatus() {
         std::vector<mrs_lib::safety_zone::Point2d> updated_points;
 
         for (auto &point : obstacle_points) {
-          updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() + world_origin_offset_x_, point.get<1>() + world_origin_offset_y_});
+          updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
         }
 
         *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", "world_origin");
