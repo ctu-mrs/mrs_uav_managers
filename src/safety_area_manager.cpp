@@ -653,6 +653,10 @@ void SafetyAreaManager::timerStatus() {
       if (new_safety_zone) {
         safety_zone_handler_.visualization_components.safeCleanup();
         safety_zone_handler_ = std::move(*new_safety_zone);
+
+        // consumed: clear it so it isn't applied again on the next rebuild
+        world_origin_offset_x_ = 0.0;
+        world_origin_offset_y_ = 0.0;
       } else {
         RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
         error_publisher_->addOneshotError("Failed to update safety area after world origin change.");
@@ -1166,8 +1170,9 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
     delta_y = new_utm_y - old_utm_y;
   }
 
-  world_origin_offset_x_ = delta_x;
-  world_origin_offset_y_ = delta_y;
+  // accumulate: an earlier call's shift may not be consumed by timerStatus() yet
+  world_origin_offset_x_ += delta_x;
+  world_origin_offset_y_ += delta_y;
 
   RCLCPP_INFO(node_->get_logger(), "World origin shifted by dx: %.2f dy: %.2f meters", delta_x, delta_y);
 
@@ -1185,7 +1190,8 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
   // genuinely moved area is the dangerous direction while an extra rebuild is not
   const double min_significant_shift = 1e-3; // [m]
 
-  if (std::abs(delta_x) > min_significant_shift || std::abs(delta_y) > min_significant_shift) {
+  // checked on the accumulated offset so sub-threshold shifts still add up to trigger a rebuild
+  if (std::abs(world_origin_offset_x_) > min_significant_shift || std::abs(world_origin_offset_y_) > min_significant_shift) {
     world_origin_changed_ = true;
   }
 
