@@ -616,10 +616,10 @@ void SafetyAreaManager::timerStatus() {
     if (world_origin_changed_ && current_border.getHorizontalFrame() == "world_origin") {
       RCLCPP_INFO(node_->get_logger(), "World origin has changed, updating the safety area accordingly.");
 
-      auto current_frame  = current_border.getHorizontalFrame();
-      auto current_points = current_border.getPoints();
-      auto current_min_z  = current_border.getMinZ();
-      auto current_max_z  = current_border.getMaxZ();
+      auto current_v_frame = current_border.getVerticalFrame();
+      auto current_points  = current_border.getPoints();
+      auto current_min_z   = current_border.getMinZ();
+      auto current_max_z   = current_border.getMaxZ();
 
       std::vector<mrs_lib::safety_zone::Point2d> new_points;
 
@@ -628,7 +628,7 @@ void SafetyAreaManager::timerStatus() {
         new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
       }
 
-      auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", "world_origin");
+      auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", current_v_frame);
 
       // Add existing obstacles with updated positions
       auto existing_obstacles = copyExistingObstacles();
@@ -643,7 +643,7 @@ void SafetyAreaManager::timerStatus() {
             updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
           }
 
-          *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", "world_origin");
+          *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", obstacle->getVerticalFrame());
         }
       }
 
