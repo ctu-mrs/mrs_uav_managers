@@ -607,56 +607,59 @@ void SafetyAreaManager::timerStatus() {
     }
   }
 
-  auto current_border = safety_zone_handler_.safety_zone->getBorder();
-
-  if (world_origin_changed_ && current_border.getHorizontalFrame() == "world_origin") {
-    RCLCPP_INFO(node_->get_logger(), "World origin has changed, updating the safety area accordingly.");
-
+  {
+    // callbackUpdateWorldOrigin mutates these under the same mutex
     std::scoped_lock lock(mutex_safety_area_);
 
-    auto current_frame  = current_border.getHorizontalFrame();
-    auto current_points = current_border.getPoints();
-    auto current_min_z  = current_border.getMinZ();
-    auto current_max_z  = current_border.getMaxZ();
+    auto current_border = safety_zone_handler_.safety_zone->getBorder();
 
-    std::vector<mrs_lib::safety_zone::Point2d> new_points;
+    if (world_origin_changed_ && current_border.getHorizontalFrame() == "world_origin") {
+      RCLCPP_INFO(node_->get_logger(), "World origin has changed, updating the safety area accordingly.");
 
-    // world_origin already moved by +offset; subtract it here to keep the point physically fixed
-    for (auto &point : current_points) {
-      new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
-    }
+      auto current_frame  = current_border.getHorizontalFrame();
+      auto current_points = current_border.getPoints();
+      auto current_min_z  = current_border.getMinZ();
+      auto current_max_z  = current_border.getMaxZ();
 
-    auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", "world_origin");
+      std::vector<mrs_lib::safety_zone::Point2d> new_points;
 
-    // Add existing obstacles with updated positions
-    auto existing_obstacles = copyExistingObstacles();
-
-    // Check if obstacles defined in world_origin frame
-    for (auto &obstacle : existing_obstacles) {
-      if (obstacle->getHorizontalFrame() == "world_origin") {
-        auto                                       obstacle_points = obstacle->getPoints();
-        std::vector<mrs_lib::safety_zone::Point2d> updated_points;
-
-        for (auto &point : obstacle_points) {
-          updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
-        }
-
-        *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", "world_origin");
+      // world_origin already moved by +offset; subtract it here to keep the point physically fixed
+      for (auto &point : current_points) {
+        new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
       }
+
+      auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", "world_origin");
+
+      // Add existing obstacles with updated positions
+      auto existing_obstacles = copyExistingObstacles();
+
+      // Check if obstacles defined in world_origin frame
+      for (auto &obstacle : existing_obstacles) {
+        if (obstacle->getHorizontalFrame() == "world_origin") {
+          auto                                       obstacle_points = obstacle->getPoints();
+          std::vector<mrs_lib::safety_zone::Point2d> updated_points;
+
+          for (auto &point : obstacle_points) {
+            updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
+          }
+
+          *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", "world_origin");
+        }
+      }
+
+      auto new_safety_zone = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
+
+      // Update the new safety zone and visualization components
+      if (new_safety_zone) {
+        safety_zone_handler_.visualization_components.safeCleanup();
+        safety_zone_handler_ = std::move(*new_safety_zone);
+      } else {
+        RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
+        error_publisher_->addOneshotError("Failed to update safety area after world origin change.");
+      }
+
+      world_origin_changed_ = false;
     }
-
-    auto new_safety_zone = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
-
-    // Update the new safety zone and visualization components
-    if (new_safety_zone) {
-      safety_zone_handler_.visualization_components.safeCleanup();
-      safety_zone_handler_ = std::move(*new_safety_zone);
-    } else {
-      RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
-      error_publisher_->addOneshotError("Failed to update safety area after world origin change.");
-    }
-
-    world_origin_changed_ = false;
   }
 
   // Publishing
