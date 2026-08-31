@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/time.hpp>
 
+#include <mrs_lib/gps_conversions.h>
 #include <mrs_lib/service_client_handler.h>
 
 #include <mrs_msgs/srv/get_bool_srv.hpp>
@@ -83,6 +84,10 @@ bool Tester::test(void) {
 
   const std::string uav_name = "uav1";
 
+  // ~25 m from the configured origin: far enough that an un-anchored frame is unmistakable
+  const double new_origin_lat = 47.397923;
+  const double new_origin_lon = 8.545794;
+
   {
     auto [uhopt, message] = getUAVHandler(uav_name);
 
@@ -98,6 +103,9 @@ bool Tester::test(void) {
 
   auto sch_safety_zone_enabled =
       mrs_lib::ServiceClientHandler<mrs_msgs::srv::GetBoolSrv>(node_, "/" + uav_name + "/safety_area_manager/is_safety_zone_enabled");
+
+  auto sch_point_in_safety_area_2d =
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "/" + uav_name + "/safety_area_manager/point_in_safety_area_2d");
 
   // | ---- wait for the system, the origin can only be set on the ground ---- |
 
@@ -116,16 +124,44 @@ bool Tester::test(void) {
     }
   }
 
-  // remember the border, the rebuild is detected by it moving with the origin
+  // remember the border and origin, so the expected shift below can be computed exactly
   std::vector<mrs_msgs::msg::Point2D> border_before;
+  std::string                         border_vertical_frame_before;
+  std::vector<mrs_msgs::msg::Prism>   obstacles_before;
+  double                              origin_lat_before = 0.0;
+  double                              origin_lon_before = 0.0;
 
   if (uh_->sh_safety_area_manager_diag_.hasMsg()) {
-    border_before = uh_->sh_safety_area_manager_diag_.getMsg()->border.points;
+    const auto diag              = uh_->sh_safety_area_manager_diag_.getMsg();
+    border_before                = diag->border.points;
+    border_vertical_frame_before = diag->border.vertical_frame;
+    obstacles_before             = diag->obstacles;
+    origin_lat_before            = diag->world_origin.x;
+    origin_lon_before            = diag->world_origin.y;
   }
 
   if (border_before.empty()) {
     RCLCPP_ERROR(node_->get_logger(), "no safety area border received before the world origin change");
     return false;
+  }
+
+  // obstacle_0 is latlon_origin (untouched), obstacle_1 is world_origin (shifts like the border)
+  if (obstacles_before.size() != 2 || obstacles_before[0].points.empty() || obstacles_before[1].points.empty()) {
+    RCLCPP_ERROR(node_->get_logger(), "expected exactly two obstacles with points before the world origin change");
+    return false;
+  }
+
+  // the origin point (0, 0) - which this border is centered on - must be inside it
+  {
+    auto request             = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
+    request->header.frame_id = uav_name + "/world_origin";
+
+    auto response = sch_point_in_safety_area_2d.callSync(request);
+
+    if (!response || !response.value()->success) {
+      RCLCPP_ERROR(node_->get_logger(), "the safety area center is not enforced as valid before the world origin change");
+      return false;
+    }
   }
 
   // the UAV stands still for the whole test, so utm_origin - a frame the origin change must not
@@ -151,11 +187,9 @@ bool Tester::test(void) {
   {
     auto request = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
 
-    request->header.frame_id = "latlon_origin";
-    // ~25 m from the configured origin: far enough that a frame left un-anchored is unmistakable
-    // (it lands megametres away), close enough to keep the UAV well inside the safety area
-    request->reference.position.x = 47.397923;
-    request->reference.position.y = 8.545794;
+    request->header.frame_id      = "latlon_origin";
+    request->reference.position.x = new_origin_lat;
+    request->reference.position.y = new_origin_lon;
 
     auto response = sch_set_world_origin.callSync(request);
 
@@ -216,8 +250,16 @@ bool Tester::test(void) {
 
   // | --------- the safety area has to survive being rebuilt -------- |
 
+  // a physically-fixed border must shift by exactly -(new_utm - old_utm), catching a sign error
+  double old_utm_x, old_utm_y, new_utm_x, new_utm_y;
+  mrs_lib::UTM(origin_lat_before, origin_lon_before, &old_utm_x, &old_utm_y);
+  mrs_lib::UTM(new_origin_lat, new_origin_lon, &new_utm_x, &new_utm_y);
+  const double expected_delta_x = new_utm_x - old_utm_x;
+  const double expected_delta_y = new_utm_y - old_utm_y;
+
   // the manager rebuilds the zone from its own timer, a moment after it answers the service; wait
   // for the shifted border to show up, otherwise the checks below still describe the old zone
+  std::vector<mrs_msgs::msg::Point2D> border_now;
   {
     const double min_shift = 1.0;  // [m]
     const double timeout   = 20.0; // [s]
@@ -230,11 +272,12 @@ bool Tester::test(void) {
 
       if (uh_->sh_safety_area_manager_diag_.hasMsg()) {
 
-        const auto border_now = uh_->sh_safety_area_manager_diag_.getMsg()->border.points;
+        const auto candidate = uh_->sh_safety_area_manager_diag_.getMsg()->border.points;
 
-        if (border_now.size() == border_before.size() && !border_now.empty() &&
-            std::hypot(border_now[0].x - border_before[0].x, border_now[0].y - border_before[0].y) > min_shift) {
-          rebuilt = true;
+        if (candidate.size() == border_before.size() && !candidate.empty() &&
+            std::hypot(candidate[0].x - border_before[0].x, candidate[0].y - border_before[0].y) > min_shift) {
+          border_now = candidate;
+          rebuilt    = true;
           break;
         }
       }
@@ -244,6 +287,92 @@ bool Tester::test(void) {
 
     if (!rebuilt) {
       RCLCPP_ERROR(node_->get_logger(), "the safety area border did not move after the world origin changed, the zone was not rebuilt");
+      return false;
+    }
+  }
+
+  // the shift has to match -expected_delta exactly (within UTM/float rounding), not just be nonzero
+  {
+    const double tol = 1e-2; // [m]
+
+    for (size_t i = 0; i < border_now.size(); i++) {
+      const double expected_x = border_before[i].x - expected_delta_x;
+      const double expected_y = border_before[i].y - expected_delta_y;
+      const double error_x    = std::abs(border_now[i].x - expected_x);
+      const double error_y    = std::abs(border_now[i].y - expected_y);
+
+      if (error_x > tol || error_y > tol) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "border point %zu shifted to (%.3f, %.3f), expected (%.3f, %.3f) - wrong sign or magnitude in the world_origin compensation", i,
+                     border_now[i].x, border_now[i].y, expected_x, expected_y);
+        return false;
+      }
+    }
+  }
+
+  // vertical frame (local_origin, deliberately not world_origin) must survive the rebuild
+  {
+    const auto border_vertical_frame_now = uh_->sh_safety_area_manager_diag_.getMsg()->border.vertical_frame;
+
+    if (border_vertical_frame_now != border_vertical_frame_before) {
+      RCLCPP_ERROR(node_->get_logger(), "the border's vertical frame changed from '%s' to '%s' after the world origin change",
+                   border_vertical_frame_before.c_str(), border_vertical_frame_now.c_str());
+      return false;
+    }
+  }
+
+  // exercises both branches of the per-obstacle rebuild
+  {
+    const auto obstacles_now = uh_->sh_safety_area_manager_diag_.getMsg()->obstacles;
+
+    if (obstacles_now.size() != 2 || obstacles_now[0].points.size() != obstacles_before[0].points.size() ||
+        obstacles_now[1].points.size() != obstacles_before[1].points.size()) {
+      RCLCPP_ERROR(node_->get_logger(), "an obstacle changed shape after the world origin change");
+      return false;
+    }
+
+    for (size_t i = 0; i < obstacles_now[0].points.size(); i++) {
+      if (obstacles_now[0].points[i].x != obstacles_before[0].points[i].x || obstacles_now[0].points[i].y != obstacles_before[0].points[i].y) {
+        RCLCPP_ERROR(node_->get_logger(), "the latlon_origin obstacle point %zu moved after the world origin change, but it is not in world_origin frame", i);
+        return false;
+      }
+    }
+
+    if (obstacles_now[1].vertical_frame != obstacles_before[1].vertical_frame) {
+      RCLCPP_ERROR(node_->get_logger(), "the world_origin obstacle's vertical frame changed from '%s' to '%s' after the world origin change",
+                   obstacles_before[1].vertical_frame.c_str(), obstacles_now[1].vertical_frame.c_str());
+      return false;
+    }
+
+    const double tol = 1e-2; // [m]
+
+    for (size_t i = 0; i < obstacles_now[1].points.size(); i++) {
+      const double expected_x = obstacles_before[1].points[i].x - expected_delta_x;
+      const double expected_y = obstacles_before[1].points[i].y - expected_delta_y;
+      const double error_x    = std::abs(obstacles_now[1].points[i].x - expected_x);
+      const double error_y    = std::abs(obstacles_now[1].points[i].y - expected_y);
+
+      if (error_x > tol || error_y > tol) {
+        RCLCPP_ERROR(
+            node_->get_logger(),
+            "world_origin obstacle point %zu shifted to (%.3f, %.3f), expected (%.3f, %.3f) - wrong sign or magnitude in the world_origin compensation", i,
+            obstacles_now[1].points[i].x, obstacles_now[1].points[i].y, expected_x, expected_y);
+        return false;
+      }
+    }
+  }
+
+  // the same physical point, re-expressed in the new frame, must still be enforced as valid
+  {
+    auto request                  = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
+    request->header.frame_id      = uav_name + "/world_origin";
+    request->reference.position.x = -expected_delta_x;
+    request->reference.position.y = -expected_delta_y;
+
+    auto response = sch_point_in_safety_area_2d.callSync(request);
+
+    if (!response || !response.value()->success) {
+      RCLCPP_ERROR(node_->get_logger(), "the safety area center is no longer enforced as valid after the world origin change");
       return false;
     }
   }
