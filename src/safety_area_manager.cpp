@@ -1831,10 +1831,10 @@ double SafetyAreaManager::getMaxZ() {
 
       if (!ret) {
         RCLCPP_WARN(node_->get_logger(), "Could not transform estimation manager's max_z to the "
-                                         "current safety area frame");
+                                         "current safety area frame; ignoring it for this query");
+      } else {
+        estimation_manager_max_z = ret->point.z;
       }
-
-      estimation_manager_max_z = ret->point.z;
     }
   }
 
