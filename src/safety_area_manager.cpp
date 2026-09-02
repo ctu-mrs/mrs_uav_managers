@@ -83,10 +83,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_;
 
   std::shared_ptr<mrs_lib::Transformer> transformer_;
-  std::atomic<bool>                     is_initialized_        = false;
-  std::atomic<bool>                     world_origin_changed_  = false;
-  double                                world_origin_offset_x_ = 0.0;
-  double                                world_origin_offset_y_ = 0.0;
+  std::atomic<bool>                     is_initialized_ = false;
 
   bool              world_origin_use_home_position_ = false;
   std::atomic<bool> home_origin_adopted_            = false;
@@ -242,6 +239,9 @@ private:
   bool                                                      initializationFromMsg(const mrs_msgs::msg::Prism &prism_msg, bool keep_obstacles);
   std::optional<SafetyZoneHandler>                          createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>            &&border,
                                                                              std::vector<std::unique_ptr<mrs_lib::safety_zone::Prism>> obstacle_prisms);
+
+  // rebuilds the zone for a world-origin shift of (delta_x, delta_y) m; caller holds mutex_safety_area_
+  bool applyWorldOriginShift(const double delta_x, const double delta_y);
 
   std::tuple<bool, std::string> validateMsg(const mrs_msgs::msg::Prism &prism_msg);
 
@@ -607,74 +607,6 @@ void SafetyAreaManager::timerStatus() {
       } else {
         safety_zone_handler_.visualization_components.safeCleanup();
       }
-    }
-  }
-
-  {
-    // callbackUpdateWorldOrigin mutates these under the same mutex
-    std::scoped_lock lock(mutex_safety_area_);
-
-    auto current_border = safety_zone_handler_.safety_zone->getBorder();
-
-    if (world_origin_changed_ && current_border.getHorizontalFrame() == "world_origin") {
-      RCLCPP_INFO(node_->get_logger(), "World origin has changed, updating the safety area accordingly.");
-
-      auto current_v_frame = current_border.getVerticalFrame();
-      auto current_points  = current_border.getPoints();
-      auto current_min_z   = current_border.getMinZ();
-      auto current_max_z   = current_border.getMaxZ();
-
-      std::vector<mrs_lib::safety_zone::Point2d> new_points;
-
-      // world_origin already moved by +offset; subtract it here to keep the point physically fixed
-      for (auto &point : current_points) {
-        new_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
-      }
-
-      auto new_border_prism = std::make_unique<mrs_lib::safety_zone::Prism>(new_points, current_max_z, current_min_z, "world_origin", current_v_frame);
-
-      // Add existing obstacles with updated positions
-      auto existing_obstacles = copyExistingObstacles();
-
-      // Check if obstacles defined in world_origin frame
-      for (auto &obstacle : existing_obstacles) {
-        if (obstacle->getHorizontalFrame() == "world_origin") {
-          auto                                       obstacle_points = obstacle->getPoints();
-          std::vector<mrs_lib::safety_zone::Point2d> updated_points;
-
-          for (auto &point : obstacle_points) {
-            updated_points.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - world_origin_offset_x_, point.get<1>() - world_origin_offset_y_});
-          }
-
-          *obstacle = mrs_lib::safety_zone::Prism(updated_points, obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin", obstacle->getVerticalFrame());
-        }
-      }
-
-      auto new_safety_zone = createSafetyZone(std::move(new_border_prism), std::move(existing_obstacles));
-
-      // Update the new safety zone and visualization components
-      if (new_safety_zone) {
-        safety_zone_handler_.visualization_components.safeCleanup();
-        safety_zone_handler_ = std::move(*new_safety_zone);
-
-        // consumed: clear it so it isn't applied again on the next rebuild
-        world_origin_offset_x_ = 0.0;
-        world_origin_offset_y_ = 0.0;
-      } else {
-        RCLCPP_ERROR(node_->get_logger(), "Failed to update safety area after world origin change.");
-        error_publisher_->addOneshotError("Failed to update safety area after world origin change.");
-      }
-
-      world_origin_changed_ = false;
-    }
-
-    // a non-world_origin border needs no point rebuild (it follows the origin through tf), but its
-    // cached visualization was projected against the old origin - drop it and consume the offset
-    if (world_origin_changed_) {
-      safety_zone_handler_.visualization_components.safeCleanup();
-      world_origin_offset_x_ = 0.0;
-      world_origin_offset_y_ = 0.0;
-      world_origin_changed_  = false;
     }
   }
 
@@ -1182,11 +1114,13 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
     delta_y = new_utm_y - old_utm_y;
   }
 
-  // accumulate: an earlier call's shift may not be consumed by timerStatus() yet
-  world_origin_offset_x_ += delta_x;
-  world_origin_offset_y_ += delta_y;
-
-  RCLCPP_INFO(node_->get_logger(), "World origin shifted by dx: %.2f dy: %.2f meters", delta_x, delta_y);
+  if (!applyWorldOriginShift(delta_x, delta_y)) {
+    RCLCPP_ERROR(node_->get_logger(), "Could not rebuild the safety area for the new world origin; keeping the previous area.");
+    error_publisher_->addOneshotError("Could not rebuild the safety area for the new world origin; keeping the previous area.");
+    response->success = false;
+    response->message = "Could not rebuild the safety area for the new world origin; the previous area is kept";
+    return true;
+  }
 
   safety_zone_handler_.parameters.world_origin.x     = request->reference.position.x;
   safety_zone_handler_.parameters.world_origin.y     = request->reference.position.y;
@@ -1194,18 +1128,6 @@ bool SafetyAreaManager::callbackUpdateWorldOrigin(const std::shared_ptr<mrs_msgs
 
   response->success = true;
   response->message = "World origin set successfully";
-
-  // the area is defined in the world_origin frame and follows it through the tf, so a zero shift
-  // means the prisms would be rebuilt unchanged - skip it rather than tear down a correct zone.
-  // Re-sending the same origin cancels out exactly; the margin only absorbs rounding from the UTM
-  // conversions and is kept far below any shift that could matter, because failing to rebuild a
-  // genuinely moved area is the dangerous direction while an extra rebuild is not
-  const double min_significant_shift = 1e-3; // [m]
-
-  // checked on the accumulated offset so sub-threshold shifts still add up to trigger a rebuild
-  if (std::abs(world_origin_offset_x_) > min_significant_shift || std::abs(world_origin_offset_y_) > min_significant_shift) {
-    world_origin_changed_ = true;
-  }
 
   return true;
 }
@@ -1424,6 +1346,63 @@ SafetyAreaManager::createSafetyZone(std::unique_ptr<mrs_lib::safety_zone::Prism>
   }
 
   return safety_zone_handler;
+}
+
+//}
+
+/* applyWorldOriginShift() //{ */
+
+bool SafetyAreaManager::applyWorldOriginShift(const double delta_x, const double delta_y) {
+
+  // a zero shift leaves the zone unchanged
+  if (delta_x == 0.0 && delta_y == 0.0) {
+    return true;
+  }
+
+  RCLCPP_INFO(node_->get_logger(), "World origin shifted by dx: %.2f dy: %.2f meters, rebuilding the safety area accordingly", delta_x, delta_y);
+
+  const auto current_border = safety_zone_handler_.safety_zone->getBorder();
+
+  // a non-world_origin border follows the origin through tf; only its cached visualization needs dropping
+  if (current_border.getHorizontalFrame() != "world_origin") {
+    safety_zone_handler_.visualization_components.safeCleanup();
+    return true;
+  }
+
+  // world_origin moved by +delta; shift the points by -delta to keep them physically fixed
+  const auto shift_points = [&](const std::vector<mrs_lib::safety_zone::Point2d> &points) {
+    std::vector<mrs_lib::safety_zone::Point2d> shifted;
+    shifted.reserve(points.size());
+    for (const auto &point : points) {
+      shifted.push_back(mrs_lib::safety_zone::Point2d{point.get<0>() - delta_x, point.get<1>() - delta_y});
+    }
+    return shifted;
+  };
+
+  // a translation keeps a valid polygon valid, so these Prism ctors do not throw
+  auto new_border = std::make_unique<mrs_lib::safety_zone::Prism>(shift_points(current_border.getPoints()), current_border.getMaxZ(), current_border.getMinZ(),
+                                                                  "world_origin", current_border.getVerticalFrame());
+
+  auto existing_obstacles = copyExistingObstacles();
+
+  for (auto &obstacle : existing_obstacles) {
+    if (obstacle->getHorizontalFrame() != "world_origin") {
+      continue;
+    }
+    *obstacle = mrs_lib::safety_zone::Prism(shift_points(obstacle->getPoints()), obstacle->getMaxZ(), obstacle->getMinZ(), "world_origin",
+                                            obstacle->getVerticalFrame());
+  }
+
+  auto new_safety_zone = createSafetyZone(std::move(new_border), std::move(existing_obstacles));
+
+  if (!new_safety_zone) {
+    return false;
+  }
+
+  safety_zone_handler_.visualization_components.safeCleanup();
+  safety_zone_handler_ = std::move(*new_safety_zone);
+
+  return true;
 }
 
 //}
