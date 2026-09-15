@@ -750,8 +750,11 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
               msg.errors.push_back(ss.str());
             }
             if constexpr (std::is_same_v<T, mrs_lib::errorgraph::Errorgraph::node_info_t>) {
-              for (const auto &error : info.errors)
-                msg.errors.push_back(error.type);
+              for (const auto &error : info.errors) {
+                std::stringstream ss;
+                ss << info.source_node.node << "." << info.source_node.component << ": " << error.type;
+                msg.errors.push_back(ss.str());
+              }
             }
           },
           root);
