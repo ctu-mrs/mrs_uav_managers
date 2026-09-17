@@ -1,0 +1,9 @@
+<map id="mrs_uav_managers::control_manager::CommonHandlers_t" name="mrs_uav_managers::control_manager::CommonHandlers_t">
+<area shape="rect" id="Node000001" title=" " alt="" coords="495,69,719,109"/>
+<area shape="rect" id="Node000002" href="$structmrs__uav__managers_1_1control__manager_1_1SafetyArea__t.html" title=" " alt="" coords="37,5,240,45"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="254,37,471,67,495,70,494,75,470,72,253,43"/>
+<area shape="rect" id="Node000003" href="$structmrs__uav__managers_1_1control__manager_1_1ScopeTimer__t.html" title=" " alt="" coords="37,69,240,109"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="254,87,495,87,495,92,254,92"/>
+<area shape="rect" id="Node000004" href="$structmrs__uav__managers_1_1control__manager_1_1ControlOutputModalities__t.html" title=" " alt="" coords="5,133,272,173"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="285,132,470,107,494,103,495,109,471,112,286,137"/>
+</map>
