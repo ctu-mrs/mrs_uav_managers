@@ -257,12 +257,12 @@ bool Tester::test(void) {
   const double expected_delta_x = new_utm_x - old_utm_x;
   const double expected_delta_y = new_utm_y - old_utm_y;
 
-  // the manager rebuilds the zone from its own timer, a moment after it answers the service; wait
-  // for the shifted border to show up, otherwise the checks below still describe the old zone
+  // the zone is rebuilt synchronously inside the service call; the diagnostics message only needs
+  // one status tick to catch up, so a short poll is enough
   std::vector<mrs_msgs::msg::Point2D> border_now;
   {
-    const double min_shift = 1.0;  // [m]
-    const double timeout   = 20.0; // [s]
+    const double min_shift = 1.0; // [m]
+    const double timeout   = 5.0; // [s]
 
     bool rebuilt = false;
 
