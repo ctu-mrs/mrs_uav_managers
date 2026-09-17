@@ -32,6 +32,7 @@ function(add_mrs_uav_managers_test_target test_name)
       mrs_lib::mrs_lib
       mrs_uav_testing::mrs_uav_testing
       ${mrs_msgs_TARGETS}
+      ${visualization_msgs_TARGETS}
   )
 
   install(
@@ -49,4 +50,5 @@ add_subdirectory(control_manager)
 add_subdirectory(errorgraph)
 add_subdirectory(estimation_manager)
 add_subdirectory(gain_manager)
+add_subdirectory(safety_area_manager)
 add_subdirectory(uav_manager)
