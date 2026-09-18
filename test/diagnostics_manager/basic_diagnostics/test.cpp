@@ -2,6 +2,7 @@
 #include <rclcpp/time.hpp>
 
 #include <mrs_msgs/msg/uav_info.hpp>
+#include <mrs_msgs/msg/general_robot_info.hpp>
 
 #include <mrs_uav_testing/test_generic.h>
 
@@ -43,6 +44,37 @@ bool Tester::test(void) {
   if (!received_msg) {
     RCLCPP_ERROR(node_->get_logger(),
                  "no message received on 'diagnostics_manager/uav_info' within 20s — DiagnosticsManager is not running as part of the core stack");
+    return false;
+  }
+
+  std::shared_ptr<mrs_msgs::msg::GeneralRobotInfo> general_robot_info_msg;
+
+  auto sub2 = node_->create_subscription<mrs_msgs::msg::GeneralRobotInfo>(
+      "/" + uav_name + "/diagnostics_manager/general_robot_info", rclcpp::SystemDefaultsQoS(),
+      [&general_robot_info_msg](const mrs_msgs::msg::GeneralRobotInfo::SharedPtr msg) { general_robot_info_msg = msg; });
+
+  auto all_ok = [](const mrs_msgs::msg::PreflightStatus &s) {
+    return s.speed_ok && s.height_ok && s.gyro_ok && s.topics_ok && s.position_valid;
+  };
+
+  const auto preflight_deadline = node_->get_clock()->now() + rclcpp::Duration(20s);
+
+  while (node_->get_clock()->now() < preflight_deadline) {
+
+    if (general_robot_info_msg && all_ok(general_robot_info_msg->preflight_status)) {
+      break;
+    }
+
+    sleep(0.1);
+  }
+
+  if (!general_robot_info_msg) {
+    RCLCPP_ERROR(node_->get_logger(), "no message received on 'diagnostics_manager/general_robot_info' within 20s");
+    return false;
+  }
+
+  if (!all_ok(general_robot_info_msg->preflight_status)) {
+    RCLCPP_ERROR(node_->get_logger(), "general_robot_info.preflight_status did not become fully ok within 20s on a healthy sim stack");
     return false;
   }
 
