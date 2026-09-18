@@ -639,6 +639,9 @@ state_t DiagnosticsManager::parse_uav_state(mrs_msgs::msg::HwApiStatus::ConstSha
   if (hw_api_status == nullptr || control_manager_diagnostics == nullptr)
     return state_t::UNKNOWN;
 
+  if (!hw_api_status->connected)
+    return state_t::LINK_LOST;
+
   const bool hw_armed = hw_api_status->armed;
   // not armed
   if (!hw_armed)

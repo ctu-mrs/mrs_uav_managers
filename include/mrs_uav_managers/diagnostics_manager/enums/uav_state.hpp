@@ -20,7 +20,8 @@
   (RC_MODE)        \
   (HOVER)          \
   (GOTO)           \
-  (TRAJECTORY)
+  (TRAJECTORY)     \
+  (LINK_LOST)
 // clang-format on
 
 // optional macro variables for enum to ROS message conversions
@@ -51,6 +52,7 @@ inline bool is_flying(state_t uav_state) {
   case state_t::DISARMED:
   case state_t::ARMED:
   case state_t::OFFBOARD:
+  case state_t::LINK_LOST:
     return false;
   default:
     return true;
@@ -69,6 +71,7 @@ inline bool is_flying_autonomously(state_t uav_state) {
   case state_t::OFFBOARD:
   case state_t::MANUAL:
   case state_t::UNKNOWN:
+  case state_t::LINK_LOST:
     return false;
   default:
     return true;
