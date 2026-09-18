@@ -706,12 +706,21 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
 
   msg.problems_preventing_start.clear();
 
+  // Always run, independent of flight state: preflight_status must stay
+  // fresh at all times (autostart needs it before the UAV is even offboard).
+  const auto preflight_result = preflight_checker_->runPreflightChecks();
+
+  msg.preflight_status.speed_ok       = preflight_result.speed_ok;
+  msg.preflight_status.height_ok      = preflight_result.height_ok;
+  msg.preflight_status.gyro_ok        = preflight_result.gyro_ok;
+  msg.preflight_status.topics_ok      = preflight_result.topics_ok;
+  msg.preflight_status.position_valid = preflight_result.position_valid;
+
   /*//{ diagnose problems preventing start */
 
   // If not flying, explain why we're not ready. When flying autonomously, we
   // assume everything was fine at takeoff and skip the diagnosis.
   if (!is_flying_autonomously(uav_state)) {
-    const auto preflight_result = preflight_checker_->runPreflightChecks();
 
     msg.ready_to_start = preflight_result.can_takeoff && state_offboard;
 
