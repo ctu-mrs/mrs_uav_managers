@@ -56,10 +56,12 @@ void PreflightChecker::initialize(void) {
     return;
   }
 
-  // if checker is not enabled, we don't need to register subscribers at all
-  if (!preflight_cfg_.enabled) {
-    return;
-  }
+  // "enabled" only gates these four optional heuristic checks -- position_valid/control_enabled
+  // stay mandatory below, regardless of this flag
+  preflight_cfg_.speed_check_enabled &= preflight_cfg_.enabled;
+  preflight_cfg_.height_check_enabled &= preflight_cfg_.enabled;
+  preflight_cfg_.gyro_check_enabled &= preflight_cfg_.enabled;
+  preflight_cfg_.topic_check_enabled &= preflight_cfg_.enabled;
 
   tim_mgr_ = std::make_shared<mrs_lib::TimeoutManager>(node_, rclcpp::Rate(1.0));
   mrs_lib::SubscriberHandlerOptions shopts;
@@ -176,7 +178,9 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
     preflight_inputs.angular_rate = angular_velocity_msg;
   }
 
-  if (hasFreshMsg(sh_safety_area_manager_diagnostics_)) {
+  preflight_inputs.position_known = hasFreshMsg(sh_safety_area_manager_diagnostics_);
+
+  if (preflight_inputs.position_known) {
     auto safety_area_diag           = sh_safety_area_manager_diagnostics_.getMsg();
     preflight_inputs.position_valid = safety_area_diag->position_valid_2d;
   }
@@ -189,14 +193,17 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
 /* runPreflightChecks() //{ */
 
 PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks() {
-
-  if (!preflight_cfg_.enabled) {
-    PreflightResult result;
-    result.can_takeoff = true; // if preflight checks are disabled, we allow takeoff
-    return result;
-  }
-
   return runPreflightChecks(collectPreflightData());
+}
+
+//}
+
+/* peekSafetyAreaManagerMsg() //{ */
+
+mrs_msgs::msg::SafetyAreaManagerDiagnostics::ConstSharedPtr PreflightChecker::peekSafetyAreaManagerMsg(void) const {
+  if (!hasFreshMsg(sh_safety_area_manager_diagnostics_))
+    return nullptr;
+  return sh_safety_area_manager_diagnostics_.peekMsg();
 }
 
 //}
@@ -205,11 +212,6 @@ PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks() {
 
 PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks(const PreflightInputs &inputs) {
   PreflightResult result;
-
-  if (!preflight_cfg_.enabled) {
-    result.can_takeoff = true; // if preflight checks are disabled, we allow takeoff
-    return result;
-  }
 
   if (hasFreshMsg(sh_control_manager_diagnostics_)) {
     auto control_manager_diag = sh_control_manager_diagnostics_.getMsg();
@@ -241,11 +243,14 @@ PreflightChecker::PreflightResult PreflightChecker::runPreflightChecks(const Pre
     result.violations.insert(result.violations.end(), topic_check_results.begin(), topic_check_results.end());
   }
 
-  if (!inputs.position_valid) {
+  if (!inputs.position_known) {
+    result.violations.push_back("preflight position: no safety area manager diagnostics received");
+  } else if (!inputs.position_valid) {
     result.violations.push_back("preflight position: invalid position");
   }
 
   result.position_valid = inputs.position_valid;
+  result.position_known = inputs.position_known;
 
   result.can_takeoff = result.speed_ok && result.height_ok && result.gyro_ok && result.topics_ok && result.position_valid && result.control_enabled;
   return result;

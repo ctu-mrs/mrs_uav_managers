@@ -36,7 +36,8 @@ public:
     bool                     height_ok       = true;
     bool                     gyro_ok         = true;
     bool                     topics_ok       = true;
-    bool                     position_valid  = true;
+    bool                     position_valid  = true;  ///< only meaningful when position_known is true
+    bool                     position_known  = false; ///< has SafetyAreaManager reported at least once recently
     bool                     control_enabled = true;
     bool                     can_takeoff     = false; ///< AND of all individual checks
     std::vector<std::string> violations;              ///< human-readable failure reasons
@@ -50,6 +51,7 @@ public:
     bool                                       has_distance_sensor = false;
     bool                                       has_imu             = false;
     bool                                       position_valid      = false; // from safety area manager diagnostics
+    bool                                       position_known      = false; // whether position_valid above is fresh data or just a default
   };
 
   /** @brief Run checks with data collected from the various subscribed topics. */
@@ -60,6 +62,9 @@ public:
   //  Useful for testing individual check logic with custom inputs, without needing to publish to all the relevant topics.
   //  Overloads the above method that collects data from topics and then calls this one.
   PreflightResult runPreflightChecks(const PreflightInputs &inputs);
+
+  /** @brief Fresh SafetyAreaManager diagnostics, or nullptr if none received recently. */
+  mrs_msgs::msg::SafetyAreaManagerDiagnostics::ConstSharedPtr peekSafetyAreaManagerMsg(void) const;
 
 private:
   rclcpp::Node::SharedPtr  node_;
