@@ -501,6 +501,22 @@ void DiagnosticsManager::timerErrorPublishing() {
     error_publisher_->addGeneralError(static_cast<mrs_lib::errorgraph::ErrorPublisher::error_id_t>(i), "Sensor handler " + failed.name + ": " + failed.message);
   }
 
+  if (peekFreshMsg(sh_hw_api_status_) == nullptr) {
+    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+  }
+  if (peekFreshMsg(sh_control_manager_diagnostics_) == nullptr) {
+    error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
+  }
+  if (peekFreshMsg(sh_constraint_manager_diagnostics_) == nullptr) {
+    error_publisher_->addWaitingForNodeError({"ConstraintManager", "main"});
+  }
+  if (peekFreshMsg(sh_gain_manager_diagnostics_) == nullptr) {
+    error_publisher_->addWaitingForNodeError({"GainManager", "main"});
+  }
+  if (peekFreshMsg(sh_estimation_diagnostics_) == nullptr) {
+    error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
+  }
+
   std::scoped_lock lck(errorgraph_mtx_);
 
   mrs_msgs::msg::ErrorgraphElementArray root_errors_msg;
