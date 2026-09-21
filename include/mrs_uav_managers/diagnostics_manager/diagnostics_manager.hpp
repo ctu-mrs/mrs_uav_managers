@@ -304,7 +304,8 @@ private:
   state_t parse_uav_state(mrs_msgs::msg::HwApiStatus::ConstSharedPtr               hw_api_status,
                           mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics);
 
-  /** @brief Build GeneralRobotInfo from battery state; preflight result populates preflight_status always, and ready_to_start/problems_preventing_start while not flying autonomously. */
+  /** @brief Build GeneralRobotInfo from battery state; preflight result populates preflight_status always, and ready_to_start/problems_preventing_start while
+   * not flying autonomously. */
   mrs_msgs::msg::GeneralRobotInfo parse_general_robot_info(sensor_msgs::msg::BatteryState::ConstSharedPtr battery_state);
 
   /** @brief Build StateEstimationInfo from estimation diagnostics, headings, and GNSS. */
