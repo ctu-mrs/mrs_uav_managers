@@ -27,6 +27,7 @@ private:
   rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub_errors_;
   std::mutex                                                        errors_mtx_;
   std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_diagnostics_manager_msg_;
+  bool                                                              saw_any_waiting_error_ = false;
 
   void errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
 };
@@ -35,6 +36,13 @@ void Tester::errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr ms
   std::scoped_lock lck(errors_mtx_);
   if (msg->source_node.node == "DiagnosticsManager" && msg->source_node.component == "main") {
     last_diagnostics_manager_msg_ = *msg;
+
+    for (const auto &error : msg->errors) {
+      if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE) {
+        saw_any_waiting_error_ = true;
+        break;
+      }
+    }
   }
 }
 
@@ -58,7 +66,7 @@ bool Tester::test(void) {
 
   const auto deadline = node_->get_clock()->now() + rclcpp::Duration(20s);
 
-  while (!received_msg && node_->get_clock()->now() < deadline) {
+  while (rclcpp::ok() && !received_msg && node_->get_clock()->now() < deadline) {
     sleep(0.1);
   }
 
@@ -78,7 +86,7 @@ bool Tester::test(void) {
 
   const auto preflight_deadline = node_->get_clock()->now() + rclcpp::Duration(20s);
 
-  while (node_->get_clock()->now() < preflight_deadline) {
+  while (rclcpp::ok() && node_->get_clock()->now() < preflight_deadline) {
 
     if (general_robot_info_msg && all_ok(general_robot_info_msg->preflight_status)) {
       break;
@@ -103,7 +111,7 @@ bool Tester::test(void) {
 
   const auto clean_deadline = node_->get_clock()->now() + rclcpp::Duration(90s);
 
-  while (node_->get_clock()->now() < clean_deadline && consecutive_clean < required_consecutive_clean) {
+  while (rclcpp::ok() && node_->get_clock()->now() < clean_deadline && consecutive_clean < required_consecutive_clean) {
 
     sleep(0.2);
 
@@ -127,6 +135,14 @@ bool Tester::test(void) {
   if (consecutive_clean < required_consecutive_clean) {
     RCLCPP_ERROR(node_->get_logger(), "DiagnosticsManager still reported waiting_for_node errors on a healthy sim stack");
     return false;
+  }
+
+  {
+    std::scoped_lock lck(errors_mtx_);
+    if (!saw_any_waiting_error_) {
+      RCLCPP_ERROR(node_->get_logger(), "never observed a waiting_for_node error, so clearing proves nothing");
+      return false;
+    }
   }
 
   return true;
