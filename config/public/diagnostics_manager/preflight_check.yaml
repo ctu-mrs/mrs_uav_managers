@@ -4,8 +4,7 @@ mrs_uav_managers:
     # DiagnosticsManager can report takeoff readiness on its own (without depending
     # on the autostart node being alive).
     preflight_check:
-      # When false, disables the four optional checks below (speed/height/gyro/topic).
-      # The safety-area position check and control-output check stay mandatory regardless.
+      # When false, disables the four optional checks below; position/control-output stay mandatory.
       enabled: true
       # topic staleness uses mrs_uav_managers/diagnostics_manager/timeout/not_reporting
 
