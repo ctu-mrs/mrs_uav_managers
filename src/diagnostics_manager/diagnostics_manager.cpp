@@ -516,6 +516,9 @@ void DiagnosticsManager::timerErrorPublishing() {
   if (peekFreshMsg(sh_estimation_diagnostics_) == nullptr) {
     error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
   }
+  if (preflight_checker_->peekSafetyAreaManagerMsg() == nullptr) {
+    error_publisher_->addWaitingForNodeError({"SafetyAreaManager", "main"});
+  }
 
   std::scoped_lock lck(errorgraph_mtx_);
 
@@ -734,6 +737,7 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   msg.preflight_status.gyro_ok        = preflight_result.gyro_ok;
   msg.preflight_status.topics_ok      = preflight_result.topics_ok;
   msg.preflight_status.position_valid = preflight_result.position_valid;
+  msg.preflight_status.position_known = preflight_result.position_known;
 
   /*//{ diagnose problems preventing start */
 
