@@ -56,8 +56,7 @@ void PreflightChecker::initialize(void) {
     return;
   }
 
-  // "enabled" only gates these four optional heuristic checks -- position_valid/control_enabled
-  // stay mandatory below, regardless of this flag
+  // "enabled" only gates these four optional checks; position_valid/control_enabled stay mandatory
   preflight_cfg_.speed_check_enabled &= preflight_cfg_.enabled;
   preflight_cfg_.height_check_enabled &= preflight_cfg_.enabled;
   preflight_cfg_.gyro_check_enabled &= preflight_cfg_.enabled;
