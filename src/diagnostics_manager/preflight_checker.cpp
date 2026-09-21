@@ -145,7 +145,7 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
 
   PreflightChecker::PreflightInputs preflight_inputs;
 
-  if (hasFreshMsg(sh_estimation_diagnostics_)) {
+  if (preflight_cfg_.speed_check_enabled && hasFreshMsg(sh_estimation_diagnostics_)) {
     auto                        estimation_diag = sh_estimation_diagnostics_.getMsg();
     geometry_msgs::msg::Vector3 velocity_msg;
     velocity_msg.x            = estimation_diag->velocity.linear.x;
@@ -162,12 +162,12 @@ PreflightChecker::PreflightInputs PreflightChecker::collectPreflightData() {
     preflight_inputs.has_imu             = hw_api_capabilities->produces_imu;
   }
 
-  if (hasFreshMsg(sh_hw_api_distance_sensor_)) {
+  if (preflight_cfg_.height_check_enabled && hasFreshMsg(sh_hw_api_distance_sensor_)) {
     auto distance_sensor_msg               = sh_hw_api_distance_sensor_.getMsg();
     preflight_inputs.distance_sensor_range = *distance_sensor_msg;
   }
 
-  if (hasFreshMsg(sh_hw_api_imu_)) {
+  if (preflight_cfg_.gyro_check_enabled && hasFreshMsg(sh_hw_api_imu_)) {
     auto                        imu_msg = sh_hw_api_imu_.getMsg();
     geometry_msgs::msg::Vector3 angular_velocity_msg;
     angular_velocity_msg.x        = imu_msg->angular_velocity.x;
@@ -300,7 +300,6 @@ std::optional<std::string> PreflightChecker::preflightCheckHeight(const std::opt
     return violation;
   }
 
-  // const double height = sh_hw_api_distance_sensor_.getMsg()->range;
   const double height = distance_sensor_range->range;
 
   if (std::isnan(height) || height > preflight_cfg_.height_check_max) {
