@@ -3,8 +3,13 @@
 
 #include <mrs_msgs/msg/uav_info.hpp>
 #include <mrs_msgs/msg/general_robot_info.hpp>
+#include <mrs_msgs/msg/errorgraph_element.hpp>
+#include <mrs_msgs/msg/errorgraph_error.hpp>
 
 #include <mrs_uav_testing/test_generic.h>
+
+#include <mutex>
+#include <optional>
 
 using namespace std::chrono_literals;
 
@@ -12,10 +17,26 @@ class Tester : public mrs_uav_testing::TestGeneric {
 
 public:
   Tester() : mrs_uav_testing::TestGeneric() {
+    sub_errors_ = node_->create_subscription<mrs_msgs::msg::ErrorgraphElement>(
+        "/uav1/errors", 100, [this](const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) { errorsCallback(msg); });
   }
 
   bool test(void);
+
+private:
+  rclcpp::Subscription<mrs_msgs::msg::ErrorgraphElement>::SharedPtr sub_errors_;
+  std::mutex                                                        errors_mtx_;
+  std::optional<mrs_msgs::msg::ErrorgraphElement>                   last_diagnostics_manager_msg_;
+
+  void errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg);
 };
+
+void Tester::errorsCallback(const mrs_msgs::msg::ErrorgraphElement::SharedPtr msg) {
+  std::scoped_lock lck(errors_mtx_);
+  if (msg->source_node.node == "DiagnosticsManager" && msg->source_node.component == "main") {
+    last_diagnostics_manager_msg_ = *msg;
+  }
+}
 
 bool Tester::test(void) {
 
@@ -53,9 +74,7 @@ bool Tester::test(void) {
       "/" + uav_name + "/diagnostics_manager/general_robot_info", rclcpp::SystemDefaultsQoS(),
       [&general_robot_info_msg](const mrs_msgs::msg::GeneralRobotInfo::SharedPtr msg) { general_robot_info_msg = msg; });
 
-  auto all_ok = [](const mrs_msgs::msg::PreflightStatus &s) {
-    return s.speed_ok && s.height_ok && s.gyro_ok && s.topics_ok && s.position_valid;
-  };
+  auto all_ok = [](const mrs_msgs::msg::PreflightStatus &s) { return s.speed_ok && s.height_ok && s.gyro_ok && s.topics_ok && s.position_valid; };
 
   const auto preflight_deadline = node_->get_clock()->now() + rclcpp::Duration(20s);
 
@@ -75,6 +94,38 @@ bool Tester::test(void) {
 
   if (!all_ok(general_robot_info_msg->preflight_status)) {
     RCLCPP_ERROR(node_->get_logger(), "general_robot_info.preflight_status did not become fully ok within 20s on a healthy sim stack");
+    return false;
+  }
+
+  // DiagnosticsManager reports waiting_for_node for its delegated managers, then stops once healthy.
+  const int required_consecutive_clean = 3;
+  int       consecutive_clean          = 0;
+
+  const auto clean_deadline = node_->get_clock()->now() + rclcpp::Duration(90s);
+
+  while (node_->get_clock()->now() < clean_deadline && consecutive_clean < required_consecutive_clean) {
+
+    sleep(0.2);
+
+    std::scoped_lock lck(errors_mtx_);
+
+    if (!last_diagnostics_manager_msg_.has_value()) {
+      continue;
+    }
+
+    bool has_waiting_for_node = false;
+    for (const auto &error : last_diagnostics_manager_msg_->errors) {
+      if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE) {
+        has_waiting_for_node = true;
+        break;
+      }
+    }
+
+    consecutive_clean = has_waiting_for_node ? 0 : consecutive_clean + 1;
+  }
+
+  if (consecutive_clean < required_consecutive_clean) {
+    RCLCPP_ERROR(node_->get_logger(), "DiagnosticsManager still reported waiting_for_node errors on a healthy sim stack");
     return false;
   }
 
