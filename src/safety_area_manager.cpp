@@ -143,6 +143,7 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_max_z_;
   mrs_msgs::msg::UavState                                   uav_state_;
   std::mutex                                                mutex_uav_state_;
+  std::atomic<bool>                                         got_uav_state_ = false;
 
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_gnss_;
 
@@ -653,6 +654,8 @@ void SafetyAreaManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSha
     uav_state_.pose             = msg->pose.pose;
     uav_state_.velocity.angular = msg->twist.twist.angular;
   }
+
+  got_uav_state_ = true;
 
   transformer_->setDefaultFrame(msg->header.frame_id);
 }
@@ -1847,6 +1850,11 @@ double SafetyAreaManager::getMinZ() {
 void SafetyAreaManager::publishDiagnostics(void) {
 
   if (!is_initialized_) {
+    return;
+  }
+
+  if (!got_uav_state_) {
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 5000, "waiting for data: UavState=FALSE");
     return;
   }
 
