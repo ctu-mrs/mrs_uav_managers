@@ -858,6 +858,7 @@ mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg:
     msg.have_goal           = control_manager_diagnostics->tracker_status.have_goal;
     msg.tracking_trajectory = control_manager_diagnostics->tracker_status.tracking_trajectory;
     msg.callbacks_enabled   = control_manager_diagnostics->tracker_status.callbacks_enabled;
+    msg.output_enabled      = control_manager_diagnostics->output_enabled;
   }
 
   if (is_thrust_valid)
