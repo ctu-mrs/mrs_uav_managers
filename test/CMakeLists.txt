@@ -47,6 +47,7 @@ endfunction()
 
 add_subdirectory(constraint_manager)
 add_subdirectory(control_manager)
+add_subdirectory(diagnostics_manager)
 add_subdirectory(errorgraph)
 add_subdirectory(estimation_manager)
 add_subdirectory(gain_manager)

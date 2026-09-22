@@ -1,0 +1,83 @@
+#pragma once
+#include <cstdint>
+#include <mrs_msgs/msg/state.hpp>
+
+// macro variables for the enum definition
+#undef X_ENUM_NAME
+#undef X_ENUM_BASE_TYPE
+#undef X_ENUM_SEQ
+
+#define X_ENUM_NAME state_t
+#define X_ENUM_BASE_TYPE uint8_t
+// clang-format off
+#define X_ENUM_SEQ \
+  (DISARMED)       \
+  (ARMED)          \
+  (OFFBOARD)       \
+  (MANUAL)         \
+  (TAKEOFF)        \
+  (LAND)           \
+  (RC_MODE)        \
+  (HOVER)          \
+  (GOTO)           \
+  (TRAJECTORY)     \
+  (LINK_LOST)
+// clang-format on
+
+// optional macro variables for enum to ROS message conversions
+#undef X_ENUM_MSG_TYPE
+#undef X_ENUM_MSG_MEMBER
+#undef X_ENUM_MSG_PREFIX
+
+#define X_ENUM_MSG_TYPE mrs_msgs::msg::State
+#define X_ENUM_MSG_MEMBER state
+#define X_ENUM_MSG_PREFIX STATE_
+
+namespace mrs_uav_managers::diagnostics_manager
+{
+
+#include <mrs_uav_managers/diagnostics_manager/enums/helpers/enum_macros.hpp>
+
+// generate the enum and the to_string() conversion
+DEFINE_ENUM_WITH_CONVERSIONS(X_ENUM_NAME, X_ENUM_BASE_TYPE, X_ENUM_SEQ)
+
+// generate the to_ros() conversion
+DEFINE_ENUM_MSG_CONVERSIONS(X_ENUM_NAME, X_ENUM_MSG_TYPE, X_ENUM_MSG_MEMBER, X_ENUM_MSG_PREFIX, X_ENUM_SEQ)
+
+/* is_flying() //{ */
+
+// True for any state beyond OFFBOARD, whether under autonomous or manual (RC) control.
+inline bool is_flying(state_t uav_state) {
+  switch (uav_state) {
+  case state_t::DISARMED:
+  case state_t::ARMED:
+  case state_t::OFFBOARD:
+  case state_t::LINK_LOST:
+    return false;
+  default:
+    return true;
+  }
+}
+
+//}
+
+/* is_flying_autonomously() //{ */
+
+// Like is_flying(), but also false for MANUAL (RC_MODE) and UNKNOWN -- true only while a tracker/controller is actually in command.
+inline bool is_flying_autonomously(state_t uav_state) {
+  switch (uav_state) {
+  case state_t::DISARMED:
+  case state_t::ARMED:
+  case state_t::OFFBOARD:
+  case state_t::MANUAL:
+  case state_t::UNKNOWN:
+  case state_t::LINK_LOST:
+    return false;
+  default:
+    return true;
+  }
+}
+
+//}
+
+} // namespace mrs_uav_managers::diagnostics_manager
