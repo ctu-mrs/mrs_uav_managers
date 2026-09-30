@@ -294,15 +294,8 @@ private:
 
   // | -------------------- Parsing methods --------------------- |
 
-  /** @brief Map ControlManagerDiagnostics tracker status to internal tracker_state_t. */
-  tracker_state_t parse_tracker_state(mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics);
-
   /** @brief Map a robot type string (e.g. "multirotor") to robot_type_t enum. */
   robot_type_t parse_robot_type(const std::string &robot_type_str);
-
-  /** @brief Determine overall UAV state from HW API status and control manager diagnostics. */
-  state_t parse_uav_state(mrs_msgs::msg::HwApiStatus::ConstSharedPtr               hw_api_status,
-                          mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diagnostics);
 
   /** @brief Build GeneralRobotInfo from battery state; preflight result populates preflight_status always, and ready_to_start/problems_preventing_start while
    * not flying autonomously. */
