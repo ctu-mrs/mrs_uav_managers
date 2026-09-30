@@ -22,3 +22,8 @@ mrs_uav_managers:
       during_takeoff:
         # some nonexisting tracker
         tracker: "WrongTracker"
+
+mrs_uav_autostart:
+
+  # the test calls uav_manager/takeoff itself
+  trigger_takeoff: false
