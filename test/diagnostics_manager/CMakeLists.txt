@@ -1,1 +1,3 @@
 add_subdirectory(basic_diagnostics)
+add_subdirectory(uav_state_parser)
+add_subdirectory(manual_after_losing_offboard)
