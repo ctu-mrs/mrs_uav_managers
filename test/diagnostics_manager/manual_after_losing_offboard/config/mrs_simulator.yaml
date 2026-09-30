@@ -1,0 +1,11 @@
+# spawn the UAV on the ground: the test expects airborne == NO before its takeoff, then loses offboard in the air
+individual_takeoff_platform:
+  enabled: false
+
+uav1:
+  type: "x500"
+  spawn:
+    x: 10.0
+    y: 20.0
+    z: 0.5
+    heading: 1.2

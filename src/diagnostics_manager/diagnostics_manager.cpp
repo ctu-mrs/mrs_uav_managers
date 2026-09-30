@@ -474,7 +474,7 @@ void DiagnosticsManager::timerUavState() {
   // timerMain relies on to (re)publish uav_info from the same hw_api/status.
   // peekFreshMsg() applies the same not_reporting_timeout_ staleness gate as
   // processIncomingMessage(), so this path and timerMain() agree on stale data.
-  const auto new_state = parse_uav_state(peekFreshMsg(sh_hw_api_status_), peekFreshMsg(sh_control_manager_diagnostics_));
+  const auto new_state = parse_uav_state(peekFreshMsg(sh_hw_api_status_), peekFreshMsg(sh_control_manager_diagnostics_), uav_state_.value());
 
   if (new_state == uav_state_.value())
     return;
@@ -667,7 +667,7 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
       msg.problems_preventing_start.emplace_back("UAV state is UNKNOWN");
       break;
     case state_t::MANUAL:
-      msg.problems_preventing_start.emplace_back("UAV state is in MANUAL mode");
+      msg.problems_preventing_start.emplace_back("UAV is flying without OFFBOARD (MANUAL)");
       break;
     case state_t::DISARMED:
       msg.problems_preventing_start.emplace_back("UAV is DISARMED");

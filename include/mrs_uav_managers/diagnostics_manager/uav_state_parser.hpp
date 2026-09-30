@@ -45,32 +45,31 @@ inline tracker_state_t parse_tracker_state(const mrs_msgs::msg::ControlManagerDi
 /* parse_uav_state() //{ */
 
 inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr               &hw_api_status,
-                               const mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr &control_manager_diagnostics) {
+                               const mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr &control_manager_diagnostics,
+                               const state_t                                                   previous = state_t::UNKNOWN) {
   if (hw_api_status == nullptr || control_manager_diagnostics == nullptr)
     return state_t::UNKNOWN;
 
   if (!hw_api_status->connected)
     return state_t::LINK_LOST;
 
-  const bool hw_armed = hw_api_status->armed;
-  // not armed
-  if (!hw_armed)
+  if (!hw_api_status->armed)
     return state_t::DISARMED;
 
-  // armed, flying in manual mode
-  const bool manual_mode = hw_api_status->mode == "MANUAL";
-  if (control_manager_diagnostics->joystick_active && manual_mode)
+  // in the air without offboard: a pilot (any RC mode) or the autopilot itself (e.g. PX4 AUTO.*) is flying, not MRS;
+  // only an explicit YES starts MANUAL -- UNKNOWN (HW API can't tell) keeps the ARMED fallback below;
+  // once MANUAL, only an explicit NO ends it -- a stale in-air source (UNKNOWN) must not look like a landing
+  const bool airborne_yes   = hw_api_status->airborne == mrs_msgs::msg::HwApiStatus::AIRBORNE_YES;
+  const bool still_airborne = previous == state_t::MANUAL && hw_api_status->airborne != mrs_msgs::msg::HwApiStatus::AIRBORNE_NO;
+
+  if (!hw_api_status->offboard && (airborne_yes || still_airborne))
     return state_t::MANUAL;
 
-  // armed, not flying
   const auto tracker_state = parse_tracker_state(control_manager_diagnostics);
-  const bool null_tracker  = tracker_state == tracker_state_t::INVALID;
-  if (hw_armed && null_tracker) {
-    const bool offboard = hw_api_status->offboard;
-    if (offboard)
-      return state_t::OFFBOARD;
-    return state_t::ARMED;
-  }
+
+  if (tracker_state == tracker_state_t::INVALID)
+    return hw_api_status->offboard ? state_t::OFFBOARD : state_t::ARMED;
+
   // flying using the MRS system in RC joystick mode
   if (control_manager_diagnostics->joystick_active)
     return state_t::RC_MODE;
@@ -79,7 +78,6 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   if (control_manager_diagnostics->active_tracker == "LandoffTracker" && tracker_state == tracker_state_t::IDLE)
     return state_t::TAKEOFF;
 
-  // unless the RC mode is active, just parse the tracker state
   switch (tracker_state) {
   case tracker_state_t::TAKEOFF:
     return state_t::TAKEOFF;

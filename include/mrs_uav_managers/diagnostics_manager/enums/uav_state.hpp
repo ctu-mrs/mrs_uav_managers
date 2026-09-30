@@ -63,7 +63,7 @@ inline bool is_flying(state_t uav_state) {
 
 /* is_flying_autonomously() //{ */
 
-// Like is_flying(), but also false for MANUAL (RC_MODE) and UNKNOWN -- true only while a tracker/controller is actually in command.
+// Like is_flying(), but also false for MANUAL and UNKNOWN -- true only while an MRS tracker is in command (RC_MODE included).
 inline bool is_flying_autonomously(state_t uav_state) {
   switch (uav_state) {
   case state_t::DISARMED:
