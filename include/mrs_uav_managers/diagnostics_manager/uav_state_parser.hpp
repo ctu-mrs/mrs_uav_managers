@@ -67,16 +67,26 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
 
   const auto tracker_state = parse_tracker_state(control_manager_diagnostics);
 
-  if (tracker_state == tracker_state_t::INVALID)
+  // flight phase driven by an MRS tracker before this reading (TAKEOFF, HOVER, GOTO, TRAJECTORY, LAND, RC_MODE)
+  const bool was_flying = is_flying_autonomously(previous);
+
+  if (tracker_state == tracker_state_t::INVALID) {
+    // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update:
+    // a switch in progress, not "no tracker" -- keep the flight phase instead of dropping to OFFBOARD mid-air
+    if (hw_api_status->offboard && was_flying && control_manager_diagnostics->active_tracker != "NullTracker")
+      return previous;
+
     return hw_api_status->offboard ? state_t::OFFBOARD : state_t::ARMED;
+  }
 
   // flying using the MRS system in RC joystick mode
   if (control_manager_diagnostics->joystick_active)
     return state_t::RC_MODE;
 
-  // LandoffTracker goes into idle state when deactivating
+  // LandoffTracker goes into idle state when deactivating after a takeoff; activated in the air (e.g. for an emergency
+  // landing) it is idle before it starts landing -- that is not a takeoff, keep the flight phase
   if (control_manager_diagnostics->active_tracker == "LandoffTracker" && tracker_state == tracker_state_t::IDLE)
-    return state_t::TAKEOFF;
+    return (was_flying && previous != state_t::TAKEOFF) ? previous : state_t::TAKEOFF;
 
   switch (tracker_state) {
   case tracker_state_t::TAKEOFF:

@@ -148,4 +148,42 @@ TEST(UavStateParser, LandoffTrackerIdleIsTakeoff) {
   m->active_tracker       = "LandoffTracker";
   m->tracker_status.state = Ts::STATE_IDLE;
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), m), state_t::TAKEOFF);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), m, state_t::OFFBOARD), state_t::TAKEOFF);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, state_t::TAKEOFF), state_t::TAKEOFF);
+}
+
+TEST(UavStateParser, TrackerSwitchInFlightKeepsState) {
+  // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update;
+  // that is a switch in progress, not "no tracker" -- the UAV must not read as OFFBOARD (not flying) mid-air
+  for (const auto previous : {state_t::HOVER, state_t::GOTO, state_t::TRAJECTORY, state_t::LAND, state_t::RC_MODE, state_t::TAKEOFF}) {
+    auto m                  = std::make_shared<Cmd>();
+    m->active_tracker       = "LandoffTracker";
+    m->tracker_status.state = Ts::STATE_INVALID;
+    EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, previous), previous) << static_cast<int>(previous);
+  }
+}
+
+TEST(UavStateParser, NewTrackerOnGroundIsStillOffboard) {
+  // the same INVALID status before the UAV flies (a tracker being activated on the ground) keeps OFFBOARD
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = "MpcTracker";
+  m->tracker_status.state = Ts::STATE_INVALID;
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), m, state_t::OFFBOARD), state_t::OFFBOARD);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), m, state_t::ARMED), state_t::OFFBOARD);
+}
+
+TEST(UavStateParser, NullTrackerAfterFlightIsOffboard) {
+  // NullTracker really means no tracker: after a landing the state leaves LAND
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), null_tracker(), state_t::LAND), state_t::OFFBOARD);
+}
+
+TEST(UavStateParser, LandoffTrackerIdleInFlightIsNotTakeoff) {
+  // LandoffTracker activated in the air (e.g. escalating failsafe -> eland) reports STATE_IDLE before it starts landing;
+  // only coming from the ground (or an ongoing takeoff) does IDLE mean TAKEOFF
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = "LandoffTracker";
+  m->tracker_status.state = Ts::STATE_IDLE;
+  for (const auto previous : {state_t::HOVER, state_t::GOTO, state_t::TRAJECTORY, state_t::LAND, state_t::RC_MODE}) {
+    EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, previous), previous) << static_cast<int>(previous);
+  }
 }
