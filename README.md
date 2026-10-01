@@ -4,69 +4,97 @@ Please follow to the [documentation page](https://ctu-mrs.github.io/docs/feature
 
 ## DiagnosticsManager: UAV state
 
-How `parse_uav_state()` (`include/mrs_uav_managers/diagnostics_manager/uav_state_parser.hpp`) turns `hw_api/status` (`mrs_msgs/HwApiStatus`) and `control_manager/diagnostics` (`mrs_msgs/ControlManagerDiagnostics`) into the single `mrs_msgs/State` published as `diagnostics_manager/uav_state`. The function is pure and re-evaluated on every reading (it keeps no state of its own) except for one thing: it is also given the *previous* published state, used only to make `MANUAL` sticky (note 2).
+How `parse_uav_state()` (`include/mrs_uav_managers/diagnostics_manager/uav_state_parser.hpp`) turns `hw_api/status` (`mrs_msgs/HwApiStatus`) and `control_manager/diagnostics` (`mrs_msgs/ControlManagerDiagnostics`) into the single `mrs_msgs/State` published as `diagnostics_manager/uav_state`. The state is re-evaluated from scratch on every reading; the rules are listed below the diagram.
 
 ```mermaid
 stateDiagram-v2
   direction TB
 
   [*] --> UNKNOWN
-  UNKNOWN --> LINK_LOST: hw_api_status and control_manager_diagnostics present,<br/>!connected
+  UNKNOWN --> DISARMED: inputs present
+  LINK_LOST --> DISARMED: connected, not armed
 
-  LINK_LOST --> DISARMED: connected, !armed
-  DISARMED --> ARMED: armed, !offboard,<br/>airborne != YES (7)
+  note left of LINK_LOST
+    From every state
+    (arrows not shown):
+    no link -> LINK_LOST
+    disarmed -> DISARMED
+  end note
 
-  ARMED --> DISARMED: !armed
-  ARMED --> OFFBOARD: offboard (7)
-  OFFBOARD --> ARMED: !offboard,<br/>airborne != YES (7)
+  DISARMED --> ARMED: armed
+  ARMED --> OFFBOARD: offboard on / off
+  OFFBOARD --> ARMED
 
-  ARMED --> MANUAL: !offboard,<br/>airborne == YES (1)
-  OFFBOARD --> MANUAL: !offboard,<br/>airborne == YES (1)
-  FLYING --> MANUAL: !offboard,<br/>airborne == YES (1)
-  MANUAL --> MANUAL: !offboard,<br/>airborne != NO (sticky) (2)
-  MANUAL --> ARMED: airborne == NO (3, 7)
-  MANUAL --> OFFBOARD: offboard resumes
-  MANUAL --> DISARMED: !armed
-  MANUAL --> LINK_LOST: !connected
+  ARMED --> MANUAL
+  OFFBOARD --> MANUAL
+  FLYING --> MANUAL
+  MANUAL --> ARMED: landed
+  MANUAL --> OFFBOARD: offboard back
 
-  OFFBOARD --> FLYING: active tracker (4)
-  FLYING --> OFFBOARD: offboard, no active tracker
+  note right of MANUAL
+    not offboard + HW says
+    airborne: a pilot or the
+    autopilot flies, not MRS;
+    stays until landed
+  end note
+
+  MANUAL --> MIDAIR_ACTIVATION: MidairActivationTracker
+  MIDAIR_ACTIVATION --> FLYING: next tracker<br/>reports a state
+
+  OFFBOARD --> FLYING: tracker active
+  FLYING --> OFFBOARD: no tracker
 
   state "Flying (tracker-driven)" as FLYING {
     [*] --> TAKEOFF
-    TAKEOFF --> HOVER: tracker_status.state
-    HOVER --> GOTO: tracker_status.state
-    HOVER --> TRAJECTORY: tracker_status.state
-    GOTO --> HOVER: tracker_status.state
-    TRAJECTORY --> HOVER: tracker_status.state
-    HOVER --> LAND: tracker_status.state
-    LAND --> HOVER: tracker_status.state
+    TAKEOFF --> HOVER
+    HOVER --> GOTO
+    HOVER --> TRAJECTORY
+    GOTO --> HOVER
+    TRAJECTORY --> HOVER
+    HOVER --> LAND
+    LAND --> HOVER
 
-    HOVER --> RC_MODE: joystick_active (6)
-    RC_MODE --> HOVER: !joystick_active
+    HOVER --> RC_MODE: joystick on
+    RC_MODE --> HOVER: joystick off
 
-    TAKEOFF: TAKEOFF<br/>(STATE_TAKEOFF, or LandoffTracker deactivating + STATE_IDLE)
+    TAKEOFF: TAKEOFF<br/>(STATE_TAKEOFF, or<br/>LandoffTracker idle<br/>on the ground)
     GOTO: GOTO<br/>(STATE_REFERENCE)
 
     note right of TAKEOFF
-      resolved fresh from tracker_status.state
-      on every reading (5) -- any of these
-      five states can follow any other
+      follows the tracker's state:
+      any can follow any other;
+      a tracker switch keeps
+      the current state
     end note
   }
 ```
 
-Notes:
+### How the state is decided
 
-1. **Lost (or never had) offboard while airborne**: an explicit `airborne == YES` starts `MANUAL` from any armed state, including mid-flight (losing offboard with a tracker active) -- `LostOffboardWithTrackerStillActiveIsManual`. A stale/`UNKNOWN` in-air reading never *starts* `MANUAL` on its own.
-2. **`MANUAL` is sticky**: once entered, only an explicit `airborne == NO` (or `armed`/`connected`/`offboard` changing) ends it -- `airborne == UNKNOWN` (the source went stale) or an out-of-range value keeps `MANUAL`, so a lost in-air sensor can't look like a landing. This only applies when the *previous* published state was `MANUAL`; a fresh (non-`MANUAL`) reading of `airborne == UNKNOWN` falls back to `ARMED`/`OFFBOARD` as if `airborne` were unknown from the start -- `UnknownAirborneWithoutManualBeforeKeepsArmed`.
-3. Reachable only when the previous state was `MANUAL` (see note 2).
-4. "active tracker" = `active_tracker != "NullTracker"` and `tracker_status.state != STATE_INVALID`.
-5. The parser has no memory here (unlike `MANUAL`'s stickiness), so the arrows inside `Flying` show a typical mission, not an enforced order. `airborne` does not affect this resolution once `offboard == true` -- `AirborneUnknownIrrelevantWhenOffboard`. A `tracker_status.state` the switch doesn't recognize (e.g. plain `STATE_IDLE` without `LandoffTracker`) falls through to `UNKNOWN` (not drawn above).
-6. `RC_MODE` is drawn from/to `HOVER` only to keep the diagram readable -- `joystick_active` is checked before the tracker-state switch, so it can equally toggle from `TAKEOFF`/`GOTO`/`TRAJECTORY`/`LAND`, not just `HOVER`.
-7. Reaching `ARMED` (from any source) or `OFFBOARD` also requires no active tracker (`tracker_state == INVALID`, i.e. `active_tracker == "NullTracker"` or `tracker_status.state == STATE_INVALID`) -- kept out of the arrow labels themselves to keep them readable; see note 4 for the opposite condition ("active tracker").
+On every reading the parser checks these rules from the top and stops at the first one that matches:
 
-Evaluation order, top to bottom, re-run from scratch on every reading: missing `hw_api_status`/`control_manager_diagnostics` -> `UNKNOWN`; `!connected` -> `LINK_LOST`; `!armed` -> `DISARMED`; `!offboard && (airborne == YES || (previous == MANUAL && airborne != NO))` -> `MANUAL`; no active tracker -> `OFFBOARD` (if `offboard`) or `ARMED`; `joystick_active` -> `RC_MODE`; `LandoffTracker` deactivating (`STATE_IDLE`) -> `TAKEOFF`; else `tracker_status.state` -> `TAKEOFF`/`HOVER`/`GOTO`/`TRAJECTORY`/`LAND` (default `UNKNOWN`). Only the `MANUAL` check reads `previous`.
+1. Missing input (`hw_api/status` or `control_manager/diagnostics` not received yet) -> `UNKNOWN`.
+2. HW API not connected to the autopilot -> `LINK_LOST`.
+3. Not armed -> `DISARMED`.
+4. The active tracker is `MidairActivationTracker` -> `MIDAIR_ACTIVATION`.
+5. Not offboard and the HW says the UAV is airborne -> `MANUAL`. Once in `MANUAL`, it stays there until the HW says the UAV has landed (`airborne == NO`) or offboard comes back. An unknown airborne reading does not end it.
+6. No active tracker (`NullTracker`, or the tracker reports `STATE_INVALID`):
+   - offboard, the previous state was a flight state, and the tracker isn't `NullTracker` -> keep the previous state (a tracker switch in flight);
+   - otherwise -> `OFFBOARD` if offboard, `ARMED` if not.
+7. Joystick active -> `RC_MODE`.
+8. `LandoffTracker` reports `STATE_IDLE` -> `TAKEOFF`, unless the previous state was a flight state other than `TAKEOFF`; then keep the previous state.
+9. Otherwise the tracker's state decides: `STATE_TAKEOFF` -> `TAKEOFF`, `STATE_HOVER` -> `HOVER`, `STATE_REFERENCE` -> `GOTO`, `STATE_TRAJECTORY` -> `TRAJECTORY`, `STATE_LAND` -> `LAND`, anything else -> `UNKNOWN`.
+
+"Flight state" means `TAKEOFF`, `HOVER`, `GOTO`, `TRAJECTORY`, `LAND`, `RC_MODE` or `MIDAIR_ACTIVATION` (`is_flying_autonomously()`).
+
+### Why some rules exist
+
+- **The previous state**: the parser keeps no state of its own. It gets the previously published state and uses it only in rules 5, 6 and 8.
+- **`MIDAIR_ACTIVATION` (rule 4)**: UavManager is taking over a UAV already in the air: control output ON, then `MidairActivationTracker` holds the UAV while the autopilot is switched to offboard, then the next tracker takes over. `MidairActivationTracker` never reports a tracker state, so it is recognised by name. It is checked before `MANUAL` because until offboard is confirmed the HW still reports a pilot flying. It counts as flying for `is_flying()` and `is_flying_autonomously()`.
+- **`MANUAL` stays until landed (rule 5)**: if the airborne source goes stale (`UNKNOWN`), that must not look like a landing. Without a previous `MANUAL`, an unknown airborne reading gives `ARMED`/`OFFBOARD` as usual.
+- **Tracker switch in flight (rule 6)**: a tracker activated in the air (`LandoffTracker` for land, land home, eland or escalating failsafe; the tracker taking over after a mid-air activation) reports `STATE_INVALID` for its first ~60-240 ms. Without this rule the state would drop to `OFFBOARD` mid-air and `is_flying()` would briefly be false. `NullTracker` really means no tracker, so after a landing the state still goes to `OFFBOARD`.
+- **`LandoffTracker` idle (rule 8)**: after a takeoff, `LandoffTracker` goes idle before the next tracker takes over -- still `TAKEOFF`. Activated in the air (e.g. escalating failsafe -> eland) it is idle before it starts landing; that is not a takeoff.
+- **Inside `Flying`**: the arrows show a typical mission. Any flight state can follow any other, and the joystick (`RC_MODE`) can take over from any of them, not just `HOVER`.
 
 ### Transitions and the tests that cover them
 
@@ -87,7 +115,15 @@ All tests are `TEST(UavStateParser, ...)` in `test/diagnostics_manager/uav_state
 | `MANUAL` -> `DISARMED`: `!armed` | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss` |
 | `MANUAL` -> `LINK_LOST`: `!connected` | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss` |
 | non-`MANUAL` previous + `airborne == UNKNOWN` -> `ARMED` (no stickiness) | `UnknownAirborneWithoutManualBeforeKeepsArmed` |
-| `HOVER` <-> `RC_MODE`: `joystick_active` toggling (6) | `OffboardFlightUnchanged`, `AirborneUnknownIrrelevantWhenOffboard` |
+| `HOVER` <-> `RC_MODE`: `joystick_active` toggling | `OffboardFlightUnchanged`, `AirborneUnknownIrrelevantWhenOffboard` |
 | `OFFBOARD` -> `FLYING`: active tracker, `tracker_status.state` | `OffboardFlightUnchanged`, `TrackerStateMapsDirectly`, `AirborneUnknownIrrelevantWhenOffboard` |
 | `FLYING` (`LandoffTracker` deactivating, `STATE_IDLE`) -> `TAKEOFF` | `LandoffTrackerIdleIsTakeoff` |
+| `FLYING` (`LandoffTracker` activated in the air, `STATE_IDLE`) keeps the flight phase | `LandoffTrackerIdleInFlightIsNotTakeoff` |
+| `FLYING` -> `FLYING`: tracker switch (`STATE_INVALID`, not `NullTracker`) keeps the state | `TrackerSwitchInFlightKeepsState` |
+| `OFFBOARD` stays: new tracker `STATE_INVALID` on the ground | `NewTrackerOnGroundIsStillOffboard` |
+| `FLYING` -> `OFFBOARD`: `NullTracker` after a flight | `NullTrackerAfterFlightIsOffboard` |
+| `MANUAL` / `ARMED` / `OFFBOARD` -> `MIDAIR_ACTIVATION`: `MidairActivationTracker` (any `airborne`) | `MidairActivationTrackerIsMidairActivation` |
+| `MIDAIR_ACTIVATION` -> `DISARMED` / `LINK_LOST` | `MidairActivationYieldsToDisarmAndLinkLoss` |
+| `MANUAL` -> `MIDAIR_ACTIVATION` -> (switch, `STATE_INVALID`) -> `GOTO` -> `HOVER` | `MidairActivationSequenceStaysFlying` |
+| `MIDAIR_ACTIVATION` is flying (`is_flying`, `is_flying_autonomously`), maps to `STATE_MIDAIR_ACTIVATION` | `MidairActivationIsFlying`, `MidairActivationMapsToMessage` |
 | `airborne` irrelevant once `offboard == true` (closes a known gap) | `AirborneUnknownIrrelevantWhenOffboard` |
