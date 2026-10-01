@@ -341,3 +341,27 @@ TEST(UavStateParser, EmergencyStatesMapToMessage) {
   EXPECT_EQ(to_ros(state_t::FAILSAFE), mrs_msgs::msg::State::STATE_FAILSAFE);
   EXPECT_EQ(to_ros(state_t::NO_LINK), mrs_msgs::msg::State::STATE_NO_LINK);
 }
+
+TEST(UavStateParser, EhoverRecoveryReturnsToFlight) {
+  // the operator switches the controller and the tracker back (in either order); EHOVER lasts until both are done
+  const auto air = hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD");
+
+  state_t s = state_t::EHOVER;
+  s         = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_IDLE), s); // controller first, LandoffTracker still holds
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_INVALID, "MpcTracker"), s);
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_HOVER, "MpcTracker"), s);
+  EXPECT_EQ(s, state_t::HOVER);
+
+  s = state_t::EHOVER;
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_HOVER, "MpcTracker"), s); // tracker first
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_HOVER, "MpcTracker"), s);
+  EXPECT_EQ(s, state_t::HOVER);
+}
+
+TEST(UavStateParser, EhoverThenLandIsLand) {
+  // UavManager's land switches to its landing controller and LandoffTracker starts landing
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("MpcController", Ts::STATE_LAND), state_t::EHOVER), state_t::LAND);
+}
