@@ -11,16 +11,17 @@
 #define X_ENUM_BASE_TYPE uint8_t
 // clang-format off
 #define X_ENUM_SEQ \
-  (DISARMED)       \
-  (ARMED)          \
-  (OFFBOARD)       \
-  (MANUAL)         \
-  (TAKEOFF)        \
-  (LAND)           \
-  (RC_MODE)        \
-  (HOVER)          \
-  (GOTO)           \
-  (TRAJECTORY)     \
+  (DISARMED)          \
+  (ARMED)             \
+  (OFFBOARD)          \
+  (MANUAL)            \
+  (TAKEOFF)           \
+  (LAND)              \
+  (RC_MODE)           \
+  (HOVER)             \
+  (GOTO)              \
+  (TRAJECTORY)        \
+  (MIDAIR_ACTIVATION) \
   (LINK_LOST)
 // clang-format on
 
