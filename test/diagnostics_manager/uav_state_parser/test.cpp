@@ -187,3 +187,58 @@ TEST(UavStateParser, LandoffTrackerIdleInFlightIsNotTakeoff) {
     EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, previous), previous) << static_cast<int>(previous);
   }
 }
+
+namespace
+{
+
+Cmd::ConstSharedPtr midair_activation_tracker() {
+  // MidairActivationTracker never fills tracker_status.state, so it always reads STATE_INVALID
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = "MidairActivationTracker";
+  m->tracker_status.state = Ts::STATE_INVALID;
+  return m;
+}
+
+} // namespace
+
+TEST(UavStateParser, MidairActivationTrackerIsMidairActivation) {
+  // UavManager activates MidairActivationTracker before it switches the autopilot to OFFBOARD
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker(), state_t::MANUAL), state_t::MIDAIR_ACTIVATION);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), midair_activation_tracker(), state_t::MIDAIR_ACTIVATION), state_t::MIDAIR_ACTIVATION);
+  // also when the HW API can't tell or reports the ground (e.g. the simulator's takeoff platform)
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_UNKNOWN, "POSCTL"), midair_activation_tracker()), state_t::MIDAIR_ACTIVATION);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), midair_activation_tracker(), state_t::ARMED), state_t::MIDAIR_ACTIVATION);
+}
+
+TEST(UavStateParser, MidairActivationYieldsToDisarmAndLinkLoss) {
+  EXPECT_EQ(parse_uav_state(hw(false, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker(), state_t::MIDAIR_ACTIVATION), state_t::DISARMED);
+
+  auto m       = std::make_shared<Hw>();
+  m->connected = false;
+  m->armed     = true;
+  EXPECT_EQ(parse_uav_state(m, midair_activation_tracker(), state_t::MIDAIR_ACTIVATION), state_t::LINK_LOST);
+}
+
+TEST(UavStateParser, MidairActivationSequenceStaysFlying) {
+  // MANUAL (pilot flies) -> MIDAIR_ACTIVATION -> MpcTracker takes over (INVALID first, then braking, then hover)
+  state_t s = state_t::MANUAL;
+  s         = parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker(), s);
+  EXPECT_EQ(s, state_t::MIDAIR_ACTIVATION);
+  s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), midair_activation_tracker(), s);
+  EXPECT_EQ(s, state_t::MIDAIR_ACTIVATION);
+  s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_INVALID), s);
+  EXPECT_EQ(s, state_t::MIDAIR_ACTIVATION);
+  s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_REFERENCE), s);
+  EXPECT_EQ(s, state_t::GOTO);
+  s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), hovering(), s);
+  EXPECT_EQ(s, state_t::HOVER);
+}
+
+TEST(UavStateParser, MidairActivationIsFlying) {
+  EXPECT_TRUE(is_flying(state_t::MIDAIR_ACTIVATION));
+  EXPECT_TRUE(is_flying_autonomously(state_t::MIDAIR_ACTIVATION));
+}
+
+TEST(UavStateParser, MidairActivationMapsToMessage) {
+  EXPECT_EQ(to_ros(state_t::MIDAIR_ACTIVATION), mrs_msgs::msg::State::STATE_MIDAIR_ACTIVATION);
+}
