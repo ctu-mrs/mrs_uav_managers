@@ -11,18 +11,18 @@
 #define X_ENUM_BASE_TYPE uint8_t
 // clang-format off
 #define X_ENUM_SEQ \
-  (DISARMED)          \
-  (ARMED)             \
-  (OFFBOARD)          \
-  (MANUAL)            \
-  (TAKEOFF)           \
-  (LAND)              \
-  (RC_MODE)           \
-  (HOVER)             \
-  (GOTO)              \
-  (TRAJECTORY)        \
-  (MIDAIR_ACTIVATION) \
-  (LINK_LOST)
+  (DISARMED)   \
+  (ARMED)      \
+  (OFFBOARD)   \
+  (MANUAL)     \
+  (TAKEOFF)    \
+  (LAND)       \
+  (RC_MODE)    \
+  (HOVER)      \
+  (GOTO)       \
+  (TRAJECTORY) \
+  (MIDAIR)     \
+  (NO_LINK)
 // clang-format on
 
 // optional macro variables for enum to ROS message conversions
@@ -53,7 +53,7 @@ inline bool is_flying(state_t uav_state) {
   case state_t::DISARMED:
   case state_t::ARMED:
   case state_t::OFFBOARD:
-  case state_t::LINK_LOST:
+  case state_t::NO_LINK:
     return false;
   default:
     return true;
@@ -72,7 +72,7 @@ inline bool is_flying_autonomously(state_t uav_state) {
   case state_t::OFFBOARD:
   case state_t::MANUAL:
   case state_t::UNKNOWN:
-  case state_t::LINK_LOST:
+  case state_t::NO_LINK:
     return false;
   default:
     return true;
