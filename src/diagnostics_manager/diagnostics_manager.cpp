@@ -412,7 +412,7 @@ void DiagnosticsManager::timerMain() {
 
   // Flight timer advances while a real tracker is active.
   if (control_manager_diagnostics.message != nullptr) {
-    const bool null_tracker = (control_manager_diagnostics.message->active_tracker == "NullTracker");
+    const bool null_tracker = (control_manager_diagnostics.message->active_tracker == names::null_tracker);
     flight_timer_->tick(null_tracker);
   }
 

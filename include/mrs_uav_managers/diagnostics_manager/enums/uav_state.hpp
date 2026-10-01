@@ -22,6 +22,9 @@
   (GOTO)       \
   (TRAJECTORY) \
   (MIDAIR)     \
+  (EHOVER)     \
+  (ELAND)      \
+  (FAILSAFE)   \
   (NO_LINK)
 // clang-format on
 
