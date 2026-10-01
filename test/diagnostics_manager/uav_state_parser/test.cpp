@@ -242,3 +242,102 @@ TEST(UavStateParser, MidairActivationIsFlying) {
 TEST(UavStateParser, MidairActivationMapsToMessage) {
   EXPECT_EQ(to_ros(state_t::MIDAIR), mrs_msgs::msg::State::STATE_MIDAIR);
 }
+
+namespace
+{
+
+// ehover/eland: LandoffTracker with EmergencyController; failsafe: FailsafeController with any tracker
+Cmd::ConstSharedPtr emergency(const std::string &controller, uint8_t tracker_status_state, const std::string &active_tracker = "LandoffTracker",
+                              bool joystick = false) {
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = active_tracker;
+  m->active_controller    = controller;
+  m->tracker_status.state = tracker_status_state;
+  m->joystick_active      = joystick;
+  return m;
+}
+
+} // namespace
+
+TEST(UavStateParser, EmergencyControllerHoldingIsEhover) {
+  for (const auto tracker_state : {Ts::STATE_IDLE, Ts::STATE_HOVER, Ts::STATE_INVALID}) {
+    for (const auto previous : {state_t::HOVER, state_t::GOTO, state_t::MIDAIR}) {
+      EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("EmergencyController", tracker_state), previous), state_t::EHOVER)
+          << int(tracker_state) << " " << static_cast<int>(previous);
+    }
+  }
+}
+
+TEST(UavStateParser, EmergencyControllerLandingIsEland) {
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("EmergencyController", Ts::STATE_LAND), state_t::EHOVER), state_t::ELAND);
+}
+
+TEST(UavStateParser, FailsafeControllerIsFailsafe) {
+  for (const auto tracker_state : {Ts::STATE_INVALID, Ts::STATE_IDLE, Ts::STATE_HOVER, Ts::STATE_LAND}) {
+    EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("FailsafeController", tracker_state), state_t::ELAND), state_t::FAILSAFE)
+        << int(tracker_state);
+  }
+}
+
+TEST(UavStateParser, EmergencyControllerOnGroundIsNotEhover) {
+  // EmergencyController is ControlManager's startup controller: with NullTracker it is no emergency
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_NO, "POSCTL"), emergency("EmergencyController", Ts::STATE_INVALID, "NullTracker")), state_t::ARMED);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), emergency("EmergencyController", Ts::STATE_INVALID, "NullTracker")),
+            state_t::OFFBOARD);
+}
+
+TEST(UavStateParser, JoystickWinsOverEmergencyController) {
+  // joystick attitude control falls back to EmergencyController
+  EXPECT_EQ(
+      parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("EmergencyController", Ts::STATE_HOVER, "MpcTracker", true), state_t::HOVER),
+      state_t::RC_MODE);
+}
+
+TEST(UavStateParser, EmergencyYieldsToDisarmLinkLossAndManual) {
+  const auto m = emergency("EmergencyController", Ts::STATE_LAND);
+  EXPECT_EQ(parse_uav_state(hw(false, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, state_t::ELAND), state_t::DISARMED);
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), m, state_t::ELAND), state_t::MANUAL); // the pilot took over
+
+  auto lost       = std::make_shared<Hw>();
+  lost->connected = false;
+  lost->armed     = true;
+  EXPECT_EQ(parse_uav_state(lost, m, state_t::ELAND), state_t::NO_LINK);
+}
+
+TEST(UavStateParser, EscalatingFailsafeSequence) {
+  // HOVER -> ehover (tracker switched first, then the controller) -> eland -> failsafe
+  const auto air = hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD");
+  state_t    s   = state_t::HOVER;
+  s              = parse_uav_state(air, emergency("MpcController", Ts::STATE_INVALID), s);
+  EXPECT_EQ(s, state_t::HOVER);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_IDLE), s);
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_LAND), s);
+  EXPECT_EQ(s, state_t::ELAND);
+  s = parse_uav_state(air, emergency("FailsafeController", Ts::STATE_LAND), s);
+  EXPECT_EQ(s, state_t::FAILSAFE);
+}
+
+TEST(UavStateParser, FailedMidairActivationIsEhover) {
+  // the next tracker can't be activated -> UavManager calls ehover
+  const auto air = hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD");
+  state_t    s   = state_t::MIDAIR;
+  s              = parse_uav_state(air, emergency("MidairActivationController", Ts::STATE_INVALID), s);
+  EXPECT_EQ(s, state_t::MIDAIR);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_IDLE), s);
+  EXPECT_EQ(s, state_t::EHOVER);
+}
+
+TEST(UavStateParser, EmergencyStatesAreFlyingAutonomously) {
+  for (const auto st : {state_t::EHOVER, state_t::ELAND, state_t::FAILSAFE}) {
+    EXPECT_TRUE(is_flying(st)) << static_cast<int>(st);
+    EXPECT_TRUE(is_flying_autonomously(st)) << static_cast<int>(st);
+  }
+}
+
+TEST(UavStateParser, EmergencyStatesMapToMessage) {
+  EXPECT_EQ(to_ros(state_t::EHOVER), mrs_msgs::msg::State::STATE_EHOVER);
+  EXPECT_EQ(to_ros(state_t::ELAND), mrs_msgs::msg::State::STATE_ELAND);
+  EXPECT_EQ(to_ros(state_t::FAILSAFE), mrs_msgs::msg::State::STATE_FAILSAFE);
+  EXPECT_EQ(to_ros(state_t::NO_LINK), mrs_msgs::msg::State::STATE_NO_LINK);
+}
