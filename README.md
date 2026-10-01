@@ -108,10 +108,11 @@ On every reading the parser checks these rules from the top and stops at the fir
 
 ### Transitions and the tests that cover them
 
-All tests are `TEST(UavStateParser, ...)` in `test/diagnostics_manager/uav_state_parser/test.cpp`.
+Unit tests are `TEST(UavStateParser, ...)` in `test/diagnostics_manager/uav_state_parser/test.cpp`; `manual_after_losing_offboard` (in `test/diagnostics_manager/`) runs in the simulator.
 
 | Transition | Test |
 |---|---|
+| `HwApiStatus.airborne` defaults to `UNKNOWN` (a HW API that doesn't fill it never starts `MANUAL`) | `AirborneDefaultsToUnknown` |
 | missing `hw_api_status`/`control_manager_diagnostics` -> `UNKNOWN` | `MissingInputsAreUnknown` |
 | any -> `NO_LINK`: `!connected` (overrides armed/airborne) | `DisconnectedIsLinkLost` |
 | any -> `DISARMED`: connected, `!armed` (overrides airborne) | `DisarmedWinsEvenInAir` |
@@ -119,6 +120,7 @@ All tests are `TEST(UavStateParser, ...)` in `test/diagnostics_manager/uav_state
 | `ARMED` -> `OFFBOARD`: offboard, no active tracker | `OffboardTakeoffIsNotManual` |
 | `OFFBOARD` -> `ARMED`: `!offboard`, `airborne == NO`, no active tracker | `LingeringJoystickDoesNotChangeManual` |
 | `ARMED` / `OFFBOARD` / `FLYING` -> `MANUAL`: `!offboard`, `airborne == YES` | `AirborneWithoutOffboardIsManualInEveryMode`, `LostOffboardWithTrackerStillActiveIsManual` |
+| `HOVER` -> `MANUAL` -> `ARMED`: output switched off in the air (offboard lost, fall, landing) | `manual_after_losing_offboard` (simulation) |
 | `MANUAL` -> `MANUAL`: `!offboard`, `airborne == UNKNOWN` (sticky) | `ManualIsStickyWhileAirborneUnknown` |
 | `MANUAL` -> `ARMED`: `airborne == NO` | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss` |
 | `MANUAL` -> `OFFBOARD`: offboard resumes | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss` |
