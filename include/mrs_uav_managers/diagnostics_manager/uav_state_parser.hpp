@@ -51,7 +51,7 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
     return state_t::UNKNOWN;
 
   if (!hw_api_status->connected)
-    return state_t::LINK_LOST;
+    return state_t::NO_LINK;
 
   if (!hw_api_status->armed)
     return state_t::DISARMED;
@@ -59,7 +59,7 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   // UavManager is taking over a UAV already in the air: MidairActivationTracker holds it while the autopilot is switched
   // to OFFBOARD (before that, the HW still reports a pilot flying); the tracker never fills its state, so decide by name
   if (control_manager_diagnostics->active_tracker == "MidairActivationTracker")
-    return state_t::MIDAIR_ACTIVATION;
+    return state_t::MIDAIR;
 
   // in the air without offboard: a pilot (any RC mode) or the autopilot itself (e.g. PX4 AUTO.*) is flying, not MRS;
   // only an explicit YES starts MANUAL -- UNKNOWN (HW API can't tell) keeps the ARMED fallback below;
@@ -73,7 +73,7 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   const auto tracker_state = parse_tracker_state(control_manager_diagnostics);
 
   // flight phase driven by an MRS tracker before this reading (TAKEOFF, HOVER, GOTO, TRAJECTORY, LAND, RC_MODE,
-  // MIDAIR_ACTIVATION)
+  // MIDAIR)
   const bool was_flying = is_flying_autonomously(previous);
 
   if (tracker_state == tracker_state_t::INVALID) {
