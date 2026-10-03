@@ -13,3 +13,12 @@ mrs_uav_managers:
     ]
 
     initial_state_estimator: "gps_garmin" # will be used as the first state estimator
+
+mrs_uav_autostart:
+
+  preflight_check:
+
+    # takeoff not allowed if UAV's height sensor exceeds <max_height>
+    height_check:
+
+      enabled: false
