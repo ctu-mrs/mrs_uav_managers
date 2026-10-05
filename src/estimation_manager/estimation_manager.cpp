@@ -401,7 +401,8 @@ private:
 
   void initialize();
 
-  void shutdown();
+  void                             shutdown();
+  rclcpp::OnShutdownCallbackHandle shutdown_callback_handle_;
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -462,6 +463,7 @@ private:
 
 public:
   EstimationManager(rclcpp::NodeOptions options);
+  ~EstimationManager();
 
   std::string getName() const;
 };
@@ -495,6 +497,14 @@ EstimationManager::EstimationManager(rclcpp::NodeOptions options) : mrs_lib::Nod
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
 
   timer_wait_for_time_ = node_->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&EstimationManager::timerWaitForTime, this));
+}
+
+//}
+
+/* ~EstimationManager() //{ */
+
+EstimationManager::~EstimationManager() {
+  rclcpp::contexts::get_global_default_context()->remove_on_shutdown_callback(shutdown_callback_handle_);
 }
 
 //}
@@ -555,7 +565,7 @@ void EstimationManager::timerPreinit() {
 
 void EstimationManager::initialize() {
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  shutdown_callback_handle_ = rclcpp::contexts::get_global_default_context()->add_on_shutdown_callback([this]() { this->shutdown(); });
 
   RCLCPP_INFO(node_->get_logger(), "initializing");
 
