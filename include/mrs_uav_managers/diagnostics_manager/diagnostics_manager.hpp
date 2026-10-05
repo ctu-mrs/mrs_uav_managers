@@ -124,6 +124,9 @@ private:
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
+  // declared before the callback groups so the plugin libraries are unloaded only after the groups holding their subscriptions are gone
+  std::unique_ptr<pluginlib::ClassLoader<DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
+
   rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;   ///< callback group for subscribers
   rclcpp::CallbackGroup::SharedPtr cbkgrp_timers_; ///< callback group for timers
   rclcpp::CallbackGroup::SharedPtr cbkgrp_tf_;     ///< callback group for the Transformer's /tf and /tf_static subscriptions
@@ -230,12 +233,11 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ErrorgraphElement>     sh_errorgraph_error_msg_;
 
   // | -------------------- Sensor handlers --------------------- |
-  DiagnosticsCommonHandlers_t                                       common_handlers_;       ///< transformer/body_frame shared with every sensor handler
-  std::unique_ptr<pluginlib::ClassLoader<DiagnosticsSensorHandler>> sensor_handler_loader_; ///< pluginlib loader for sensor handler plugins
-  std::vector<std::string>                                          _sensor_handler_names_;
-  std::vector<std::shared_ptr<DiagnosticsSensorHandler>>            sensor_handlers_;
-  std::vector<mrs_msgs::msg::SensorStatus>                          failed_sensor_handlers_; ///< ERROR statuses for sensors that failed to load/initialize
-  std::mutex                                                        mutex_sensor_handler_list_;
+  DiagnosticsCommonHandlers_t                            common_handlers_; ///< transformer/body_frame shared with every sensor handler
+  std::vector<std::string>                               _sensor_handler_names_;
+  std::vector<std::shared_ptr<DiagnosticsSensorHandler>> sensor_handlers_;
+  std::vector<mrs_msgs::msg::SensorStatus>               failed_sensor_handlers_; ///< ERROR statuses for sensors that failed to load/initialize
+  std::mutex                                             mutex_sensor_handler_list_;
 
   // | ----------------------- Timers --------------------------- |
 
