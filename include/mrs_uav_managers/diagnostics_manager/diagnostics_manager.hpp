@@ -108,6 +108,7 @@ public:
    * @param options ROS2 node options (used for composable node loading).
    */
   DiagnosticsManager(rclcpp::NodeOptions options);
+  ~DiagnosticsManager();
 
   /**
    * @brief Result of checking a subscriber for new messages.
@@ -137,6 +138,8 @@ private:
 
   /** @brief Graceful shutdown. */
   void shutdown();
+
+  rclcpp::OnShutdownCallbackHandle shutdown_callback_handle_;
 
   /** @brief Resolve and log this robot's IP address from its hostname, storing it in robot_ip_address_. Requires _robot_name_ to already be set. */
   void resolveRobotIpAddress();
