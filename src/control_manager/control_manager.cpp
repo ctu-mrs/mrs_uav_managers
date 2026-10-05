@@ -2199,6 +2199,10 @@ void ControlManager::shutdown() {
 
   std::cout << "ControlManager: shutdown(): called" << std::endl;
 
+  if (!is_initialized_) {
+    return;
+  }
+
   timer_status_->stop();
   timer_failsafe_->stop();
   timer_eland_->stop();

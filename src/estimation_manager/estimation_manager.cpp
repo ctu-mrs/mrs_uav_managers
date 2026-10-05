@@ -1292,6 +1292,10 @@ void EstimationManager::shutdown() {
 
   std::cout << "EstimationManager: shutdown(): called" << std::endl;
 
+  if (!sm_ || !sm_->isInitialized()) {
+    return;
+  }
+
   timer_check_health_->stop();
   timer_publish_->stop();
   timer_publish_diagnostics_->stop();
