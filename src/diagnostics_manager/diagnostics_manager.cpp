@@ -24,11 +24,19 @@ DiagnosticsManager::DiagnosticsManager(rclcpp::NodeOptions options)
 
 //}
 
+/* ~DiagnosticsManager() //{ */
+
+DiagnosticsManager::~DiagnosticsManager() {
+  rclcpp::contexts::get_global_default_context()->remove_on_shutdown_callback(shutdown_callback_handle_);
+}
+
+//}
+
 /* initialize() //{ */
 
 void DiagnosticsManager::initialize() {
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  shutdown_callback_handle_ = rclcpp::contexts::get_global_default_context()->add_on_shutdown_callback([this]() { this->shutdown(); });
 
   RCLCPP_INFO(node_->get_logger(), "Initializing...");
 
