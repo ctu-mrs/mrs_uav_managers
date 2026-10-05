@@ -236,6 +236,7 @@ class ControlManager : public mrs_lib::Node {
 
 public:
   ControlManager(rclcpp::NodeOptions options);
+  ~ControlManager();
 
 private:
   rclcpp::Node::SharedPtr  trackers_subnode_;
@@ -298,8 +299,9 @@ private:
   rclcpp::TimerBase::SharedPtr timer_hw_api_capabilities_;
   void                         timerHwApiCapabilities();
 
-  void initialize(void);
-  void shutdown();
+  void                             initialize(void);
+  void                             shutdown();
+  rclcpp::OnShutdownCallbackHandle shutdown_callback_handle_;
 
   // | ------------ tracker and controller switching ------------ |
 
@@ -964,11 +966,19 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
 
 //}
 
+/* ~ControlManager() //{ */
+
+ControlManager::~ControlManager() {
+  rclcpp::contexts::get_global_default_context()->remove_on_shutdown_callback(shutdown_callback_handle_);
+}
+
+//}
+
 /* initialize() //{ */
 
 void ControlManager::initialize(void) {
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  shutdown_callback_handle_ = rclcpp::contexts::get_global_default_context()->add_on_shutdown_callback([this]() { this->shutdown(); });
 
   joystick_start_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
   joystick_failsafe_press_time_   = rclcpp::Time(0, 0, clock_->get_clock_type());
