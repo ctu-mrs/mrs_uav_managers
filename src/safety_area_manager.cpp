@@ -544,7 +544,15 @@ void SafetyAreaManager::timerPrerequisites() {
     return;
   }
 
-  initialize();
+  try {
+    initialize();
+  }
+  catch (const rclcpp::exceptions::RCLError &) {
+    if (rclcpp::ok()) {
+      throw;
+    }
+    return;
+  }
 
   timer_prerequisites_->cancel();
 }
