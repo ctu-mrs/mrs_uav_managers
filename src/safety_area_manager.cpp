@@ -544,7 +544,15 @@ void SafetyAreaManager::timerPrerequisites() {
     return;
   }
 
-  initialize();
+  try {
+    initialize();
+  }
+  catch (const rclcpp::exceptions::RCLError &) {
+    if (rclcpp::ok()) {
+      throw;
+    }
+    return;
+  }
 
   timer_prerequisites_->cancel();
 }
@@ -572,7 +580,7 @@ void SafetyAreaManager::timerStatus() {
 
   // RViz visualization: built once the prisms can be projected into their display frame (see
   // visualizationFrame()), then latched; invalidated on any rebuild.
-  {
+  try {
     std::scoped_lock lock(mutex_safety_area_);
     if (safety_zone_handler_.safety_zone && !safety_zone_handler_.visualization_components.initialized) {
       bool all_transforms_done = true;
@@ -608,6 +616,12 @@ void SafetyAreaManager::timerStatus() {
         safety_zone_handler_.visualization_components.safeCleanup();
       }
     }
+  }
+  catch (const rclcpp::exceptions::RCLError &) {
+    if (rclcpp::ok()) {
+      throw;
+    }
+    return;
   }
 
   // Publishing

@@ -751,7 +751,15 @@ void UavManager::timerHwApiCapabilities() {
 
   RCLCPP_INFO(node_->get_logger(), "got HW API capabilities, initializing");
 
-  initialize();
+  try {
+    initialize();
+  }
+  catch (const rclcpp::exceptions::RCLError &) {
+    if (rclcpp::ok()) {
+      throw;
+    }
+    return;
+  }
 
   timer_hw_api_capabilities_->cancel();
 }

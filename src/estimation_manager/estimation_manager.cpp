@@ -545,7 +545,14 @@ void EstimationManager::timerPreinit() {
 
     timer_preinit_->cancel();
 
-    initialize();
+    try {
+      initialize();
+    }
+    catch (const rclcpp::exceptions::RCLError &) {
+      if (rclcpp::ok()) {
+        throw;
+      }
+    }
   }
 }
 

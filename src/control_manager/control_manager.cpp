@@ -2304,7 +2304,15 @@ void ControlManager::timerHwApiCapabilities() {
     _hw_api_inputs_.position = true;
   }
 
-  initialize();
+  try {
+    initialize();
+  }
+  catch (const rclcpp::exceptions::RCLError &) {
+    if (rclcpp::ok()) {
+      throw;
+    }
+    return;
+  }
 
   timer_hw_api_capabilities_->cancel();
 }
