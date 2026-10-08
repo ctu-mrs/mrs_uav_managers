@@ -286,11 +286,35 @@ TEST(UavStateParser, EmergencyControllerOnGroundIsNotEhover) {
             state_t::OFFBOARD);
 }
 
-TEST(UavStateParser, JoystickWinsOverEmergencyController) {
-  // joystick attitude control falls back to EmergencyController
-  EXPECT_EQ(
-      parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("EmergencyController", Ts::STATE_HOVER, "MpcTracker", true), state_t::HOVER),
-      state_t::RC_MODE);
+TEST(UavStateParser, EmergencyWinsOverRcMode) {
+  // joystick_active is ControlManager's RC goto mode, which ehover/eland/failsafe leave set -- the emergency must show
+  const auto air = hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD");
+  EXPECT_EQ(parse_uav_state(air, emergency("EmergencyController", Ts::STATE_IDLE, "LandoffTracker", true), state_t::RC_MODE), state_t::EHOVER);
+  EXPECT_EQ(parse_uav_state(air, emergency("EmergencyController", Ts::STATE_LAND, "LandoffTracker", true), state_t::EHOVER), state_t::ELAND);
+  EXPECT_EQ(parse_uav_state(air, emergency("FailsafeController", Ts::STATE_LAND, "LandoffTracker", true), state_t::ELAND), state_t::FAILSAFE);
+}
+
+TEST(UavStateParser, EscalatingFailsafeFromRcModeSequence) {
+  // escalating failsafe triggered by RC while flying in RC goto mode
+  const auto air = hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD");
+  state_t    s   = state_t::RC_MODE;
+  s              = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_REFERENCE, "MpcTracker", true), s);
+  EXPECT_EQ(s, state_t::RC_MODE);
+  s = parse_uav_state(air, emergency("Se3Controller", Ts::STATE_INVALID, "LandoffTracker", true), s); // tracker switched first
+  EXPECT_EQ(s, state_t::RC_MODE);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_INVALID, "LandoffTracker", true), s);
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_IDLE, "LandoffTracker", true), s);
+  EXPECT_EQ(s, state_t::EHOVER);
+  s = parse_uav_state(air, emergency("EmergencyController", Ts::STATE_LAND, "LandoffTracker", true), s);
+  EXPECT_EQ(s, state_t::ELAND);
+  s = parse_uav_state(hw(false, true, Hw::AIRBORNE_NO, "OFFBOARD"), emergency("EmergencyController", Ts::STATE_INVALID, "NullTracker", true), s);
+  EXPECT_EQ(s, state_t::DISARMED);
+}
+
+TEST(UavStateParser, RcModeWithoutEmergencyIsRcMode) {
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), emergency("Se3Controller", Ts::STATE_HOVER, "MpcTracker", true), state_t::HOVER),
+            state_t::RC_MODE);
 }
 
 TEST(UavStateParser, EmergencyYieldsToDisarmLinkLossAndManual) {
