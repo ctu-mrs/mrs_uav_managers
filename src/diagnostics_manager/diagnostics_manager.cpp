@@ -626,6 +626,26 @@ robot_type_t DiagnosticsManager::parse_robot_type(const std::string &robot_type_
 
 //}
 
+/* filter_human_switchable() //{ */
+
+std::vector<std::string> DiagnosticsManager::filter_human_switchable(const std::vector<std::string> &names, const std::vector<bool> &human_switchable) {
+
+  if (names.size() != human_switchable.size()) {
+    return names;
+  }
+
+  std::vector<std::string> filtered;
+  for (size_t i = 0; i < names.size(); i++) {
+    if (human_switchable[i]) {
+      filtered.push_back(names[i]);
+    }
+  }
+
+  return filtered;
+}
+
+//}
+
 // | --------------------- Parsing methods -------------------- |
 
 /* parse_general_robot_info() //{ */
@@ -790,10 +810,11 @@ mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg:
   const bool is_tracker_cmd_valid                    = tracker_cmd != nullptr;
 
   if (is_control_manager_diagnostics_valid) {
-    msg.active_controller     = control_manager_diagnostics->active_controller;
-    msg.available_controllers = control_manager_diagnostics->available_controllers;
-    msg.active_tracker        = control_manager_diagnostics->active_tracker;
-    msg.available_trackers    = control_manager_diagnostics->available_trackers;
+    msg.active_controller = control_manager_diagnostics->active_controller;
+    msg.available_controllers =
+        filter_human_switchable(control_manager_diagnostics->available_controllers, control_manager_diagnostics->human_switchable_controllers);
+    msg.active_tracker     = control_manager_diagnostics->active_tracker;
+    msg.available_trackers = filter_human_switchable(control_manager_diagnostics->available_trackers, control_manager_diagnostics->human_switchable_trackers);
 
     msg.flying_normally     = control_manager_diagnostics->flying_normally;
     msg.have_goal           = control_manager_diagnostics->tracker_status.have_goal;
