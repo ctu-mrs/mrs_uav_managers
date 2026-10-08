@@ -92,6 +92,24 @@ TEST(UavStateParser, LingeringJoystickDoesNotChangeManual) {
   EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_NO, "MANUAL"), null_tracker(true)), state_t::ARMED);
 }
 
+TEST(UavStateParser, NotOffboardOnGroundIgnoresTracker) {
+  // the pilot took over during the takeoff (MRS kept MpcTracker hovering) and landed;
+  // without offboard MRS isn't flying, so a lingering tracker or controller must not show as a flight state
+  state_t s = state_t::MANUAL;
+  s         = parse_uav_state(hw(true, false, Hw::AIRBORNE_NO, "MANUAL"), hovering(), s);
+  EXPECT_EQ(s, state_t::ARMED);
+  s = parse_uav_state(hw(false, false, Hw::AIRBORNE_NO, "MANUAL"), hovering(), s);
+  EXPECT_EQ(s, state_t::DISARMED);
+
+  for (const auto airborne : {Hw::AIRBORNE_NO, Hw::AIRBORNE_UNKNOWN}) {
+    for (const auto tracker_state : {Ts::STATE_TAKEOFF, Ts::STATE_HOVER, Ts::STATE_REFERENCE, Ts::STATE_TRAJECTORY, Ts::STATE_LAND}) {
+      EXPECT_EQ(parse_uav_state(hw(true, false, airborne, "POSCTL"), tracker(tracker_state)), state_t::ARMED) << int(airborne) << " " << int(tracker_state);
+      EXPECT_EQ(parse_uav_state(hw(true, false, airborne, "POSCTL"), tracker(tracker_state, true)), state_t::ARMED)
+          << int(airborne) << " " << int(tracker_state);
+    }
+  }
+}
+
 TEST(UavStateParser, OffboardTakeoffIsNotManual) {
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), null_tracker()), state_t::OFFBOARD);
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), null_tracker()), state_t::OFFBOARD);

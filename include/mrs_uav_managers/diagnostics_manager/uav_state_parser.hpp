@@ -85,6 +85,11 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   if (!hw_api_status->offboard && (airborne_yes || still_airborne))
     return state_t::MANUAL;
 
+  // without offboard and not in the air, MRS isn't flying: a tracker or controller left active (e.g. after a pilot
+  // took over and landed) must not show as a flight state
+  if (!hw_api_status->offboard)
+    return state_t::ARMED;
+
   // ControlManager's emergencies: ehover/eland run the eland controller, failsafe the failsafe controller;
   // the eland controller alone is no emergency -- it is also the startup controller (with NullTracker);
   // checked before RC mode: joystick_active is the RC goto mode, which an emergency triggered during it leaves set
@@ -105,10 +110,10 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   if (tracker_state == tracker_state_t::INVALID) {
     // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update:
     // a switch in progress, not "no tracker" -- keep the flight phase instead of dropping to OFFBOARD mid-air
-    if (hw_api_status->offboard && was_flying && control_manager_diagnostics->active_tracker != names::null_tracker)
+    if (was_flying && control_manager_diagnostics->active_tracker != names::null_tracker)
       return previous;
 
-    return hw_api_status->offboard ? state_t::OFFBOARD : state_t::ARMED;
+    return state_t::OFFBOARD;
   }
 
   // flying using the MRS system in RC joystick mode
