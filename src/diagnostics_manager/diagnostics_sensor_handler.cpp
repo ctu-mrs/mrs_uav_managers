@@ -11,13 +11,19 @@ namespace mrs_uav_managers::diagnostics_manager
 bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const std::string &config_key, const std::string &name_space,
                                           const DiagnosticsCommonHandlers_t &common_handlers, rclcpp::CallbackGroup::SharedPtr cbkgrp_subs) {
 
-  transformer_     = common_handlers.transformer;
-  body_frame_      = common_handlers.body_frame;
-  timeout_manager_ = common_handlers.timeout_manager;
-  error_publisher_ = common_handlers.error_publisher;
+  transformer_           = common_handlers.transformer;
+  body_frame_            = common_handlers.body_frame;
+  timeout_manager_       = common_handlers.timeout_manager;
+  error_publisher_       = common_handlers.error_publisher;
+  not_reporting_timeout_ = common_handlers.not_reporting_timeout;
 
   if (!error_publisher_) {
     RCLCPP_ERROR(node->get_logger(), "[%s]: no error publisher provided in the common handlers, not initializing", config_key.c_str());
+    return false;
+  }
+
+  if (not_reporting_timeout_ <= rclcpp::Duration(0, 0)) {
+    RCLCPP_ERROR(node->get_logger(), "[%s]: no not_reporting_timeout provided in the common handlers, not initializing", config_key.c_str());
     return false;
   }
 
@@ -242,6 +248,14 @@ bool DiagnosticsSensorHandler::isInGracePeriod(const rclcpp::Time &now) const {
 
 bool DiagnosticsSensorHandler::isTopicFresh(const rclcpp::Time &now, const rclcpp::Time &last_msg) const {
   return (now - last_msg).seconds() <= (1.0 / expected_rate_) * 3.0;
+}
+
+//}
+
+/* isReporting() //{ */
+
+bool DiagnosticsSensorHandler::isReporting(const rclcpp::Time &now, const rclcpp::Time &last_msg) const {
+  return now - last_msg <= not_reporting_timeout_;
 }
 
 //}

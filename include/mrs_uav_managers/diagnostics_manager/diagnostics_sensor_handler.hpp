@@ -30,6 +30,7 @@ struct DiagnosticsCommonHandlers_t
   std::string                                          body_frame;
   std::shared_ptr<mrs_lib::TimeoutManager>             timeout_manager;
   std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher;
+  rclcpp::Duration                                     not_reporting_timeout{0, 0}; // diagnostics_manager/timeout/not_reporting
 };
 
 class DiagnosticsSensorHandler {
@@ -93,6 +94,7 @@ protected:
   mrs_lib::SubscriberHandlerOptions        shopts_;
   rclcpp::QoS                              qos_profile_{10};
   std::shared_ptr<mrs_lib::TimeoutManager> timeout_manager_;
+  rclcpp::Duration                         not_reporting_timeout_{0, 0};
 
   // Shared with the manager and all other handlers (flushAndShutdown() terminates the whole node)
   std::shared_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
@@ -110,8 +112,12 @@ protected:
   /** @brief True while the node is still within the startup grace period. */
   bool isInGracePeriod(const rclcpp::Time &now) const;
 
-  /** @brief True if @p last_msg is recent enough (within 3× the expected period). */
+  /** @brief True if @p last_msg is recent enough (within 3× the main topic's expected period). */
   bool isTopicFresh(const rclcpp::Time &now, const rclcpp::Time &last_msg) const;
+
+  /** @brief True if @p last_msg is within DiagnosticsManager's not_reporting timeout -- for a plugin's secondary topics, whose rate is not
+   * the main topic's expected_rate. Pass node-clock times and check hasMsg() first: a never-received topic's lastMsgTime() would throw. */
+  bool isReporting(const rclcpp::Time &now, const rclcpp::Time &last_msg) const;
 
   /** @brief Records rate/staleness bookkeeping for the arrival of one message. Call once per message from every subscription callback --
    * create_main_subscriber()'s SubscriberHandler<T> callback does this automatically; a plugin using a generic/type-erased subscription
