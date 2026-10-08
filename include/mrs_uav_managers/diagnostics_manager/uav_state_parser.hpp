@@ -86,8 +86,9 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
     return state_t::MANUAL;
 
   // ControlManager's emergencies: ehover/eland run the eland controller, failsafe the failsafe controller;
-  // the eland controller alone is no emergency -- it is also the startup controller and the joystick fallback
-  if (control_manager_diagnostics->active_tracker != names::null_tracker && !control_manager_diagnostics->joystick_active) {
+  // the eland controller alone is no emergency -- it is also the startup controller (with NullTracker);
+  // checked before RC mode: joystick_active is the RC goto mode, which an emergency triggered during it leaves set
+  if (control_manager_diagnostics->active_tracker != names::null_tracker) {
 
     if (control_manager_diagnostics->active_controller == names::failsafe_controller)
       return state_t::FAILSAFE;

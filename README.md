@@ -83,13 +83,13 @@ On every reading the parser checks these rules from the top and stops at the fir
 3. Not armed -> `DISARMED`.
 4. The active tracker is `MidairActivationTracker` -> `MIDAIR`.
 5. Not offboard and the HW says the UAV is airborne -> `MANUAL`. Once in `MANUAL`, it stays there until the HW says the UAV has landed (`airborne == NO`) or offboard comes back. An unknown airborne reading does not end it.
-6. A tracker is active (not `NullTracker`), the joystick is not, and ControlManager has switched to an emergency controller:
+6. A tracker is active (not `NullTracker`) and ControlManager has switched to an emergency controller:
    - `FailsafeController` -> `FAILSAFE`;
    - `EmergencyController` and the tracker reports `STATE_LAND` -> `ELAND`, otherwise -> `EHOVER`.
 7. No active tracker (`NullTracker`, or the tracker reports `STATE_INVALID`):
    - offboard, the previous state was a flight state, and the tracker isn't `NullTracker` -> keep the previous state (a tracker switch in flight);
    - otherwise -> `OFFBOARD` if offboard, `ARMED` if not.
-8. Joystick active -> `RC_MODE`.
+8. Joystick active (`joystick_active`, ControlManager's RC goto mode) -> `RC_MODE`.
 9. `LandoffTracker` reports `STATE_IDLE` -> `TAKEOFF`, unless the previous state was a flight state other than `TAKEOFF`; then keep the previous state.
 10. Otherwise the tracker's state decides: `STATE_TAKEOFF` -> `TAKEOFF`, `STATE_HOVER` -> `HOVER`, `STATE_REFERENCE` -> `GOTO`, `STATE_TRAJECTORY` -> `TRAJECTORY`, `STATE_LAND` -> `LAND`, anything else -> `UNKNOWN`.
 
@@ -100,7 +100,7 @@ On every reading the parser checks these rules from the top and stops at the fir
 - **Matched by name**: `NullTracker` and `MidairActivationTracker` are built into ControlManager. `LandoffTracker`, `EmergencyController` and `FailsafeController` are ControlManager parameters (`landing_takeoff_tracker`, `safety/eland/controller`, `safety/failsafe_controller`) matched against their default values; all names are in one place, `names` in `uav_state_parser.hpp`. Technical debt: ControlManager should report these modes explicitly.
 - **The previous state**: the parser keeps no state of its own. It gets the previously published state and uses it only in rules 5, 7 and 9.
 - **`MIDAIR` (rule 4)**: UavManager is taking over a UAV already in the air: control output ON, then `MidairActivationTracker` holds the UAV while the autopilot is switched to offboard, then the next tracker takes over. `MidairActivationTracker` never reports a tracker state, so it is recognised by name. It is checked before `MANUAL` because until offboard is confirmed the HW still reports a pilot flying. It counts as flying for `is_flying()` and `is_flying_autonomously()`.
-- **Emergencies (rule 6)**: ControlManager's safety levels, in the order the escalating failsafe goes through them. `EHOVER`: holds the position after an error (e.g. a failed mid-air activation or takeoff, a tracker error); the UAV keeps flying until someone commands it. `ELAND`: lands where it is. `FAILSAFE`: descends without position feedback, the last resort. ehover and eland both use the eland controller (`EmergencyController`) with the ehover tracker; failsafe uses `FailsafeController`. `EmergencyController` alone is no emergency: it is ControlManager's startup controller (with `NullTracker`) and the joystick fallback. A pilot taking over (`MANUAL`), disarm and link loss still win. `EHOVER` ends once both the controller and the tracker are switched back (the state then follows the tracker again), or with land / eland / failsafe.
+- **Emergencies (rule 6)**: ControlManager's safety levels, in the order the escalating failsafe goes through them. `EHOVER`: holds the position after an error (e.g. a failed mid-air activation or takeoff, a tracker error); the UAV keeps flying until someone commands it. `ELAND`: lands where it is. `FAILSAFE`: descends without position feedback, the last resort. ehover and eland both use the eland controller (`EmergencyController`) with the ehover tracker; failsafe uses `FailsafeController`. `EmergencyController` alone is no emergency: it is ControlManager's startup controller (with `NullTracker`). Emergencies are checked before `RC_MODE` (rule 8): `joystick_active` is ControlManager's RC goto mode, and an ehover/eland/failsafe triggered during it (e.g. the escalating failsafe triggered by RC) leaves it set. A pilot taking over (`MANUAL`), disarm and link loss still win. `EHOVER` ends once both the controller and the tracker are switched back (the state then follows the tracker again), or with land / eland / failsafe.
 - **`MANUAL` stays until landed (rule 5)**: if the airborne source goes stale (`UNKNOWN`), that must not look like a landing. Without a previous `MANUAL`, an unknown airborne reading gives `ARMED`/`OFFBOARD` as usual.
 - **Tracker switch in flight (rule 7)**: a tracker activated in the air (`LandoffTracker` for land, land home, eland or escalating failsafe; the tracker taking over after a mid-air activation) reports `STATE_INVALID` for its first ~60-240 ms. Without this rule the state would drop to `OFFBOARD` mid-air and `is_flying()` would briefly be false. `NullTracker` really means no tracker, so after a landing the state still goes to `OFFBOARD`.
 - **`LandoffTracker` idle (rule 9)**: after a takeoff, `LandoffTracker` goes idle before the next tracker takes over -- still `TAKEOFF`. Activated in the air for a landing it is idle before it starts landing; that is not a takeoff.
@@ -142,7 +142,9 @@ Unit tests are `TEST(UavStateParser, ...)` in `test/diagnostics_manager/uav_stat
 | `EHOVER` -> `ELAND`: `EmergencyController`, tracker `STATE_LAND` | `EmergencyControllerLandingIsEland` |
 | any flight -> `FAILSAFE`: `FailsafeController` | `FailsafeControllerIsFailsafe` |
 | `EmergencyController` with `NullTracker` (startup) is no emergency | `EmergencyControllerOnGroundIsNotEhover` |
-| joystick (fallback `EmergencyController`) -> `RC_MODE` | `JoystickWinsOverEmergencyController` |
+| `RC_MODE` -> `EHOVER` / `ELAND` / `FAILSAFE`: an emergency wins over `joystick_active` | `EmergencyWinsOverRcMode` |
+| `RC_MODE` -> `EHOVER` -> `ELAND` -> `DISARMED` (escalating failsafe by RC) | `EscalatingFailsafeFromRcModeSequence` |
+| `joystick_active` without an emergency controller -> `RC_MODE` | `RcModeWithoutEmergencyIsRcMode` |
 | emergency -> `DISARMED` / `MANUAL` / `NO_LINK` | `EmergencyYieldsToDisarmLinkLossAndManual` |
 | `HOVER` -> `EHOVER` -> `ELAND` -> `FAILSAFE` (escalating failsafe) | `EscalatingFailsafeSequence` |
 | `MIDAIR` -> `EHOVER` (failed mid-air activation) | `FailedMidairActivationIsEhover` |
