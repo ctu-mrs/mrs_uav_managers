@@ -81,8 +81,9 @@ void DiagnosticsManager::initialize() {
 
   tim_mgr_ = std::make_shared<mrs_lib::TimeoutManager>(node_, rclcpp::Rate(1.0));
 
-  common_handlers_.timeout_manager = tim_mgr_;
-  common_handlers_.error_publisher = error_publisher_;
+  common_handlers_.timeout_manager       = tim_mgr_;
+  common_handlers_.error_publisher       = error_publisher_;
+  common_handlers_.not_reporting_timeout = not_reporting_timeout_;
   param_loader.loadParam("mrs_uav_managers/diagnostics_manager/body_frame", common_handlers_.body_frame);
   common_handlers_.body_frame = _robot_name_ + "/" + common_handlers_.body_frame;
 
