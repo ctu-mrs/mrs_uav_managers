@@ -189,7 +189,7 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ConstraintManagerDiagnostics> sh_constraint_manager_diagnostics_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>    sh_control_manager_diagnostics_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::GainManagerDiagnostics>       sh_gain_manager_diagnostics_;
-  mrs_lib::SubscriberHandler<std_msgs::msg::Float64>                      sh_control_manager_thrust_;
+  mrs_lib::SubscriberHandler<std_msgs::msg::Float64>                      sh_control_manager_throttle_;
 
   // | ----------------- CollisionAvoidanceInfo ----------------- |
   mrs_lib::PublisherHandler<mrs_msgs::msg::CollisionAvoidanceInfo> ph_collision_avoidance_info_;
@@ -315,11 +315,11 @@ private:
                                                                  sensor_msgs::msg::NavSatFix::ConstSharedPtr          global_position,
                                                                  mrs_msgs::msg::Float64Stamped::ConstSharedPtr        global_heading);
 
-  /** @brief Build ControlInfo from control manager diagnostics, thrust, and the current tracker command setpoint. */
+  /** @brief Build ControlInfo from control manager diagnostics, throttle, and the current tracker command setpoint. */
   mrs_msgs::msg::ControlInfo parse_control_info(mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr    control_manager_diagnostics,
                                                 mrs_msgs::msg::ConstraintManagerDiagnostics::ConstSharedPtr constraint_manager_diagnostics,
                                                 mrs_msgs::msg::GainManagerDiagnostics::ConstSharedPtr       gain_manager_diagnostics,
-                                                std_msgs::msg::Float64::ConstSharedPtr thrust, mrs_msgs::msg::TrackerCommand::ConstSharedPtr tracker_cmd);
+                                                std_msgs::msg::Float64::ConstSharedPtr throttle, mrs_msgs::msg::TrackerCommand::ConstSharedPtr tracker_cmd);
 
   /** @brief Build CollisionAvoidanceInfo from MPC tracker diagnostics. */
   mrs_msgs::msg::CollisionAvoidanceInfo parse_collision_avoidance_info(mrs_msgs::msg::MpcTrackerDiagnostics::ConstSharedPtr     mpc_tracker_diagnostics,
