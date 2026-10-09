@@ -20,6 +20,8 @@
 #include <utility>
 #include <vector>
 
+#include <unistd.h>
+
 #include <mrs_msgs/msg/cpu_load.hpp>
 
 //}
@@ -35,8 +37,8 @@ namespace mrs_uav_managers::diagnostics_manager::utils
  * successive update() calls, while scanning/sampling per-PID stats on a slower
  * cadence to reduce overhead.
  *
- * * Per-PID CPU loads are approximated by attributing each ROS2-linked PID
- * (detected via `librclcpp.so` in /proc/<pid>/maps) a top-style CPU % based on
+ * * Per-PID CPU loads are approximated by attributing each ROS2 PID (started with
+ * `--ros-args`, or with `librcl.so` in /proc/<pid>/maps) a top-style CPU % based on
  * utime+stime deltas between successive update() calls.
  */
 

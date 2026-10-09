@@ -16,17 +16,46 @@ std::vector<std::string> splitByChar(const std::string &line, char delim) {
   return out;
 }
 
-// Returns true if /proc/<pid>/maps contains a librclcpp.so mapping —
-// a reliable signal that the process linked the ROS2 C++ client library.
-// Returns false on EACCES (other-user process) or any read error.
+// Reads /proc/<pid>/cmdline (NUL-separated) into its arguments.
+// Returns an empty vector for kernel threads, zombies, or on any read error.
+std::vector<std::string> readCmdline(int pid) {
+  std::ifstream cmdline("/proc/" + std::to_string(pid) + "/cmdline");
+  if (!cmdline.is_open()) {
+    return {};
+  }
+  std::string raw((std::istreambuf_iterator<char>(cmdline)), std::istreambuf_iterator<char>());
+  auto        args = splitByChar(raw, '\0');
+  args.erase(std::remove(args.begin(), args.end(), ""), args.end());
+  return args;
+}
+
+// Returns true for the "ros2 run" wrapper ("python3 .../ros2 run <pkg> <exe> ...").
+// It forwards the node's --ros-args to the child it spawns, so it would duplicate that node.
+bool isRos2RunWrapper(const std::vector<std::string> &args) {
+  if (args.size() < 3) {
+    return false;
+  }
+  return std::filesystem::path(args[0]).filename().string().rfind("python", 0) == 0 && std::filesystem::path(args[1]).filename() == "ros2" && args[2] == "run";
+}
+
+// Returns true if the process was started with --ros-args, or if /proc/<pid>/maps
+// contains a librcl.so mapping — the C layer under rclcpp, rclpy and rclc alike.
+// The maps check returns false on EACCES (other-user process) or any read error.
 bool isRosProcess(int pid) {
+  const auto args = readCmdline(pid);
+  if (isRos2RunWrapper(args)) {
+    return false;
+  }
+  if (std::find(args.begin(), args.end(), "--ros-args") != args.end()) {
+    return true;
+  }
   std::ifstream maps("/proc/" + std::to_string(pid) + "/maps");
   if (!maps.is_open()) {
     return false;
   }
   std::string line;
   while (std::getline(maps, line)) {
-    if (line.find("librclcpp.so") != std::string::npos) {
+    if (line.find("/librcl.so") != std::string::npos) {
       return true;
     }
   }
@@ -53,6 +82,36 @@ long readProcTicks(int pid) {
   }
   try {
     return std::stol(tokens[11]) + std::stol(tokens[12]);
+  }
+  catch (const std::exception &) {
+    return -1;
+  }
+}
+
+// Returns seconds since the process started, or -1 on failure.
+// starttime (field 22 of /proc/<pid>/stat, in clock ticks since boot) is compared against /proc/uptime.
+double readProcAgeSec(int pid) {
+  std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
+  std::string   line;
+  if (!std::getline(stat, line)) {
+    return -1;
+  }
+  const auto rparen = line.rfind(')');
+  if (rparen == std::string::npos || rparen + 2 > line.size()) {
+    return -1;
+  }
+  // Tokens after ')' begin at field 3 (state); starttime is field 22 → index 19.
+  const auto tokens = splitByChar(line.substr(rparen + 2), ' ');
+  if (tokens.size() < 20) {
+    return -1;
+  }
+  std::ifstream uptime_file("/proc/uptime");
+  double        uptime = 0.0;
+  if (!(uptime_file >> uptime)) {
+    return -1;
+  }
+  try {
+    return uptime - std::stod(tokens[19]) / static_cast<double>(sysconf(_SC_CLK_TCK));
   }
   catch (const std::exception &) {
     return -1;
@@ -294,16 +353,24 @@ void HostStats::discoverRosPids(std::chrono::steady_clock::time_point now) {
     live_pids.insert(pid);
 
     // Use cached ROS classification if available; otherwise probe and cache.
-    auto cache_it = pid_is_ros_.find(pid);
-    bool is_ros   = (cache_it != pid_is_ros_.end()) ? cache_it->second : isRosProcess(pid);
-    pid_is_ros_.emplace(pid, is_ros);
+    // A young process may not look like itself yet: librcl is mapped only after e.g. a slow
+    // "import rclpy", and a just-forked child still carries its parent's cmdline and maps.
+    // So its classification and name are cached only once it is old enough to have settled.
+    constexpr double kRosProbeGraceSec = 30.0;
+
+    const auto cache_it = pid_is_ros_.find(pid);
+    const bool cached   = cache_it != pid_is_ros_.end();
+    const bool is_ros   = cached ? cache_it->second : isRosProcess(pid);
+    if (!cached && readProcAgeSec(pid) >= kRosProbeGraceSec) {
+      pid_is_ros_.emplace(pid, is_ros);
+    }
     if (!is_ros) {
       continue;
     }
 
     discovered_ros_pids.insert(pid);
-    if (pid_name_cache_.find(pid) == pid_name_cache_.end()) {
-      pid_name_cache_.emplace(pid, readProcName(pid));
+    if (!cached || pid_name_cache_.find(pid) == pid_name_cache_.end()) {
+      pid_name_cache_[pid] = readProcName(pid);
     }
   }
 
