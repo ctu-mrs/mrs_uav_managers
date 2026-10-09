@@ -181,7 +181,7 @@ def generate_launch_description():
             ("~/battery_state_in", "hw_api/battery_state"),
             ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
             ("~/control_manager_heading_in", "control_manager/heading"),
-            ("~/control_manager_thrust_in", "control_manager/thrust"),
+            ("~/control_manager_throttle_in", "control_manager/throttle"),
             ("~/constraint_manager_diagnostics_in", "constraint_manager/diagnostics"),
             ("~/estimation_diagnostics_in", "estimation_manager/diagnostics"),
             ("~/gain_manager_diagnostics_in", "gain_manager/diagnostics"),

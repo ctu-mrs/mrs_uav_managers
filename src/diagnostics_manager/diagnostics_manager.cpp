@@ -142,7 +142,7 @@ void DiagnosticsManager::initialize() {
   sh_constraint_manager_diagnostics_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ConstraintManagerDiagnostics>(shopts, "~/constraint_manager_diagnostics_in");
   sh_control_manager_diagnostics_    = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(
       shopts, "~/control_manager_diagnostics_in", &DiagnosticsManager::cbk_control_manager_diag_rate, this);
-  sh_control_manager_thrust_   = mrs_lib::SubscriberHandler<std_msgs::msg::Float64>(shopts, "~/control_manager_thrust_in");
+  sh_control_manager_throttle_ = mrs_lib::SubscriberHandler<std_msgs::msg::Float64>(shopts, "~/control_manager_throttle_in");
   sh_gain_manager_diagnostics_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::GainManagerDiagnostics>(shopts, "~/gain_manager_diagnostics_in");
 
   // | ----------------- CollisionAvoidanceInfo ----------------- |
@@ -398,7 +398,7 @@ void DiagnosticsManager::timerMain() {
   const auto battery_state                  = processIncomingMessage(sh_battery_state_);
   const auto control_manager_diagnostics    = processIncomingMessage(sh_control_manager_diagnostics_);
   const auto control_manager_heading        = processIncomingMessage(sh_control_manager_heading_);
-  const auto control_manager_thrust         = processIncomingMessage(sh_control_manager_thrust_);
+  const auto control_manager_throttle       = processIncomingMessage(sh_control_manager_throttle_);
   const auto constraint_manager_diagnostics = processIncomingMessage(sh_constraint_manager_diagnostics_);
   const auto gain_manager_diagnostics       = processIncomingMessage(sh_gain_manager_diagnostics_);
   const auto estimation_diagnostics         = processIncomingMessage(sh_estimation_diagnostics_);
@@ -431,10 +431,10 @@ void DiagnosticsManager::timerMain() {
         parse_state_estimation_info(estimation_diagnostics.message, control_manager_heading.message, hw_api_gnss.message, hw_api_mag_heading.message);
   }
 
-  if (control_manager_diagnostics.hasNewMessage || control_manager_thrust.hasNewMessage || constraint_manager_diagnostics.hasNewMessage ||
+  if (control_manager_diagnostics.hasNewMessage || control_manager_throttle.hasNewMessage || constraint_manager_diagnostics.hasNewMessage ||
       gain_manager_diagnostics.hasNewMessage || tracker_cmd.hasNewMessage) {
     last_control_info_ = parse_control_info(control_manager_diagnostics.message, constraint_manager_diagnostics.message, gain_manager_diagnostics.message,
-                                            control_manager_thrust.message, tracker_cmd.message);
+                                            control_manager_throttle.message, tracker_cmd.message);
   }
 
   if (mpc_tracker_diagnostics.hasNewMessage || control_manager_diagnostics.hasNewMessage) {
@@ -798,7 +798,7 @@ mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::parse_state_estimation_in
 mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr    control_manager_diagnostics,
                                                                   mrs_msgs::msg::ConstraintManagerDiagnostics::ConstSharedPtr constraint_manager_diagnostics,
                                                                   mrs_msgs::msg::GainManagerDiagnostics::ConstSharedPtr       gain_manager_diagnostics,
-                                                                  std_msgs::msg::Float64::ConstSharedPtr                      thrust,
+                                                                  std_msgs::msg::Float64::ConstSharedPtr                      throttle,
                                                                   mrs_msgs::msg::TrackerCommand::ConstSharedPtr               tracker_cmd) {
 
   mrs_msgs::msg::ControlInfo msg;
@@ -806,7 +806,7 @@ mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg:
   const bool is_control_manager_diagnostics_valid    = control_manager_diagnostics != nullptr;
   const bool is_constraint_manager_diagnostics_valid = constraint_manager_diagnostics != nullptr;
   const bool is_gain_manager_diagnostics_valid       = gain_manager_diagnostics != nullptr;
-  const bool is_thrust_valid                         = thrust != nullptr;
+  const bool is_throttle_valid                       = throttle != nullptr;
   const bool is_tracker_cmd_valid                    = tracker_cmd != nullptr;
 
   if (is_control_manager_diagnostics_valid) {
@@ -823,8 +823,8 @@ mrs_msgs::msg::ControlInfo DiagnosticsManager::parse_control_info(mrs_msgs::msg:
     msg.output_enabled      = control_manager_diagnostics->output_enabled;
   }
 
-  if (is_thrust_valid)
-    msg.thrust = thrust->data;
+  if (is_throttle_valid)
+    msg.throttle = throttle->data;
 
   if (is_constraint_manager_diagnostics_valid) {
     msg.active_constraints    = constraint_manager_diagnostics->current_name;
