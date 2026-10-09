@@ -763,8 +763,8 @@ mrs_msgs::msg::StateEstimationInfo DiagnosticsManager::parse_state_estimation_in
     msg.velocity     = estimation_diagnostics->velocity;
     msg.acceleration = estimation_diagnostics->acceleration;
 
-    if (!estimation_diagnostics->running_state_estimators.empty())
-      msg.current_estimator = estimation_diagnostics->running_state_estimators.at(0);
+    if (!estimation_diagnostics->current_state_estimator.empty())
+      msg.current_estimator = estimation_diagnostics->current_state_estimator;
 
     msg.running_estimators    = estimation_diagnostics->running_state_estimators;
     msg.switchable_estimators = estimation_diagnostics->switchable_state_estimators;
