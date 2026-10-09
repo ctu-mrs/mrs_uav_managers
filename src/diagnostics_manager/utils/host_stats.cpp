@@ -29,13 +29,22 @@ std::vector<std::string> readCmdline(int pid) {
   return args;
 }
 
+// Returns true for a Python interpreter running a script ("python3 <script> ...").
+// Shebang scripts such as the ros2 CLI show up this way too, with the interpreter as argv[0].
+bool isPythonScript(const std::vector<std::string> &args) {
+  if (args.size() < 2 || args[1].rfind('-', 0) == 0) {
+    return false;
+  }
+  return std::filesystem::path(args[0]).filename().string().rfind("python", 0) == 0;
+}
+
 // Returns true for the "ros2 run" wrapper ("python3 .../ros2 run <pkg> <exe> ...").
 // It forwards the node's --ros-args to the child it spawns, so it would duplicate that node.
 bool isRos2RunWrapper(const std::vector<std::string> &args) {
   if (args.size() < 3) {
     return false;
   }
-  return std::filesystem::path(args[0]).filename().string().rfind("python", 0) == 0 && std::filesystem::path(args[1]).filename() == "ros2" && args[2] == "run";
+  return isPythonScript(args) && std::filesystem::path(args[1]).filename() == "ros2" && args[2] == "run";
 }
 
 // Returns true if the process was started with --ros-args, or if /proc/<pid>/maps
@@ -118,27 +127,92 @@ double readProcAgeSec(int pid) {
   }
 }
 
-// Best-effort process label. Prefers __node:=<name> from /proc/<pid>/cmdline
-// (so we get the actual ROS node name instead of "component_container_mt"),
-// falls back to /proc/<pid>/comm. Returns "pid<N>" if both fail.
-std::string readProcName(int pid) {
-  std::ifstream cmdline("/proc/" + std::to_string(pid) + "/cmdline");
-  if (cmdline.is_open()) {
-    std::string raw((std::istreambuf_iterator<char>(cmdline)), std::istreambuf_iterator<char>());
-    // cmdline tokens are NUL-separated.
-    const std::string marker = "__node:=";
-    const auto        pos    = raw.find(marker);
-    if (pos != std::string::npos) {
-      const auto end = raw.find('\0', pos);
-      return raw.substr(pos + marker.size(), end - pos - marker.size());
-    }
+// Returns the value of a "<key>:=<value>" remap argument, also in its node-targeted
+// form "<node>:<key>:=<value>". Returns "" if the argument is not that remap.
+std::string remapValue(const std::string &arg, const std::string &key) {
+  const auto pos = arg.find(key + ":=");
+  if (pos == std::string::npos || (pos != 0 && arg[pos - 1] != ':')) {
+    return "";
   }
+  return arg.substr(pos + key.size() + 2);
+}
+
+// Returns true for a ros2 CLI verb such as "bag" or "record" (not an option, path or file).
+bool isCliWord(const std::string &arg) {
+  return !arg.empty() && std::all_of(arg.begin(), arg.end(), [](unsigned char c) { return std::islower(c) || std::isdigit(c) || c == '_'; });
+}
+
+// Returns a label for a process without a __node:= (or __name:=) remap, in order of preference:
+// - "ros2 <verb> <verb>" for the ros2 CLI, e.g. "ros2 bag record";
+// - "ros2 daemon" for the ros2 CLI daemon ("python3 -c 'from ros2cli.daemon.daemonize import main; ...'");
+// - the script name for other Python processes;
+// - the executable name, which unlike /proc/<pid>/comm is not cut to 15 characters;
+// - /proc/<pid>/comm. Returns "pid<N>" if all fail.
+std::string readProcBaseName(int pid, const std::vector<std::string> &args) {
+  if (isPythonScript(args)) {
+    const auto script = std::filesystem::path(args[1]).filename().string();
+    if (script != "ros2") {
+      return script;
+    }
+    std::string label = script;
+    for (size_t i = 2; i < args.size() && i < 4 && isCliWord(args[i]); ++i) {
+      label += " " + args[i];
+    }
+    return label;
+  }
+
+  if (args.size() >= 3 && args[1] == "-c" && args[2].find("ros2cli.daemon") != std::string::npos) {
+    return "ros2 daemon";
+  }
+
+  std::error_code ec;
+  auto            exe = std::filesystem::read_symlink("/proc/" + std::to_string(pid) + "/exe", ec).filename().string();
+  // The link gets this suffix when the binary was replaced while running (e.g. by a rebuild).
+  const std::string deleted = " (deleted)";
+  if (exe.size() > deleted.size() && exe.compare(exe.size() - deleted.size(), deleted.size(), deleted) == 0) {
+    exe.erase(exe.size() - deleted.size());
+  }
+  if (!ec && !exe.empty()) {
+    return exe;
+  }
+
   std::ifstream comm("/proc/" + std::to_string(pid) + "/comm");
   std::string   name;
   if (std::getline(comm, name) && !name.empty()) {
     return name;
   }
   return "pid" + std::to_string(pid);
+}
+
+// Best-effort process label: the node name from __node:= (or its alias __name:=), else
+// readProcBaseName(). Prefixed with __ns:= when given, so we get "/uav1/uav_core_container"
+// instead of "component_container_mt", and "/uav1/mavros/mavros_node" for a node that only
+// has its namespace remapped. The first matching remap wins, as in rcl.
+std::string readProcName(int pid) {
+  const auto args = readCmdline(pid);
+
+  std::string node;
+  std::string ns;
+  for (const auto &arg : args) {
+    if (node.empty()) {
+      node = remapValue(arg, "__node");
+    }
+    if (node.empty()) {
+      node = remapValue(arg, "__name");
+    }
+    if (ns.empty()) {
+      ns = remapValue(arg, "__ns");
+    }
+  }
+
+  const auto label = node.empty() ? readProcBaseName(pid, args) : node;
+  while (!ns.empty() && ns.back() == '/') {
+    ns.pop_back();
+  }
+  if (ns.empty()) {
+    return label;
+  }
+  return (ns.front() == '/' ? "" : "/") + ns + "/" + label;
 }
 
 bool isPidString(const std::string &name) {
@@ -400,8 +474,8 @@ void HostStats::sampleNodeCpuLoads(std::chrono::steady_clock::time_point now) {
   std::vector<int>                    stale_ros_pids;
 
   // Composable-node note: nodes sharing a container share one PID, so per-PID load
-  // aggregates them. The __node:= label in readProcName() falls back to comm for
-  // multi-node containers — fine for operator-facing "which process is hot" views.
+  // aggregates them under the container's own label from readProcName() (its __node:=
+  // name, else its executable name) — fine for operator-facing "which process is hot" views.
   for (const int pid : ros_pids_) {
     const long ticks = readProcTicks(pid);
     if (ticks < 0) {
