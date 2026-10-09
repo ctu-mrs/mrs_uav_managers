@@ -7,28 +7,28 @@ import launch
 import launch_ros
 import launch_testing.actions
 import launch_testing.asserts
-from launch.actions import IncludeLaunchDescription, GroupAction, SetEnvironmentVariable
+from launch.actions import IncludeLaunchDescription, GroupAction, SetEnvironmentVariable, DeclareLaunchArgument
 import rclpy
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution, TextSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 
 from std_msgs.msg import Bool
 
 def generate_test_description():
 
-
     ld = launch.LaunchDescription()
-
-    uav_type="x500"
-    uav_name="uav1"
-    platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/"+uav_type+".yaml"
 
     launch_file_path = os.path.abspath(__file__)
     launch_dir = os.path.dirname(launch_file_path)
 
     test_name = os.path.basename(launch_dir)
+
+    uav_name="uav1"
+
+    platform_config=get_package_share_directory("mrs_multirotor_simulator")+"/config/mrs_uav_system/x500.yaml",
 
     current_rmw = os.environ.get('RMW_IMPLEMENTATION', '')
 
@@ -42,26 +42,6 @@ def generate_test_description():
                 output='screen'
             )
         )
-
-    ld.add_action(
-        GroupAction([
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    PathJoinSubstitution([
-                        FindPackageShare('mrs_uav_testing'),
-                        'launch',
-                        'mrs_uav_system.launch.py'
-                        ])
-                    ]),
-                    launch_arguments={
-                        'run_automatic_start': "true",
-                        'uav_name': uav_name,
-                        'platform_config': platform_config,
-                    }.items()
-                )
-            ]
-        )
-    )
 
     ld.add_action(
         GroupAction([
@@ -86,6 +66,29 @@ def generate_test_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
+                        FindPackageShare('mrs_uav_testing'),
+                        'launch',
+                        'mrs_uav_system.launch.py'
+                        ])
+                    ]),
+                    launch_arguments={
+                        'run_automatic_start': "true",
+                        # 'standalone': "true",
+                        'uav_name': uav_name,
+                        'platform_config': platform_config,
+                        'world_config': launch_dir+"/config/world_config.yaml",
+                        'custom_config': launch_dir+"/config/custom_config.yaml",
+                    }.items()
+                )
+            ]
+        )
+    )
+
+    ld.add_action(
+        GroupAction([
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([
                         FindPackageShare('mrs_multirotor_simulator'),
                             'launch',
                             'hw_api.launch.py'
@@ -96,7 +99,9 @@ def generate_test_description():
         )
     )
 
+    # starts the integration interactor
     ld.add_action(
+            # Nodes under test
             launch_ros.actions.Node(
                 package='mrs_uav_managers',
                 namespace='',
@@ -109,6 +114,7 @@ def generate_test_description():
             )
         )
 
+    # starts the python test part down below
     ld.add_action(
         launch.actions.TimerAction(
             period=1.0, actions=[launch_testing.actions.ReadyToTest()]),

@@ -1,0 +1,9 @@
+mrs_uav_managers:
+  diagnostics_manager:
+    # name of the network interface to report wifi link quality for (e.g. "wlan0"); leave empty to disable
+    wifi_interface: ""
+
+    # NOTE: sensor handlers (active_sensor_handlers, per-instance tuning) live in
+    # config/public/diagnostics_manager/sensor_handlers.yaml
+    # NOTE: preflight checks (enabled, speed/height/gyro thresholds, ...) live in
+    # config/public/diagnostics_manager/preflight_check.yaml
