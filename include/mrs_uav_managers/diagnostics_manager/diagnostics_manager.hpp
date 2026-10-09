@@ -305,8 +305,8 @@ private:
   /** @brief Keep only the names ControlManager flags as human switchable. */
   std::vector<std::string> filter_human_switchable(const std::vector<std::string> &names, const std::vector<bool> &human_switchable);
 
-  /** @brief Build GeneralRobotInfo from battery state; preflight result populates preflight_status always, and ready_to_start/problems_preventing_start while
-   * not flying autonomously. */
+  /** @brief Build GeneralRobotInfo from battery state; preflight result populates preflight_status always, and
+   * ready_for_automatic_takeoff/missing_for_automatic_takeoff while not flying autonomously. */
   mrs_msgs::msg::GeneralRobotInfo parse_general_robot_info(sensor_msgs::msg::BatteryState::ConstSharedPtr battery_state);
 
   /** @brief Build StateEstimationInfo from estimation diagnostics, headings, and GNSS. */

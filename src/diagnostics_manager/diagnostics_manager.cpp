@@ -667,7 +667,7 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   const auto uav_state      = uav_state_.value();
   const bool state_offboard = uav_state == state_t::OFFBOARD;
 
-  msg.problems_preventing_start.clear();
+  msg.missing_for_automatic_takeoff.clear();
 
   // Always run, independent of flight state: preflight_status must stay
   // fresh at all times (autostart needs it before the UAV is even offboard).
@@ -686,24 +686,24 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   // assume everything was fine at takeoff and skip the diagnosis.
   if (!is_flying_autonomously(uav_state)) {
 
-    msg.ready_to_start = preflight_result.can_takeoff && state_offboard;
+    msg.ready_for_automatic_takeoff = preflight_result.can_takeoff && state_offboard;
 
     for (const auto &v : preflight_result.violations)
-      msg.problems_preventing_start.push_back(v);
+      msg.missing_for_automatic_takeoff.push_back(v);
 
     switch (uav_state) {
     case state_t::UNKNOWN:
-      msg.problems_preventing_start.emplace_back("UAV state is UNKNOWN");
+      msg.missing_for_automatic_takeoff.emplace_back("UAV state is UNKNOWN");
       break;
     case state_t::MANUAL:
-      msg.problems_preventing_start.emplace_back("UAV is flying without OFFBOARD (MANUAL)");
+      msg.missing_for_automatic_takeoff.emplace_back("UAV is flying without OFFBOARD (MANUAL)");
       break;
     case state_t::DISARMED:
-      msg.problems_preventing_start.emplace_back("UAV is DISARMED");
+      msg.missing_for_automatic_takeoff.emplace_back("UAV is DISARMED");
       break;
     default:
       if (!state_offboard)
-        msg.problems_preventing_start.emplace_back("UAV is not in OFFBOARD mode");
+        msg.missing_for_automatic_takeoff.emplace_back("UAV is not in OFFBOARD mode");
       break;
     }
   }
