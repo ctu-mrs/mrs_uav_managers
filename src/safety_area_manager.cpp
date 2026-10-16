@@ -143,6 +143,7 @@ private:
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped> sh_max_z_;
   mrs_msgs::msg::UavState                                   uav_state_;
   std::mutex                                                mutex_uav_state_;
+  std::atomic<bool>                                         got_uav_state_ = false;
 
   mrs_lib::SubscriberHandler<sensor_msgs::msg::NavSatFix> sh_gnss_;
 
@@ -562,7 +563,9 @@ void SafetyAreaManager::timerStatus() {
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("timerStatus");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "SafetyAreaManager::timerStatus", scope_timer_logger_, scope_timer_enabled_);
 
-  bool got_odom = sh_odometry_.hasMsg();
+  // not sh_odometry_.hasMsg(): it turns true before callbackOdometry() runs, and also for odometry
+  // that callbackOdometry() drops before initialization; got_uav_state_ is set once uav_state_ is filled
+  bool got_odom = got_uav_state_;
 
   if (!got_odom) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 5000, "waiting for data: Odometry=%s", got_odom ? "true" : "FALSE");
@@ -653,6 +656,8 @@ void SafetyAreaManager::callbackOdometry(const nav_msgs::msg::Odometry::ConstSha
     uav_state_.pose             = msg->pose.pose;
     uav_state_.velocity.angular = msg->twist.twist.angular;
   }
+
+  got_uav_state_ = true;
 
   transformer_->setDefaultFrame(msg->header.frame_id);
 }
