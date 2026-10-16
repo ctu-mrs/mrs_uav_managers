@@ -1327,7 +1327,23 @@ void TransformManager::publishLocalTf() {
   tf_msg.header.frame_id       = ns_fixed_origin_child_frame_id_;
   tf_msg.child_frame_id        = ns_local_origin_child_frame_id_;
   tf_msg.transform.translation = Support::pointToVector3(pose_first_.pose.position);
-  tf_msg.transform.rotation    = pose_first_.pose.orientation;
+
+  // local_origin must be gravity-aligned and only yawed to the heading at the UAV's initial
+  // position. pose_first_ is the first uav_state - latched once at startup, never re-latched on
+  // takeoff - whose orientation also carries the roll and pitch the estimator reported at that
+  // instant: nonzero from ground slope, an unconverged attitude estimate, or an IMU mount offset.
+  // This tf is static, so latching the full orientation would tilt local_origin for the whole
+  // session, and the tilt turns into a position error that grows with distance from the
+  // local_origin origin. Take the heading only.
+  double heading;
+  try {
+    heading = mrs_lib::AttitudeConverter(pose_first_.pose.orientation).getHeading();
+  }
+  catch (...) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: Exception caught during getting heading, not latching local_origin yet", getPrintName().c_str());
+    return;
+  }
+  tf_msg.transform.rotation = mrs_lib::AttitudeConverter(0, 0, heading);
 
   if (Support::noNans(tf_msg)) {
 
