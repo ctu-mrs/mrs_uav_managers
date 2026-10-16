@@ -1,5 +1,15 @@
 mrs_uav_managers:
 
+  diagnostics_manager:
+
+    preflight_check:
+
+      # takeoff not allowed if UAV's height sensor exceeds <max_height> -- disabled here since this
+      # test spawns the UAV elevated on a takeoff platform (see mrs_simulator.yaml, spawn.z)
+      height_check:
+
+        enabled: false
+
   estimation_manager:
 
     # loaded state estimator plugins
@@ -14,6 +24,7 @@ mrs_uav_managers:
 
     initial_state_estimator: "gps_garmin" # will be used as the first state estimator
 
+# needed until mrs_uav_autostart switches to DiagnosticsManager's preflight checks
 mrs_uav_autostart:
 
   preflight_check:

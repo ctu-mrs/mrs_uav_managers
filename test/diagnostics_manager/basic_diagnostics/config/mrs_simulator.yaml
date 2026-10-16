@@ -1,0 +1,11 @@
+# turning off for the takeoff test
+individual_takeoff_platform:
+  enabled: false
+
+uav1:
+  type: "x500"
+  spawn:
+    x: 10.0
+    y: 20.0
+    z: 0.5
+    heading: 1.2
