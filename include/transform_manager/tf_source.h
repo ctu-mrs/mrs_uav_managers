@@ -346,12 +346,10 @@ private:
     }
 
     if (Support::noNans(tf_msg)) {
-      try {
-        broadcaster_->sendTransform(tf_msg);
-      }
-      catch (...) {
-        RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-      }
+
+      // sent together in one tf message by sendTransforms()
+      std::vector<geometry_msgs::msg::TransformStamped> tf_msgs;
+      tf_msgs.push_back(tf_msg);
 
       if (tf_from_attitude_enabled_) {
         if (is_inverted_) {
@@ -359,12 +357,7 @@ private:
         } else {
           tf_msg.header.frame_id += "_att_only";
         }
-        try {
-          broadcaster_->sendTransform(tf_msg);
-        }
-        catch (...) {
-          RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-        }
+        tf_msgs.push_back(tf_msg);
       }
       /*//}*/
 
@@ -376,6 +369,7 @@ private:
         if (!is_utm_origin_set_) {
           RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "[%s]: %s utm_origin initialization", getPrintName().c_str(),
                                Support::waiting_for_string.c_str());
+          sendTransforms(tf_msgs);
           return;
         }
 
@@ -396,13 +390,8 @@ private:
         }
         tf_utm_msg.transform = Support::msgFromTf2(tf_utm);
 
-        try {
-          broadcaster_->sendTransform(tf_utm_msg);
-          RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: publishing utm_origin tf", getPrintName().c_str());
-        }
-        catch (...) {
-          RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-        }
+        tf_msgs.push_back(tf_utm_msg);
+        RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: publishing utm_origin tf", getPrintName().c_str());
       }
       /*//}*/
 
@@ -431,16 +420,13 @@ private:
         tf_world_msg.transform          = Support::msgFromTf2(tf_utm * tf_world);
         tf_world_msg.transform.rotation = pose_inv.orientation;
 
-        try {
-          broadcaster_->sendTransform(tf_world_msg);
-          RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: publishing world_origin tf", getPrintName().c_str());
-        }
-        catch (...) {
-          RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-        }
+        tf_msgs.push_back(tf_world_msg);
+        RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: publishing world_origin tf", getPrintName().c_str());
       }
 
       /*//}*/
+
+      sendTransforms(tf_msgs);
 
     } else {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
@@ -448,6 +434,17 @@ private:
     }
     RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s based on topic: %s", getPrintName().c_str(),
                      tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str(), full_topic_odom_.c_str());
+  }
+  /*//}*/
+
+  /* sendTransforms() //{*/
+  void sendTransforms(const std::vector<geometry_msgs::msg::TransformStamped> &tf_msgs) {
+    try {
+      broadcaster_->sendTransform(tf_msgs);
+    }
+    catch (...) {
+      RCLCPP_ERROR(node_->get_logger(), "exception caught ");
+    }
   }
   /*//}*/
 
