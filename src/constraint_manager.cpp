@@ -144,7 +144,7 @@ private:
 
 /* ConstraintManager::ConstraintManager() //{ */
 
-ConstraintManager::ConstraintManager(rclcpp::NodeOptions options) : mrs_lib::Node("control_manager", options) {
+ConstraintManager::ConstraintManager(rclcpp::NodeOptions options) : mrs_lib::Node("constraint_manager", options) {
 
   this->initialize();
 }
