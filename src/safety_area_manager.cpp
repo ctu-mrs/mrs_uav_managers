@@ -93,6 +93,7 @@ private:
   bool                                       scope_timer_enabled_ = false;
   std::shared_ptr<mrs_lib::ScopeTimerLogger> scope_timer_logger_;
   std::string                                _uav_name_;
+  bool                                       _use_shared_tf_buffer_;
   std::string                                _world_config_;
 
   struct VisualizationComponents
@@ -273,10 +274,13 @@ SafetyAreaManager::SafetyAreaManager(rclcpp::NodeOptions options) : mrs_lib::Nod
 
   mrs_lib::ParamLoader param_loader(node_, "SafetyAreaManager");
   param_loader.loadParam("uav_name", _uav_name_);
+  param_loader.loadParam("use_shared_tf_buffer", _use_shared_tf_buffer_, true);
+  RCLCPP_INFO(node_->get_logger(), "Shared TF buffer is: %s", _use_shared_tf_buffer_ ? "ON" : "OFF");
 
   // | ---------------------- tf-transformer ----------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>(node_);
+  transformer_ = std::make_shared<mrs_lib::Transformer>(node_, _use_shared_tf_buffer_ ? mrs_lib::Transformer::buffer_mode_t::shared
+                                                                                      : mrs_lib::Transformer::buffer_mode_t::own);
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->retryLookupNewest(true);
 
