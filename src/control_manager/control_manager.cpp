@@ -255,6 +255,7 @@ private:
 
   std::atomic<bool> is_initialized_ = false;
   std::string       _uav_name_;
+  bool              _use_shared_tf_buffer_;
   std::string       _body_frame_;
 
   std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
@@ -1074,6 +1075,7 @@ void ControlManager::initialize(void) {
   param_loader_->loadParam("uav_name", _uav_name_);
   param_loader_->loadParam("body_frame", _body_frame_);
   param_loader_->loadParam("enable_profiler", _profiler_enabled_);
+  param_loader_->loadParam("use_shared_tf_buffer", _use_shared_tf_buffer_, true);
   param_loader_->loadParam("uav_mass", _uav_mass_);
 
   if (_uav_mass_ <= 0.0) {
@@ -1297,7 +1299,10 @@ void ControlManager::initialize(void) {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>(node_);
+  RCLCPP_INFO(node_->get_logger(), "Shared TF buffer is: %s", _use_shared_tf_buffer_ ? "ON" : "OFF");
+
+  transformer_ = std::make_shared<mrs_lib::Transformer>(node_, _use_shared_tf_buffer_ ? mrs_lib::Transformer::buffer_mode_t::shared
+                                                                                      : mrs_lib::Transformer::buffer_mode_t::own);
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->retryLookupNewest(true);
 
