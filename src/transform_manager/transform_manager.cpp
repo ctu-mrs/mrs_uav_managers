@@ -93,6 +93,7 @@ private:
   std::string _custom_config_;
   std::string _platform_config_;
   std::string _world_config_;
+  bool        _use_shared_tf_buffer_;
 
   const std::string package_name_ = "mrs_uav_managers";
   const std::string nodelet_name_ = "TransformManager";
@@ -266,9 +267,6 @@ void TransformManager::initialize() {
   broadcaster_        = std::make_shared<mrs_lib::TransformBroadcaster>(node_);
   static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(node_);
 
-  ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
-  ch_->transformer->retryLookupNewest(true);
-
   mrs_lib::ParamLoader param_loader(node_);
 
   param_loader.loadParam("custom_config", _custom_config_);
@@ -320,6 +318,7 @@ void TransformManager::initialize() {
   const std::string yaml_prefix = "mrs_uav_managers/transform_manager/";
 
   param_loader.loadParam("uav_name", ch_->uav_name);
+  param_loader.loadParam("use_shared_tf_buffer", _use_shared_tf_buffer_, true);
 
   /*//{ initialize scope timer */
   param_loader.loadParam(yaml_prefix + "scope_timer/enabled", ch_->scope_timer.enabled);
@@ -648,6 +647,16 @@ void TransformManager::initialize() {
     error_publisher_->flushAndShutdown();
   }
 
+  // | --------------------- tf transformer --------------------- |
+
+  // the transform manager owns the TF buffer shared by the other managers in the same container
+  RCLCPP_INFO(node_->get_logger(), "Shared TF buffer is: %s", _use_shared_tf_buffer_ ? "ON (owner)" : "OFF");
+
+  ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_, _use_shared_tf_buffer_ ? mrs_lib::Transformer::buffer_mode_t::shared_owner
+                                                                                          : mrs_lib::Transformer::buffer_mode_t::own);
+  ch_->transformer->retryLookupNewest(true);
+
+  // | -------------------- static tf checks -------------------- |
 
   if (isRtkUsed()) {
     // Check if the RTK antenna static tf is defined
