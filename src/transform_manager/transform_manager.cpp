@@ -234,7 +234,7 @@ private:
 
 /* TransformManager() //{ */
 
-TransformManager::TransformManager(rclcpp::NodeOptions options) : mrs_lib::Node("estimation_manager", options) {
+TransformManager::TransformManager(rclcpp::NodeOptions options) : mrs_lib::Node("transform_manager", options) {
 
   this->initialize();
 }

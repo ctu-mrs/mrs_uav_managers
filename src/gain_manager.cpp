@@ -148,7 +148,7 @@ private:
 
 /* GainManager() //{ */
 
-GainManager::GainManager(rclcpp::NodeOptions options) : mrs_lib::Node("control_manager", options) {
+GainManager::GainManager(rclcpp::NodeOptions options) : mrs_lib::Node("gain_manager", options) {
 
   this->initialize();
 }
