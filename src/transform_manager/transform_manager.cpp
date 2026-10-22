@@ -731,6 +731,9 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
     publishLocalTf();
   }
 
+  // sent together in one tf message after the fixed_origin tf
+  std::vector<geometry_msgs::msg::TransformStamped> tf_msgs;
+
   if (publish_stable_origin_tf_) {
     /*//{ publish stable_origin tf*/
     geometry_msgs::msg::TransformStamped tf_msg;
@@ -758,12 +761,7 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
       tf_msg.transform.rotation               = pose_inv.orientation;
 
       if (Support::noNans(tf_msg)) {
-        try {
-          broadcaster_->sendTransform(tf_msg);
-        }
-        catch (...) {
-          RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-        }
+        tf_msgs.push_back(tf_msg);
       } else {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                              tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -803,12 +801,7 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
     tf_msg.transform.rotation               = pose_inv.orientation;
 
     if (Support::noNans(tf_msg)) {
-      try {
-        broadcaster_->sendTransform(tf_msg);
-      }
-      catch (...) {
-        RCLCPP_ERROR(node_->get_logger(), "exception caught ");
-      }
+      tf_msgs.push_back(tf_msg);
     } else {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NaN detected in transform from %s to %s. Not publishing tf.", getPrintName().c_str(),
                            tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
@@ -817,6 +810,15 @@ void TransformManager::callbackUavState(const mrs_msgs::msg::UavState::ConstShar
     RCLCPP_INFO_ONCE(node_->get_logger(), "[%s]: Broadcasting transform from parent frame: %s to child frame: %s", getPrintName().c_str(),
                      tf_msg.header.frame_id.c_str(), tf_msg.child_frame_id.c_str());
     /*//}*/
+  }
+
+  if (!tf_msgs.empty()) {
+    try {
+      broadcaster_->sendTransform(tf_msgs);
+    }
+    catch (...) {
+      RCLCPP_ERROR(node_->get_logger(), "exception caught ");
+    }
   }
 
   /*//{ choose another source of utm and world tfs after estimator switch */
