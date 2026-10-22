@@ -349,6 +349,7 @@ private:
   std::string _custom_config_;
   std::string _platform_config_;
   std::string _world_config_;
+  bool        _use_shared_tf_buffer_;
 
   // | -------------------- errorgraph -------------------- |
   enum class error_type_t : uint16_t
@@ -640,6 +641,8 @@ void EstimationManager::initialize() {
   }
 
   param_loader.loadParam("uav_name", ch_->uav_name);
+  param_loader.loadParam("use_shared_tf_buffer", _use_shared_tf_buffer_, true);
+  RCLCPP_INFO(node_->get_logger(), "Shared TF buffer is: %s", _use_shared_tf_buffer_ ? "ON" : "OFF");
 
   /*//{ load world_origin parameters */
 
@@ -671,7 +674,8 @@ void EstimationManager::initialize() {
   param_loader.loadParam("frame_id/rtk_antenna", ch_->frames.rtk_antenna);
   ch_->frames.ns_rtk_antenna = ch_->uav_name + "/" + ch_->frames.rtk_antenna;
 
-  ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_);
+  ch_->transformer = std::make_shared<mrs_lib::Transformer>(node_, _use_shared_tf_buffer_ ? mrs_lib::Transformer::buffer_mode_t::shared
+                                                                                          : mrs_lib::Transformer::buffer_mode_t::own);
   ch_->transformer->retryLookupNewest(true);
 
   param_loader.loadParam("rate/diagnostics", ch_->desired_diagnostics_rate);
