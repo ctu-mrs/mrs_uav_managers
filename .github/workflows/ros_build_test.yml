@@ -3,14 +3,14 @@ name: ros_build_test
 on:
 
   push:
-    branches: [ devel ]
+    branches: [ ros1_devel ]
 
     paths-ignore:
       - '**/README.md'
       - 'test/**'
 
   pull_request:
-    branches: [ master ]
+    branches: [ ros1 ]
 
   workflow_dispatch:
 
