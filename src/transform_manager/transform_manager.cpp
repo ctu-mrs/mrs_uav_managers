@@ -333,8 +333,10 @@ void TransformManager::initialize() {
   {
     double world_origin_x = 0;
     double world_origin_y = 0;
+    double world_origin_z     = 0;
+    bool   use_z_relative_to_home = true;
 
-    Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getPrintName(), world_origin_x, world_origin_y,
+    Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getPrintName(), world_origin_x, world_origin_y, world_origin_z, use_z_relative_to_home,
                              world_origin_use_home_position_);
 
     world_origin_.x = world_origin_x;

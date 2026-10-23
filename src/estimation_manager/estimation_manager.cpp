@@ -644,10 +644,10 @@ void EstimationManager::initialize() {
   /*//{ load world_origin parameters */
 
   {
-    bool        use_z_relative_to_home = true;
     double      world_origin_x     = 0;
     double      world_origin_y     = 0;
     double      world_origin_z     = 0;
+    bool        use_z_relative_to_home = true;
 
     Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getName(), world_origin_x, world_origin_y, world_origin_z, use_z_relative_to_home, world_origin_use_home_position_);
 
@@ -655,6 +655,8 @@ void EstimationManager::initialize() {
     ch_->world_origin.y = world_origin_y;
     ch_->world_origin.z = world_origin_z;
     ch_->use_z_relative_to_home = use_z_relative_to_home;
+      
+    RCLCPP_INFO(node_->get_logger(), "Z origin. %f, is relative to home: %d", world_origin_z, use_z_relative_to_home);
   }
   /*//}*/
 

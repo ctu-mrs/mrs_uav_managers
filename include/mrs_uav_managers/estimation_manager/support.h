@@ -356,7 +356,7 @@ public:
 
   static bool loadWorldOrigin(mrs_lib::ParamLoader &param_loader, const rclcpp::Logger &logger,
                               const std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> &error_publisher, const std::string &print_name,
-                              double &world_origin_x, double &world_origin_y, bool &world_origin_use_home_position) {
+                              double &world_origin_x, double &world_origin_y, double &world_origin_z, bool &use_z_relative_to_home, bool &world_origin_use_home_position) {
 
     param_loader.loadParam("mrs_uav_managers/world_origin/use_home_position", world_origin_use_home_position, false);
 
@@ -376,6 +376,8 @@ public:
 
       is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
       is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
 
     } else if (toLowercase(world_origin_units) == "latlon") {
 
@@ -384,6 +386,8 @@ public:
       double lat, lon;
       is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
       is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
 
       mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
 
