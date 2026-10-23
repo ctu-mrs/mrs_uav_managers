@@ -189,6 +189,9 @@ def generate_launch_description():
             ("~/map_delay_out", "~/map_delay"),
             # services in
             ("~/set_world_origin_in", "~/set_world_origin"),
+            ("~/is_world_origin_ready_in", "~/is_world_origin_ready"),
+            # services out
+            ("~/set_world_origin_out", "estimation_manager/set_world_origin"),
         ],
 
         extra_arguments=[

@@ -105,7 +105,7 @@ mrs_uav_managers:
       # * true => any safety measure that would othewise lead to the ground will result in giving control back to the safety pilot's RC controller
       #    > use above water or other surfaces when immediate landing is not the best choice
       #    > use when the safety pilot is always ready to take over
-      # * false => the system will automatically eland, failsafe leanding or disarm to minimize damage during malfunction
+      # * false => the system will automatically eland, failsafe landing or disarm to minimize damage during malfunction
       #    > use in multi-robot experiments
       #    > use when the pilot might not be able to safe the UAV
       rc_emergency_handoff:

@@ -236,6 +236,7 @@ def generate_launch_description():
             ("~/set_odometry_callbacks_out", "estimation_manager/toggle_service_callbacks"),
             ("~/ungrip_out", "gripper/ungrip"),
             ("~/offboard_out", "hw_api/offboard"),
+            ("~/is_world_origin_ready_out", "transform_manager/is_world_origin_ready"),
         ],
 
         extra_arguments=[

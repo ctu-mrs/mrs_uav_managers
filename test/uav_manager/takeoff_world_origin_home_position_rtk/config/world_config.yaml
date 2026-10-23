@@ -1,0 +1,36 @@
+mrs_uav_managers:
+
+  world_origin:
+
+    # feature under test: pin the world_origin to the UAV's home position, determined at runtime
+    # from the first usable GNSS/RTK fix (no static units/origin_x/origin_y needed in this mode)
+    use_home_position: true
+
+  safety_area_manager:
+
+    safety_area:
+
+      enabled: true
+
+      horizontal:
+
+        # points are relative to the (home) world_origin, so home sits inside the fence
+        frame_name: "world_origin"
+
+        points: [
+          -50, -50,
+          50,  -50,
+          50,  50,
+          -50, 50,
+        ]
+
+      vertical:
+
+        frame_name: "world_origin"
+
+        max_z: 15.0
+        min_z: 0.5
+
+      obstacles:
+
+        present: false

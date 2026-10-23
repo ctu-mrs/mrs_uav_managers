@@ -236,6 +236,7 @@ class ControlManager : public mrs_lib::Node {
 
 public:
   ControlManager(rclcpp::NodeOptions options);
+  ~ControlManager();
 
 private:
   rclcpp::Node::SharedPtr  trackers_subnode_;
@@ -298,8 +299,9 @@ private:
   rclcpp::TimerBase::SharedPtr timer_hw_api_capabilities_;
   void                         timerHwApiCapabilities();
 
-  void initialize(void);
-  void shutdown();
+  void                             initialize(void);
+  void                             shutdown();
+  rclcpp::OnShutdownCallbackHandle shutdown_callback_handle_;
 
   // | ------------ tracker and controller switching ------------ |
 
@@ -964,11 +966,19 @@ ControlManager::ControlManager(rclcpp::NodeOptions options) : mrs_lib::Node("con
 
 //}
 
+/* ~ControlManager() //{ */
+
+ControlManager::~ControlManager() {
+  rclcpp::contexts::get_global_default_context()->remove_on_shutdown_callback(shutdown_callback_handle_);
+}
+
+//}
+
 /* initialize() //{ */
 
 void ControlManager::initialize(void) {
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  shutdown_callback_handle_ = rclcpp::contexts::get_global_default_context()->add_on_shutdown_callback([this]() { this->shutdown(); });
 
   joystick_start_press_time_      = rclcpp::Time(0, 0, clock_->get_clock_type());
   joystick_failsafe_press_time_   = rclcpp::Time(0, 0, clock_->get_clock_type());
@@ -1001,63 +1011,63 @@ void ControlManager::initialize(void) {
   if (_custom_config_ != "") {
     if (!param_loader_->addYamlFile(_custom_config_)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load custom_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (_platform_config_ != "") {
     if (!param_loader_->addYamlFile(_platform_config_)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load platform_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (_world_config_ != "") {
     if (!param_loader_->addYamlFile(_world_config_)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load world_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (_network_config_ != "") {
     if (!param_loader_->addYamlFile(_network_config_)) {
       RCLCPP_ERROR(node_->get_logger(), "failed to load network_config");
-      rclcpp::shutdown();
-      exit(1);
+      error_publisher_->addOneshotError("failed to load network_config");
+      error_publisher_->flushAndShutdown();
     }
   }
 
   if (!param_loader_->addYamlFileFromParam("private_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load private_config");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader_->addYamlFileFromParam("public_config")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load public_config");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader_->addYamlFileFromParam("private_trackers")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_trackers");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load private_trackers");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader_->addYamlFileFromParam("private_controllers")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load private_controllers");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load private_controllers");
+    error_publisher_->flushAndShutdown();
   }
 
   if (!param_loader_->addYamlFileFromParam("public_controllers")) {
     RCLCPP_ERROR(node_->get_logger(), "failed to load public_controllers");
-    rclcpp::shutdown();
-    exit(1);
+    error_publisher_->addOneshotError("failed to load public_controllers");
+    error_publisher_->flushAndShutdown();
   }
 
   // params passed from the launch file are not prefixed
@@ -1834,8 +1844,15 @@ void ControlManager::initialize(void) {
   ph_diagnostics_            = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlManagerDiagnostics>(node_, "~/diagnostics_out");
   ph_offboard_on_            = mrs_lib::PublisherHandler<std_msgs::msg::Empty>(node_, "~/offboard_on_out");
   ph_tilt_error_             = mrs_lib::PublisherHandler<mrs_msgs::msg::Float64Stamped>(node_, "~/tilt_error_out");
-  ph_mass_nominal_           = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(node_, "~/mass_nominal_out"); // TODO latch
-  ph_control_error_          = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
+
+  {
+    mrs_lib::PublisherHandlerOptions opts;
+    opts.node        = node_;
+    opts.qos         = rclcpp::QoS(1).transient_local();
+    ph_mass_nominal_ = mrs_lib::PublisherHandler<std_msgs::msg::Float64>(opts, "~/mass_nominal_out");
+  }
+
+  ph_control_error_ = mrs_lib::PublisherHandler<mrs_msgs::msg::ControlError>(node_, "~/control_error_out");
 
   {
     mrs_lib::PublisherHandlerOptions opts;
@@ -2191,6 +2208,10 @@ void ControlManager::initialize(void) {
 void ControlManager::shutdown() {
 
   std::cout << "ControlManager: shutdown(): called" << std::endl;
+
+  if (!is_initialized_) {
+    return;
+  }
 
   timer_status_->stop();
   timer_failsafe_->stop();

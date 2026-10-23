@@ -1,0 +1,13 @@
+mrs_uav_managers:
+
+  estimation_manager:
+
+    # two utm-based estimators, so switching between them makes TransformManager hand the
+    # utm_origin/world_origin tfs over to a different tf source
+    state_estimators: [
+      "gps_garmin",
+      "gps_baro",
+    ]
+
+    initial_state_estimator: "gps_garmin"
+    agl_height_estimator: ""

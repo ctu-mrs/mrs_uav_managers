@@ -401,7 +401,8 @@ private:
 
   void initialize();
 
-  void shutdown();
+  void                             shutdown();
+  rclcpp::OnShutdownCallbackHandle shutdown_callback_handle_;
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::HwApiCapabilities> sh_hw_api_capabilities_;
 
@@ -415,6 +416,11 @@ private:
   mrs_lib::ServiceServerHandler<mrs_msgs::srv::ReferenceStampedSrv> srvs_set_world_origin_;
   bool callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Request>  request,
                               const std::shared_ptr<mrs_msgs::srv::ReferenceStampedSrv::Response> response);
+
+  // with use_home_position the world origin is not known at startup, it is pushed in by
+  // TransformManager once the home position is captured
+  bool              world_origin_use_home_position_ = false;
+  std::atomic<bool> world_origin_set_               = false;
 
   mrs_lib::ServiceServerHandler<std_srvs::srv::SetBool> srvs_toggle_callbacks_;
 
@@ -457,6 +463,7 @@ private:
 
 public:
   EstimationManager(rclcpp::NodeOptions options);
+  ~EstimationManager();
 
   std::string getName() const;
 };
@@ -490,6 +497,14 @@ EstimationManager::EstimationManager(rclcpp::NodeOptions options) : mrs_lib::Nod
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
 
   timer_wait_for_time_ = node_->create_wall_timer(std::chrono::duration<double>(1.0), std::bind(&EstimationManager::timerWaitForTime, this));
+}
+
+//}
+
+/* ~EstimationManager() //{ */
+
+EstimationManager::~EstimationManager() {
+  rclcpp::contexts::get_global_default_context()->remove_on_shutdown_callback(shutdown_callback_handle_);
 }
 
 //}
@@ -550,7 +565,7 @@ void EstimationManager::timerPreinit() {
 
 void EstimationManager::initialize() {
 
-  rclcpp::on_shutdown([this]() { this->shutdown(); });
+  shutdown_callback_handle_ = rclcpp::contexts::get_global_default_context()->add_on_shutdown_callback([this]() { this->shutdown(); });
 
   RCLCPP_INFO(node_->get_logger(), "initializing");
 
@@ -571,70 +586,75 @@ void EstimationManager::initialize() {
   param_loader.loadParam("world_config", _world_config_);
 
   if (_custom_config_ != "") {
-    param_loader.addYamlFile(_custom_config_);
+    if (!param_loader.addYamlFile(_custom_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load custom_config");
+      error_publisher_->addOneshotError("failed to load custom_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_platform_config_ != "") {
-    param_loader.addYamlFile(_platform_config_);
+    if (!param_loader.addYamlFile(_platform_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load platform_config");
+      error_publisher_->addOneshotError("failed to load platform_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
   if (_world_config_ != "") {
-    param_loader.addYamlFile(_world_config_);
+    if (!param_loader.addYamlFile(_world_config_)) {
+      RCLCPP_ERROR(node_->get_logger(), "failed to load world_config");
+      error_publisher_->addOneshotError("failed to load world_config");
+      error_publisher_->flushAndShutdown();
+    }
   }
 
-  param_loader.addYamlFileFromParam("private_config");
-  param_loader.addYamlFileFromParam("public_config");
-  param_loader.addYamlFileFromParam("uav_manager_config");
-  param_loader.addYamlFileFromParam("estimators_config");
-  param_loader.addYamlFileFromParam("active_estimators_config");
+  if (!param_loader.addYamlFileFromParam("private_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load private_config");
+    error_publisher_->addOneshotError("failed to load private_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("public_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load public_config");
+    error_publisher_->addOneshotError("failed to load public_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("uav_manager_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load uav_manager_config");
+    error_publisher_->addOneshotError("failed to load uav_manager_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("estimators_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load estimators_config");
+    error_publisher_->addOneshotError("failed to load estimators_config");
+    error_publisher_->flushAndShutdown();
+  }
+
+  if (!param_loader.addYamlFileFromParam("active_estimators_config")) {
+    RCLCPP_ERROR(node_->get_logger(), "failed to load active_estimators_config");
+    error_publisher_->addOneshotError("failed to load active_estimators_config");
+    error_publisher_->flushAndShutdown();
+  }
 
   param_loader.loadParam("uav_name", ch_->uav_name);
 
   /*//{ load world_origin parameters */
 
-  std::string world_origin_units;
-  bool        is_origin_param_ok = true;
-  bool        use_z_relative_to_home = true;
-  double      world_origin_x     = 0;
-  double      world_origin_y     = 0;
-  double      world_origin_z     = 0;
+  {
+    bool        use_z_relative_to_home = true;
+    double      world_origin_x     = 0;
+    double      world_origin_y     = 0;
+    double      world_origin_z     = 0;
 
-  param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
+    Support::loadWorldOrigin(param_loader, node_->get_logger(), error_publisher_, getName(), world_origin_x, world_origin_y, world_origin_z, use_z_relative_to_home, world_origin_use_home_position_);
 
-  if (Support::toLowercase(world_origin_units) == "utm") {
-    RCLCPP_INFO(node_->get_logger(), "Loading world origin in UTM units.");
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
-
-  } else if (Support::toLowercase(world_origin_units) == "latlon") {
-    double lat, lon;
-    RCLCPP_INFO(node_->get_logger(), "Loading world origin in LatLon units.");
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_z", world_origin_z);
-    is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/use_z_relative_to_home", use_z_relative_to_home);
-    mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
-    RCLCPP_INFO(node_->get_logger(), "Converted to UTM x: %f, y: %f.", world_origin_x, world_origin_y);
-
-  } else {
-    RCLCPP_ERROR(node_->get_logger(), "world_origin_units must be (\"UTM\"|\"LATLON\"). Got '%s'", world_origin_units.c_str());
-    error_publisher_->addOneshotError("world_origin_units must be (\"UTM\"|\"LATLON\").");
-    error_publisher_->flushAndShutdown();
-  }
-
-  ch_->world_origin.x = world_origin_x;
-  ch_->world_origin.y = world_origin_y;
-  ch_->world_origin.z = world_origin_z;
-  ch_->use_z_relative_to_home = use_z_relative_to_home;
-    
-  RCLCPP_INFO(node_->get_logger(), "Z origin. %f, use z relative to home: %d", world_origin_z, use_z_relative_to_home);
-
-  if (!is_origin_param_ok) {
-    RCLCPP_ERROR(node_->get_logger(), "Could not load all mandatory parameters from world file. Please check your world file.");
-    error_publisher_->addOneshotError("Could not load all mandatory parameters from world file.");
-    error_publisher_->flushAndShutdown();
+    ch_->world_origin.x = world_origin_x;
+    ch_->world_origin.y = world_origin_y;
+    ch_->world_origin.z = world_origin_z;
+    ch_->use_z_relative_to_home = use_z_relative_to_home;
   }
   /*//}*/
 
@@ -1154,10 +1174,21 @@ void EstimationManager::timerCheckHealth() {
 
   /*//{ start ready estimators, check switchable estimators */
 
+  // in home-position mode the world origin arrives at runtime; hold the estimators until then so
+  // they are never anchored to the placeholder origin and never have to be reset off it, which
+  // would re-anchor every frame derived from them
+  const bool waiting_for_world_origin = world_origin_use_home_position_ && !world_origin_set_;
+
+  if (waiting_for_world_origin) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "%s a usable GNSS/RTK fix to establish the home-position world_origin",
+                         Support::waiting_for_string.c_str());
+    error_publisher_->addWaitingForNodeError({"TransformManager", "main"});
+  }
+
   std::vector<std::string> switchable_estimator_names;
   for (auto estimator : estimator_list_) {
 
-    if (estimator->isReady()) {
+    if (estimator->isReady() && !waiting_for_world_origin) {
       try {
         RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "starting the estimator '%s'", estimator->getName().c_str());
         estimator->start();
@@ -1274,6 +1305,10 @@ void EstimationManager::timerCheckHealth() {
 void EstimationManager::shutdown() {
 
   std::cout << "EstimationManager: shutdown(): called" << std::endl;
+
+  if (!sm_ || !sm_->isInitialized()) {
+    return;
+  }
 
   timer_check_health_->stop();
   timer_publish_->stop();
@@ -1464,11 +1499,24 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
     return false;
   }
 
-  if (!callbacks_enabled_) {
+  // callbacks are only enabled from READY_FOR_FLIGHT onwards, which in home-position mode cannot be
+  // reached until this very call delivers the origin and releases the estimators; let the automated
+  // home-position push (identified by its frame_id marker, set only by TransformManager's own retry
+  // timer) through in that case, so an unrelated caller can't race it for the one-time origin adoption.
+  // The state check below still keeps the origin from being changed in flight.
+  const std::string home_position_marker  = "home_position_";
+  const bool        is_home_position_push = request->header.frame_id.find(home_position_marker) != std::string::npos;
+  if (!callbacks_enabled_ && !(world_origin_use_home_position_ && !world_origin_set_ && is_home_position_push)) {
     response->success = false;
     response->message = ("Service callbacks are disabled");
     RCLCPP_WARN(node_->get_logger(), "[%s]: Ignoring service call. Callbacks are disabled.", getName().c_str());
     return true;
+  }
+
+  // the marker above is only meaningful to this guard; strip it so the rest of this function and the
+  // forwarded calls to TransformManager/SafetyAreaManager see only the canonical frame_id
+  if (is_home_position_push) {
+    request->header.frame_id.erase(0, home_position_marker.size());
   }
 
   if (sm_->isInState(StateMachine::INITIALIZED_STATE) || sm_->isInState(StateMachine::READY_FOR_FLIGHT_STATE)) {
@@ -1500,6 +1548,9 @@ bool EstimationManager::callbackSetWorldOrigin(const std::shared_ptr<mrs_msgs::s
 
     ch_->world_origin.x = world_origin_x;
     ch_->world_origin.y = world_origin_y;
+
+    // releases the estimators in home-position mode, where they were held until the origin was known
+    world_origin_set_ = true;
 
     for (auto estimator : estimator_list_) {
 

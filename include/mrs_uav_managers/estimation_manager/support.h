@@ -18,6 +18,9 @@
 
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/transformer.h>
+#include <mrs_lib/param_loader.h>
+#include <mrs_lib/gps_conversions.h>
+#include <mrs_lib/errorgraph/error_publisher.h>
 
 //}
 
@@ -345,6 +348,62 @@ public:
   static std::string frameIdToEstimatorName(const std::string &str_in) {
     const std::string str_tmp = str_in.substr(str_in.find("/") + 1, str_in.size());
     return str_tmp.substr(0, str_tmp.find("_origin"));
+  }
+
+  /*//}*/
+
+  /*//{ loadWorldOrigin() */
+
+  static bool loadWorldOrigin(mrs_lib::ParamLoader &param_loader, const rclcpp::Logger &logger,
+                              const std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> &error_publisher, const std::string &print_name,
+                              double &world_origin_x, double &world_origin_y, bool &world_origin_use_home_position) {
+
+    param_loader.loadParam("mrs_uav_managers/world_origin/use_home_position", world_origin_use_home_position, false);
+
+    if (world_origin_use_home_position) {
+      RCLCPP_INFO(logger, "[%s]: world_origin will be pinned to the UAV's home position (set at runtime).", print_name.c_str());
+      return true;
+    }
+
+    bool        is_origin_param_ok = true;
+    std::string world_origin_units;
+
+    param_loader.loadParam("mrs_uav_managers/world_origin/units", world_origin_units);
+
+    if (toLowercase(world_origin_units) == "utm") {
+
+      RCLCPP_INFO(logger, "[%s]: Loading world origin in UTM units.", print_name.c_str());
+
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", world_origin_x);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", world_origin_y);
+
+    } else if (toLowercase(world_origin_units) == "latlon") {
+
+      RCLCPP_INFO(logger, "[%s]: Loading world origin in LatLon units.", print_name.c_str());
+
+      double lat, lon;
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_x", lat);
+      is_origin_param_ok &= param_loader.loadParam("mrs_uav_managers/world_origin/origin_y", lon);
+
+      mrs_lib::UTM(lat, lon, &world_origin_x, &world_origin_y);
+
+      RCLCPP_INFO(logger, "[%s]: Converted to UTM x: %f, y: %f.", print_name.c_str(), world_origin_x, world_origin_y);
+
+    } else {
+      RCLCPP_ERROR(logger, "[%s]: mrs_uav_managers/world_origin/units must be (\"UTM\"|\"LATLON\"). Got '%s'", print_name.c_str(), world_origin_units.c_str());
+      error_publisher->addOneshotError("Invalid world_origin/units: must be 'UTM' or 'LATLON'.");
+      error_publisher->flushAndShutdown();
+      return false;
+    }
+
+    if (!is_origin_param_ok) {
+      RCLCPP_ERROR(logger, "[%s]: Could not load all mandatory parameters from world file. Please check your world file.", print_name.c_str());
+      error_publisher->addOneshotError("Could not load all mandatory parameters from world file.");
+      error_publisher->flushAndShutdown();
+      return false;
+    }
+
+    return true;
   }
 
   /*//}*/
