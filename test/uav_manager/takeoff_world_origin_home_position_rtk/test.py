@@ -94,7 +94,7 @@ def generate_test_description():
                         ])
                     ]),
                     launch_arguments={
-                        'custom_config': launch_dir+"/config/hw_api.yaml",
+                        'custom_config': launch_dir+"/config/custom_config.yaml",
                     }.items()
                 )
             ]

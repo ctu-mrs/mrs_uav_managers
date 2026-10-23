@@ -9,3 +9,22 @@ mrs_uav_managers:
 
     initial_state_estimator: "rtk_garmin"
     agl_height_estimator: "garmin_agl"
+
+mrs_uav_hw_api:
+
+  outputs:
+    distance_sensor:      true
+    gnss:                 false
+    gnss_status:          false
+    rtk:                  true
+    imu:                  true
+    altitude:             true
+    magnetometer_heading: true
+    rc_channels:          true
+    battery_state:        true
+    position:             true
+    orientation:          true
+    velocity:             true
+    angular_velocity:     true
+    odometry:             false
+    ground_truth:         false
