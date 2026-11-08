@@ -47,11 +47,17 @@ void DiagnosticsManager::initialize() {
   mrs_lib::ParamLoader param_loader(node_, "DiagnosticsManager");
 
   std::string custom_config_path;
+  std::string platform_config_path;
 
-  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("custom_config", custom_config_path, std::string(""));
+  param_loader.loadParam("platform_config", platform_config_path, std::string(""));
 
   if (custom_config_path != "") {
     param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
   }
 
   param_loader.addYamlFileFromParam("private_config");

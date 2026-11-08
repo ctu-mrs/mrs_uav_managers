@@ -24,11 +24,17 @@ void PreflightChecker::initialize(void) {
   // Load parameters, set up subscribers, etc.
   mrs_lib::ParamLoader param_loader(node_, "PreflightChecker");
   std::string          custom_config_path;
+  std::string          platform_config_path;
 
-  param_loader.loadParam("custom_config", custom_config_path);
+  param_loader.loadParam("custom_config", custom_config_path, std::string(""));
+  param_loader.loadParam("platform_config", platform_config_path, std::string(""));
 
   if (custom_config_path != "") {
     param_loader.addYamlFile(custom_config_path);
+  }
+
+  if (platform_config_path != "") {
+    param_loader.addYamlFile(platform_config_path);
   }
 
   param_loader.addYamlFileFromParam("preflight_check_config");
