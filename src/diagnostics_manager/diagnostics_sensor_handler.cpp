@@ -35,6 +35,12 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
     param_loader.addYamlFile(custom_config_path);
   }
 
+  std::string platform_config_path;
+  param_loader.loadParam("platform_config", platform_config_path, std::string(""));
+  if (!platform_config_path.empty()) {
+    param_loader.addYamlFile(platform_config_path);
+  }
+
   param_loader.addYamlFileFromParam("public_config");
   param_loader.addYamlFileFromParam("public_sensor_handlers");
   param_loader.setPrefix("mrs_uav_managers/diagnostics_manager/sensor_handlers/");

@@ -97,10 +97,6 @@ def generate_launch_description():
 
     # #{ platform_config
 
-    # Declared for argument-compatibility with core.launch.py's uniform pass-through to every
-    # manager launch file. Unlike its sibling managers, DiagnosticsManager does not read this
-    # parameter (state_monitor.launch.py never had it either) -- it is computed here but not
-    # forwarded to the node below.
     platform_config = LaunchConfiguration('platform_config')
 
     ld.add_action(DeclareLaunchArgument(
@@ -157,6 +153,7 @@ def generate_launch_description():
 
         parameters=[
             {"custom_config": custom_config},
+            {"platform_config": platform_config},
             {"robot_name": uav_name},
             {"robot_type": robot_type},
             {"simulation": simulation},
