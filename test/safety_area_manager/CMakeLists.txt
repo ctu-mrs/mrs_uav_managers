@@ -1,1 +1,2 @@
 add_subdirectory(rviz_markers)
+add_subdirectory(outside_safety_area)

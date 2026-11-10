@@ -1,0 +1,12 @@
+# turning off for the takeoff test
+individual_takeoff_platform:
+  enabled: false
+
+uav1:
+  type: "x500"
+  spawn:
+    # outside the +-50 m safety area in config/world_config.yaml
+    x: 500.0
+    y: 500.0
+    z: 0.5
+    heading: 0.0
