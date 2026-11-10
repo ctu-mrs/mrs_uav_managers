@@ -1,0 +1,14 @@
+mrs_uav_managers:
+
+  diagnostics_manager:
+
+    preflight_check:
+
+      # short, so the test doesn't wait the default 5 s
+      time_window: 1.0 # [s]
+
+      topic_check:
+        timeout: 1.0 # [s]
+        topics: [
+          "/preflight_checker_test/heartbeat:std_msgs/msg/Empty",
+        ]
