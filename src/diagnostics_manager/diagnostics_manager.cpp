@@ -578,7 +578,13 @@ void DiagnosticsManager::timerHostInfo() {
   if (!is_initialized_) {
     return;
   }
-  host_stats_->update();
+  // a /proc or /sys read error must not kill the node
+  try {
+    host_stats_->update();
+  }
+  catch (const std::exception &e) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 10000, "Failed to update the host stats: %s", e.what());
+  }
 }
 
 //}
