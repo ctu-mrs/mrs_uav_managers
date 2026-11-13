@@ -1,0 +1,7 @@
+<map id="mrs_uav_managers::diagnostics_manager::DiagnosticsSensorHandler" name="mrs_uav_managers::diagnostics_manager::DiagnosticsSensorHandler">
+<area shape="rect" id="Node000001" title=" " alt="" coords="409,49,676,89"/>
+<area shape="rect" id="Node000002" href="$structmrs__uav__managers_1_1diagnostics__manager_1_1DiagnosticsSensorHandler_1_1RuntimeState.html" title=" " alt="" coords="5,5,272,60"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="286,43,410,54,409,59,286,48"/>
+<area shape="rect" id="Node000003" href="$classmrs__uav__managers_1_1diagnostics__manager_1_1utils_1_1RateTracker.html" title="Sliding&#45;window message&#45;rate tracker." alt="" coords="23,85,255,125"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="269,90,409,78,410,83,269,96"/>
+</map>
