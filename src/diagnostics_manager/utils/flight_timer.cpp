@@ -33,7 +33,8 @@ void FlightTimer::tick(bool null_tracker) {
 }
 
 void FlightTimer::loadFromDisk() {
-  if (!std::filesystem::exists(persist_path_)) {
+  std::error_code ec;
+  if (!std::filesystem::exists(persist_path_, ec)) {
     return;
   }
   std::ifstream file(persist_path_);
@@ -52,13 +53,19 @@ void FlightTimer::loadFromDisk() {
   }
 }
 
+// Best effort: a write error only loses the value across restarts.
 void FlightTimer::persistToDisk() {
   const std::string tmp_path = persist_path_ + ".tmp";
   {
     std::ofstream file(tmp_path, std::ios::trunc);
     file << secs_flown_.load();
+    file.close();
+    if (!file) {
+      return;
+    }
   }
-  std::filesystem::rename(tmp_path, persist_path_);
+  std::error_code ec;
+  std::filesystem::rename(tmp_path, persist_path_, ec);
 }
 
 } // namespace mrs_uav_managers::diagnostics_manager::utils

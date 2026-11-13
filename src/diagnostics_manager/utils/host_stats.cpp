@@ -18,14 +18,16 @@ std::vector<std::string> splitByChar(const std::string &line, char delim) {
 
 // Reads /proc/<pid>/cmdline (NUL-separated) into its arguments.
 // Returns an empty vector for kernel threads, zombies, or on any read error.
+// Uses getline: istreambuf_iterator throws if the process exits before the read.
 std::vector<std::string> readCmdline(int pid) {
-  std::ifstream cmdline("/proc/" + std::to_string(pid) + "/cmdline");
-  if (!cmdline.is_open()) {
-    return {};
+  std::ifstream            cmdline("/proc/" + std::to_string(pid) + "/cmdline");
+  std::vector<std::string> args;
+  std::string              arg;
+  while (std::getline(cmdline, arg, '\0')) {
+    if (!arg.empty()) {
+      args.push_back(std::move(arg));
+    }
   }
-  std::string raw((std::istreambuf_iterator<char>(cmdline)), std::istreambuf_iterator<char>());
-  auto        args = splitByChar(raw, '\0');
-  args.erase(std::remove(args.begin(), args.end(), ""), args.end());
   return args;
 }
 
@@ -299,7 +301,8 @@ void HostStats::readCpuTemperature() {
   bool found    = false;
   for (int i = 0; i < 11; ++i) {
     const std::string path = "/sys/class/thermal/thermal_zone" + std::to_string(i) + "/temp";
-    if (!std::filesystem::exists(path)) {
+    std::error_code   ec;
+    if (!std::filesystem::exists(path, ec)) {
       break;
     }
     std::ifstream file(path);
@@ -407,12 +410,10 @@ void HostStats::discoverRosPids(std::chrono::steady_clock::time_point now) {
   std::unordered_set<int> live_pids;
   std::unordered_set<int> discovered_ros_pids;
 
+  // increment(ec) does not throw, unlike a range-for
   std::error_code ec;
-  for (const auto &entry : std::filesystem::directory_iterator("/proc", ec)) {
-    if (ec) {
-      break;
-    }
-    const std::string name = entry.path().filename().string();
+  for (auto it = std::filesystem::directory_iterator("/proc", ec); !ec && it != std::filesystem::directory_iterator(); it.increment(ec)) {
+    const std::string name = it->path().filename().string();
     if (!isPidString(name)) {
       continue;
     }
