@@ -449,6 +449,9 @@ private:
   std::shared_ptr<mrs_uav_managers::StateEstimator>                         active_estimator_;
   std::mutex                                                                mutex_active_estimator_;
 
+  // held across a whole estimator switch, so the health check does not see a manual switch in progress as a failover
+  std::mutex mutex_estimator_switch_;
+
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_; // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
   std::shared_ptr<mrs_uav_managers::AglEstimator>                         est_alt_agl_;
@@ -458,6 +461,7 @@ private:
 
   bool switchToHealthyEstimator();
   void switchToEstimator(const std::shared_ptr<mrs_uav_managers::StateEstimator> &target_estimator);
+  std::tuple<std::shared_ptr<mrs_uav_managers::StateEstimator>, int> getActiveEstimator();
 
   bool loadConfigFile(const std::string &file_path);
 
@@ -996,13 +1000,15 @@ void EstimationManager::timerPublish() {
     return;
   }
 
+  auto [active_estimator, estimator_switch_count] = getActiveEstimator();
+
   mrs_msgs::msg::UavState uav_state;
-  auto                    ret = active_estimator_->getUavState();
+  auto                    ret = active_estimator->getUavState();
   if (ret) {
     uav_state = ret.value();
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
-    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getPrintName()});
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator->getPrintName()});
     return;
   }
 
@@ -1012,10 +1018,11 @@ void EstimationManager::timerPublish() {
     return;
   }
 
-  if (active_estimator_->isMitigatingJump()) {
-    estimator_switch_count_++;
+  if (active_estimator->isMitigatingJump()) {
+    std::scoped_lock lock(mutex_active_estimator_);
+    estimator_switch_count = ++estimator_switch_count_;
   }
-  uav_state.estimator_iteration = estimator_switch_count_;
+  uav_state.estimator_iteration = estimator_switch_count;
 
   scope_timer.checkpoint("get uav state");
   // TODO state health checks
@@ -1026,12 +1033,12 @@ void EstimationManager::timerPublish() {
   nav_msgs::msg::Odometry odom_main = Support::uavStateToOdom(uav_state);
 
   scope_timer.checkpoint("uav state to odom");
-  const std::vector<double> pose_covariance = active_estimator_->getPoseCovariance();
+  const std::vector<double> pose_covariance = active_estimator->getPoseCovariance();
   for (size_t i = 0; i < pose_covariance.size(); i++) {
     odom_main.pose.covariance[i] = pose_covariance[i];
   }
 
-  const std::vector<double> twist_covariance = active_estimator_->getTwistCovariance();
+  const std::vector<double> twist_covariance = active_estimator->getTwistCovariance();
   for (size_t i = 0; i < twist_covariance.size(); i++) {
     odom_main.twist.covariance[i] = twist_covariance[i];
   }
@@ -1039,7 +1046,7 @@ void EstimationManager::timerPublish() {
   scope_timer.checkpoint("get covariance");
   ph_odom_main_.publish(odom_main);
 
-  nav_msgs::msg::Odometry innovation = active_estimator_->getInnovation();
+  nav_msgs::msg::Odometry innovation = active_estimator->getInnovation();
   ph_innovation_.publish(innovation);
 
 
@@ -1073,13 +1080,15 @@ void EstimationManager::timerPublishDiagnostics() {
     return;
   }
 
+  auto [active_estimator, estimator_switch_count] = getActiveEstimator();
+
   mrs_msgs::msg::UavState uav_state;
-  auto                    ret = active_estimator_->getUavState();
+  auto                    ret = active_estimator->getUavState();
   if (ret) {
     uav_state = ret.value();
   } else {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Active estimator did not provide uav_state.");
-    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator_->getPrintName()});
+    error_publisher_->addWaitingForNodeError({"EstimationManager", active_estimator->getPrintName()});
     return;
   }
 
@@ -1098,9 +1107,9 @@ void EstimationManager::timerPublishDiagnostics() {
 
   mrs_msgs::msg::Float64Stamped max_flight_z_msg;
   max_flight_z_msg.header.stamp = clock_->now();
-  if (active_estimator_ && active_estimator_->isInitialized()) {
-    max_flight_z_msg.header.frame_id = active_estimator_->getFrameId();
-    max_flight_z_msg.value           = active_estimator_->getMaxFlightZ();
+  if (active_estimator && active_estimator->isInitialized()) {
+    max_flight_z_msg.header.frame_id = active_estimator->getFrameId();
+    max_flight_z_msg.value           = active_estimator->getMaxFlightZ();
   }
   max_flight_z_ = max_flight_z_msg.value;
   ph_max_flight_z_.publish(max_flight_z_msg);
@@ -1117,7 +1126,7 @@ void EstimationManager::timerPublishDiagnostics() {
 
   diagnostics.sm_state                 = sm_->getCurrentStateString();
   diagnostics.max_flight_z             = max_flight_z_msg.value;
-  diagnostics.estimator_iteration      = estimator_switch_count_;
+  diagnostics.estimator_iteration      = estimator_switch_count;
   diagnostics.estimation_rate          = ch_->desired_uav_state_rate;
   diagnostics.running_state_estimators = estimator_names_;
 
@@ -1126,9 +1135,9 @@ void EstimationManager::timerPublishDiagnostics() {
     diagnostics.switchable_state_estimators = switchable_estimator_names_;
   }
 
-  if (active_estimator_ && active_estimator_->isInitialized()) {
-    diagnostics.header.frame_id         = active_estimator_->getFrameId();
-    diagnostics.current_state_estimator = active_estimator_->getName();
+  if (active_estimator && active_estimator->isInitialized()) {
+    diagnostics.header.frame_id         = active_estimator->getFrameId();
+    diagnostics.current_state_estimator = active_estimator->getName();
   } else {
     diagnostics.header.frame_id         = "";
     diagnostics.current_state_estimator = "";
@@ -1153,7 +1162,7 @@ void EstimationManager::timerPublishDiagnostics() {
 
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 5000, "%s. pos: [%.2f, %.2f, %.2f] m. Estimator: %s. Max. z.: %.2f m. Estimator switches: %d.",
                        sm_->getCurrentStateString().c_str(), uav_state.pose.position.x, uav_state.pose.position.y, uav_state.pose.position.z,
-                       active_estimator_->getName().c_str(), max_flight_z_, estimator_switch_count_);
+                       active_estimator->getName().c_str(), max_flight_z_, estimator_switch_count);
 }
 
 //}
@@ -1239,18 +1248,21 @@ void EstimationManager::timerCheckHealth() {
     }
   }
 
-  // active estimator is in faulty state, we need to switch to healthy estimator
-  if (sm_->isInSwitchableState() && active_estimator_->isError()) {
-    sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
-  }
+  {
+    std::scoped_lock lock(mutex_estimator_switch_);
 
-  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
-    if (switchToHealthyEstimator()) {
-      sm_->changeToPreSwitchState();
-    } else { // cannot switch to healthy estimator - failsafe necessary
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
-      error_publisher_->addGeneralError(error_type_t::no_healthy_estimator_available, "Cannot switch to any healthy estimator. Triggering failsafe.");
-      sm_->changeState(StateMachine::FAILSAFE_STATE);
+    // active estimator is in faulty state, we need to switch to healthy estimator
+    if (sm_->isInSwitchableState() && std::get<0>(getActiveEstimator())->isError()) {
+
+      sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
+
+      if (switchToHealthyEstimator()) {
+        sm_->changeToPreSwitchState();
+      } else { // cannot switch to healthy estimator - failsafe necessary
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
+        error_publisher_->addGeneralError(error_type_t::no_healthy_estimator_available, "Cannot switch to any healthy estimator. Triggering failsafe.");
+        sm_->changeState(StateMachine::FAILSAFE_STATE);
+      }
     }
   }
 
@@ -1326,7 +1338,7 @@ void EstimationManager::shutdown() {
   }
 
   initial_estimator_.reset();
-  active_estimator_.reset();
+  mrs_lib::set_mutexed(mutex_active_estimator_, std::shared_ptr<mrs_uav_managers::StateEstimator>(), active_estimator_);
 
   std::cout << "EstimationManager: unloading agl estimator" << std::endl;
 
@@ -1360,7 +1372,7 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
   }
 
   // enable switching out from vins_kickoff estimator during takeoff
-  if (!callbacks_enabled_ && active_estimator_->getName() != "vins_kickoff") {
+  if (!callbacks_enabled_ && std::get<0>(getActiveEstimator())->getName() != "vins_kickoff") {
     response->success = false;
     response->message = ("Service callbacks are disabled");
     RCLCPP_WARN(node_->get_logger(), "Ignoring service call. Callbacks are disabled.");
@@ -1393,6 +1405,7 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
   if (target_estimator_found) {
 
     if (target_estimator->isRunning()) {
+      std::scoped_lock lock(mutex_estimator_switch_);
       sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
       switchToEstimator(target_estimator);
       sm_->changeToPreSwitchState();
@@ -1449,7 +1462,7 @@ bool EstimationManager::callbackResetEstimator(const std::shared_ptr<mrs_msgs::s
 
   if (target_estimator_found) {
 
-    if (target_estimator->getName() == active_estimator_->getName()) {
+    if (target_estimator->getName() == std::get<0>(getActiveEstimator())->getName()) {
       response->success = false;
       response->message = ("Cannot reset active estimator");
       RCLCPP_WARN(node_->get_logger(), "Ignoring service call. Cannot reset active estimator.");
@@ -1677,6 +1690,18 @@ void EstimationManager::switchToEstimator(const std::shared_ptr<mrs_uav_managers
   active_estimator_ = target_estimator;
   active_estimator_->setActive(true);
   estimator_switch_count_++;
+}
+
+//}
+
+/* getActiveEstimator() //{ */
+
+// switchToEstimator() replaces the active estimator from the service callback group
+std::tuple<std::shared_ptr<mrs_uav_managers::StateEstimator>, int> EstimationManager::getActiveEstimator() {
+
+  std::scoped_lock lock(mutex_active_estimator_);
+
+  return {active_estimator_, estimator_switch_count_};
 }
 
 //}
