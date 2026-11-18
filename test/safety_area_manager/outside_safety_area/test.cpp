@@ -51,6 +51,10 @@ bool Tester::test(void) {
     uh_ = uhopt.value();
   }
 
+  // created early, a request sent right after creating the client can get lost
+  auto sch_point_in_safety_area_2d =
+      mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "/" + uav_name + "/safety_area_manager/point_in_safety_area_2d");
+
   sub_safety_area_diag_ = node_->create_subscription<mrs_msgs::msg::SafetyAreaManagerDiagnostics>(
       "/" + uav_name + "/safety_area_manager/diagnostics", rclcpp::QoS(10), [this](const mrs_msgs::msg::SafetyAreaManagerDiagnostics::ConstSharedPtr msg) {
         std::scoped_lock lock(msgs_mtx_);
@@ -92,15 +96,17 @@ bool Tester::test(void) {
   // | ------- SafetyAreaManager is up and checking positions ------ |
 
   {
-    auto sch_point_in_safety_area_2d =
-        mrs_lib::ServiceClientHandler<mrs_msgs::srv::ReferenceStampedSrv>(node_, "/" + uav_name + "/safety_area_manager/point_in_safety_area_2d");
-
     auto request             = std::make_shared<mrs_msgs::srv::ReferenceStampedSrv::Request>();
     request->header.frame_id = uav_name + "/world_origin";
 
-    auto response = sch_point_in_safety_area_2d.callSync(request);
+    auto future = sch_point_in_safety_area_2d.callAsync(request);
 
-    if (!response || !response.value()->success) {
+    if (!future || future->wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+      RCLCPP_ERROR(node_->get_logger(), "point_in_safety_area_2d service did not respond");
+      return false;
+    }
+
+    if (!future->get()->success) {
       RCLCPP_ERROR(node_->get_logger(), "the safety area center (0, 0) is not reported as inside");
       return false;
     }
