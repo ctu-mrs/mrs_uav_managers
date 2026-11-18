@@ -150,7 +150,7 @@ On every reading the parser checks these rules from the top and stops at the fir
 
 Unit tests are `TEST(UavStateParser, ...)` in
 [`test/diagnostics_manager/uav_state_parser/test.cpp`][parser_test];
-[`manual_after_losing_offboard`][sim_test] runs in the simulator.
+[`manual_after_output_off`][sim_test] runs in the simulator.
 
 | Transition                                                                                                                                       | Test                                                                                           |
 |--------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
@@ -163,7 +163,7 @@ Unit tests are `TEST(UavStateParser, ...)` in
 | `OFFBOARD` -> `ARMED`: `!offboard`, `airborne == NO`, no active tracker                                                                          | `LingeringJoystickDoesNotChangeManual`                                                         |
 | `MANUAL` -> `ARMED` -> `DISARMED`: landed by a pilot while a tracker still reports a flight state; `!offboard` on the ground ignores the tracker | `NotOffboardOnGroundIgnoresTracker`                                                            |
 | `ARMED` / `OFFBOARD` / `FLYING` -> `MANUAL`: `!offboard`, `airborne == YES`                                                                      | `AirborneWithoutOffboardIsManualInEveryMode`, `LostOffboardWithTrackerStillActiveIsManual`     |
-| `HOVER` -> `MANUAL` -> `ARMED`: output switched off in the air (offboard lost, fall, landing)                                                    | `manual_after_losing_offboard` (simulation)                                                    |
+| `HOVER` -> `MANUAL` -> `ARMED`: output switched off in the air (offboard lost, fall, landing)                                                    | `manual_after_output_off` (simulation)                                                         |
 | `MANUAL` -> `MANUAL`: `!offboard`, `airborne == UNKNOWN` (sticky)                                                                                | `ManualIsStickyWhileAirborneUnknown`                                                           |
 | `MANUAL` -> `ARMED`: `airborne == NO`                                                                                                            | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss`                                          |
 | `MANUAL` -> `OFFBOARD`: offboard resumes                                                                                                         | `ManualEndsOnExplicitLandingDisarmOffboardOrLinkLoss`                                          |
@@ -198,4 +198,4 @@ Unit tests are `TEST(UavStateParser, ...)` in
 
 [parser]: ../../include/mrs_uav_managers/diagnostics_manager/uav_state_parser.hpp
 [parser_test]: ../../test/diagnostics_manager/uav_state_parser/test.cpp
-[sim_test]: ../../test/diagnostics_manager/manual_after_losing_offboard/
+[sim_test]: ../../test/diagnostics_manager/manual_after_output_off/
