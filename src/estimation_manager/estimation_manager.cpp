@@ -449,6 +449,9 @@ private:
   std::shared_ptr<mrs_uav_managers::StateEstimator>                         active_estimator_;
   std::mutex                                                                mutex_active_estimator_;
 
+  // held across a whole estimator switch, so the health check does not see a manual switch in progress as a failover
+  std::mutex mutex_estimator_switch_;
+
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::AglEstimator>> agl_estimator_loader_; // pluginlib loader of dynamically loaded estimators
   std::string                                                             est_alt_agl_name_ = "UNDEFINED_AGL_ESTIMATOR";
   std::shared_ptr<mrs_uav_managers::AglEstimator>                         est_alt_agl_;
@@ -1245,18 +1248,21 @@ void EstimationManager::timerCheckHealth() {
     }
   }
 
-  // active estimator is in faulty state, we need to switch to healthy estimator
-  if (sm_->isInSwitchableState() && std::get<0>(getActiveEstimator())->isError()) {
-    sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
-  }
+  {
+    std::scoped_lock lock(mutex_estimator_switch_);
 
-  if (sm_->isInState(StateMachine::ESTIMATOR_SWITCHING_STATE)) {
-    if (switchToHealthyEstimator()) {
-      sm_->changeToPreSwitchState();
-    } else { // cannot switch to healthy estimator - failsafe necessary
-      RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
-      error_publisher_->addGeneralError(error_type_t::no_healthy_estimator_available, "Cannot switch to any healthy estimator. Triggering failsafe.");
-      sm_->changeState(StateMachine::FAILSAFE_STATE);
+    // active estimator is in faulty state, we need to switch to healthy estimator
+    if (sm_->isInSwitchableState() && std::get<0>(getActiveEstimator())->isError()) {
+
+      sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
+
+      if (switchToHealthyEstimator()) {
+        sm_->changeToPreSwitchState();
+      } else { // cannot switch to healthy estimator - failsafe necessary
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "Cannot switch to any healthy estimator. Triggering failsafe.");
+        error_publisher_->addGeneralError(error_type_t::no_healthy_estimator_available, "Cannot switch to any healthy estimator. Triggering failsafe.");
+        sm_->changeState(StateMachine::FAILSAFE_STATE);
+      }
     }
   }
 
@@ -1399,6 +1405,7 @@ bool EstimationManager::callbackChangeEstimator(const std::shared_ptr<mrs_msgs::
   if (target_estimator_found) {
 
     if (target_estimator->isRunning()) {
+      std::scoped_lock lock(mutex_estimator_switch_);
       sm_->changeState(StateMachine::ESTIMATOR_SWITCHING_STATE);
       switchToEstimator(target_estimator);
       sm_->changeToPreSwitchState();
