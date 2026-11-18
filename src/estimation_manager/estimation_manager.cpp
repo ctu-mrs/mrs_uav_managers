@@ -396,6 +396,17 @@ private:
   std::shared_ptr<TimerType> timer_publish_diagnostics_;
   void                       timerPublishDiagnostics();
 
+  struct DiagnosticsState
+  {
+    std::string              sm_state;
+    std::string              estimator_name;
+    int                      switch_count;
+    std::vector<std::string> switchable_estimators;
+
+    bool operator==(const DiagnosticsState &) const = default;
+  };
+  std::optional<DiagnosticsState> last_published_state_;
+
   std::shared_ptr<TimerType> timer_check_health_;
   void                       timerCheckHealth();
 
@@ -1302,6 +1313,17 @@ void EstimationManager::timerCheckHealth() {
     } else if ((clock_->now() - sh_control_input_.lastMsgTime()).seconds() > 0.1) {
       RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not received control input for %.4fs, estimation suboptimal, potentially unstable",
                            (clock_->now() - sh_control_input_.lastMsgTime()).seconds());
+    }
+  }
+
+  {
+    const auto [active_estimator, switch_count] = getActiveEstimator();
+
+    const DiagnosticsState state{sm_->getCurrentStateString(), active_estimator ? active_estimator->getName() : "", switch_count, switchable_estimator_names};
+
+    if (state != last_published_state_) {
+      last_published_state_ = state;
+      timerPublishDiagnostics();
     }
   }
 }
