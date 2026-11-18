@@ -118,6 +118,8 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::msg::ConstraintManagerDiagnostics> ph_diagnostics_;
 
   void                       timerDiagnostics();
+  void                       publishDiagnostics();
+  std::mutex                 mutex_publish_diagnostics_;
   std::shared_ptr<TimerType> timer_diagnostics_;
   double                     _diagnostics_rate_;
 
@@ -431,6 +433,9 @@ bool ConstraintManager::setConstraints(std::string constraints_name) {
     if (response.value()->success) {
 
       mrs_lib::set_mutexed(mutex_current_constraints_, constraints_name, current_constraints_);
+
+      publishDiagnostics();
+
       return true;
 
     } else {
@@ -650,6 +655,22 @@ void ConstraintManager::timerDiagnostics() {
   if (!sh_estimation_diag_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do constraint management, missing estimation diagnostics!");
     error_publisher_->addWaitingForNodeError({"EstimationManager", "main"});
+    return;
+  }
+
+  publishDiagnostics();
+}
+
+//}
+
+/* publishDiagnostics() //{ */
+
+void ConstraintManager::publishDiagnostics() {
+
+  // called from the setter and the timer, which run in different callback groups
+  std::scoped_lock lock(mutex_publish_diagnostics_);
+
+  if (!sh_estimation_diag_.hasMsg()) {
     return;
   }
 

@@ -122,6 +122,8 @@ private:
   mrs_lib::PublisherHandler<mrs_msgs::msg::GainManagerDiagnostics> ph_diagnostics_;
 
   void                       timerDiagnostics();
+  void                       publishDiagnostics();
+  std::mutex                 mutex_publish_diagnostics_;
   std::shared_ptr<TimerType> timer_diagnostics_;
   double                     _diagnostics_rate_;
 
@@ -562,6 +564,9 @@ bool GainManager::setGains(std::string gains_name) {
     }
 
     mrs_lib::set_mutexed(mutex_current_gains_, gains_name, current_gains_);
+
+    publishDiagnostics();
+
     return true;
   }
 }
@@ -672,8 +677,6 @@ void GainManager::timerGainManagement() {
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
-  auto control_manager_diagnostics = sh_estimation_diag_.getMsg();
-
   auto current_gains       = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
@@ -743,6 +746,22 @@ void GainManager::timerDiagnostics() {
   if (!sh_control_manager_diag_.hasMsg()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 10000, "can not do gain management, missing control manager diagnostics!");
     error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
+    return;
+  }
+
+  publishDiagnostics();
+}
+
+//}
+
+/* publishDiagnostics() //{ */
+
+void GainManager::publishDiagnostics() {
+
+  // called from the setter and the timer, which run in different callback groups
+  std::scoped_lock lock(mutex_publish_diagnostics_);
+
+  if (!sh_estimation_diag_.hasMsg()) {
     return;
   }
 
