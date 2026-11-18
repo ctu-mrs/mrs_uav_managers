@@ -233,6 +233,7 @@ private:
 
   std::tuple<bool, std::vector<mrs_lib::safety_zone::Point2d>> transformPoints(const std::vector<mrs_lib::safety_zone::Point2d> &points,
                                                                                const std::string &from_frame, const std::string &target_frame);
+  std::optional<std::vector<mrs_lib::safety_zone::Point2d>>    latlonToWorldOrigin(const std::vector<mrs_lib::safety_zone::Point2d> &points);
 
   std::tuple<bool, double>                                  transformZ(const std::string &current_frame, const std::string &target_frame, const double z);
   bool                                                      initializationFromFile(mrs_lib::ParamLoader &param_loader, const std::string &filename);
@@ -1514,8 +1515,21 @@ std::string SafetyAreaManager::visualizationFrame(const mrs_lib::safety_zone::Pr
 
 std::optional<mrs_lib::safety_zone::Prism> SafetyAreaManager::transformPrism(const mrs_lib::safety_zone::Prism &prism, const std::string &target_frame) {
 
-  auto border_points                        = prism.getPoints();
-  auto [success, transformed_border_points] = transformPoints(border_points, prism.getHorizontalFrame(), target_frame);
+  auto border_points = prism.getPoints();
+
+  bool                                       success = false;
+  std::vector<mrs_lib::safety_zone::Point2d> transformed_border_points;
+
+  // not through tf: right after a world origin change, the tf can still describe the old origin
+  if (prism.getHorizontalFrame() == "latlon_origin" && target_frame == "world_origin") {
+    if (const auto points = latlonToWorldOrigin(border_points)) {
+      success                   = true;
+      transformed_border_points = points.value();
+    }
+  } else {
+    std::tie(success, transformed_border_points) = transformPoints(border_points, prism.getHorizontalFrame(), target_frame);
+  }
+
   // transform max_z and min_z
   auto [z_success_max, transformed_max_z] = transformZ(prism.getVerticalFrame(), target_frame, prism.getMaxZ());
   auto [z_success_min, transformed_min_z] = transformZ(prism.getVerticalFrame(), target_frame, prism.getMinZ());
@@ -1557,6 +1571,37 @@ SafetyAreaManager::transformPoints(const std::vector<mrs_lib::safety_zone::Point
   }
 
   return std::make_tuple(true, transformed_points);
+}
+
+//}
+
+/* latlonToWorldOrigin() //{ */
+
+std::optional<std::vector<mrs_lib::safety_zone::Point2d>> SafetyAreaManager::latlonToWorldOrigin(const std::vector<mrs_lib::safety_zone::Point2d> &points) {
+
+  if (world_origin_use_home_position_ && !home_origin_adopted_) {
+    return std::nullopt;
+  }
+
+  const auto &origin = safety_zone_handler_.parameters.world_origin;
+
+  double origin_x = origin.x;
+  double origin_y = origin.y;
+
+  if (estimation_manager::Support::toLowercase(origin.units) == "latlon") {
+    mrs_lib::UTM(origin.x, origin.y, &origin_x, &origin_y);
+  }
+
+  std::vector<mrs_lib::safety_zone::Point2d> transformed;
+  transformed.reserve(points.size());
+
+  for (const auto &point : points) {
+    double x, y;
+    mrs_lib::UTM(boost::geometry::get<0>(point), boost::geometry::get<1>(point), &x, &y);
+    transformed.push_back(mrs_lib::safety_zone::Point2d{x - origin_x, y - origin_y});
+  }
+
+  return transformed;
 }
 
 //}
