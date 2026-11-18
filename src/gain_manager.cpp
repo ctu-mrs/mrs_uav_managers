@@ -677,8 +677,6 @@ void GainManager::timerGainManagement() {
 
   auto estimation_diagnostics = sh_estimation_diag_.getMsg();
 
-  auto control_manager_diagnostics = sh_estimation_diag_.getMsg();
-
   auto current_gains       = mrs_lib::get_mutexed(mutex_current_gains_, current_gains_);
   auto last_estimator_name = mrs_lib::get_mutexed(mutex_last_estimator_name_, last_estimator_name_);
 
