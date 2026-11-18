@@ -275,6 +275,8 @@ private:
   std::vector<std::shared_ptr<mrs_uav_managers::Tracker>>            tracker_list_;   // list of trackers, routines are callable from this
   std::mutex                                                         mutex_tracker_list_;
 
+  std::optional<std::pair<unsigned int, mrs_msgs::msg::TrackerStatus>> last_seen_tracker_status_;
+
   // | ------------- dynamic loading of controllers ------------- |
 
   std::unique_ptr<pluginlib::ClassLoader<mrs_uav_managers::Controller>> controller_loader_; // pluginlib loader of dynamically loaded controllers
@@ -806,6 +808,7 @@ private:
 
   // diagnostics publishing
   void publishDiagnostics(void);
+  bool trackerStatusChanged(const mrs_msgs::msg::TrackerStatus &a, const mrs_msgs::msg::TrackerStatus &b);
 
   void                                                  ungripSrv(void);
   mrs_lib::ServiceClientHandler<std_srvs::srv::Trigger> sch_ungrip_;
@@ -881,8 +884,8 @@ private:
 
   // | --------------------- other routines --------------------- |
 
-  // this is called to update the trackers and to receive position control command from the active one
-  void updateTrackers(void);
+  // this is called to update the trackers and to receive position control command from the active one, returns true if its status changed
+  bool updateTrackers(void);
 
   // this is called to update the controllers and to receive attitude control command from the active one
   void updateControllers(const mrs_msgs::msg::UavState &uav_state);
@@ -3617,7 +3620,7 @@ void ControlManager::asyncControl(void) {
 
     timerSafety();
 
-    updateTrackers();
+    const bool tracker_status_changed = updateTrackers();
 
     updateControllers(uav_state);
 
@@ -3664,6 +3667,11 @@ void ControlManager::asyncControl(void) {
     }
 
     publish();
+
+    // publish the diagnostics after the control output, so it is not delayed
+    if (tracker_status_changed) {
+      publishDiagnostics();
+    }
   }
 
   // if odometry switch happened, we finish it here and turn the safety timer back on
@@ -6656,6 +6664,17 @@ void ControlManager::publishDiagnostics(void) {
 
 //}
 
+/* trackerStatusChanged() //{ */
+
+// only the discrete fields, trajectory_idx changes every step while tracking
+bool ControlManager::trackerStatusChanged(const mrs_msgs::msg::TrackerStatus &a, const mrs_msgs::msg::TrackerStatus &b) {
+
+  return a.active != b.active || a.callbacks_enabled != b.callbacks_enabled || a.state != b.state || a.have_goal != b.have_goal ||
+         a.tracking_trajectory != b.tracking_trajectory || a.trajectory_length != b.trajectory_length;
+}
+
+//}
+
 /* setConstraintsToTrackers() //{ */
 
 void ControlManager::setConstraintsToTrackers(const mrs_msgs::srv::DynamicsConstraintsSrv::Request &constraints) {
@@ -8458,7 +8477,7 @@ std::tuple<bool, std::string> ControlManager::switchController(const std::string
 
 /* updateTrackers() //{ */
 
-void ControlManager::updateTrackers(void) {
+bool ControlManager::updateTrackers(void) {
 
   mrs_lib::Routine    profiler_routine = profiler_.createRoutine("updateTrackers");
   mrs_lib::ScopeTimer timer            = mrs_lib::ScopeTimer(node_, "ControlManager::updateTrackers", scope_timer_logger_, scope_timer_enabled_);
@@ -8474,6 +8493,8 @@ void ControlManager::updateTrackers(void) {
   std::optional<mrs_msgs::msg::TrackerCommand> tracker_command;
 
   unsigned int active_tracker_idx;
+
+  bool tracker_status_changed = false;
 
   {
     std::scoped_lock lock(mutex_tracker_list_);
@@ -8509,9 +8530,21 @@ void ControlManager::updateTrackers(void) {
       }
     }
 
-    if (active_tracker_idx == _null_tracker_idx_) {
-      return;
+    // | ------ detect a change of the active tracker's status ----- |
+
+    {
+      const auto status = tracker_list_.at(active_tracker_idx)->getStatus();
+
+      if (!last_seen_tracker_status_ || last_seen_tracker_status_->first != active_tracker_idx ||
+          trackerStatusChanged(last_seen_tracker_status_->second, status)) {
+        last_seen_tracker_status_ = std::make_pair(active_tracker_idx, status);
+        tracker_status_changed    = true;
+      }
     }
+  }
+
+  if (active_tracker_idx == _null_tracker_idx_) {
+    return tracker_status_changed;
   }
 
   if (validateTrackerCommand(node_, tracker_command, "tracker_command")) {
@@ -8552,6 +8585,8 @@ void ControlManager::updateTrackers(void) {
       }
     }
   }
+
+  return tracker_status_changed;
 }
 
 //}
