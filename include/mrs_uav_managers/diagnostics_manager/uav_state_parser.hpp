@@ -111,8 +111,8 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   const bool was_flying = is_flying_autonomously(previous);
 
   if (tracker_state == tracker_state_t::INVALID) {
-    // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update:
-    // a switch in progress, not "no tracker" -- keep the flight phase instead of dropping to OFFBOARD mid-air
+    // a tracker that doesn't report its state (e.g. a custom tracker leaving it unset) is still flying the UAV:
+    // keep the flight phase instead of dropping to OFFBOARD mid-air; NullTracker really means no tracker
     if (was_flying && control_manager_diagnostics->active_tracker != names::null_tracker)
       return previous;
 

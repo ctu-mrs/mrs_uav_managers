@@ -70,8 +70,8 @@ stateDiagram-v2
     note right of TAKEOFF
       follows the tracker's state:
       any can follow any other;
-      a tracker switch keeps
-      the current state
+      a tracker without a state
+      keeps the current state
     end note
   }
 ```
@@ -94,7 +94,7 @@ On every reading the parser checks these rules from the top and stops at the fir
    - `EmergencyController` and the tracker reports `STATE_LAND` -> `ELAND`, otherwise -> `EHOVER`.
 8. No active tracker (`NullTracker`, or the tracker reports `STATE_INVALID`):
    - the previous state was a flight state and the tracker isn't `NullTracker` -> keep the previous
-     state (a tracker switch in flight);
+     state (a tracker that doesn't report its state);
    - otherwise -> `OFFBOARD`.
 9. Joystick active (`joystick_active`, ControlManager's RC goto mode) -> `RC_MODE`.
 10. `LandoffTracker` reports `STATE_IDLE` -> `TAKEOFF`, unless the previous state was a flight state
@@ -138,11 +138,11 @@ On every reading the parser checks these rules from the top and stops at the fir
   through offboard. When a pilot takes over (e.g. during a takeoff), ControlManager doesn't notice
   and keeps its tracker active (finishing the takeoff into `HOVER`); after the pilot lands, that
   tracker must not show as a flight state on the ground.
-- **Tracker switch in flight (rule 8)**: a tracker activated in the air (`LandoffTracker` for land,
-  land home, eland or escalating failsafe; the tracker taking over after a mid-air activation)
-  reports `STATE_INVALID` for its first ~60-240 ms. Without this rule the state would drop to
-  `OFFBOARD` mid-air and `is_flying()` would briefly be false. `NullTracker` really means no
-  tracker, so after a landing the state still goes to `OFFBOARD`.
+- **Tracker without a state (rule 8)**: the MRS trackers report a state from their activation on;
+  a tracker that doesn't (e.g. a custom tracker leaving `TrackerStatus.state` unset) reads as
+  `STATE_INVALID`. Without this rule the state would drop to `OFFBOARD` mid-air and `is_flying()`
+  would be false. `NullTracker` really means no tracker, so after a landing the state still goes
+  to `OFFBOARD`.
 - **`LandoffTracker` idle (rule 10)**: after a takeoff, `LandoffTracker` goes idle before the next
   tracker takes over -- still `TAKEOFF`. Activated in the air for a landing it is idle before it
   starts landing; that is not a takeoff.
@@ -177,7 +177,7 @@ Unit tests are `TEST(UavStateParser, ...)` in
 | `OFFBOARD` -> `FLYING`: active tracker, `tracker_status.state`                                                                                   | `OffboardFlightUnchanged`, `TrackerStateMapsDirectly`, `AirborneUnknownIrrelevantWhenOffboard` |
 | `FLYING` (`LandoffTracker` deactivating, `STATE_IDLE`) -> `TAKEOFF`                                                                              | `LandoffTrackerIdleIsTakeoff`                                                                  |
 | `FLYING` (`LandoffTracker` activated in the air, `STATE_IDLE`) keeps the flight phase                                                            | `LandoffTrackerIdleInFlightIsNotTakeoff`                                                       |
-| `FLYING` -> `FLYING`: tracker switch (`STATE_INVALID`, not `NullTracker`) keeps the state                                                        | `TrackerSwitchInFlightKeepsState`                                                              |
+| `FLYING` -> `FLYING`: tracker without a state (`STATE_INVALID`, not `NullTracker`) keeps the state                                               | `TrackerWithoutStateInFlightKeepsState`                                                        |
 | `OFFBOARD` stays: new tracker `STATE_INVALID` on the ground                                                                                      | `NewTrackerOnGroundIsStillOffboard`                                                            |
 | `FLYING` -> `OFFBOARD`: `NullTracker` after a flight                                                                                             | `NullTrackerAfterFlightIsOffboard`                                                             |
 | `MANUAL` / `ARMED` / `OFFBOARD` -> `MIDAIR`: tracker `STATE_MIDAIR_ACTIVATION` (any `airborne`, any tracker name)                                | `MidairActivationTrackerIsMidairActivation`, `CustomMidairTrackerIsMidairActivation`           |

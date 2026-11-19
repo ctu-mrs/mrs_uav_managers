@@ -170,12 +170,12 @@ TEST(UavStateParser, LandoffTrackerIdleIsTakeoff) {
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, state_t::TAKEOFF), state_t::TAKEOFF);
 }
 
-TEST(UavStateParser, TrackerSwitchInFlightKeepsState) {
-  // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update;
-  // that is a switch in progress, not "no tracker" -- the UAV must not read as OFFBOARD (not flying) mid-air
+TEST(UavStateParser, TrackerWithoutStateInFlightKeepsState) {
+  // a tracker that doesn't report its state (STATE_INVALID, e.g. a custom tracker) is still flying the UAV;
+  // the UAV must not read as OFFBOARD (not flying) mid-air
   for (const auto previous : {state_t::HOVER, state_t::GOTO, state_t::TRAJECTORY, state_t::LAND, state_t::RC_MODE, state_t::TAKEOFF}) {
     auto m                  = std::make_shared<Cmd>();
-    m->active_tracker       = "LandoffTracker";
+    m->active_tracker       = "CustomTracker";
     m->tracker_status.state = Ts::STATE_INVALID;
     EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, previous), previous) << static_cast<int>(previous);
   }
