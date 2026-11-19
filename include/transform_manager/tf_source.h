@@ -2,6 +2,8 @@
 #ifndef TF_SOURCE_H
 #define TF_SOURCE_H
 
+#include <mutex>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <mrs_lib/param_loader.h>
@@ -184,6 +186,8 @@ public:
   /*//{ setUtmOrigin() */
   void setUtmOrigin(const geometry_msgs::msg::Point &pt) {
 
+    std::scoped_lock lock(mtx_origins_);
+
     if (is_utm_based_ && !is_utm_origin_set_) {
       utm_origin_        = pt;
       is_utm_origin_set_ = true;
@@ -194,6 +198,8 @@ public:
   /*//{ setWorldOrigin() */
   void setWorldOrigin(const geometry_msgs::msg::Point &pt) {
 
+    std::scoped_lock lock(mtx_origins_);
+
     if (is_utm_based_) {
       world_origin_        = pt;
       is_world_origin_set_ = true;
@@ -201,10 +207,18 @@ public:
   }
   /*//}*/
 
-  /*//{ invalidateFirstMsg() */
-  // forces recapture of the reference odom msg; call after the estimator frame is re-anchored (e.g.
-  // world-origin change + estimator reset), else the stale reference offsets the utm/world tfs
-  void invalidateFirstMsg() {
+  /*//{ changeWorldOrigin() */
+  // the estimators are reset when the world origin changes, which re-anchors their odom frame; the reference odom msg is recaptured
+  // together with the new origin, otherwise one tf could combine the new origin with the stale reference
+  void changeWorldOrigin(const geometry_msgs::msg::Point &pt) {
+
+    std::scoped_lock lock(mtx_origins_);
+
+    if (is_utm_based_) {
+      world_origin_        = pt;
+      is_world_origin_set_ = true;
+    }
+
     got_first_msg_ = false;
   }
   /*//}*/
@@ -237,6 +251,9 @@ private:
 
   bool                      is_world_origin_set_ = false;
   geometry_msgs::msg::Point world_origin_;
+
+  // the origins are set from the TransformManager's callbacks, the odom callback reads them together with first_msg_
+  std::mutex mtx_origins_;
 
   std::string full_topic_odom_;
   std::string full_topic_attitude_;
@@ -273,6 +290,8 @@ private:
     mrs_lib::ScopeTimer scope_timer = mrs_lib::ScopeTimer(node_, getPrintName() + "::callbackTfSourceOdom", ch_->scope_timer.logger, ch_->scope_timer.enabled);
 
     scope_timer.checkpoint("get msg");
+
+    std::scoped_lock lock(mtx_origins_);
 
     if (!got_first_msg_) {
       first_msg_     = msg;
