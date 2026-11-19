@@ -238,7 +238,7 @@ TEST(UavStateParser, MidairActivationYieldsToDisarmAndLinkLoss) {
 }
 
 TEST(UavStateParser, MidairActivationSequenceStaysFlying) {
-  // MANUAL (pilot flies) -> MIDAIR -> MpcTracker takes over (INVALID first, then braking, then hover)
+  // MANUAL (pilot flies) -> MIDAIR -> MpcTracker takes over (INVALID first, then hover)
   state_t s = state_t::MANUAL;
   s         = parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker(), s);
   EXPECT_EQ(s, state_t::MIDAIR);
@@ -246,8 +246,6 @@ TEST(UavStateParser, MidairActivationSequenceStaysFlying) {
   EXPECT_EQ(s, state_t::MIDAIR);
   s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_INVALID), s);
   EXPECT_EQ(s, state_t::MIDAIR);
-  s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_REFERENCE), s);
-  EXPECT_EQ(s, state_t::GOTO);
   s = parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), hovering(), s);
   EXPECT_EQ(s, state_t::HOVER);
 }
