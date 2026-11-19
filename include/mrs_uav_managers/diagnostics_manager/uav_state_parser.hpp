@@ -15,11 +15,10 @@ namespace mrs_uav_managers::diagnostics_manager
 // TODO ControlManager should report these modes explicitly, so that no names are needed here
 namespace names
 {
-inline constexpr char null_tracker[]              = "NullTracker";
-inline constexpr char midair_activation_tracker[] = "MidairActivationTracker";
-inline constexpr char landoff_tracker[]           = "LandoffTracker";
-inline constexpr char eland_controller[]          = "EmergencyController";
-inline constexpr char failsafe_controller[]       = "FailsafeController";
+inline constexpr char null_tracker[]        = "NullTracker";
+inline constexpr char landoff_tracker[]     = "LandoffTracker";
+inline constexpr char eland_controller[]    = "EmergencyController";
+inline constexpr char failsafe_controller[] = "FailsafeController";
 } // namespace names
 
 //}
@@ -50,6 +49,8 @@ inline tracker_state_t parse_tracker_state(const mrs_msgs::msg::ControlManagerDi
     return tracker_state_t::TRAJECTORY;
   case mrs_msgs::msg::TrackerStatus::STATE_LAND:
     return tracker_state_t::LAND;
+  case mrs_msgs::msg::TrackerStatus::STATE_MIDAIR_ACTIVATION:
+    return tracker_state_t::MIDAIR_ACTIVATION;
   default:
     return tracker_state_t::UNKNOWN;
   }
@@ -71,9 +72,9 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
   if (!hw_api_status->armed)
     return state_t::DISARMED;
 
-  // UavManager is taking over a UAV already in the air: MidairActivationTracker holds it while the autopilot is switched
-  // to OFFBOARD (before that, the HW still reports a pilot flying); the tracker never fills its state, so decide by name
-  if (control_manager_diagnostics->active_tracker == names::midair_activation_tracker)
+  // UavManager is taking over a UAV already in the air: its mid-air activation tracker holds it while the autopilot is
+  // switched to OFFBOARD (before that, the HW still reports a pilot flying)
+  if (parse_tracker_state(control_manager_diagnostics) == tracker_state_t::MIDAIR_ACTIVATION)
     return state_t::MIDAIR;
 
   // in the air without offboard: a pilot (any RC mode) or the autopilot itself (e.g. PX4 AUTO.*) is flying, not MRS;

@@ -37,8 +37,8 @@ stateDiagram-v2
     stays until landed
   end note
 
-  MANUAL --> MIDAIR: MidairActivationTracker
-  MIDAIR --> FLYING: next tracker<br/>reports a state
+  MANUAL --> MIDAIR: STATE_MIDAIR_ACTIVATION
+  MIDAIR --> FLYING: next tracker<br/>takes over
 
   OFFBOARD --> FLYING: tracker active
   FLYING --> OFFBOARD: no tracker
@@ -80,7 +80,7 @@ On every reading the parser checks these rules from the top and stops at the fir
 1. Missing input (`hw_api/status` or `control_manager/diagnostics` not received yet) -> `UNKNOWN`.
 2. HW API not connected to the autopilot -> `NO_LINK`.
 3. Not armed -> `DISARMED`.
-4. The active tracker is `MidairActivationTracker` -> `MIDAIR`.
+4. The tracker reports `STATE_MIDAIR_ACTIVATION` -> `MIDAIR`.
 5. Not offboard and the HW says the UAV is airborne -> `MANUAL`. Once in `MANUAL`, it stays there
    until the HW says the UAV has landed (`airborne == NO`) or offboard comes back. An unknown
    airborne reading does not end it.
@@ -105,7 +105,7 @@ On every reading the parser checks these rules from the top and stops at the fir
 
 ## Why some rules exist
 
-- **Matched by name**: `NullTracker` and `MidairActivationTracker` are built into ControlManager.
+- **Matched by name**: `NullTracker` is built into ControlManager.
   `LandoffTracker`, `EmergencyController` and `FailsafeController` are ControlManager parameters
   (`landing_takeoff_tracker`, `safety/eland/controller`, `safety/failsafe_controller`) matched
   against their default values; all names are in one place, `names` in `uav_state_parser.hpp`.
@@ -113,10 +113,10 @@ On every reading the parser checks these rules from the top and stops at the fir
 - **The previous state**: the parser keeps no state of its own. It gets the previously published
   state and uses it only in rules 5, 8 and 10.
 - **`MIDAIR` (rule 4)**: UavManager is taking over a UAV already in the air: control output ON, then
-  `MidairActivationTracker` holds the UAV while the autopilot is switched to offboard, then the next
-  tracker takes over. `MidairActivationTracker` never reports a tracker state, so it is recognized
-  by name. It is checked before `MANUAL` because until offboard is confirmed the HW still reports a
-  pilot flying. It counts as flying for `is_flying()` and `is_flying_autonomously()`.
+  its mid-air activation tracker (`MidairActivationTracker` by default) holds the UAV while the
+  autopilot is switched to offboard, then the next tracker takes over. The tracker reports
+  `STATE_MIDAIR_ACTIVATION`. It is checked before `MANUAL` because until offboard is confirmed the HW
+  still reports a pilot flying. It counts as flying for `is_flying()` and `is_flying_autonomously()`.
 - **Emergencies (rule 7)**: ControlManager's safety levels, in the order the escalating failsafe
   goes through them. `EHOVER`: holds the position after an error (e.g. a failed mid-air activation
   or takeoff, a tracker error); the UAV keeps flying until someone commands it. `ELAND`: lands where
@@ -177,7 +177,8 @@ Unit tests are `TEST(UavStateParser, ...)` in
 | `FLYING` -> `FLYING`: tracker switch (`STATE_INVALID`, not `NullTracker`) keeps the state                                                        | `TrackerSwitchInFlightKeepsState`                                                              |
 | `OFFBOARD` stays: new tracker `STATE_INVALID` on the ground                                                                                      | `NewTrackerOnGroundIsStillOffboard`                                                            |
 | `FLYING` -> `OFFBOARD`: `NullTracker` after a flight                                                                                             | `NullTrackerAfterFlightIsOffboard`                                                             |
-| `MANUAL` / `ARMED` / `OFFBOARD` -> `MIDAIR`: `MidairActivationTracker` (any `airborne`)                                                          | `MidairActivationTrackerIsMidairActivation`                                                    |
+| `MANUAL` / `ARMED` / `OFFBOARD` -> `MIDAIR`: tracker `STATE_MIDAIR_ACTIVATION` (any `airborne`, any tracker name)                                | `MidairActivationTrackerIsMidairActivation`, `CustomMidairTrackerIsMidairActivation`           |
+| `MidairActivationTracker` without `STATE_MIDAIR_ACTIVATION` is not `MIDAIR` (no name match)                                                      | `OldMidairTrackerWithoutStateIsNotMidair`                                                      |
 | `MIDAIR` -> `DISARMED` / `NO_LINK`                                                                                                               | `MidairActivationYieldsToDisarmAndLinkLoss`                                                    |
 | `MANUAL` -> `MIDAIR` -> (switch, `STATE_INVALID`) -> `GOTO` -> `HOVER`                                                                           | `MidairActivationSequenceStaysFlying`                                                          |
 | `MIDAIR` is flying (`is_flying`, `is_flying_autonomously`), maps to `STATE_MIDAIR`                                                               | `MidairActivationIsFlying`, `MidairActivationMapsToMessage`                                    |

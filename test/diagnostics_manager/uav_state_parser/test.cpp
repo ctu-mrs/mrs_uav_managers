@@ -209,11 +209,11 @@ TEST(UavStateParser, LandoffTrackerIdleInFlightIsNotTakeoff) {
 namespace
 {
 
-Cmd::ConstSharedPtr midair_activation_tracker() {
-  // MidairActivationTracker never fills tracker_status.state, so it always reads STATE_INVALID
+// the tracker UavManager uses during a mid-air activation (uav_manager/midair_activation/during_activation/tracker)
+Cmd::ConstSharedPtr midair_activation_tracker(const std::string &name = "MidairActivationTracker") {
   auto m                  = std::make_shared<Cmd>();
-  m->active_tracker       = "MidairActivationTracker";
-  m->tracker_status.state = Ts::STATE_INVALID;
+  m->active_tracker       = name;
+  m->tracker_status.state = Ts::STATE_MIDAIR_ACTIVATION;
   return m;
 }
 
@@ -226,6 +226,19 @@ TEST(UavStateParser, MidairActivationTrackerIsMidairActivation) {
   // also when the HW API can't tell or reports the ground (e.g. the simulator's takeoff platform)
   EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_UNKNOWN, "POSCTL"), midair_activation_tracker()), state_t::MIDAIR);
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), midair_activation_tracker(), state_t::ARMED), state_t::MIDAIR);
+}
+
+TEST(UavStateParser, CustomMidairTrackerIsMidairActivation) {
+  // recognised by the tracker state, so a tracker configured under another name works too
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker("MyMidairTracker"), state_t::MANUAL), state_t::MIDAIR);
+}
+
+TEST(UavStateParser, OldMidairTrackerWithoutStateIsNotMidair) {
+  // a MidairActivationTracker that doesn't report STATE_MIDAIR_ACTIVATION is not recognised by its name
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = "MidairActivationTracker";
+  m->tracker_status.state = Ts::STATE_INVALID;
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), m, state_t::MANUAL), state_t::MANUAL);
 }
 
 TEST(UavStateParser, MidairActivationYieldsToDisarmAndLinkLoss) {
