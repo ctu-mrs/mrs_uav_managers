@@ -274,6 +274,21 @@ TEST(UavStateParser, MidairActivationMapsToMessage) {
   EXPECT_EQ(to_ros(state_t::MIDAIR), mrs_msgs::msg::State::STATE_MIDAIR);
 }
 
+TEST(UavStateParser, TrackerFlipIsFlip) {
+  // FlipTracker flipping; its own idle while active is a hover
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_FLIP), state_t::HOVER), state_t::FLIP);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), hovering(), state_t::FLIP), state_t::HOVER);
+}
+
+TEST(UavStateParser, FlipIsFlying) {
+  EXPECT_TRUE(is_flying(state_t::FLIP));
+  EXPECT_TRUE(is_flying_autonomously(state_t::FLIP));
+}
+
+TEST(UavStateParser, FlipMapsToMessage) {
+  EXPECT_EQ(to_ros(state_t::FLIP), mrs_msgs::msg::State::STATE_FLIP);
+}
+
 namespace
 {
 

@@ -57,12 +57,15 @@ stateDiagram-v2
     TRAJECTORY --> HOVER
     HOVER --> LAND
     LAND --> HOVER
+    HOVER --> FLIP
+    FLIP --> HOVER
 
     HOVER --> RC_MODE: joystick on
     RC_MODE --> HOVER: joystick off
 
     TAKEOFF: TAKEOFF<br/>(STATE_TAKEOFF, or<br/>LandoffTracker idle<br/>on the ground)
     GOTO: GOTO<br/>(STATE_REFERENCE)
+    FLIP: FLIP<br/>(FlipTracker flipping)
 
     note right of TAKEOFF
       follows the tracker's state:
@@ -98,9 +101,9 @@ On every reading the parser checks these rules from the top and stops at the fir
     other than `TAKEOFF`; then keep the previous state.
 11. Otherwise the tracker's state decides: `STATE_TAKEOFF` -> `TAKEOFF`, `STATE_HOVER` -> `HOVER`,
     `STATE_REFERENCE` -> `GOTO`, `STATE_TRAJECTORY` -> `TRAJECTORY`, `STATE_LAND` -> `LAND`,
-    anything else -> `UNKNOWN`.
+    `STATE_FLIP` -> `FLIP`, anything else -> `UNKNOWN`.
 
-"Flight state" means `TAKEOFF`, `HOVER`, `GOTO`, `TRAJECTORY`, `LAND`, `RC_MODE`, `MIDAIR`,
+"Flight state" means `TAKEOFF`, `HOVER`, `GOTO`, `TRAJECTORY`, `LAND`, `FLIP`, `RC_MODE`, `MIDAIR`,
 `EHOVER`, `ELAND` or `FAILSAFE` (`is_flying_autonomously()`).
 
 ## Why some rules exist
@@ -182,6 +185,8 @@ Unit tests are `TEST(UavStateParser, ...)` in
 | `MIDAIR` -> `DISARMED` / `NO_LINK`                                                                                                               | `MidairActivationYieldsToDisarmAndLinkLoss`                                                    |
 | `MANUAL` -> `MIDAIR` -> (switch, `STATE_INVALID`) -> `GOTO` -> `HOVER`                                                                           | `MidairActivationSequenceStaysFlying`                                                          |
 | `MIDAIR` is flying (`is_flying`, `is_flying_autonomously`), maps to `STATE_MIDAIR`                                                               | `MidairActivationIsFlying`, `MidairActivationMapsToMessage`                                    |
+| `HOVER` <-> `FLIP`: tracker `STATE_FLIP` (FlipTracker flipping), `STATE_HOVER` (holding)                                                         | `TrackerFlipIsFlip`                                                                            |
+| `FLIP` is flying (`is_flying`, `is_flying_autonomously`), maps to `STATE_FLIP`                                                                   | `FlipIsFlying`, `FlipMapsToMessage`                                                            |
 | `FLYING` -> `EHOVER`: `EmergencyController`, tracker not landing                                                                                 | `EmergencyControllerHoldingIsEhover`                                                           |
 | `EHOVER` -> `ELAND`: `EmergencyController`, tracker `STATE_LAND`                                                                                 | `EmergencyControllerLandingIsEland`                                                            |
 | any flight -> `FAILSAFE`: `FailsafeController`                                                                                                   | `FailsafeControllerIsFailsafe`                                                                 |

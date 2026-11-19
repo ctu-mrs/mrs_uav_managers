@@ -16,7 +16,8 @@
   (REFERENCE)         \
   (TRAJECTORY)        \
   (LAND)              \
-  (MIDAIR_ACTIVATION)
+  (MIDAIR_ACTIVATION) \
+  (FLIP)
 // clang-format on
 
 namespace mrs_uav_managers::diagnostics_manager

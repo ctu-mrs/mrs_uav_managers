@@ -51,6 +51,8 @@ inline tracker_state_t parse_tracker_state(const mrs_msgs::msg::ControlManagerDi
     return tracker_state_t::LAND;
   case mrs_msgs::msg::TrackerStatus::STATE_MIDAIR_ACTIVATION:
     return tracker_state_t::MIDAIR_ACTIVATION;
+  case mrs_msgs::msg::TrackerStatus::STATE_FLIP:
+    return tracker_state_t::FLIP;
   default:
     return tracker_state_t::UNKNOWN;
   }
@@ -137,6 +139,8 @@ inline state_t parse_uav_state(const mrs_msgs::msg::HwApiStatus::ConstSharedPtr 
     return state_t::TRAJECTORY;
   case tracker_state_t::LAND:
     return state_t::LAND;
+  case tracker_state_t::FLIP:
+    return state_t::FLIP;
   default:
     return state_t::UNKNOWN;
   }
