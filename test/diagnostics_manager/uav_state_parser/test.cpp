@@ -170,12 +170,12 @@ TEST(UavStateParser, LandoffTrackerIdleIsTakeoff) {
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, state_t::TAKEOFF), state_t::TAKEOFF);
 }
 
-TEST(UavStateParser, TrackerSwitchInFlightKeepsState) {
-  // a tracker activated in flight (e.g. LandoffTracker for landing) reports STATE_INVALID until its first update;
-  // that is a switch in progress, not "no tracker" -- the UAV must not read as OFFBOARD (not flying) mid-air
+TEST(UavStateParser, TrackerWithoutStateInFlightKeepsState) {
+  // a tracker that doesn't report its state (STATE_INVALID, e.g. a custom tracker) is still flying the UAV;
+  // the UAV must not read as OFFBOARD (not flying) mid-air
   for (const auto previous : {state_t::HOVER, state_t::GOTO, state_t::TRAJECTORY, state_t::LAND, state_t::RC_MODE, state_t::TAKEOFF}) {
     auto m                  = std::make_shared<Cmd>();
-    m->active_tracker       = "LandoffTracker";
+    m->active_tracker       = "CustomTracker";
     m->tracker_status.state = Ts::STATE_INVALID;
     EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), m, previous), previous) << static_cast<int>(previous);
   }
@@ -209,11 +209,11 @@ TEST(UavStateParser, LandoffTrackerIdleInFlightIsNotTakeoff) {
 namespace
 {
 
-Cmd::ConstSharedPtr midair_activation_tracker() {
-  // MidairActivationTracker never fills tracker_status.state, so it always reads STATE_INVALID
+// the tracker UavManager uses during a mid-air activation (uav_manager/midair_activation/during_activation/tracker)
+Cmd::ConstSharedPtr midair_activation_tracker(const std::string &name = "MidairActivationTracker") {
   auto m                  = std::make_shared<Cmd>();
-  m->active_tracker       = "MidairActivationTracker";
-  m->tracker_status.state = Ts::STATE_INVALID;
+  m->active_tracker       = name;
+  m->tracker_status.state = Ts::STATE_MIDAIR_ACTIVATION;
   return m;
 }
 
@@ -226,6 +226,19 @@ TEST(UavStateParser, MidairActivationTrackerIsMidairActivation) {
   // also when the HW API can't tell or reports the ground (e.g. the simulator's takeoff platform)
   EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_UNKNOWN, "POSCTL"), midair_activation_tracker()), state_t::MIDAIR);
   EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_NO, "OFFBOARD"), midair_activation_tracker(), state_t::ARMED), state_t::MIDAIR);
+}
+
+TEST(UavStateParser, CustomMidairTrackerIsMidairActivation) {
+  // recognised by the tracker state, so a tracker configured under another name works too
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), midair_activation_tracker("MyMidairTracker"), state_t::MANUAL), state_t::MIDAIR);
+}
+
+TEST(UavStateParser, OldMidairTrackerWithoutStateIsNotMidair) {
+  // a MidairActivationTracker that doesn't report STATE_MIDAIR_ACTIVATION is not recognised by its name
+  auto m                  = std::make_shared<Cmd>();
+  m->active_tracker       = "MidairActivationTracker";
+  m->tracker_status.state = Ts::STATE_INVALID;
+  EXPECT_EQ(parse_uav_state(hw(true, false, Hw::AIRBORNE_YES, "POSCTL"), m, state_t::MANUAL), state_t::MANUAL);
 }
 
 TEST(UavStateParser, MidairActivationYieldsToDisarmAndLinkLoss) {
@@ -259,6 +272,21 @@ TEST(UavStateParser, MidairActivationIsFlying) {
 
 TEST(UavStateParser, MidairActivationMapsToMessage) {
   EXPECT_EQ(to_ros(state_t::MIDAIR), mrs_msgs::msg::State::STATE_MIDAIR);
+}
+
+TEST(UavStateParser, TrackerFlipIsFlip) {
+  // FlipTracker flipping; its own idle while active is a hover
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), tracker(Ts::STATE_FLIP), state_t::HOVER), state_t::FLIP);
+  EXPECT_EQ(parse_uav_state(hw(true, true, Hw::AIRBORNE_YES, "OFFBOARD"), hovering(), state_t::FLIP), state_t::HOVER);
+}
+
+TEST(UavStateParser, FlipIsFlying) {
+  EXPECT_TRUE(is_flying(state_t::FLIP));
+  EXPECT_TRUE(is_flying_autonomously(state_t::FLIP));
+}
+
+TEST(UavStateParser, FlipMapsToMessage) {
+  EXPECT_EQ(to_ros(state_t::FLIP), mrs_msgs::msg::State::STATE_FLIP);
 }
 
 namespace

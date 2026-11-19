@@ -25,6 +25,7 @@
   (EHOVER)     \
   (ELAND)      \
   (FAILSAFE)   \
+  (FLIP)       \
   (NO_LINK)
 // clang-format on
 

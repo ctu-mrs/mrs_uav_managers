@@ -9,13 +9,15 @@
 #define X_ENUM_BASE_TYPE uint8_t
 // clang-format off
 #define X_ENUM_SEQ \
-  (INVALID)        \
-  (IDLE)           \
-  (TAKEOFF)        \
-  (HOVER)          \
-  (REFERENCE)      \
-  (TRAJECTORY)     \
-  (LAND)
+  (INVALID)           \
+  (IDLE)              \
+  (TAKEOFF)           \
+  (HOVER)             \
+  (REFERENCE)         \
+  (TRAJECTORY)        \
+  (LAND)              \
+  (MIDAIR_ACTIVATION) \
+  (FLIP)
 // clang-format on
 
 namespace mrs_uav_managers::diagnostics_manager
