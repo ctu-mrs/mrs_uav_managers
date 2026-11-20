@@ -51,6 +51,9 @@ def generate_launch_description():
 
     ld.add_action(declare_standalone)
 
+    # the TF buffer is shared only between the managers in the shared container, the transform manager owns it there
+    use_shared_tf_buffer = IfElseSubstitution(condition=standalone, if_value='false', else_value='true')
+
     # #} end of standalone
 
     # #{ container_name
@@ -208,6 +211,7 @@ def generate_launch_description():
 
         parameters=[
             {"uav_name": uav_name},
+            {"use_shared_tf_buffer": use_shared_tf_buffer},
             {"uav_mass": uav_mass},
             {"topic_prefix": ["/", uav_name]},
             {"use_sim_time": use_sim_time},
