@@ -565,7 +565,7 @@ private:
   bool   _odometry_innovation_check_enabled_ = false;
   double _odometry_innovation_threshold_     = 0;  // innovation size for triggering eland
 
-  bool callbacks_enabled_ = true;
+  std::atomic<bool> callbacks_enabled_ = true;
 
   // | ------------------------ parachute ----------------------- |
 
@@ -839,6 +839,7 @@ private:
 
   bool              _rc_goto_enabled_               = false;
   std::atomic<bool> rc_goto_active_                 = false;
+  std::mutex        mutex_rc_goto_;  // serializes RC joystick (de)activation and the RC goto in timerJoystick()
   double            rc_joystick_channel_last_value_ = 0.5;
   bool              rc_joystick_channel_was_low_    = false;
   int               _rc_joystick_channel_           = 0;
@@ -3203,6 +3204,11 @@ void ControlManager::timerJoystick(const ros::TimerEvent& event) {
     }
   }
 
+  // Held for the whole RC goto. Otherwise callbackRC() could deactivate the RC joystick while the goto
+  // runs, and its callbacks_enabled_ = true would be overwritten by the callbacks_enabled_ = false below,
+  // leaving the reference callbacks disabled for good.
+  std::scoped_lock lock_rc_goto(mutex_rc_goto_);
+
   if (rc_goto_active_ && !bumper_repulsing_ && last_tracker_cmd && sh_hw_api_rc_.hasMsg()) {
 
     // create the reference
@@ -4081,6 +4087,8 @@ void ControlManager::callbackRC(const mrs_msgs::HwApiRcChannels::ConstPtr msg) {
 
   // when the switch change its position
   if (_rc_goto_enabled_) {
+
+    std::scoped_lock lock_rc_goto(mutex_rc_goto_);
 
     if (_rc_joystick_channel_ >= int(rc->channels.size())) {
 
