@@ -73,7 +73,7 @@ class TransformManager : public mrs_lib::Node {
 public:
   TransformManager(rclcpp::NodeOptions options);
 
-  bool is_initialized_ = false;
+  std::atomic<bool> is_initialized_ = false;
 
   std::string getName() const;
 
@@ -209,6 +209,23 @@ private:
 
   bool isRtkUsed() const;
   bool isGarminUsed() const;
+
+  // | ------------------- static tf check ---------------------- |
+
+  // The FCU -> RTK antenna and FCU -> garmin static tfs are checked from a timer, not in the
+  // constructor. With use_sim_time, sleeping in the constructor waits for /clock, and the
+  // component container cannot load the simulator (which provides /clock and the static tfs)
+  // until this constructor returns.
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_static_tfs_;
+  std::shared_ptr<TimerType>       timer_check_static_tfs_;
+  void                             timerCheckStaticTfs();
+
+  std::atomic<bool> static_tfs_checked_    = false;
+  int               static_tfs_attempts_   = 0;
+  bool              got_rtk_antenna_tf_    = false;
+  bool              got_garmin_tf_         = false;
+  const int         _static_tfs_max_attempts_ = 20;
 
   // | ----------------- tf publishing routines ------------------ |
 
@@ -649,54 +666,27 @@ void TransformManager::initialize() {
   }
 
 
-  if (isRtkUsed()) {
-    // Check if the RTK antenna static tf is defined
-    bool got_rtk_antenna_tf = false;
-    for (int i = 0; i < 20; i++) {
-      auto res_tf_rtk = ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, clock_->now());
-      if (res_tf_rtk) {
-        RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
-        got_rtk_antenna_tf = true;
-        break;
-      }
-      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(),
-                           Support::waiting_for_string.c_str());
-      clock_->sleep_for(1.0s);
-    }
+  if (isRtkUsed() || isGarminUsed()) {
 
-    if (!got_rtk_antenna_tf) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
-                   getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
-      error_publisher_->addOneshotError("RTK antenna TF not available.");
-      error_publisher_->flushAndShutdown();
-    }
+    cbkgrp_static_tfs_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    mrs_lib::TimerHandlerOptions topts;
+    topts.node           = node_;
+    topts.autostart      = true;
+    topts.callback_group = cbkgrp_static_tfs_;
+
+    std::function<void()> callback_fcn = std::bind(&TransformManager::timerCheckStaticTfs, this);
+
+    timer_check_static_tfs_ = std::make_shared<TimerType>(topts, rclcpp::Rate(1.0, clock_), callback_fcn);
+
+    RCLCPP_INFO(node_->get_logger(), "[%s]: waiting for the static tfs before finishing the initialization", getPrintName().c_str());
+
+  } else {
+
+    static_tfs_checked_ = true;
+    is_initialized_     = true;
+    RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
   }
-
-  if (isGarminUsed()) {
-    // Check if the garmin static tf is defined
-    const std::string ns_garmin     = ch_->uav_name + "/garmin";
-    bool              got_garmin_tf = false;
-    for (int i = 0; i < 20; i++) {
-      auto res_tf_garmin = ch_->transformer->getTransform(ns_garmin, ch_->frames.ns_fcu, clock_->now());
-      if (res_tf_garmin) {
-        RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to GARMIN", getPrintName().c_str());
-        got_garmin_tf = true;
-        break;
-      }
-      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s tf from FCU to GARMIN", getPrintName().c_str(), Support::waiting_for_string.c_str());
-      clock_->sleep_for(1.0s);
-    }
-
-    if (!got_garmin_tf) {
-      RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to GARMIN is not defined. Please provide static tf from %s to %s.",
-                   getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ns_garmin.c_str());
-      error_publisher_->addOneshotError("Garmin TF not available.");
-      error_publisher_->flushAndShutdown();
-    }
-  }
-
-  is_initialized_ = true;
-  RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
 }
 
 //}
@@ -1255,6 +1245,67 @@ bool TransformManager::callbackIsWorldOriginReady([[maybe_unused]] const std::sh
   return true;
 }
 /*//}*/
+
+/* timerCheckStaticTfs() //{ */
+void TransformManager::timerCheckStaticTfs() {
+
+  if (static_tfs_checked_) {
+    return;
+  }
+
+  static_tfs_attempts_++;
+
+  if (isRtkUsed() && !got_rtk_antenna_tf_) {
+    if (ch_->transformer->getTransform(ch_->frames.ns_rtk_antenna, ch_->frames.ns_fcu, clock_->now())) {
+      RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to RTK antenna", getPrintName().c_str());
+      got_rtk_antenna_tf_ = true;
+    } else {
+      RCLCPP_INFO(node_->get_logger(), "[%s] %s tf from FCU to RTK antenna", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    }
+  }
+
+  const std::string ns_garmin = ch_->uav_name + "/garmin";
+
+  if (isGarminUsed() && !got_garmin_tf_) {
+    if (ch_->transformer->getTransform(ns_garmin, ch_->frames.ns_fcu, clock_->now())) {
+      RCLCPP_INFO(node_->get_logger(), "[%s] got tf from FCU to GARMIN", getPrintName().c_str());
+      got_garmin_tf_ = true;
+    } else {
+      RCLCPP_INFO(node_->get_logger(), "[%s] %s tf from FCU to GARMIN", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    }
+  }
+
+  const bool rtk_ok    = !isRtkUsed() || got_rtk_antenna_tf_;
+  const bool garmin_ok = !isGarminUsed() || got_garmin_tf_;
+
+  if (rtk_ok && garmin_ok) {
+    static_tfs_checked_ = true;
+    is_initialized_     = true;
+    RCLCPP_INFO(node_->get_logger(), "[%s]: initialized", getPrintName().c_str());
+    return;
+  }
+
+  if (static_tfs_attempts_ < _static_tfs_max_attempts_) {
+    return;
+  }
+
+  static_tfs_checked_ = true;
+
+  if (!rtk_ok) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to RTK antenna is not defined. Please provide static tf from %s to %s.",
+                 getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ch_->frames.ns_rtk_antenna.c_str());
+    error_publisher_->addOneshotError("RTK antenna TF not available.");
+  }
+
+  if (!garmin_ok) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to GARMIN is not defined. Please provide static tf from %s to %s.",
+                 getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ns_garmin.c_str());
+    error_publisher_->addOneshotError("Garmin TF not available.");
+  }
+
+  error_publisher_->flushAndShutdown();
+}
+//}
 
 /* isRtkUsed() //{ */
 bool TransformManager::isRtkUsed() const {
