@@ -869,10 +869,12 @@ private:
 
   bool              _rc_goto_enabled_               = false;
   std::atomic<bool> rc_goto_active_                 = false;
-  std::mutex        mutex_rc_goto_;  // serializes RC joystick (de)activation and the RC goto in timerJoystick()
   double            rc_joystick_channel_last_value_ = 0.5;
   bool              rc_joystick_channel_was_low_    = false;
   int               _rc_joystick_channel_           = 0;
+
+  // serializes the RC joystick (de)activation in callbackRC() and the RC goto in timerJoystick()
+  std::mutex mutex_rc_goto_;
 
   double _rc_horizontal_speed_ = 0;
   double _rc_vertical_speed_   = 0;

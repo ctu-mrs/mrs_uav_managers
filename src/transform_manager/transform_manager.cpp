@@ -221,10 +221,10 @@ private:
   std::shared_ptr<TimerType>       timer_check_static_tfs_;
   void                             timerCheckStaticTfs();
 
-  std::atomic<bool> static_tfs_checked_    = false;
-  int               static_tfs_attempts_   = 0;
-  bool              got_rtk_antenna_tf_    = false;
-  bool              got_garmin_tf_         = false;
+  std::atomic<bool> static_tfs_checked_       = false;
+  int               static_tfs_attempts_      = 0;
+  bool              got_rtk_antenna_tf_       = false;
+  bool              got_garmin_tf_            = false;
   const int         _static_tfs_max_attempts_ = 20;
 
   // | ----------------- tf publishing routines ------------------ |
@@ -1298,8 +1298,8 @@ void TransformManager::timerCheckStaticTfs() {
   }
 
   if (!garmin_ok) {
-    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to GARMIN is not defined. Please provide static tf from %s to %s.",
-                 getPrintName().c_str(), ch_->frames.ns_fcu.c_str(), ns_garmin.c_str());
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: The transform from FCU to GARMIN is not defined. Please provide static tf from %s to %s.", getPrintName().c_str(),
+                 ch_->frames.ns_fcu.c_str(), ns_garmin.c_str());
     error_publisher_->addOneshotError("Garmin TF not available.");
   }
 
