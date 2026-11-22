@@ -14,17 +14,19 @@ class Tester : public mrs_uav_testing::TestGeneric {
 public:
   Tester() : mrs_uav_testing::TestGeneric() {
 
+    // create the publisher first, callbackOdometry() uses it as soon as the subscriber exists
+    ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "/" + _uav_name_ + "/hw_api/odometry");
+
     sh_hw_api_odom_ =
         mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
-
-    ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "/" + _uav_name_ + "/hw_api/odometry");
   }
 
   const std::string _uav_name_ = "uav1";
 
-  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_hw_api_odom_;
-
+  // declared before the subscriber, so it is destroyed after it: callbackOdometry() publishes through it
   mrs_lib::PublisherHandler<nav_msgs::msg::Odometry> ph_odometry_;
+
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_hw_api_odom_;
 
   bool test(void);
 
