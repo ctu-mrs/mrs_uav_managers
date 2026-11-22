@@ -13,9 +13,10 @@ public:
 
   Tester();
 
-  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_hw_api_odom_;
-
+  // declared before the subscriber, so it is destroyed after it: callbackOdometry() publishes through it
   mrs_lib::PublisherHandler<nav_msgs::Odometry> ph_odometry_;
+
+  mrs_lib::SubscribeHandler<nav_msgs::Odometry> sh_hw_api_odom_;
 
   void callbackOdometry(const nav_msgs::Odometry::ConstPtr msg);
 
@@ -24,9 +25,10 @@ public:
 
 Tester::Tester() : mrs_uav_testing::TestGeneric() {
 
-  sh_hw_api_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
-
+  // create the publisher first, callbackOdometry() uses it as soon as the subscriber exists
   ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::Odometry>(nh_, "/" + _uav_name_ + "/hw_api/odometry");
+
+  sh_hw_api_odom_ = mrs_lib::SubscribeHandler<nav_msgs::Odometry>(*shopts_, "/" + _uav_name_ + "/hw_api/odometry_unchanged", &Tester::callbackOdometry, this);
 }
 
 void Tester::callbackOdometry(const nav_msgs::Odometry::ConstPtr msg) {
