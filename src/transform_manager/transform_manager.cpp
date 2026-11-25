@@ -243,6 +243,7 @@ private:
     nans_in_utm,
     nans_in_rtk,
     transform_failure,
+    no_gnss_fix,
   };
 
   std::unique_ptr<mrs_lib::errorgraph::ErrorPublisher> error_publisher_;
@@ -1002,6 +1003,9 @@ void TransformManager::callbackGnss(const sensor_msgs::msg::NavSatFix::ConstShar
 
   if (msg->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
     RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s]: NavSatFix has no GNSS fix!!!", getPrintName().c_str());
+    if (world_origin_use_home_position_ && !home_position_ready_) {
+      error_publisher_->addGeneralError(error_type_t::no_gnss_fix, "No GNSS fix for the home-position world origin.");
+    }
     return;
   }
 
@@ -1072,6 +1076,9 @@ void TransformManager::callbackRtkGps(const mrs_msgs::msg::RtkGps::ConstSharedPt
 
   if (msg->fix_type.fix_type != mrs_msgs::msg::RtkFixType::RTK_FIX) {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[%s] %s RTK FIX", getPrintName().c_str(), Support::waiting_for_string.c_str());
+    if (world_origin_use_home_position_ && !home_position_ready_) {
+      error_publisher_->addGeneralError(error_type_t::no_gnss_fix, "No RTK FIX for the home-position world origin.");
+    }
     return;
   }
 
