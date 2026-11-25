@@ -1007,7 +1007,19 @@ void EstimationManager::timerPublish() {
 
   if (!sm_->isInPublishableState()) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not publishing uav state in %s", sm_->getCurrentStateString().c_str());
-    error_publisher_->addGeneralError(error_type_t::invalid_state, "Not publishing uav state in " + sm_->getCurrentStateString() + ".");
+
+    // wait for the estimators instead of a general error, so the errorgraph shows their cause instead of this state
+    if (sm_->isInState(StateMachine::INITIALIZED_STATE)) {
+      if (!initial_estimator_->isRunning()) {
+        error_publisher_->addWaitingForNodeError({"EstimationManager", initial_estimator_->getPrintName()});
+      }
+      if (is_using_agl_estimator_ && !est_alt_agl_->isRunning()) {
+        error_publisher_->addWaitingForNodeError({"EstimationManager", est_alt_agl_->getPrintName()});
+      }
+    } else {
+      error_publisher_->addGeneralError(error_type_t::invalid_state, "Not publishing uav state in " + sm_->getCurrentStateString() + ".");
+    }
+
     return;
   }
 
