@@ -9,11 +9,12 @@ using mrs_uav_managers::diagnostics_manager::error_lines;
 namespace
 {
 
-Errorgraph::node_info_t node(const std::string &name, const std::vector<std::string> &error_types, bool not_reporting = false) {
+Errorgraph::node_info_t node(const std::string &name, const std::vector<std::string> &descriptions, bool not_reporting = false) {
   std::vector<Errorgraph::error_t> errors;
-  for (const auto &type : error_types) {
+  for (const auto &description : descriptions) {
     mrs_msgs::msg::ErrorgraphError msg;
-    msg.type = type;
+    msg.type        = mrs_msgs::msg::ErrorgraphError::TYPE_GENERAL;
+    msg.description = description;
     errors.emplace_back(msg);
   }
   return Errorgraph::node_info_t{node_id_t{name, "main"}, errors, rclcpp::Time(), not_reporting};
@@ -33,18 +34,18 @@ TEST(ErrorLines, NodeErrors) {
 TEST(ErrorLines, NodeWaitsAreReadable) {
   // a node root with a genuine error also lists its waits: a wait for a node names the node, a wait for a topic is left
   // out (the topic has its own line)
-  mrs_msgs::msg::ErrorgraphError genuine, waiting_for_node, waiting_for_topic, no_error;
-  genuine.type                               = "no state estimator";
+  mrs_msgs::msg::ErrorgraphError genuine, waiting_for_node, waiting_for_topic;
+  genuine.type                               = mrs_msgs::msg::ErrorgraphError::TYPE_GENERAL;
+  genuine.description                        = "no state estimator";
   waiting_for_node.type                      = mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE;
   waiting_for_node.waited_for_node.node      = "HwApiManager";
   waiting_for_node.waited_for_node.component = "main";
   waiting_for_topic.type                     = mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_TOPIC;
   waiting_for_topic.waited_for_topic         = "/uav1/hw_api/gnss";
-  no_error.type                              = mrs_msgs::msg::ErrorgraphError::TYPE_NO_ERROR;
 
   const Errorgraph::node_info_t estimation_manager{
       node_id_t{"EstimationManager", "main"},
-      {Errorgraph::error_t(genuine), Errorgraph::error_t(waiting_for_node), Errorgraph::error_t(waiting_for_topic), Errorgraph::error_t(no_error)},
+      {Errorgraph::error_t(genuine), Errorgraph::error_t(waiting_for_node), Errorgraph::error_t(waiting_for_topic)},
       rclcpp::Time(),
       false};
 

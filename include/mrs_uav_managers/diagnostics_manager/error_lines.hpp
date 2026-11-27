@@ -52,14 +52,14 @@ inline std::vector<std::string> error_lines(const std::vector<mrs_lib::errorgrap
 
       for (const auto &error : node->errors) {
 
-        if (error.is_no_error() || error.is_waiting_for_topic()) {
+        if (error.is_waiting_for_topic()) {
           continue;
         }
 
         if (error.is_waiting_for_node() && error.waited_for_node.has_value()) {
           add_line(name(node->source_node) + ": waiting for " + name(error.waited_for_node.value()));
         } else {
-          add_line(name(node->source_node) + ": " + error.type);
+          add_line(name(node->source_node) + ": " + error.description);
         }
       }
 
