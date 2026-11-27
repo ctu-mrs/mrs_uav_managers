@@ -68,6 +68,9 @@ bool DiagnosticsSensorHandler::initialize(rclcpp::Node::SharedPtr &node, const s
     return false;
   }
 
+  // resolved by the node the plugins subscribe with, so that the errorgraph gets the same name as from the other nodes
+  topic_ = node->get_node_topics_interface()->resolve_topic_name(topic_);
+
   RCLCPP_INFO(node->get_logger(), "[%s]: loaded config (topic: '%s')", name_.c_str(), topic_.c_str());
 
   const auto sensor_type = mapSensorType(sensor_type_str);
