@@ -748,7 +748,7 @@ void UavManager::timerHwApiCapabilities() {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for HW API capabilities");
-    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+    error_publisher_->addWaitingForTopicError(sh_hw_api_capabilities_.topicName(), {"HwApiManager", "main"});
     return;
   }
 
@@ -1570,7 +1570,7 @@ bool UavManager::callbackTakeoff([[maybe_unused]] const std::shared_ptr<std_srvs
     if (!sh_hw_api_status_.hasMsg() || (clock_->now() - sh_hw_api_status_.lastMsgTime()).seconds() > 5.0) {
       ss << "can not takeoff, missing HW API status!";
       RCLCPP_ERROR_STREAM_THROTTLE(node_->get_logger(), *clock_, 1000, "" << ss.str());
-      error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+      error_publisher_->addWaitingForTopicError(sh_hw_api_status_.topicName(), {"HwApiManager", "main"});
       response->message = ss.str();
       response->success = false;
       return true;

@@ -546,7 +546,7 @@ void SafetyAreaManager::timerPrerequisites() {
 
   if (!got_hw_api_capabilities) {
     RCLCPP_WARN(node_->get_logger(), "waiting for data: HW Api=%s", got_hw_api_capabilities ? " TRUE " : " FALSE ");
-    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+    error_publisher_->addWaitingForTopicError(sh_hw_api_capabilities_.topicName(), {"HwApiManager", "main"});
     return;
   }
 

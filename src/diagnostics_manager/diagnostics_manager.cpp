@@ -518,7 +518,7 @@ void DiagnosticsManager::timerErrorPublishing() {
   }
 
   if (peekFreshMsg(sh_hw_api_status_) == nullptr) {
-    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+    error_publisher_->addWaitingForTopicError(sh_hw_api_status_.topicName(), {"HwApiManager", "main"});
   }
   if (peekFreshMsg(sh_control_manager_diagnostics_) == nullptr) {
     error_publisher_->addWaitingForNodeError({"ControlManager", "main"});
