@@ -96,15 +96,15 @@ bool Tester::test(void) {
         continue;
       }
 
-      bool has_waiting_for_node = false;
+      bool has_waiting_for = false;
       for (const auto &error : element.errors) {
-        if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE) {
-          has_waiting_for_node = true;
+        if (error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_NODE || error.type == mrs_msgs::msg::ErrorgraphError::TYPE_WAITING_FOR_TOPIC) {
+          has_waiting_for = true;
           break;
         }
       }
 
-      if (!has_waiting_for_node) {
+      if (!has_waiting_for) {
         state.consecutive_clean++;
         RCLCPP_INFO(node_->get_logger(), "%s: clean message %d/%d", name.c_str(), state.consecutive_clean, required_consecutive_clean);
       } else {

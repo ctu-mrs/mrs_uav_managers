@@ -2276,7 +2276,7 @@ void ControlManager::timerHwApiCapabilities() {
 
   if (!sh_hw_api_capabilities_.hasMsg()) {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for HW API capabilities");
-    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+    error_publisher_->addWaitingForTopicError(sh_hw_api_capabilities_.topicName(), {"HwApiManager", "main"});
     return;
   }
 

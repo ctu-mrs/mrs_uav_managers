@@ -40,7 +40,6 @@ private:
   };
 
   const std::set<std::string> known_dependencies_ = {
-      "HwApiManager",
       "ControlManager",
       "EstimationManager",
   };

@@ -554,7 +554,7 @@ void EstimationManager::timerPreinit() {
 
     RCLCPP_INFO(node_->get_logger(), "%s hw_api_capabilities message at topic: %s", Support::waiting_for_string.c_str(),
                 sh_hw_api_capabilities_.topicName().c_str());
-    error_publisher_->addWaitingForNodeError({"HwApiManager", "main"});
+    error_publisher_->addWaitingForTopicError(sh_hw_api_capabilities_.topicName(), {"HwApiManager", "main"});
     got_data = false;
   }
 
