@@ -1,5 +1,6 @@
 #include <mrs_uav_managers/diagnostics_manager/diagnostics_manager.hpp>
 #include <mrs_uav_managers/diagnostics_manager/uav_state_parser.hpp>
+#include <mrs_uav_managers/diagnostics_manager/error_lines.hpp>
 
 namespace mrs_uav_managers::diagnostics_manager
 {
@@ -724,26 +725,7 @@ mrs_msgs::msg::GeneralRobotInfo DiagnosticsManager::parse_general_robot_info(sen
   { // find all errors
     std::scoped_lock lck(errorgraph_mtx_);
 
-    const auto error_roots = errorgraph_.find_error_roots();
-    for (const auto &root : error_roots) {
-      std::visit(
-          [&msg](const auto &info) {
-            using T = std::decay_t<decltype(info)>;
-            if (info.not_reporting) {
-              std::stringstream ss;
-              ss << info.source_node.node << "." << info.source_node.component << ": not responding";
-              msg.errors.push_back(ss.str());
-            }
-            if constexpr (std::is_same_v<T, mrs_lib::errorgraph::Errorgraph::node_info_t>) {
-              for (const auto &error : info.errors) {
-                std::stringstream ss;
-                ss << info.source_node.node << "." << info.source_node.component << ": " << error.type;
-                msg.errors.push_back(ss.str());
-              }
-            }
-          },
-          root);
-    }
+    msg.errors = error_lines(errorgraph_.find_error_roots());
   }
   return msg;
 }
